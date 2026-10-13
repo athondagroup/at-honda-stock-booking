@@ -195,7 +195,11 @@
         return out;
       }
     };
-    const [sample, mcp] = await Promise.all([makeSample(), makeMcp()]);
+    const [sample, mcp, notify] = await Promise.all([makeSample(), makeMcp(),
+      sb.functions.invoke('booking-notify', { body: { ping: true } }).then(r => r.data || null).catch(() => null)]);
+    // a booking keyed here goes to the Telegram groups and the form's sheet (Edge Function booking-notify)
+    window.__WEB.notifyReady = notify && (notify.mgr || notify.sales || notify.sheet) ? notify : null;
+    window.__WEB.notify = async body => { const { data, error } = await sb.functions.invoke('booking-notify', { body }); if (error) throw Object.assign(new Error('notify'), { code: 'unavailable' }); return data; };
     const caps = { db, user, assets, downloads, sample, mcp };
     window.claude = { use: async n => caps[n] || null };
     window.__startApp();
