@@ -801,6 +801,15 @@ const ACTIONS = {
   },
   async restore(el) { const cur = S.vehicles.get(el.dataset.vin); if (!cur) return; if (await write('vehicles', el.dataset.vin, { ...cur, removed: null })) toast('คืนรถเข้าสต็อกแล้ว'); },
   'recv-open'(el) { const r = S.receipts.get(el.dataset.id); if (!r) return; S.modal = { kind: 'receive', id: el.dataset.id, r: JSON.parse(JSON.stringify(r)), status: r.status, note: '' }; render(); },
+  // receive a car without a photo of the delivery note (ขอ 13/10): the same check-and-confirm window, empty
+  'recv-manual'() {
+    if (!perms().write || !perms().confirmReceive) return;
+    const br = myBranch() || S.br || 'PSC';
+    const r = { img: null, img_missing: true, manual: true, doc_no: '', doc_date: todayISO(), dealer_code: '', br, ref_no: '', transporter: '', plate: '', sign_date: null,
+      cars: [{ vin: '', model: '', grade: '', color: '', engine: '', br }], unreadable: [], ai_ok: false, ai_msg: 'คีย์ข้อมูลเองโดยไม่มีรูป', status: 'pending',
+      created_at: new Date().toISOString(), by: S.me.id || null, role: roleLabel() };
+    S.modal = { kind: 'receive', id: null, r, status: 'pending', note: '' }; render();
+  },
   'recv-car-add'() { const r = S.modal.r; if ((r.cars || []).length >= 6) return; r.cars = [...(r.cars || []), { vin: '', model: '', grade: '', color: '', engine: '', br: r.br }]; render(); },
   'recv-car-del'(el) { const r = S.modal.r, i = Number(el.dataset.i); r.cars.splice(i, 1); if (S.modal.pimg) S.modal.pimg.splice(i, 1); render(); },
   async 'recv-confirm'() {
@@ -822,6 +831,12 @@ const ACTIONS = {
       vins.add(c.vin);
     }
     if (!(r.cars || []).length) { toast('ใบนี้ยังไม่มีรถ', 'bad'); return; }
+    // keyed in by hand (no photo): the receipt is created only now, after checking it is not already in the system
+    if (!m.id) {
+      const dups = receiptDups(r);
+      if (dups.length) { toast(`ใบนี้หรือเลขตัวถังนี้รับเข้าแล้ว (${dups.map(x => x.doc_no || x.id).join(', ')})`, 'bad'); return; }
+      m.id = newId('receipts');
+    }
     let moved = 0, queued = 0;
     for (const [i, c] of r.cars.entries()) {
       const q = D.quota.find(x => x.vin === c.vin);

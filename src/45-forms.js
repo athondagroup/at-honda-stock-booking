@@ -237,6 +237,7 @@ function viewReceive(D) {
       <div class="flex flex-wrap justify-center gap-2 mt-2">
         <label class="btn btn-red relative ${p.write && !running ? '' : 'opacity-50'}"><input type="file" accept="image/*" capture="environment" data-file="recv" class="absolute w-px h-px opacity-0" ${p.write && !running ? '' : 'disabled'}>ถ่ายรูป</label>
         <label class="btn btn-ghost relative ${p.write && !running ? '' : 'opacity-50'}"><input type="file" accept="image/*" multiple data-file="recv" class="absolute w-px h-px opacity-0" ${p.write && !running ? '' : 'disabled'}>อัปโหลดรูปจากเครื่อง (เลือกได้หลายใบ)</label>
+        ${p.write && p.confirmReceive ? `<button class="btn btn-ghost" data-act="recv-manual" ${running ? 'disabled' : ''}>คีย์ข้อมูลเอง (ไม่มีรูป)</button>` : ''}
       </div>
       ${ANDROID_NOTE}
     </div>
@@ -290,7 +291,7 @@ function receiveModal(m, D) {
   };
   return `<div class="flex items-start justify-between gap-3 mb-3"><h2 class="font-head text-xl font-semibold">${canConfirm ? 'ตรวจและยืนยันรับรถเข้า' : 'ใบรับรถเข้า'}</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
   <div class="grid md:grid-cols-2 gap-5">
-    <div>${r.img ? `<div class="photo-pane"><img src="${imgSrc(r.img)}" alt="ใบ New Cars Delivery Note"></div><p class="text-xs text-muted mt-1">เลื่อนดูรูปเพื่อเทียบกับข้อมูลด้านขวา</p>` : '<div class="p-4 rounded-lg text-sm text-muted" style="background:var(--surface-2)">ไม่มีรูป</div>'}
+    <div>${r.img ? `<div class="photo-pane"><img src="${imgSrc(r.img)}" alt="ใบ New Cars Delivery Note"></div><p class="text-xs text-muted mt-1">เลื่อนดูรูปเพื่อเทียบกับข้อมูลด้านขวา</p>` : `<div class="p-4 rounded-lg text-sm text-muted" style="background:var(--surface-2)">${r.manual ? 'คีย์ข้อมูลเองโดยไม่มีรูปใบ New Car · ตรวจเลขตัวถังกับตัวรถหรือเอกสารให้ถูกก่อนยืนยัน' : 'ไม่มีรูป'}</div>`}
       ${(r.extra_imgs || []).map((id, i) => `<div class="text-xs text-muted mt-3 mb-1">รูปที่ส่งซ้ำ ${i + 1}</div><div class="photo-pane" style="max-height:40vh"><img src="${imgSrc(id)}" alt="รูปใบ New Car ที่ส่งซ้ำ ${i + 1}" loading="lazy"></div>`).join('')}</div>
     <div class="flex flex-col gap-3">
       ${r.ai_ok ? '<p class="text-sm" style="color:var(--good)">ข้อมูลด้านล่าง AI อ่านจากรูป ตรวจทุกช่องก่อนยืนยัน</p>' : `<p class="text-sm" style="color:var(--warn)">${esc(r.ai_msg || 'กรอกข้อมูลจากรูป')}</p>`}
