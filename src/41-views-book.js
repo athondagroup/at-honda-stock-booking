@@ -18,7 +18,7 @@ function matchChip(a) {
   }
   const pre = m.status === 'possible' ? 'อาจตรง · ' : '';
   if (m.kind === 'dl') return chip(pre + (m.ddate ? `ส่งมอบแล้ว ${fmtD(m.ddate)}` : `ออกใบกำกับ ${fmtD(m.idate)}`), m.status === 'possible' ? 'warn' : 'good');
-  if (m.kind === 'stock') return chip(pre + 'จัดสรรรถแล้ว', m.status === 'possible' ? 'warn' : 'good');
+  if (m.kind === 'stock') return chip(pre + 'จัดสรรรถแล้ว · รอส่งมอบ', m.status === 'possible' ? 'warn' : 'good');
   return chip(pre + 'พบใน IDS', m.status === 'possible' ? 'warn' : 'good');
 }
 
@@ -413,11 +413,21 @@ function historyList(D) {
 }
 
 // ---------- delivery flow
-const FLOW_TABS = [['booked', 'รอเลขที่ใบเสร็จจอง'], ['fin', 'รอไฟแนนซ์ผ่าน'], ['assign', 'รอจัดสรรรถ'], ['po', 'รอ PO สั่งแต่ง'], ['down', 'รอชำระดาวน์'], ['delivered', 'รอส่งมอบ / เซลล์อัปเดต'], ['confirmed', 'รอผู้จัดการยืนยัน'], ['done', 'ยืนยันแล้ว']];
+// a booking with its car allocated waits for delivery; the paperwork still missing is listed and filled at delivery (ตกลง 13/10)
+const FLOW_TABS = [['booked', 'รอเลขที่ใบเสร็จจอง'], ['fin', 'รอไฟแนนซ์ผ่าน'], ['assign', 'รอจัดสรรรถ'], ['delivered', 'จัดสรรแล้ว รอส่งมอบ'], ['confirmed', 'รอผู้จัดการยืนยัน'], ['done', 'ยืนยันแล้ว']];
+function flowTab(a) {
+  const f = a.flow;
+  if (f.history) return null;
+  if (f.done.confirmed) return 'done';
+  if (f.done.delivered || f.lateUpdate) return 'confirmed';
+  if (f.done.assign) return 'delivered';
+  return f.next;
+}
+function flowMissing(a) { return ['booked', 'fin', 'po', 'down'].filter(k => !a.flow.done[k]).map(k => ({ booked: 'ใบเสร็จมัดจำ', fin: 'ไฟแนนซ์', po: 'PO แต่งรถ', down: 'ใบเสร็จดาวน์' })[k]); }
 function viewFlow(D) {
   const vis = D.at.filter(a => !a.cancelled && !a.demo && inBr(a) && atVisible(a));
-  const inTab = (a, t) => t === 'done' ? a.flow.done.confirmed : a.flow.next === t;
-  const sub = S.sub.flow || 'booked';
+  const inTab = (a, t) => flowTab(a) === t;
+  const sub = FLOW_TABS.some(t => t[0] === S.sub.flow) ? S.sub.flow : 'booked';
   const list = vis.filter(a => inTab(a, sub)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   return `${pageHead('ขั้นตอนส่งมอบ', 'จอง (เลขที่ใบเสร็จมัดจำ) → ไฟแนนซ์ผ่าน (ยืนยันบริษัท + แนบใบอนุมัติ) → จัดสรรรถ → PO สั่งแต่ง → แต่งรถ → ชำระดาวน์ (เลขที่ใบเสร็จ) → ส่งมอบ (ป้ายแดง + ประกัน) → ผู้จัดการยืนยัน เพื่อไปขั้นตอนจ่ายค่าคอม ต้องทำตามลำดับ ข้ามขั้นไม่ได้')}
   ${brSeg()}
@@ -428,9 +438,9 @@ function viewFlow(D) {
       <td class="num nowrap">${fmtD(a.date)}</td><td style="min-width:150px">${custCell(a.cust, a.sales)}</td>
       <td class="nowrap">${salesCell(a.sales, a.idsSales, a.ownerCheck)}<div class="text-xs text-muted">${esc(a.br || '')}</div>${crossChip(a)}</td>
       <td class="nowrap">${specLabel(a.spec)}</td><td class="nowrap">${matchChip(a)}</td>
-      <td class="nowrap">${flowDots(a)}</td>
-      <td class="text-right"><button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(a.id)}">เปิด</button></td></tr>`).join('')}</tbody></table></div>`
+      <td class="nowrap">${flowDots(a)}${sub === 'delivered' && flowMissing(a).length ? `<div class="text-xs" style="color:var(--warn)">ยังขาด: ${flowMissing(a).join(', ')}</div>` : ''}</td>
+      <td class="text-right nowrap">${sub === 'delivered' && atVin(a) ? delivBtn(carAny(atVin(a), D) || { vin: atVin(a) }, D) : ''}<button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(a.id)}">เปิด</button></td></tr>`).join('')}</tbody></table></div>`
     : `<div class="bg-surface border border-line rounded-lg">${emptyBox('ไม่มีรายการในขั้นนี้', 'เปิดใบจองจากหน้า Booking เพื่ออัปเดตขั้นตอน')}</div>`}
-  ${sub === 'delivered' ? '<p class="text-xs text-muted mt-2">รวมใบจองที่ IDS แสดงว่าส่งมอบแล้วเดือนนี้แต่เซลล์ยังไม่อัปเดตในระบบ AT</p>' : ''}`;
+  ${sub === 'delivered' ? '<p class="text-xs text-muted mt-2">ใบจองที่ได้รถแล้ว (จัดสรรในระบบนี้หรือ IDS) รอส่งมอบ · เอกสารที่ยังขาดใส่ได้ตอนกด "ส่งมอบ" ในหน้าต่างเดียว</p>' : sub === 'confirmed' ? '<p class="text-xs text-muted mt-2">รวมใบจองที่ IDS แสดงว่าส่งมอบแล้วเดือนนี้แต่เซลล์ยังไม่อัปเดตในระบบ AT</p>' : ''}`;
 }
 const flowDots = a => FLOW.map(k => `<span title="${FLOW_LABEL[k]}" class="inline-block w-2.5 h-2.5 rounded-full mr-1" style="background:${a.flow.done[k] ? 'var(--good)' : (a.flow.next === k ? 'var(--warn)' : 'var(--line)')}"></span>`).join('');

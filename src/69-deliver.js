@@ -3,6 +3,8 @@
 // the steps of its booking that are still missing (receipt, finance, PO, down payment) and the delivery itself, saved together.
 // Only function declarations here: the first render runs before this part of the file.
 function invWaiting(c, D) { const i = c && D.invByVin.get(c.vin); return i && !i.company && !i.ddate ? i : null; }
+// a car waits for delivery once it has its invoice, or once it is allocated to a booking that is not delivered yet (13/10)
+function delivReady(c, D) { if (!c) return false; const i = D.invByVin.get(c.vin); if (i && (i.company || i.ddate)) return false; if (invWaiting(c, D)) return true; const a = carBookingOf(c.vin, D); return !!(a && !a.done && !a.flow.done.delivered); }
 function carBookingOf(vin, D) { return D.at.find(a => !a.cancelled && !a.demo && ((a.match && a.match.vin === vin) || (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin === vin))) || null; }
 // no booking holds this car yet: open bookings of the same spec the person may update, the invoice customer first
 function delivCands(c, inv, D) {
@@ -12,7 +14,7 @@ function delivCands(c, inv, D) {
     .sort((x, y) => (y.hit - x.hit) || (x.a.date || '').localeCompare(y.a.date || ''));
 }
 function delivBtn(c, D, big) {
-  if (!perms().write || !invWaiting(c, D)) return '';
+  if (!perms().write || !delivReady(c, D)) return '';
   const a = carBookingOf(c.vin, D);
   if (a && !stepAllowed(a, 'delivered')) return '';
   if (!a && isSales()) return '';
@@ -23,7 +25,7 @@ function cdelivModal(m, D) {
   const head = `<div class="flex items-start justify-between gap-3 mb-2"><div><h2 class="font-head text-xl font-semibold">ส่งมอบรถ <span class="code">${esc(m.vin)}</span></h2>
     ${c ? `<p class="text-sm text-muted">${specLabel(c.spec)} · ${esc(c.br)}${inv ? ` · ใบกำกับ ${esc(inv.inv || '')} ${fmtD(inv.idate)}${inv.cust && !isSales() ? ` · ${esc(inv.cust)}` : ''}` : ''}</p>` : ''}</div>
     ${m.back ? '<button class="btn btn-dark btn-sm" data-act="car-back">← กลับ</button>' : '<button class="btn btn-ghost btn-sm" data-act="close">ปิด</button>'}</div>`;
-  if (!c || !invWaiting(c, D)) return head + `<p class="text-sm">รถคันนี้ส่งมอบแล้วหรือยังไม่ได้ออกใบกำกับ</p>`;
+  if (!c || !delivReady(c, D)) return head + `<p class="text-sm">รถคันนี้ส่งมอบแล้ว หรือยังไม่ได้จัดสรรให้ใบจองและยังไม่ได้ออกใบกำกับ</p>`;
   let a = carBookingOf(c.vin, D), linked = !!a;
   if (!a && m.aid) a = D.at.find(x => x.id === m.aid) || null;
   if (!a) {
@@ -62,7 +64,7 @@ Object.assign(ACTIONS, {
   'cdeliv-po'(el) { const a = atById(el.dataset.id); if (!a) return; S.modal = { kind: 'at', id: a.id, po: poDraft(a), poq: '', ret: { ...S.modal } }; render(); },
   async 'cdeliv-save'(el) {
     const D = derive(), m = S.modal, a = D.at.find(x => x.id === el.dataset.id), c = carAny(m.vin, D);
-    if (!a || !c || !invWaiting(c, D) || !stepAllowed(a, 'delivered')) { toast('บันทึกส่งมอบไม่ได้', 'bad'); return; }
+    if (!a || !c || !delivReady(c, D) || !stepAllowed(a, 'delivered')) { toast('บันทึกส่งมอบไม่ได้', 'bad'); return; }
     const r = a.rec, f = r.flow || {}, fl = a.flow, v = m.v || {}, patch = { flow: {} }, t = todayISO();
     const bad = (msg, id) => { toast(msg, 'bad'); if (id) $('#' + id)?.focus(); };
     if (!fl.done.booked) {
@@ -109,3 +111,15 @@ Object.assign(ACTIONS, {
     S.files.fin = []; S.modal = { kind: 'at', id: a.id }; render();
   }
 });
+
+// สต็อก: cars invoiced in IDS but not handed over yet, to record the delivery here before the next IDS file (13/10)
+function delivWaitBox(D) {
+  const W = invWaitingList(D); if (!W.length) return '';
+  const late = W.filter(w => w.age > 14).length;
+  return `<details class="bg-surface border border-line rounded-lg mb-4" ${S.delivOpen ? 'open' : ''} data-deliv-box><summary class="p-3 px-4 cursor-pointer flex flex-wrap items-center gap-2"><b>ออกใบกำกับแล้ว ยังไม่ส่งมอบ</b> ${chip(`${fmtN(W.length)} คัน`, 'neutral')}${late ? chip(`เกิน 14 วัน ${fmtN(late)}`, 'warn') : ''}<span class="text-sm text-muted">กด "ส่งมอบ" เพื่อบันทึกการส่งมอบเองได้เลย ไม่ต้องรอไฟล์ IDS</span></summary>
+    <div class="border-t border-line divide-y divide-line max-h-96 overflow-auto">${W.map(w => { const c = carAny(w.vin, D) || { vin: w.vin }; return `<div class="p-2 px-4 text-sm flex flex-wrap gap-x-3 gap-y-1 items-center">
+      ${w.vin ? vinLink({ vin: w.vin }) : '<span class="text-muted">ไม่มีเลขตัวถัง</span>'}<span>${esc(w.model || '')} ${esc(gradeShort(w.model, w.grade) || '')} ${esc(w.color || '')}</span>
+      <span class="text-muted">${esc(w.br)} · ใบกำกับ ${esc(w.inv || '')} ${fmtD(w.idate)} · ${esc(w.cust || '')} · ${esc(w.sales || '')}</span>
+      <span class="ml-auto flex items-center gap-2"><span class="num ${w.age > 14 ? 'font-semibold' : 'text-muted'}" ${w.age > 14 ? 'style="color:var(--warn)"' : ''}>${w.age} วัน</span>${w.vin ? delivBtn(c, D) : ''}</span></div>`; }).join('')}</div></details>`;
+}
+document.addEventListener('toggle', ev => { const t = ev.target; if (t && t.dataset && t.dataset.delivBox !== undefined) S.delivOpen = t.open; }, true);

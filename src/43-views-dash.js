@@ -79,7 +79,7 @@ function dashAdmin(D) {
   const recv = D.receipts.filter(r => r.status === 'pending' && r.br === br);
   const assign = D.at.filter(a => a.active && a.br === br && a.flow.next === 'assign');
   const toAlloc = D.locks.filter(l => l.status === 'approved' && l.type !== 'temp' && l.car_br === br);
-  const noReceipt = D.at.filter(a => a.active && a.br === br && a.flow.next === 'booked');
+  const noReceipt = D.at.filter(a => a.active && a.br === br && flowTab(a) === 'booked');
   const alerts = myAlerts(D).filter(a => a.tone !== 'muted');
   const lastQ = (src.quota || []).slice(-1)[0];
   return `${pageHead(`งานแอดมินสาขา ${br} ${BR[br]?.name || ''}`, `สิ่งที่ต้องทำวันนี้ ${fmtD(D.today)}`,

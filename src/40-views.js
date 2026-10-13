@@ -237,6 +237,7 @@ function viewStock(D) {
   <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
     <div class="seg" role="group" aria-label="มุมมอง"><button data-act="sub" data-key="stock" data-sub="spec" aria-pressed="${mode === 'spec'}">ตามสเปก</button><button data-act="sub" data-key="stock" data-sub="list" aria-pressed="${mode === 'list'}">รายคัน${isSales() ? '' : ' พร้อมชื่อลูกค้า'}</button></div>
   </div>
+  ${isSales() ? '' : delivWaitBox(D)}
   ${filters}${line}
   ${mode === 'list' ? carTable(all, D) : specTable(all, D)}
   <p class="text-xs text-muted mt-2">อายุรถนับจากวันผลิต (ใช้ค่าจาก IDS ถ้าไม่มีใช้ค่าที่คีย์จากป้ายที่รถ) · * ยังไม่มีวันผลิต อายุนับจากวันที่รถฝากศูนย์ไปก่อน</p>
