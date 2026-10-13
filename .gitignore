@@ -1,0 +1,7 @@
+dist/
+tools/app.css
+node_modules/
+*.log
+# data exports hold customer details: never commit them
+at-honda-data-*.json
+src/seed-artifact.json
