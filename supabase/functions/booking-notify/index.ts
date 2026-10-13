@@ -13,10 +13,20 @@ const out = (body: unknown, status = 200) => new Response(JSON.stringify(body), 
 const mgrReady = () => !!(env("TELEGRAM_MGR_BOT_TOKEN") && env("TELEGRAM_MGR_CHAT_ID"));
 const salesReady = () => !!(env("TELEGRAM_SALES_BOT_TOKEN") && env("TELEGRAM_SALES_CHAT_ID"));
 const sheetReady = () => !!env("GOOGLE_SERVICE_ACCOUNT");
+const driveReady = () => !!(env("APPS_SCRIPT_URL") && env("APPS_SCRIPT_SECRET"));
+const b64 = (buf: ArrayBuffer) => { const u = new Uint8Array(buf); let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
+// the booking photo goes into the Google Form's Drive folder through the Apps Script web app (drive-upload.gs)
+async function toDrive(blob: Blob, name: string) {
+  const r = await fetch(env("APPS_SCRIPT_URL"), { method: "POST", headers: { "Content-Type": "text/plain" }, redirect: "follow",
+    body: JSON.stringify({ secret: env("APPS_SCRIPT_SECRET"), name, mime: blob.type || "image/jpeg", b64: b64(await blob.arrayBuffer()) }) });
+  const j = await r.json().catch(() => ({}));
+  if (!j.url) throw new Error("drive " + (j.error || r.status));
+  return j.url as string;
+}
 
 const escMd = (t: string) => String(t ?? "").replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, "\\$&");
 const escHtml = (t: string) => String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const norm = (t: string) => String(t || "").replace(/ /g, " ").replace(/\s+/g, " ").trim();
+const norm = (t: string) => String(t || "").replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
 
 async function tg(token: string, method: string, body: unknown) {
   const r = await fetch(`https://api.telegram.org/bot${token}/${method}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -53,7 +63,7 @@ async function appendRow(sheetId: string, tab: string, fields: [string, string][
     const k = norm(title).split(" (")[0];
     put((h) => h === norm(title) || h.startsWith(k) || k.startsWith(h.split(" (")[0]), v);
   }
-  put((h) => /รูป|ใบจอง.*(ภาพ|ไฟล์)|file/i.test(h), photoNote);
+  put((h) => /^หน้าใบจอง|รูป|ใบจอง.*(ภาพ|ไฟล์)|file/i.test(h), photoNote);
   if (!put((h) => /รหัสใบจองเว็บ/.test(h), webId) && row.length < 21) { while (row.length < 21) row.push(""); row[20] = webId; }
   const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/${encodeURIComponent(tab + "!A1")}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
     method: "POST", headers: { ...H, "Content-Type": "application/json" }, body: JSON.stringify({ values: [row] }) });
@@ -68,7 +78,7 @@ Deno.serve(async (req) => {
   if (!user) return out({ code: "not_granted" }, 401);
   const { data: m } = await sb.from("members").select("active").eq("email", (user.email || "").toLowerCase()).maybeSingle();
   if (!m || !m.active) return out({ code: "not_granted" }, 403);
-  if (body.ping) return out({ mgr: mgrReady(), sales: salesReady(), sheet: sheetReady() });
+  if (body.ping) return out({ mgr: mgrReady(), sales: salesReady(), sheet: sheetReady(), drive: driveReady() });
 
   const title: string = body.title || "แบบฟอร์ม จอง เอทีฮอนด้า";
   const fields: [string, string][] = (body.fields || []).map((f: any) => [String(f[0]), String(f[1] ?? "")]);
@@ -93,8 +103,28 @@ Deno.serve(async (req) => {
       res.sales = "ok";
     } catch (e) { console.error(e); res.sales = "error"; }
   } else res.sales = "off";
+  // booking photos → Google Drive (then the copy here is removed and the booking points to Drive, like form bookings)
+  let driveUrls: string[] = [];
+  const docImgs: string[] = (body.docImgs || []).slice(0, 3);
+  if (driveReady() && docImgs.length && body.webId) {
+    try {
+      for (let i = 0; i < docImgs.length; i++) {
+        const { data: blob, error } = await sb.storage.from("assets").download(docImgs[i]);
+        if (error || !blob) throw new Error("download " + docImgs[i]);
+        driveUrls.push(await toDrive(blob, `${body.driveName || "ใบจอง"}${docImgs.length > 1 ? "_" + (i + 1) : ""}.jpg`));
+      }
+      const admin = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"));
+      const { data: row } = await admin.from("docs").select("data").eq("col", "bookings").eq("id", String(body.webId)).maybeSingle();
+      if (row) {
+        const d = row.data || {};
+        await admin.from("docs").update({ data: { ...d, doc_url: driveUrls[0], doc_drive: driveUrls, doc_imgs: (d.doc_imgs || []).filter((x: string) => !docImgs.includes(x)) } }).eq("col", "bookings").eq("id", String(body.webId));
+        await admin.storage.from("assets").remove(docImgs);
+      }
+      res.drive = "ok";
+    } catch (e) { console.error(e); res.drive = "error"; driveUrls = []; }
+  } else res.drive = "off";
   if (sheetReady() && body.sheetId) {
-    try { await appendRow(body.sheetId, body.sheetTab || "Booking", fields, String(body.webId || ""), String(body.photoNote || "")); res.sheet = "ok"; }
+    try { await appendRow(body.sheetId, body.sheetTab || "Booking", fields, String(body.webId || ""), driveUrls.length ? driveUrls.join(", ") : String(body.photoNote || "")); res.sheet = "ok"; }
     catch (e) { console.error(e); res.sheet = "error"; }
   } else res.sheet = "off";
   return out(res);

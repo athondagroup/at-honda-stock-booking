@@ -13,11 +13,11 @@ function notifyFields(a) {
 function notifyResText(r) {
   if (!r) return '';
   const lab = { ok: 'ส่งแล้ว', error: 'ไม่สำเร็จ', off: 'ยังไม่ได้ตั้งค่า' };
-  return ` (กลุ่มผู้จัดการ ${lab[r.mgr] || '–'} · กลุ่มเซลล์ ${lab[r.sales] || '–'} · ชีต ${lab[r.sheet] || '–'})`;
+  return ` (กลุ่มผู้จัดการ ${lab[r.mgr] || '–'} · กลุ่มเซลล์ ${lab[r.sales] || '–'} · ชีต ${lab[r.sheet] || '–'}${r.drive && r.drive !== 'off' ? ` · รูปเข้า Drive ${lab[r.drive]}` : ''})`;
 }
 function notifyBox(a, c) {
   const can = canEditBooking(a) && perms().write, R = window.__WEB.notifyReady, busy = S.notifyBusy && S.notifyBusy[a.id];
-  const parts = [R.mgr ? 'กลุ่มผู้จัดการ (พร้อมรูป)' : '', R.sales ? 'กลุ่มเซลล์' : '', R.sheet ? 'Google Sheet' : ''].filter(Boolean).join(' · ');
+  const parts = [R.mgr ? 'กลุ่มผู้จัดการ (พร้อมรูป)' : '', R.sales ? 'กลุ่มเซลล์' : '', R.sheet ? 'Google Sheet' : '', R.drive ? 'เก็บรูปเข้า Google Drive' : ''].filter(Boolean).join(' · ');
   const photos = (a.rec.doc_imgs || []).length;
   return box('warn', `<b>ส่งใบจองนี้เข้า Telegram และ Google Sheet</b>
     <div class="text-sm">เลือกได้ 2 แบบ: ส่งจากเว็บเลย (${esc(parts)}) หรือเปิด Google Form ที่กรอกให้แล้วแบบเดิม${photos ? '' : ' · <span style="color:var(--bad)">ใบจองนี้ยังไม่มีรูปหน้าใบจอง</span>'}</div>
@@ -35,7 +35,8 @@ Object.assign(ACTIONS, {
     try {
       const f = notifyFields(a);
       res = await window.__WEB.notify({ title: 'แบบฟอร์ม จอง เอทีฮอนด้า', fields: f, salesFields: f, photos: [...(a.rec.doc_imgs || []), ...(a.rec.slip_imgs || [])],
-        sheetId: gsCfg().id, sheetTab: (gsCfg().range || 'Booking!A2:U').split('!')[0], webId: a.id, photoNote: 'รูปอยู่ในเว็บ AT Honda' });
+        sheetId: gsCfg().id, sheetTab: (gsCfg().range || 'Booking!A2:U').split('!')[0], webId: a.id, photoNote: 'รูปอยู่ในเว็บ AT Honda',
+        docImgs: a.rec.doc_imgs || [], driveName: `${a.rec.customer || 'ลูกค้า'} - ${a.rec.sales || ''} - เว็บ` });
     } catch (e) { res = null; }
     S.notifyBusy[a.id] = false;
     if (!res || !['mgr', 'sales', 'sheet'].some(k => res[k] === 'ok')) { toast('ส่งไม่สำเร็จ ลองอีกครั้ง หรือใช้ Google Form แบบเดิม', 'bad'); render(); return; }

@@ -134,7 +134,7 @@ function editPanel(m, a) {
     <fieldset class="border border-line rounded-lg p-3 grid sm:grid-cols-3 gap-3 mt-3"><legend class="text-sm font-semibold px-1">มีผลทันที</legend>
       ${F('booking_no', 'เลขที่ใบจอง IDS', inp('booking_no', 'text', 'inputmode="numeric" maxlength="12"'))}
       ${F('insurance', 'ประกันภัย', sel('insurance', INSURANCE))}
-      ${F('source', 'แหล่งที่มา', sel('source', SOURCES))}
+      ${F('source', 'แหล่งที่มาของการจอง', sel('source', e.source && !SOURCES.includes(e.source) ? [e.source, ...SOURCES] : SOURCES, 'เลือกแหล่งที่มา'))}
       ${F('lead_id', 'Lead ID', inp('lead_id'))}
       ${F('delivery_plan', 'วันนัดรับรถ', inp('delivery_plan', 'date'))}
       ${F('note', 'หมายเหตุ', inp('note'))}

@@ -21,7 +21,8 @@ const ROLES = {
 };
 const LOCK_REASONS = ['รอผลอนุมัติไฟแนนซ์', 'รอโอนเงินดาวน์/ชำระส่วนที่เหลือ', 'ลูกค้าขอดูรถก่อนตัดสินใจ', 'อื่น ๆ'];
 const FINANCE = ['HLTC', 'BAY', 'SCB', 'TTB', 'KKP', 'อื่น ๆ'];
-const SOURCES = ['Walk-in', 'ลูกค้าแนะนำ', 'Online ตัวเอง', 'Online บริษัท', 'Call', 'ลูกค้าเก่า/Service'];
+// the Google Form's choices (as answered in the sheet, 13/10)
+const SOURCES = ['Online – เซลล์หาเอง', 'ลูกค้าแนะนำ', 'Walk-in', 'Call', 'Lead Bot — รับเคสผ่าน Telegram', 'ลูกค้าเก่า', 'Service', 'Facebook ตัวเอง', 'Honda SPEAR', 'Telegram', 'เพื่อนแนะนำ'];
 const INSURANCE = ['Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม', 'ลูกค้าซื้อเอง'];
 // insurers taking part in Honda's new-car insurance (campaign 1–31 Oct 2569, HEI 26-D / Super Pack); others can be typed in
 const INSURERS = ['คุ้มภัยโตเกียวมารีนประกันภัย', 'กรุงเทพประกันภัย', 'ซมโปะประกันภัย', 'ธนชาตประกันภัย', 'ประกันภัยไทยวิวัฒน์', 'แอกซ่าประกันภัย', 'มิตซุย สุมิโตโม อินชัวรันซ์'];

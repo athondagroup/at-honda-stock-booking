@@ -86,7 +86,7 @@ function bookingForm(D) {
   <form id="booking-form" class="flex flex-col gap-5" novalidate>
     <section class="bg-surface border border-line rounded-lg p-4 md:p-6">
       <h2 class="font-head text-lg font-semibold mb-1">1. แนบใบจองและหลักฐานมัดจำ</h2>
-      <p class="text-sm text-muted mb-4">ระบบต้องมีรูปใบจองและสลิปหรือใบเสร็จมัดจำทุกใบ AI จะอ่านข้อมูลมากรอกให้ แล้วเก็บไว้ใช้ทำใบสรุปค่าคอมรายคันในเฟสถัดไป</p>
+      <p class="text-sm text-muted mb-4">ต้องมีรูปหน้าใบจองทุกใบ (เหมือนช่อง "หน้าใบจอง" ใน Google Form) · สลิปหรือใบเสร็จมัดจำแนบได้ถ้ามี · AI อ่านข้อมูลมากรอกให้ได้</p>
       <div class="grid md:grid-cols-2 gap-5">
         ${photoDrop('bk', 'รูปใบจอง', 'ถ่ายให้เห็นทั้งใบ ตัวหนังสือชัด', f.bk, 3)}
         ${photoDrop('slip', 'สลิปโอนหรือใบเสร็จมัดจำ', 'สลิปจากแอปธนาคารหรือใบเสร็จรับเงิน', f.slip, 2)}
@@ -102,34 +102,33 @@ function bookingForm(D) {
     <section class="bg-surface border border-line rounded-lg p-4 md:p-6 flex flex-col gap-6">
       <div><h2 class="font-head text-lg font-semibold">2. ตรวจและแก้ข้อมูลใบจอง</h2>
         <p class="text-sm text-muted">หัวข้อใช้ชื่อเดียวกับรายงานใน IDS เพื่อจับคู่กับไฟล์ IDS ได้ตรง</p></div>
-      <fieldset class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"><legend class="font-head font-semibold mb-2">ใบจอง</legend>
-        ${F('booking_no', 'เลขที่ใบจอง', inp('booking_no', 'text', 'inputmode="numeric" maxlength="12" placeholder="10 หลักจาก IDS"'), false, 'ยังไม่ได้ลง IDS เว้นไว้ก่อนได้ ระบบจะเตือนจนกว่าจะใส่')}
-        ${F('booking_date', 'วันที่ใบจอง', inp('booking_date', 'date', `max="${todayISO()}"`), true)}
-        ${F('br', 'ตัวแทนจำหน่าย (สาขา)', `<select id="b-br" data-draft="booking.br" ${myBranch() ? 'disabled' : ''}>${BRS.map(b => `<option value="${b}" ${d.br === b ? 'selected' : ''}>${BR[b].code} ${BR[b].name}</option>`).join('')}</select>`, true)}
-        ${F('sales', 'ชื่อที่ปรึกษาขาย', sel('sales', salesNames(), 'เลือกชื่อตามใน IDS', S.role.role === 'sales' ? 'disabled' : ''), true)}
-        ${F('customer', 'ชื่อลูกค้า', inp('customer', 'text', 'autocomplete="off" placeholder="ชื่อ นามสกุล"'), true)}
-        ${F('source', 'แหล่งที่มา', sel('source', SOURCES))}
-      </fieldset>
-      <fieldset class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"><legend class="font-head font-semibold mb-2">รถที่จอง</legend>
+      <fieldset class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"><legend class="font-head font-semibold mb-1">ข้อมูลใบจอง (เรียงตาม Google Form)</legend>
+        ${F('br', 'สาขา', `<select id="b-br" data-draft="booking.br" ${myBranch() ? 'disabled' : ''}>${BRS.map(b => `<option value="${b}" ${d.br === b ? 'selected' : ''}>${BR[b].name} (${b})</option>`).join('')}</select>`, true)}
+        ${F('sales', 'ชื่อเซลล์', sel('sales', salesNames(), 'เลือกชื่อเซลล์', S.role.role === 'sales' ? 'disabled' : ''), true)}
+        ${F('customer', 'ชื่อ-นามสกุลลูกค้า', inp('customer', 'text', 'autocomplete="off" placeholder="ชื่อ นามสกุล"'), true)}
         ${d.model_text ? `<div class="sm:col-span-2 lg:col-span-3 text-sm">AI อ่านรุ่นจากใบจองได้ว่า <b>${esc(d.model_text)}</b></div>` : ''}
-        ${F('model', 'Model', `<select id="b-model" data-draft="booking.model" class="${isAi('model')}">${modelOpts}</select>`, true, 'แสดงเฉพาะรุ่นปีล่าสุดที่มีในสต็อก Quota หรือใบราคา')}
-        ${F('grade', 'Grade', `<select id="b-grade" data-draft="booking.grade" class="${isAi('grade')}" ${d.model ? '' : 'disabled'}>${opt(grades, d.grade, 'เลือกเกรด')}</select>`, true)}
-        ${F('color', 'รหัสสี', `<select id="b-color" data-draft="booking.color" class="${isAi('color')}" ${d.grade ? '' : 'disabled'}>${opt(colors, d.color, 'เลือกสี')}</select>`, true)}
+        ${F('model', 'รุ่นรถที่จอง', `<select id="b-model" data-draft="booking.model" class="${isAi('model')}">${modelOpts}</select>`, true, 'แสดงเฉพาะรุ่นปีล่าสุดที่มีในสต็อก Quota หรือใบราคา')}
+        ${F('grade', 'เกรด', `<select id="b-grade" data-draft="booking.grade" class="${isAi('grade')}" ${d.model ? '' : 'disabled'}>${opt(grades, d.grade, 'เลือกเกรด')}</select>`, true)}
+        ${F('color', 'สี', `<select id="b-color" data-draft="booking.color" class="${isAi('color')}" ${d.grade ? '' : 'disabled'}>${opt(colors, d.color, 'เลือกสี')}</select>`, true)}
         <div class="sm:col-span-2 lg:col-span-3 text-sm">${spec ? `${myOf(d.model) ? `<span class="chip" style="background:var(--surface-2)">รุ่นปี '${String(myOf(d.model)).slice(2)}</span> ` : ''}สเปกนี้ตอนนี้: ${spec.free ? `<span style="color:var(--good)">มีรถว่าง</span> <b class="num">${spec.free}</b> คัน${Object.keys(spec.freeBy).length ? ` (${Object.entries(spec.freeBy).map(([b, n]) => `${b} ${n}`).join(', ')})` : ''}${yrs.length ? ` · ${yrs.map(([y, n]) => `${y} ${n} คัน`).join(' · ')}` : ''}` : '<b style="color:var(--bad)">ยังไม่มีรถว่าง</b>'} · ใบจองรอรถ <b class="num">${spec.waiting}</b> ใบ · Quota รอเข้า <b class="num">${spec.incoming}</b> คัน
           ${spec.none ? '<div class="text-muted">ยังไม่เคยมีรถหรือ Quota สเปกนี้ในไฟล์ IDS ถ้าจองต้องรอ Honda จัดสรร Quota ใหม่</div>' : ''}
           ${spec.waiting >= spec.free + spec.incoming ? `<div style="color:var(--bad)">ถ้าจองตอนนี้จะอยู่คิวที่ ${spec.waiting + 1} และรถยังไม่พอ</div>` : ''}` : (colorAvail ? `<span>รถว่างตามสี: ${colorAvail}</span>` : '<span class="text-muted">เลือกรุ่น เกรด สี แล้วจะเห็นจำนวนรถว่างและคิว</span>')}</div>
-      </fieldset>
-      <fieldset class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"><legend class="font-head font-semibold mb-2">เงื่อนไขการซื้อและมัดจำ</legend>
         ${F('purchase', 'เงื่อนไข', sel('purchase', ['ไฟแนนซ์', 'ซื้อสด']), true)}
-        ${d.purchase === 'ไฟแนนซ์' ? F('finance', 'บริษัทไฟแนนซ์ที่ยื่น', sel('finance', FINANCE), true) : '<div></div>'}
-        ${F('deposit', 'ยอดมัดจำ (บาท)', inp('deposit', 'number', 'min="0" step="100" inputmode="numeric"'), true)}
-        ${F('receipt_no', 'เลขที่ใบเสร็จมัดจำ', inp('receipt_no', 'text', 'autocomplete="off"'), true)}
-        ${F('insurance', 'ประกันภัย', sel('insurance', INSURANCE))}
-        ${F('discount', 'ส่วนลด (บาท ไม่มีใส่ 0)', inp('discount', 'number', 'min="0" step="100" inputmode="numeric" placeholder="0"'))}
-        ${F('foc_total', 'FOC ที่ใช้ทั้งหมด (บาท)', inp('foc_total', 'number', 'min="0" step="100" inputmode="numeric" placeholder="0"'))}
-        ${F('delivery_plan', 'วันนัดรับรถ (ถ้ามี)', inp('delivery_plan', 'date', `min="${todayISO()}"`), false, 'ใส่แล้วล็อกรถจะถือไว้จนส่งมอบ ไม่ต้องปลดล็อกทุก 15 วัน')}
-        ${F('lead_id', 'Lead ID จาก BOT', inp('lead_id', 'text', 'placeholder="ถ้ามี"'))}
+        ${F('insurance', 'ประกันภัย', sel('insurance', d.insurance && !['Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม'].includes(d.insurance) ? [d.insurance, 'Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม'] : ['Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม']), true)}
+        ${F('discount', 'ส่วนลด ระบุจำนวน ไม่มี ใส่ 0 บาท', inp('discount', 'number', 'min="0" step="100" inputmode="numeric" placeholder="0"'), true)}
+        ${F('foc_total', 'FOC ที่ใช้ทั้งหมด', inp('foc_total', 'number', 'min="0" step="100" inputmode="numeric" placeholder="0"'), true)}
         <div class="field"><label for="b-note">หมายเหตุ</label>${inp('note', 'text', 'placeholder="เช่น Trade in"')}</div>
+        ${F('booking_date', 'วันที่จอง', inp('booking_date', 'date', `max="${todayISO()}"`), true)}
+        <div class="field"><span class="text-sm font-medium">หน้าใบจอง</span><span class="text-sm ${f.bk.length ? '' : ''}" style="color:var(--${f.bk.length ? 'good' : 'bad'})">${f.bk.length ? `แนบแล้ว ${f.bk.length} รูป (ข้อ 1 ด้านบน)` : 'ยังไม่ได้แนบ แนบที่ข้อ 1 ด้านบน'}</span></div>
+        ${F('source', 'แหล่งที่มาของการจอง', sel('source', SOURCES, 'เลือกแหล่งที่มา'))}
+        ${F('lead_id', 'Lead ID จาก BOT (ถ้ามี)', inp('lead_id', 'text', 'placeholder="ถ้ามี"'))}
+      </fieldset>
+      <fieldset class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-lg" style="background:var(--surface-2)"><legend class="font-head font-semibold px-1">ข้อมูลเพิ่ม (ไม่อยู่ใน Google Form · ไม่บังคับ ใส่ทีหลังได้)</legend>
+        ${F('booking_no', 'เลขที่ใบจอง IDS', inp('booking_no', 'text', 'inputmode="numeric" maxlength="12" placeholder="10 หลักจาก IDS"'), false, 'ยังไม่ได้ลง IDS เว้นไว้ก่อนได้ ระบบจะเตือนจนกว่าจะใส่')}
+        ${d.purchase === 'ไฟแนนซ์' ? F('finance', 'บริษัทไฟแนนซ์ที่ยื่น', sel('finance', FINANCE)) : ''}
+        ${F('deposit', 'ยอดมัดจำ (บาท)', inp('deposit', 'number', 'min="0" step="100" inputmode="numeric"'))}
+        ${F('receipt_no', 'เลขที่ใบเสร็จมัดจำ', inp('receipt_no', 'text', 'autocomplete="off"'), false, 'ต้องใส่ก่อนไปขั้นไฟแนนซ์ ใส่ทีหลังในใบจองได้')}
+        ${F('delivery_plan', 'วันนัดรับรถ (ถ้ามี)', inp('delivery_plan', 'date', `min="${todayISO()}"`), false, 'ใส่แล้วล็อกรถจะถือไว้จนส่งมอบ ไม่ต้องปลดล็อกทุก 15 วัน')}
       </fieldset>
       ${multiBlock(d, D)}
       ${checks.length ? `<div class="p-3 rounded-lg text-sm flex flex-col gap-1" style="background:var(--surface-2)"><b>ผลตรวจ</b>${checks.map(c => `<div style="color:var(--${c.bad ? 'warn' : 'good'})">${c.bad ? '⚠' : '✓'} ${esc(c.t)}</div>`).join('')}</div>` : ''}

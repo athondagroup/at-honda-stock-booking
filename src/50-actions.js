@@ -366,14 +366,15 @@ async function runBookingAi() {
 async function saveBooking() {
   const d = S.draft.booking, D = derive(), msg = $('#booking-msg');
   const missing = [];
-  if (!S.files.bk.length) missing.push('รูปใบจอง');
-  if (!S.files.slip.length) missing.push('สลิปหรือใบเสร็จมัดจำ');
-  if (!d.booking_date) missing.push('วันที่ใบจอง');
-  if (!d.sales) missing.push('ชื่อที่ปรึกษาขาย');
-  if (!d.customer.trim()) missing.push('ชื่อลูกค้า');
-  if (!d.model || !d.grade || !d.color) missing.push('Model / Grade / รหัสสี');
-  if (!(Number(d.deposit) > 0)) missing.push('ยอดมัดจำ');
-  if (!(d.receipt_no || '').trim()) missing.push('เลขที่ใบเสร็จมัดจำ');
+  if (!S.files.bk.length) missing.push('หน้าใบจอง (รูป)');
+  if (!d.booking_date) missing.push('วันที่จอง');
+  if (!d.sales) missing.push('ชื่อเซลล์');
+  if (!d.customer.trim()) missing.push('ชื่อ-นามสกุลลูกค้า');
+  if (!d.model || !d.grade || !d.color) missing.push('รุ่นรถ / เกรด / สี');
+  if (!d.purchase) missing.push('เงื่อนไข');
+  if (!d.insurance) missing.push('ประกันภัย');
+  if (d.discount === '' || d.discount === null || d.discount === undefined) missing.push('ส่วนลด (ไม่มีใส่ 0)');
+  if (d.foc_total === '' || d.foc_total === null || d.foc_total === undefined) missing.push('FOC (ไม่มีใส่ 0)');
   if (d.booking_no && !/^\d{8,12}$/.test(d.booking_no.trim())) missing.push('เลขที่ใบจองต้องเป็นตัวเลข 8–12 หลัก');
   const checks = bookingChecks(d, D);
   const block = checks.find(c => c.block);
@@ -388,7 +389,7 @@ async function saveBooking() {
   const rec = {
     booking_no: d.booking_no.trim() || null, booking_date: d.booking_date, br: myBranch() || d.br || salesBranch(d.sales), sales: d.sales, customer: d.customer.trim(), source: d.source,
     model: d.model, grade: d.grade, color: d.color, model_text: d.model_text || null, purchase: d.purchase, finance: fin ? d.finance : null,
-    fin_status: fin ? 'รอผล' : null, deposit: num(d.deposit) || 0, receipt_no: d.receipt_no.trim(), discount: num(d.discount), foc_total: num(d.foc_total), insurance: d.insurance,
+    fin_status: fin ? 'รอผล' : null, deposit: num(d.deposit) || 0, receipt_no: (d.receipt_no || '').trim() || null, discount: num(d.discount), foc_total: num(d.foc_total), insurance: d.insurance,
     delivery_plan: validDate(d.delivery_plan), lead_id: d.lead_id || null, note: d.note || null, ids_claim: d.ids_claim || null,
     doc_imgs, slip_imgs, img_missing: imgMissing, slip: S.files.slip.length > 0, flow: {},
     ai: d.ai, ai_ok: !!d.ai, ai_fields: d.aiFields, checks: checks.map(({ t, bad }) => ({ t, bad: !!bad })),

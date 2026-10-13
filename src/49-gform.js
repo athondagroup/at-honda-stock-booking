@@ -58,7 +58,7 @@ function gformValue(field, a) {
     case 'foc_total': return r.foc_total ?? '';
     case 'note': return [r.note, r.receipt_no ? `ใบเสร็จมัดจำ ${r.receipt_no}` : '', r.deposit ? `มัดจำ ${r.deposit}` : ''].filter(Boolean).join(' · ');
     case 'booking_date': return r.booking_date || '';
-    case 'source': return GF_SOURCE[r.source] || '';
+    case 'source': return GF_SOURCE[r.source] || r.source || '';
     case 'lead_id': return r.lead_id || '';
     case 'web_id': return a.id;
     default: return '';
