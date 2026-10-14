@@ -310,6 +310,7 @@ function receiveModal(m, D) {
       ${(() => { const d = recvDupsOf({ ...r, id: m.id }, D); return d.length ? `<div class="p-3 rounded-lg text-sm" style="background:var(--bad-soft);color:var(--bad)"><b>ใบนี้น่าจะซ้ำ</b> ${d.map(esc).join(' · ')} · ถ้าซ้ำจริง กด "ซ้ำ ไม่ต้องรับเข้า"</div>` : ''; })()}
       <div class="flex flex-wrap justify-end gap-2"><button class="btn btn-ghost" data-act="recv-dup" data-id="${esc(m.id)}">ซ้ำ ไม่ต้องรับเข้า</button><button class="btn btn-ghost" data-act="recv-reject">ไม่ผ่าน ตีกลับ</button><button class="btn btn-red" data-act="recv-confirm">ยืนยันรับรถเข้าสต็อก</button></div>`
       : m.status === 'pending' ? `<p class="text-sm text-muted">ต้องให้แอดมินสาขา ${esc(r.br || '')} หรือผู้จัดการเป็นคนยืนยัน</p>` : (r.review?.note ? `<p class="text-sm">หมายเหตุ: ${esc(r.review.note)}</p>` : '')}
+      ${recvCanDelete(m) ? `<div class="flex justify-start pt-2 mt-1 border-t border-line"><button class="btn btn-ghost btn-sm" style="color:var(--bad)" data-act="recv-del" data-id="${esc(m.id)}">ลบรายการนี้ (ลงผิด ไม่เก็บเข้าระบบ)</button></div>` : ''}
     </div>
   </div>`;
 }

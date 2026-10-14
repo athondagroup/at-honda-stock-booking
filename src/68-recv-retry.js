@@ -58,3 +58,18 @@ async function recvMoveLocks(vin, ref) {
   }
   return { moved, queued };
 }
+
+// ---- removing a receive record entered by mistake (ตกลง 14/10): only one not confirmed yet (pending or ไม่ผ่าน).
+// Records are never erased (history is kept); the record is marked removed and no longer shows anywhere.
+function recvCanDelete(m) {
+  const r = S.receipts.get(m.id); if (!r || r.hidden || r.status === 'confirmed') return false;
+  const p = perms(); if (!p.write) return false;
+  return (p.confirmReceive && branchOk(r.br)) || (r.by && r.by === S.me.id);
+}
+Object.assign(ACTIONS, {
+  async 'recv-del'(el) {
+    const id = el.dataset.id, r = S.receipts.get(id); if (!r || !recvCanDelete({ id })) return;
+    if (!confirm('ลบรายการรับรถนี้? (ลงผิด ไม่เก็บเข้าระบบ)')) return;
+    if (await write('receipts', id, { ...r, hidden: true, removed: { ...actor(), at: new Date().toISOString(), prev_status: r.status || null } })) { S.modal = null; toast('ลบรายการรับรถแล้ว'); render(); }
+  }
+});

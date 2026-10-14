@@ -330,7 +330,7 @@ function deriveNow() {
   at.forEach(a => { if (a.active && sum[a.br]) { sum[a.br].at++; if (!a.match) sum[a.br].atNoIds++; } });
   quota.forEach(q => { const s = sum[q.br]; if (!s) return; s.quota += q.qty || 1; if (q.open) s.quotaIn += q.qty || 1; });
 
-  const receipts = [...S.receipts.entries()].map(([id, r]) => ({ id, ...r })).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  const receipts = [...S.receipts.entries()].filter(([, r]) => !r.hidden).map(([id, r]) => ({ id, ...r })).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
   const D = { today, X, cars, removed, deliveredOut, locks, idsB, at, bookings, bookingByKey, bySpec, quota, specs, sum, receipts, invByVin, idsOnly: M.idsOnly };
   D.alerts = buildAlerts(D);
   return D;

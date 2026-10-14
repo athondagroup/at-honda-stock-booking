@@ -335,7 +335,7 @@ async function handleReceiveFile(file, batch) {
 // receipts already holding this delivery note: same document number, or any of the same frame numbers (rejected ones skipped)
 function receiptDups(doc) {
   const no = String(doc.doc_no || '').trim().toUpperCase(), vins = new Set((doc.cars || []).map(c => c.vin).filter(v => VIN_RE.test(v || '')));
-  return [...S.receipts.entries()].map(([id, r]) => ({ id, ...r })).filter(r => r.status !== 'rejected'
+  return [...S.receipts.entries()].map(([id, r]) => ({ id, ...r })).filter(r => !r.hidden && r.status !== 'rejected'
     && ((no && String(r.doc_no || '').trim().toUpperCase() === no) || (r.cars || []).some(c => vins.has(String(c.vin || '').toUpperCase()))));
 }
 async function saveReceipt(doc, quiet) {
