@@ -116,7 +116,7 @@ function deriveNow() {
   const at = [];
   for (const [id, r] of S.bookings) {
     at.push({
-      key: 'app:' + id, id, src: 'AT', rec: r, no: r.booking_no || null, date: r.booking_date, br: r.br, sales: r.sales,
+      key: 'app:' + id, id, src: 'AT', rec: r, no: r.booking_no || null, date: r.booking_date, br: r.br, sales: salesCanon(r.sales),
       cust: r.customer, model: r.model, grade: r.grade, color: r.color, spec: specKey(r.model, r.grade, r.color),
       deposit: (Number(r.deposit) || 0) + (r.deposit_from ? Number(r.deposit_from.amount) || 0 : 0), slip: (r.slip_imgs || []).length > 0 || r.slip === true || !!r.doc_url || !!r.deposit_from,
       cancelled: r.status === 'cancelled', demo: !!r.demo || !!r.hidden, created_at: r.created_at,

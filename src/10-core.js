@@ -198,10 +198,27 @@ function fitSales(name) {
   return all.find(s => norm(s) === n) || all.find(s => n.includes(norm(s.split(' ')[0])) && norm(s.split(' ')[0]).length > 2) || '';
 }
 // all = include people who have left (for reports); pickers only offer current staff
+// a name written in a booking as a nickname ("ติ๋ว") or with one ("คณิต จุ้ยทอง (ซิก)") → the name in the sales list
+function salesCanon(name) {
+  if (!name) return name;
+  const roster = S.ref.get('sales')?.list; if (!roster) return name;
+  if (roster.some(s => s.name === name)) return name;
+  const nk = S.ref.get('sales').nick || {}, plain = String(name).replace(/\s*\(.*?\)\s*/g, ' ').trim();
+  if (nk[name] || nk[plain]) return nk[name] || nk[plain];
+  const hit = roster.find(s => s.name === plain); if (hit) return hit.name;
+  // same rule as the Stock sheet nicknames: tone marks ignored, "น้อง" / "พี่" in front ignored
+  const kn = x => String(x || '').toLowerCase().replace(/[\u0E31\u0E47-\u0E4E]/g, '').replace(/[^ก-๙a-z]/g, '');
+  const k = kn(plain), k2 = k.replace(/^(นอง|พี)/, '');
+  for (const [n, full] of Object.entries(nk)) if (kn(n) === k || kn(n) === k2) return full;
+  const r = roster.find(s => kn(s.name) === k || kn(s.name.split(' ')[0]) === k || kn(s.name.split(' ')[0]) === k2);
+  return r ? r.name : name;
+}
+// pickers (all = false): only the sales list, without people who left; reports (all = true) also keep names
+// found in bookings that are not on the list
 function salesNames(all = false) {
   const roster = S.ref.get('sales')?.list;
   const set = new Set(roster ? roster.map(s => s.name) : SEED.sales.map(s => s.name));
-  for (const b of S.bookings.values()) if (b.sales) set.add(b.sales);
+  if (all || !roster) for (const b of S.bookings.values()) if (b.sales) set.add(salesCanon(b.sales));
   if (!roster) idsData().bookings.forEach(b => b.sales && set.add(b.sales));
   const left = new Set((roster || []).filter(s => s.left).map(s => s.name));
   return [...set].filter(n => n && (all || !left.has(n))).sort((a, b) => a.localeCompare(b, 'th'));
