@@ -4,16 +4,16 @@
 // Only function declarations here: the first render runs before this part of the file.
 function dashTabs() {
   const r = S.role.role; if (r !== 'exec' && !MGR_OF[r]) return '';
-  const cur = dashSub(), tabs = r === 'exec' ? [['exec', 'สรุปผู้บริหาร'], ['sales', 'ยอดขายและเป้า'], ['ana', 'วิเคราะห์'], ['acct', 'บัญชี'], ['ops', 'งานรออนุมัติและคิวรถ']] : [['ops', 'งานรออนุมัติและคิวรถ'], ['sales', 'ยอดขายและเป้า'], ['ana', 'วิเคราะห์'], ['acct', 'บัญชี']];
+  const cur = dashSub(), tabs = r === 'exec' ? [['exec', 'สรุปผู้บริหาร'], ['sales', 'ยอดขายและเป้า'], ['person', 'รายบุคคล'], ['ana', 'วิเคราะห์'], ['acct', 'บัญชี'], ['ops', 'งานรออนุมัติและคิวรถ']] : [['ops', 'งานรออนุมัติและคิวรถ'], ['sales', 'ยอดขายและเป้า'], ['person', 'รายบุคคล'], ['ana', 'วิเคราะห์'], ['acct', 'บัญชี']];
   return `<div class="seg mb-4" role="group" aria-label="มุมมอง">${tabs.map(([k, t]) => `<button data-act="sub" data-key="dash" data-sub="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>`;
 }
 // a manager sees sales, targets and analysis only for the branches they look after; the executive sees all
 function dashScoped(D, sub) {
   const own = MGR_OF[S.role.role], keep = S.br;
   if (own) { S.brScope = own; if (S.br && !own.includes(S.br)) S.br = ''; }
-  try { return sub === 'sales' ? dashSalesTarget(D) : sub === 'acct' ? dashAcct(D) : dashAna(D); } finally { S.brScope = null; if (own && keep && !own.includes(keep)) S.br = keep; }
+  try { return sub === 'sales' ? dashSalesTarget(D) : sub === 'acct' ? dashAcct(D) : sub === 'person' ? dashPerson(D) : dashAna(D); } finally { S.brScope = null; if (own && keep && !own.includes(keep)) S.br = keep; }
 }
-function dashSub() { const s = S.sub.dash || 'exec'; if (S.role.role === 'exec') return s; return s === 'sales' || s === 'ana' || s === 'acct' ? s : 'ops'; }
+function dashSub() { const s = S.sub.dash || 'exec'; if (S.role.role === 'exec') return s; return s === 'sales' || s === 'ana' || s === 'acct' || s === 'person' ? s : 'ops'; }
 function monthsIn(from, to) { const out = []; let d = from.slice(0, 7); while (d <= to.slice(0, 7)) { out.push(d); const [y, m] = d.split('-').map(Number); d = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`; } return out; }
 function dCard(title, body, note) { return `<section class="bg-surface border border-line rounded-lg p-4 min-w-0"><h2 class="font-head font-semibold mb-2">${title}</h2>${body}${note ? `<p class="text-xs text-muted mt-2">${note}</p>` : ''}</section>`; }
 function pctOf(a, b) { return b ? Math.round(a / b * 100) : 0; }
@@ -54,7 +54,7 @@ function monthPace(D, E) {
 }
 function invWaitingList(D) {
   // the latest invoice per car only: a car invoiced again (e.g. a cancelled and re-issued invoice) counts once, by its newest invoice
-  return D.X.inv.filter(i => !i.company && i.idate && !i.ddate && inBr(i) && (!i.vin || D.invByVin.get(i.vin) === i) && !(i.vin && (carBookingOf(i.vin, D) || {}).done)).map(i => ({ ...i, age: daysBetween(i.idate, D.today) })).sort((a, b) => b.age - a.age);
+  return D.X.inv.filter(i => !i.company && !i.archived && i.idate && !i.ddate && inBr(i) && (!i.vin || D.invByVin.get(i.vin) === i) && !(i.vin && (carBookingOf(i.vin, D) || {}).done)).map(i => ({ ...i, age: daysBetween(i.idate, D.today) })).sort((a, b) => b.age - a.age);
 }
 function dashSalesTarget(D) {
   const E = execData(D), P = monthPace(D, E), W = invWaitingList(D);
@@ -88,7 +88,8 @@ function dashSalesTarget(D) {
       <div class="border border-line rounded-lg divide-y divide-line max-h-72 overflow-auto">${W.slice(0, 30).map(w => `<div class="p-2 px-3 text-sm flex flex-wrap gap-x-3 items-center">${w.vin ? vinLink({ vin: w.vin }) : '<span class="text-muted">ไม่มีเลขตัวถัง</span>'}<span>${esc(w.model || '')} ${esc(gradeShort(w.model, w.grade) || '')}</span><span class="text-muted">${esc(w.br)} · ใบกำกับ ${fmtD(w.idate)}${isSales() ? '' : ` · ${esc(w.cust || '')}`} · ${esc(w.sales || '')}</span><span class="ml-auto flex items-center gap-2"><span class="num ${w.age > 14 ? 'font-semibold' : ''}" ${w.age > 14 ? 'style="color:var(--warn)"' : ''}>${w.age} วัน</span>${w.vin ? delivBtn(carAny(w.vin, D) || { vin: w.vin }, D) : ''}</span></div>`).join('') || '<div class="p-3 text-sm text-muted">ไม่มี</div>'}</div>`, 'กด "ส่งมอบ" เพื่อบันทึกการส่งมอบก่อนอัปเดตไฟล์ IDS · รายการเดียวกันอยู่ที่หน้าสต็อกด้วย')}
   </div>
   ${dCard(`แยกรุ่น <span class="text-muted text-sm font-normal">เป้า ${fmtN(tT)} · ใบกำกับในเดือนที่มีเป้า ${fmtN(tIt)} (${tT ? pctOf(tIt, tT) + '%' : '–'}) · ใบกำกับทั้งช่วง ${fmtN(tI)}</span>`, `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>รุ่น</th><th class="text-right">เป้า</th><th class="text-right">ใบกำกับ</th><th class="text-right">% เป้า</th><th class="text-right">ส่งมอบ</th><th class="text-right">จอง</th></tr></thead><tbody>
-    ${mrow.map(r => `<tr><td class="nowrap">${esc(r.md)}</td><td class="num text-right">${r.t ? fmtN(r.t) : '–'}</td><td class="num text-right font-semibold">${fmtN(r.i)}</td><td class="num text-right">${pctCell(r.it, r.t)}</td><td class="num text-right">${fmtN(r.d)}</td><td class="num text-right">${fmtN(r.b)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ไม่มีข้อมูลในช่วงนี้</td></tr>'}</tbody></table></div>`)}`;
+    ${mrow.map(r => `<tr><td class="nowrap">${esc(r.md)}</td><td class="num text-right">${r.t ? fmtN(r.t) : '–'}</td><td class="num text-right font-semibold">${fmtN(r.i)}</td><td class="num text-right">${pctCell(r.it, r.t)}</td><td class="num text-right">${fmtN(r.d)}</td><td class="num text-right">${fmtN(r.b)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ไม่มีข้อมูลในช่วงนี้</td></tr>'}</tbody></table></div>`)}
+  ${carListCard(D, E)}`;
 }
 
 // ---- analysis: what customers book, who sells, what falls through, what sits in stock

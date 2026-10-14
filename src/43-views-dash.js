@@ -16,10 +16,10 @@ const sectionBox = (title, link, body) => `<section class="min-w-0 mb-6"><div cl
 const listBox = (rows, empty) => `<div class="bg-surface border border-line rounded-lg divide-y divide-line">${rows || emptyBox(empty[0], empty[1])}</div>`;
 function viewDash(D) {
   const r = S.role.role;
-  if (r === 'sales') return dashSales(D);
+  if (r === 'sales') return dashSales(D) + salesMonthly(D);
   if (r === 'admin') return dashAdmin(D);
   const sub = dashSub();
-  if ((sub === 'sales' || sub === 'ana' || sub === 'acct') && (r === 'exec' || MGR_OF[r])) return dashScoped(D, sub);
+  if ((sub === 'sales' || sub === 'ana' || sub === 'acct' || sub === 'person') && (r === 'exec' || MGR_OF[r])) return dashScoped(D, sub);
   if (r === 'exec' && sub === 'exec') return dashExec(D);
   return dashManager(D);
 }

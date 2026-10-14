@@ -467,7 +467,10 @@ function idsData() {
     else SEED.bookings.filter(x => x.br === b).forEach(x => d.bookings.push({ ...x, seed: true }));
     if (qs.length) qs.forEach(q => unpack(q).forEach(r => d.quota.push({ ...r, br: b })));
     else SEED.quota.filter(x => x.br === b).forEach(x => d.quota.push({ ...x, seed: true }));
-    if (dl) unpack(dl).forEach(r => d.inv.push({ ...r, br: b }));
+    const live = dl ? unpack(dl) : [];
+    live.forEach(r => d.inv.push({ ...r, br: b }));
+    // older invoices kept from earlier DL files (ids/invold_<br>_<year>)
+    invArchiveRows(b, new Set(live.map(invKey))).forEach(r => d.inv.push({ ...r, br: b, archived: true }));
   }
   CATALOG = buildCatalog([d.cars, d.quota, d.bookings, SEED.cars, SEED.quota, ...catalogLists()]);
   BOOK_CATALOG = buildBookCatalog(d);

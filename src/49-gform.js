@@ -103,5 +103,5 @@ function viewUpload(D) {
   // the Google Form box goes right under the page title
   const base = viewUploadBase(D), cut = base.indexOf('<section');
   const top = gsCan() ? gsBox(D) : '';
-  return (cut > 0 ? base.slice(0, cut) + top + base.slice(cut) : top + base) + (perms().upload ? delivSyncBox(D) + sheetSyncBox(D) + gformSettings() : '');
+  return (cut > 0 ? base.slice(0, cut) + top + base.slice(cut) : top + base) + (perms().upload ? idsGsBox() + delivSyncBox(D) + sheetSyncBox(D) + gformSettings() : '');
 }

@@ -22,6 +22,7 @@ function renderModal(D) {
   else if (m.kind === 'cdeliv') { body = cdelivModal(m, D); wide = true; }
   else if (m.kind === 'specq') { body = specQueueModal(m, D); wide = true; }
   else if (m.kind === 'sumcell') { body = sumCellModal(m, D); wide = true; }
+  else if (m.kind === 'pm') { body = pmModal(m, D); wide = true; }
   else if (m.kind === 'adsales') body = adminSalesModal(m);
   else if (m.kind === 'adbk') { body = adminBkModal(m); wide = true; }
   else if (m.kind === 'adlk') body = adminLkModal(m);
@@ -257,8 +258,11 @@ async function saveUploads() {
       let rows = part.rows;
       const mk = () => ({ src: r.src, br: r.br, m: part.m, asof: r.asof, file: r.file, sheet: r.sheet, n: rows.length, ...pack(r.src, rows), warn: r.warn.slice(0, 20), ...actor() });
       let doc = mk();
-      if (utf8len(doc) > 240000 && r.src === 'invoice') { const cut = addDays(r.asof, -180); rows = rows.filter(x => !x.idate || x.idate >= cut || !x.ddate); doc = mk(); }
+      let cutRows = [];
+      if (utf8len(doc) > 240000 && r.src === 'invoice') { const cut = addDays(r.asof, -180); cutRows = rows.filter(x => !(!x.idate || x.idate >= cut || !x.ddate)); rows = rows.filter(x => !x.idate || x.idate >= cut || !x.ddate); doc = mk(); }
       if (utf8len(doc) > 250000) { toast(`ตาราง ${SRC_LABEL[r.src]} ${r.br} ใหญ่เกินที่ต้นแบบเก็บได้`, 'bad'); continue; }
+      // invoices the new file no longer carries are kept in yearly archives, so history does not disappear
+      if (r.src === 'invoice' && !await invArchive(r.br, rows, cutRows)) { U.busy = false; render(); return; }
       if (!await write('ids', part.id, doc)) { U.busy = false; render(); return; }
       await write('uploads', newId('uploads'), { src: r.src, br: r.br, m: part.m, asof: r.asof, file: r.file, sheet: r.sheet, n: rows.length,
         prevN: r.diff ? r.diff.prevN : null, out: r.src === 'stock' ? (r.diff?.out || []).slice(0, 300) : [], inN: r.diff?.inN || 0, ...actor() });

@@ -1,4 +1,6 @@
-// Reads the Google Form response sheet for the AT Honda website ("ดึงใบจองจาก Google Form").
+// Reads Google Sheets for the AT Honda website: the Google Form response sheet ("ดึงใบจองจาก Google Form")
+// and the IDS stock sheet (backup for "อัปเดตข้อมูล IDS"). { spreadsheetId, range } → values;
+// { spreadsheetId, fields } → the sheet's tab names (spreadsheets.get).
 // Set secret GOOGLE_SERVICE_ACCOUNT (the JSON key of a Google service account) and share the sheet
 // with that account's e-mail as Viewer. Returns { range, values } like the Sheets API.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -35,7 +37,9 @@ Deno.serve(async (req) => {
   if (!SA) return out({ code: "unavailable" }, 503);
   try {
     const t = await token(JSON.parse(SA));
-    const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(body.spreadsheetId)}/values/${encodeURIComponent(body.range)}`, { headers: { Authorization: `Bearer ${t}` } });
+    const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(body.spreadsheetId)}`;
+    const url = body.range ? `${base}/values/${encodeURIComponent(body.range)}` : `${base}?fields=${encodeURIComponent((body.fields && body.fields.length ? body.fields : ["sheets.properties.title"]).join(","))}`;
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${t}` } });
     if (!r.ok) return out({ code: "tool_error", status: r.status }, 502);
     return out(await r.json());
   } catch (e) { console.error(e); return out({ code: "tool_error" }, 502); }
