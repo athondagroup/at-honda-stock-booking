@@ -253,6 +253,9 @@ function deriveNow() {
     else if (hard) temps.forEach(t => { t.challenged = hard; });
     return { hard: hard || null, temps, all: ls };
   };
+  // a car given to a booking in the delivery steps (จัดสรร) and not handed over yet
+  const assignedBy = new Map();
+  at.forEach(a => { const f = a.rec.flow || {}; if (!a.cancelled && !a.demo && f.assign && f.assign.vin && !(f.delivered && f.delivered.date)) assignedBy.set(f.assign.vin, a); });
   for (const car of cars.values()) {
     const basis = car.prod || car.consign || car.stockin;
     car.age = basis ? daysBetween(basis, today) : null;
@@ -262,6 +265,8 @@ function deriveNow() {
     car.lock = ls.hard; car.temps = ls.temps;
     car.status = ls.hard ? (ls.hard.status === 'pending' ? 'pending' : ls.hard.status === 'allocated' ? 'allocated' : 'locked')
       : (car.st === 'free' && ls.temps.length ? 'temp' : car.st);
+    car.assignedTo = assignedBy.get(car.vin) || null;
+    if (car.assignedTo && ['free', 'temp', 'noted', 'locked', 'pending'].includes(car.status)) car.status = 'assigned';
   }
   for (const b of bookings) {
     const l = locks.find(x => x.live && x.type === 'booking' && (x.bkref === b.key || (b.app && x.bkref === b.app.key)));
@@ -352,6 +357,9 @@ function buildAlerts(D) {
   }
   for (const a of D.at) {
     const car = `${a.cust} · ${a.model} ${gradeShort(a.model, a.grade)} ${a.color || ''}`, go = { act: 'at-open', id: a.id };
+    const ro = a.rec.reassigned_out;
+    if (ro && !a.cancelled && ro.at && daysBetween(ro.at.slice(0, 10), today) <= 7) add('reas:' + a.id + ':' + ro.vin, { sales: a.sales, br: a.br, roles: ['sales', 'admin', 'manager'] }, 'warn', 'รถที่จัดสรรให้ใบจองนี้ ถูกเปลี่ยนไปให้ใบจองอื่น',
+      `${car} · รถ ${ro.vin} ไปให้ ${ro.to || 'ใบจองอื่น'} (${ro.role || ''} ${fmtD(ro.at.slice(0, 10))}) · ใบจองนี้กลับไปรอรถ`, go);
     if (a.matchAsk) add('matchq:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin'] }, 'warn', a.match.status === 'possible' ? 'ชื่อลูกค้าตรงกับ IDS แต่รุ่นไม่ตรง ยืนยันการจับคู่' : 'เกรดหรือสีในฟอร์มไม่ตรงกับ IDS ยืนยันการจับคู่',
       `${car} · ใน IDS เป็น ${a.match.idsModel} ${gradeShort(a.match.idsModel, a.match.idsGrade)} ${a.match.idsColor || ''} ใช่ใบเดียวกันหรือเป็นการจองเพิ่มอีกคัน`, go);
     if (a.ownerCheck === 'pending') add('owner:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin'] }, 'warn', 'ยืนยันเจ้าของเคส (ชื่อเซลล์ใน IDS ไม่ตรง)',

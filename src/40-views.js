@@ -291,8 +291,8 @@ function carRow(c, D) {
     <div class="flex gap-2">${carActions(c, p, D)}</div></div>`;
 }
 const lockLabel = l => `${l.type === 'dealer' ? 'ดีลเลอร์ ' + esc(l.dealer_name || '') : l.type === 'temp' ? 'ล็อกชั่วคราว ' + esc(l.owner || l.sales_nick || '') : 'ใบจองของ ' + esc(l.owner || '')}${l.status === 'approved' ? (l.hold ? ` · ถือไว้จนส่งมอบ ${fmtD(l.holdUntil)}` : ` · หมด ${fmtD(l.end)}`) : l.status === 'pending' ? ' · รออนุมัติ' : ''}`;
-const carActions = (c, p, D) => `${delivBtn(c, D)}${carLockBtn(c, D)}${carLockable(c) && p.write && p.request ? `<button class="btn btn-ghost btn-sm" data-act="lock-open" data-vin="${esc(c.vin)}">${c.status === 'pending' ? 'ขอคิวต่อ' : 'ล็อก'}</button>` : ''}
-  ${p.remove && p.write && !c.lock ? `<button class="btn btn-ghost btn-sm" data-act="remove-open" data-vin="${esc(c.vin)}" aria-label="นำรถ ${esc(c.vin)} ออก">− นำออก</button>` : ''}`;
+// every car (ตกลง 14/10): ล็อก · จัดสรร · ส่งมอบ · นำออก — sales only look
+const carActions = (c, p, D) => stockActions(c, p, D);
 function carTable(cars, D) {
   const f = S.filters, p = perms();
   const list = cars.filter(c => !f.status || f.status === 'low' || c.status === f.status)
