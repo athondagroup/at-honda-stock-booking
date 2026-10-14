@@ -19,7 +19,7 @@ function viewDash(D) {
   if (r === 'sales') return dashSales(D);
   if (r === 'admin') return dashAdmin(D);
   const sub = dashSub();
-  if ((sub === 'sales' || sub === 'ana') && (r === 'exec' || MGR_OF[r])) return dashScoped(D, sub);
+  if ((sub === 'sales' || sub === 'ana' || sub === 'acct') && (r === 'exec' || MGR_OF[r])) return dashScoped(D, sub);
   if (r === 'exec' && sub === 'exec') return dashExec(D);
   return dashManager(D);
 }

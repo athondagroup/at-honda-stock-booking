@@ -26,34 +26,47 @@ function catGradeOf(model, g) {
   if (/HEV/.test(model) && !/^e:HEV/.test(s)) s = 'e:HEV ' + s;
   return s.trim();
 }
-// text copied from the price list PDF → [{model, grade, colors}]
-function catParse(text) {
-  const out = new Map(); let model = null, year = null;
-  for (const raw of String(text || '').split(/\r?\n/)) {
+// text copied from (or read out of) the price list PDF → rows [{model, grade, year, colors}] for the pickers,
+// plus prices [{model, grade, year, color, price, qd}]: the Retail Price (incl. VAT), column A. Only that column is kept;
+// the dealer margin and wholesale columns of the confidential list are not stored.
+// One model year can carry two quotations (e.g. QD-1-006/26 and the newer QD-1-008/26): the newest quotation number wins.
+function qdRank(q) { const m = String(q || '').match(/QD-?(\d)-?(\d+)\/(\d{2})/i); return m ? Number(m[3]) * 1e5 + Number(m[2]) * 10 + Number(m[1]) : 0; }
+function catParseFull(text) {
+  const out = new Map(), prices = new Map(); let model = null, year = null, qd = null;
+  const src = String(text || '');
+  const issue = { no: (src.match(/Issued\s*No\.?\s*([\d/]+)/i) || [])[1] || null, date: (src.match(/\b(\d{1,2}-[A-Z][a-z]{2}-\d{2})\b/) || [])[1] || null };
+  for (const raw of src.split(/\r?\n/)) {
     let line = raw.replace(/\s+/g, ' ').trim(); if (!line) continue;
-    line = line.replace(/^'?QD-?\d[-\d/ ]*\s+/, '');
+    const q = line.match(/^'?(QD-?\d[-\d/]*)\s+/); if (q) { qd = q[1]; line = line.slice(q[0].length); }
     const head = line.match(/^(CITY|New CIVIC|CIVIC|ACCORD|HR-V|CR-V|STEP ?WGN|e:N[12]|WR-V|BR-V)\b[^()]*$/i);
-    if (head && !/\d{2,3},\d{3}/.test(line)) { model = catModelOf(line); const ys = [...line.matchAll(/(?:'|\b)(\d{2})(?=\s*(?:YM|-|'|$|\s))/g)].map(x => Number(x[1])).filter(y => y >= 18 && y <= 40); year = ys.length ? 2000 + Math.max(...ys) : null; continue; }
+    if (head && !/\d{2,3},\d{3}/.test(line)) { model = catModelOf(line); qd = null; const ys = [...line.matchAll(/(?:'|\b)(\d{2})(?=\s*(?:YM|-|'|$|\s))/g)].map(x => Number(x[1])).filter(y => y >= 18 && y <= 40); year = ys.length ? 2000 + Math.max(...ys) : null; continue; }
     if (/^e:N[12]\s*\(/i.test(line) && !model) model = catModelOf(line);
     if (!model) continue;
-    let g = null, cs = null;
+    let g = null, cs = null, rest = '';
     const m = line.match(/^(.+?)\s*\(([A-Z]{3}(?:\s*\/\s*[A-Z]{3})*)\s*\)/);
-    if (m) { g = m[1]; cs = m[2].split('/').map(x => x.trim()); }
-    else { const h = line.match(/^(e:HEV Hunt)\s+([A-Z]{3})\b/i); if (h) { g = h[1]; cs = [h[2]]; } }
+    if (m) { g = m[1]; cs = m[2].split('/').map(x => x.trim()); rest = line.slice(m[0].length); }
+    else { const h = line.match(/^(e:HEV Hunt)\s+([A-Z]{3})\b/i); if (h) { g = h[1]; cs = [h[2]]; rest = line.slice(h[0].length); } }
     // a real price-list row has a price on it; this drops headings and footnotes that happen to have brackets
     if (!g || !/\d{1,3},\d{3}/.test(line) || /[\u0E00-\u0E7F]/.test(g) || g.length > 40) continue;
     const grade = catGradeOf(model, g), key = model + '|' + grade + '|' + (year || '');
     if (!grade || grade === 'e:HEV') continue;
     if (!out.has(key)) out.set(key, { model, grade, year, colors: new Set() });
     cs.forEach(c => out.get(key).colors.add(c.toUpperCase()));
+    const pm = rest.match(/(\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?/), price = pm ? Number(pm[1].replace(/,/g, '')) : null;
+    if (price && price >= 100000) cs.forEach(c => {
+      const k = key + '|' + c.toUpperCase(), cur = prices.get(k);
+      if (!cur || qdRank(qd) >= qdRank(cur.qd)) prices.set(k, { model, grade, year, color: c.toUpperCase(), price, qd: qd || null });
+    });
   }
   // keep the newest model year of each model only: older years are no longer ordered (old codes stay only if a car of that year is in IDS)
   const rows = [...out.values()], newest = {};
   rows.forEach(r => { if (r.year) newest[r.model] = Math.max(newest[r.model] || 0, r.year); });
   const keep = new Map();
   rows.filter(r => !newest[r.model] || r.year === newest[r.model]).forEach(r => { const k = r.model + '|' + r.grade; if (!keep.has(k)) keep.set(k, { model: r.model, grade: r.grade, year: r.year, colors: new Set() }); r.colors.forEach(c => keep.get(k).colors.add(c)); });
-  return [...keep.values()].map(r => ({ ...r, colors: [...r.colors].sort() }));
+  // prices of every model year are kept: a car of last year's model in stock is still sold at its own price
+  return { rows: [...keep.values()].map(r => ({ ...r, colors: [...r.colors].sort() })), prices: [...prices.values()], issue };
 }
+function catParse(text) { return catParseFull(text).rows; }
 function catRows() { return (S.ref.get('catalog') || {}).rows || []; }
 // the merged table the pickers use: IDS names first, then ref/catalog
 function catalogLists() { return [catRows().flatMap(r => (r.colors && r.colors.length ? r.colors : [null]).map(c => ({ model: r.model, grade: r.grade, color: c })))]; }
@@ -62,28 +75,40 @@ function adminCatalog(D) {
   const ids = buildCatalog([idsData().cars, idsData().quota, idsData().bookings]);
   const list = Object.entries(CATALOG).flatMap(([mo, gs]) => Object.entries(gs).map(([g, cs]) => ({ mo, g, cs, fromIds: !!(ids[mo] && ids[mo][g]), fromCat: mine.has(mo + '|' + g) })));
   return `${can ? `<section class="bg-surface border border-line rounded-lg p-4 mb-4"><h2 class="font-head font-semibold mb-1">อัปเดตจากใบราคา Honda (Price List)</h2>
-    <p class="text-sm text-muted mb-2">เปิดไฟล์ PDF ใบราคา กด Ctrl+A แล้ว Ctrl+C วางในช่องนี้ ระบบอ่านเฉพาะชื่อรุ่น เกรด และรหัสสี (ไม่เก็บราคา)</p>
-    <textarea id="cat-txt" rows="4" class="w-full" data-catx="1" placeholder="วางข้อความจากใบราคาที่นี่">${esc(m.text || '')}</textarea>
-    <div class="flex gap-2 mt-2"><button class="btn btn-dark btn-sm" data-act="cat-parse">อ่านข้อความ</button></div>
-    ${m.parsed ? `<div class="mt-3">${m.parsed.length ? `<p class="text-sm mb-1">พบ ${m.parsed.length} รุ่น/เกรด · ใหม่ ${m.parsed.filter(r => !CATALOG[r.model] || !CATALOG[r.model][r.grade] || r.colors.some(c => !CATALOG[r.model][r.grade].includes(c))).length} รายการ</p>
-      <div class="scroll-x max-h-64 overflow-auto"><table class="tbl text-sm"><thead><tr><th>รุ่น</th><th>เกรด</th><th>สี</th></tr></thead><tbody>${m.parsed.map(r => { const cur = (CATALOG[r.model] || {})[r.grade]; return `<tr><td>${esc(r.model)}${CATALOG[r.model] ? '' : ' ' + chip('รุ่นใหม่', 'warn')}</td><td>${esc(r.grade)}${cur ? '' : ' ' + chip('ใหม่', 'warn')}</td><td>${r.colors.map(c => cur && cur.includes(c) ? esc(c) : `<b style="color:var(--warn)">${esc(c)}</b>`).join(' ')}</td></tr>`; }).join('')}</tbody></table></div>
-      <button class="btn btn-red btn-sm mt-2" data-act="cat-save">บันทึกเข้ารายการรุ่น</button>` : '<p class="text-sm" style="color:var(--bad)">ไม่พบรุ่น เกรด สีในข้อความนี้</p>'}</div>` : ''}</section>
+    <p class="text-sm text-muted mb-2">เลือกไฟล์ PDF ใบราคา (Price List) ระบบอ่านรุ่น เกรด รหัสสี และราคาขายปลีกรวม VAT (คอลัมน์ Retail Price) ให้ตรวจก่อนบันทึก · ไม่เก็บ Margin หรือราคาขายส่ง</p>
+    <div class="flex flex-wrap gap-2 items-center mb-2"><label class="btn btn-dark btn-sm relative">เลือกไฟล์ PDF ใบราคา<input type="file" accept=".pdf,application/pdf" data-cat-pdf class="absolute w-px h-px opacity-0"></label>
+      ${m.busy ? `<span class="text-sm"><span class="spin"></span> ${esc(m.busy)}</span>` : m.file ? `<span class="text-sm text-muted">ไฟล์ ${esc(m.file)}</span>` : ''}</div>
+    <details class="mb-1" ${m.text ? 'open' : ''}><summary class="text-sm cursor-pointer text-muted">หรือวางข้อความจาก PDF (เปิด PDF กด Ctrl+A แล้ว Ctrl+C)</summary>
+    <textarea id="cat-txt" rows="4" class="w-full mt-2" data-catx="1" placeholder="วางข้อความจากใบราคาที่นี่">${esc(m.text || '')}</textarea>
+    <div class="flex gap-2 mt-2"><button class="btn btn-ghost btn-sm" data-act="cat-parse">อ่านข้อความ</button></div></details>
+    ${m.pdfErr ? `<p class="text-sm" style="color:var(--bad)">${esc(m.pdfErr)}</p>` : ''}
+    ${m.parsed ? `<div class="mt-3">${m.parsed.length ? `<p class="text-sm mb-1">${m.issue && m.issue.no ? `ใบราคา Issued No. <b>${esc(m.issue.no)}</b>${m.issue.date ? ` (${esc(m.issue.date)})` : ''} · ` : ''}พบ ${m.parsed.length} รุ่น/เกรด (ปีรุ่นล่าสุด) · ใหม่ ${m.parsed.filter(r => !CATALOG[r.model] || !CATALOG[r.model][r.grade] || r.colors.some(c => !CATALOG[r.model][r.grade].includes(c))).length} รายการ · ราคา ${fmtN((m.prices || []).length)} รายการ (ทุกปีรุ่น)${m.prices && m.prices.length ? ` · ราคาเปลี่ยน/ใหม่ ${fmtN(priceMerge(catPrices(), m.prices).changed)} รายการ` : ''}</p>
+      <div class="scroll-x max-h-72 overflow-auto"><table class="tbl text-sm"><thead><tr><th>รุ่น</th><th>เกรด</th><th>สี</th><th class="text-right">ราคา (บาท)</th></tr></thead><tbody>${m.parsed.map(r => { const cur = (CATALOG[r.model] || {})[r.grade]; const ps = (m.prices || []).filter(p => p.model === r.model && p.grade === r.grade && p.year === r.year); return `<tr><td>${esc(r.model)}${r.year ? ` <span class="text-xs text-muted">MY'${String(r.year).slice(-2)}</span>` : ''}${CATALOG[r.model] ? '' : ' ' + chip('รุ่นใหม่', 'warn')}</td><td>${esc(r.grade)}${cur ? '' : ' ' + chip('ใหม่', 'warn')}</td><td>${r.colors.map(c => cur && cur.includes(c) ? esc(c) : `<b style="color:var(--warn)">${esc(c)}</b>`).join(' ')}</td><td class="num text-right text-xs">${priceCell(ps)}</td></tr>`; }).join('')}</tbody></table></div>
+      <button class="btn btn-red btn-sm mt-2" data-act="cat-save">บันทึกรุ่นและราคา</button>` : '<p class="text-sm" style="color:var(--bad)">ไม่พบรุ่น เกรด สีในข้อความนี้</p>'}</div>` : ''}</section>
   <section class="bg-surface border border-line rounded-lg p-4 mb-4"><h2 class="font-head font-semibold mb-2">เพิ่มเอง</h2>
     <div class="grid sm:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
       <div class="field"><label for="cat-m">รุ่น</label><input id="cat-m" list="cat-ms" data-catf="model" value="${esc(m.model || '')}" placeholder="เช่น CITY e:HEV"><datalist id="cat-ms">${Object.keys(CATALOG).map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>
       <div class="field"><label for="cat-g">เกรด</label><input id="cat-g" data-catf="grade" value="${esc(m.grade || '')}" placeholder="เช่น e:HEV SV"></div>
       <div class="field"><label for="cat-c">รหัสสี (คั่นด้วยจุลภาค)</label><input id="cat-c" data-catf="colors" value="${esc(m.colors || '')}" placeholder="เช่น MTG, CBL, PMW"></div>
       <button class="btn btn-dark btn-sm" data-act="cat-add">เพิ่ม</button></div></section>` : ''}
-  <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl"><thead><tr><th>รุ่น</th><th>เกรด</th><th>สี</th><th>มาจาก</th><th></th></tr></thead><tbody>
-    ${list.map(x => `<tr><td>${esc(x.mo)}</td><td>${esc(x.g)}</td><td class="text-sm">${x.cs.map(esc).join(' ')}</td><td class="text-xs">${[x.fromIds ? 'ไฟล์ IDS' : '', x.fromCat ? 'ใบราคา / เพิ่มเอง' : ''].filter(Boolean).join(' · ')}</td>
+  <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl"><thead><tr><th>รุ่น</th><th>เกรด</th><th>สี</th><th class="text-right">ราคา (ปีรุ่นล่าสุด)</th><th>มาจาก</th><th></th></tr></thead><tbody>
+    ${list.map(x => `<tr><td>${esc(x.mo)}</td><td>${esc(x.g)}</td><td class="text-sm">${x.cs.map(esc).join(' ')}</td><td class="num text-right text-xs">${priceCell(newestPrices(x.mo, x.g))}</td><td class="text-xs">${[x.fromIds ? 'ไฟล์ IDS' : '', x.fromCat ? 'ใบราคา / เพิ่มเอง' : ''].filter(Boolean).join(' · ')}</td>
       <td class="text-right">${can && x.fromCat ? `<button class="btn btn-ghost btn-sm" data-act="cat-del" data-k="${esc(x.mo + '|' + x.g)}">ลบ</button>` : ''}</td></tr>`).join('')}</tbody></table></div>
-  <p class="text-xs text-muted mt-2">รุ่น เกรด สีที่ขึ้นในไฟล์ IDS ระบบเพิ่มให้เอง ลบได้เฉพาะที่มาจากใบราคาหรือเพิ่มเอง</p>`;
+  <p class="text-xs text-muted mt-2">รุ่น เกรด สีที่ขึ้นในไฟล์ IDS ระบบเพิ่มให้เอง ลบได้เฉพาะที่มาจากใบราคาหรือเพิ่มเอง${catIssue() && catIssue().no ? ` · ราคาจากใบราคา Issued No. ${esc(catIssue().no)}${catIssue().date ? ' (' + esc(catIssue().date) + ')' : ''}` : ''}</p>`;
 }
-async function catSave(fn, act, note) {
+// "649,000" or "649,000 · CBL +6,000 · PMW +10,000": the grade's starting price and the colours that cost more
+function priceCell(ps) {
+  if (!ps || !ps.length) return '<span class="text-muted">–</span>';
+  const base = Math.min(...ps.map(p => p.price)), up = {};
+  ps.filter(p => p.price > base).forEach(p => { (up[p.price - base] ||= []).push(p.color); });
+  return `<b>${money(base)}</b>${Object.entries(up).sort((a, b) => a[0] - b[0]).map(([d, cs]) => `<br>${cs.map(esc).join('/')} +${money(Number(d))}`).join('')}`;
+}
+function newestPrices(model, grade) { const ps = catPrices().filter(p => p.model === model && p.grade === grade); const y = Math.max(0, ...ps.map(p => p.year || 0)); return ps.filter(p => (p.year || 0) === y); }
+async function catSave(fn, act, note, extra) {
   const cur = S.ref.get('catalog') || { rows: [] };
   const rows = (cur.rows || []).map(r => ({ ...r, colors: [...(r.colors || [])] }));
   if (fn(rows) === false) return false;
-  const ok = await write('ref', 'catalog', { rows, at: new Date().toISOString(), log: [...(cur.log || []), { ...actor(), act, note }].slice(-40) });
+  const ok = await write('ref', 'catalog', { ...cur, rows, ...(extra ? extra(cur) : {}), at: new Date().toISOString(), log: [...(cur.log || []), { ...actor(), act, note }].slice(-40) });
   if (ok) { S.cache = null; }
   return ok;
 }
@@ -94,10 +119,12 @@ function catMerge(rows, add) {
   }
 }
 Object.assign(ACTIONS, {
-  'cat-parse'() { const t = ($('#cat-txt') || {}).value || ''; S.adCat = { ...(S.adCat || {}), text: t, parsed: catParse(t) }; render(); },
+  'cat-parse'() { const t = ($('#cat-txt') || {}).value || '', P = catParseFull(t); S.adCat = { ...(S.adCat || {}), text: t, file: null, pdfErr: null, parsed: P.rows, prices: P.prices, issue: P.issue }; render(); },
   async 'cat-save'() {
     const p = S.adCat && S.adCat.parsed; if (!p || !p.length || !adminWrite()) return;
-    if (await catSave(rows => catMerge(rows, p), 'หลังบ้าน: อัปเดตรุ่นจากใบราคา', `${p.length} รุ่น/เกรด`)) { S.adCat = null; toast('บันทึกรุ่น เกรด สีแล้ว ใช้ในหน้าลงใบจองได้ทันที'); render(); }
+    const pr = S.adCat.prices || [], iss = S.adCat.issue || null;
+    const extra = pr.length ? cur => { const mg = priceMerge(cur.prices, pr); return { prices: mg.list, price_issue: { ...(iss || {}), at: new Date().toISOString() } }; } : null;
+    if (await catSave(rows => catMerge(rows, p), 'หลังบ้าน: อัปเดตรุ่นจากใบราคา', `${p.length} รุ่น/เกรด${pr.length ? ` · ราคา ${pr.length} รายการ` : ''}${iss && iss.no ? ` · Issued No. ${iss.no}` : ''}`, extra)) { S.adCat = null; toast(pr.length ? 'บันทึกรุ่นและราคาแล้ว' : 'บันทึกรุ่น เกรด สีแล้ว ใช้ในหน้าลงใบจองได้ทันที'); render(); }
   },
   async 'cat-add'() {
     const m = S.adCat || {}; if (!adminWrite()) return;

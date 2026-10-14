@@ -390,6 +390,7 @@ async function saveBooking() {
     booking_no: d.booking_no.trim() || null, booking_date: d.booking_date, br: myBranch() || d.br || salesBranch(d.sales), sales: d.sales, customer: d.customer.trim(), source: d.source,
     model: d.model, grade: d.grade, color: d.color, model_text: d.model_text || null, purchase: d.purchase, finance: fin ? d.finance : null,
     fin_status: fin ? 'รอผล' : null, deposit: num(d.deposit) || 0, receipt_no: (d.receipt_no || '').trim() || null, discount: num(d.discount), foc_total: num(d.foc_total), insurance: d.insurance,
+    ...bookPriceSnap(d),
     delivery_plan: validDate(d.delivery_plan), lead_id: d.lead_id || null, note: d.note || null, ids_claim: d.ids_claim || null,
     doc_imgs, slip_imgs, img_missing: imgMissing, slip: S.files.slip.length > 0, flow: {},
     ai: d.ai, ai_ok: !!d.ai, ai_fields: d.aiFields, checks: checks.map(({ t, bad }) => ({ t, bad: !!bad })),

@@ -4,16 +4,16 @@
 // Only function declarations here: the first render runs before this part of the file.
 function dashTabs() {
   const r = S.role.role; if (r !== 'exec' && !MGR_OF[r]) return '';
-  const cur = dashSub(), tabs = r === 'exec' ? [['exec', 'สรุปผู้บริหาร'], ['sales', 'ยอดขายและเป้า'], ['ana', 'วิเคราะห์'], ['ops', 'งานรออนุมัติและคิวรถ']] : [['ops', 'งานรออนุมัติและคิวรถ'], ['sales', 'ยอดขายและเป้า'], ['ana', 'วิเคราะห์']];
+  const cur = dashSub(), tabs = r === 'exec' ? [['exec', 'สรุปผู้บริหาร'], ['sales', 'ยอดขายและเป้า'], ['ana', 'วิเคราะห์'], ['acct', 'บัญชี'], ['ops', 'งานรออนุมัติและคิวรถ']] : [['ops', 'งานรออนุมัติและคิวรถ'], ['sales', 'ยอดขายและเป้า'], ['ana', 'วิเคราะห์'], ['acct', 'บัญชี']];
   return `<div class="seg mb-4" role="group" aria-label="มุมมอง">${tabs.map(([k, t]) => `<button data-act="sub" data-key="dash" data-sub="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>`;
 }
 // a manager sees sales, targets and analysis only for the branches they look after; the executive sees all
 function dashScoped(D, sub) {
   const own = MGR_OF[S.role.role], keep = S.br;
   if (own) { S.brScope = own; if (S.br && !own.includes(S.br)) S.br = ''; }
-  try { return sub === 'sales' ? dashSalesTarget(D) : dashAna(D); } finally { S.brScope = null; if (own && keep && !own.includes(keep)) S.br = keep; }
+  try { return sub === 'sales' ? dashSalesTarget(D) : sub === 'acct' ? dashAcct(D) : dashAna(D); } finally { S.brScope = null; if (own && keep && !own.includes(keep)) S.br = keep; }
 }
-function dashSub() { const s = S.sub.dash || 'exec'; if (S.role.role === 'exec') return s; return s === 'sales' || s === 'ana' ? s : 'ops'; }
+function dashSub() { const s = S.sub.dash || 'exec'; if (S.role.role === 'exec') return s; return s === 'sales' || s === 'ana' || s === 'acct' ? s : 'ops'; }
 function monthsIn(from, to) { const out = []; let d = from.slice(0, 7); while (d <= to.slice(0, 7)) { out.push(d); const [y, m] = d.split('-').map(Number); d = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`; } return out; }
 function dCard(title, body, note) { return `<section class="bg-surface border border-line rounded-lg p-4 min-w-0"><h2 class="font-head font-semibold mb-2">${title}</h2>${body}${note ? `<p class="text-xs text-muted mt-2">${note}</p>` : ''}</section>`; }
 function pctOf(a, b) { return b ? Math.round(a / b * 100) : 0; }
