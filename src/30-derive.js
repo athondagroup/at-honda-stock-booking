@@ -196,6 +196,8 @@ function deriveNow() {
   const outByVin = new Map(deliveredOut.map(c => [c.vin, c]));
   for (const l of locks) {
     l.type = l.type === 'customer' ? 'booking' : (l.type || 'booking');
+    // a request read from the Stock sheet before the nickname was known: match the nickname again with today's list
+    if (!l.sales && l.sales_nick) { const s = salesOfNick(l.sales_nick); if (s) { l.sales = s; l.warnings = (l.warnings || []).filter(w => !/^ยังไม่รู้ว่า/.test(w)); } }
     l.days = LOCK_DAYS_BY[l.type] || 15;
     const bk = l.bkref ? bookingByKey.get(l.bkref) : null;
     const rec = bk && bk.app ? bk.app.rec : null;

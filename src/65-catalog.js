@@ -54,8 +54,9 @@ function catParseFull(text) {
     cs.forEach(c => out.get(key).colors.add(c.toUpperCase()));
     const pm = rest.match(/(\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?/), price = pm ? Number(pm[1].replace(/,/g, '')) : null;
     if (price && price >= 100000) cs.forEach(c => {
-      const k = key + '|' + c.toUpperCase(), cur = prices.get(k);
-      if (!cur || qdRank(qd) >= qdRank(cur.qd)) prices.set(k, { model, grade, year, color: c.toUpperCase(), price, qd: qd || null });
+      const k = key + '|' + c.toUpperCase();
+      if (!prices.has(k)) prices.set(k, []);
+      prices.get(k).push({ model, grade, year, color: c.toUpperCase(), price, qd: qd || null });
     });
   }
   // keep the newest model year of each model only: older years are no longer ordered (old codes stay only if a car of that year is in IDS)
@@ -64,7 +65,15 @@ function catParseFull(text) {
   const keep = new Map();
   rows.filter(r => !newest[r.model] || r.year === newest[r.model]).forEach(r => { const k = r.model + '|' + r.grade; if (!keep.has(k)) keep.set(k, { model: r.model, grade: r.grade, year: r.year, colors: new Set() }); r.colors.forEach(c => keep.get(k).colors.add(c)); });
   // prices of every model year are kept: a car of last year's model in stock is still sold at its own price
-  return { rows: [...keep.values()].map(r => ({ ...r, colors: [...r.colors].sort() })), prices: [...prices.values()], issue };
+  // two quotations in one model year (CITY: before and after the campaign adjustment): the newest is the current price,
+  // the one before it the "ราคาเดิม" price, used for cars IDS marks "ราคาเดิม"
+  const out2 = [];
+  prices.forEach(list => {
+    const s = list.slice().sort((a, b) => qdRank(b.qd) - qdRank(a.qd));
+    out2.push({ ...s[0], tier: 'cur' });
+    const o = s.find(x => x.qd !== s[0].qd && x.price !== s[0].price); if (o) out2.push({ ...o, tier: 'old' });
+  });
+  return { rows: [...keep.values()].map(r => ({ ...r, colors: [...r.colors].sort() })), prices: out2, issue };
 }
 function catParse(text) { return catParseFull(text).rows; }
 function catRows() { return (S.ref.get('catalog') || {}).rows || []; }
@@ -93,12 +102,17 @@ function adminCatalog(D) {
       <button class="btn btn-dark btn-sm" data-act="cat-add">เพิ่ม</button></div></section>` : ''}
   <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl"><thead><tr><th>รุ่น</th><th>เกรด</th><th>สี</th><th class="text-right">ราคา (ปีรุ่นล่าสุด)</th><th>มาจาก</th><th></th></tr></thead><tbody>
     ${list.map(x => `<tr><td>${esc(x.mo)}</td><td>${esc(x.g)}</td><td class="text-sm">${x.cs.map(esc).join(' ')}</td><td class="num text-right text-xs">${priceCell(newestPrices(x.mo, x.g))}</td><td class="text-xs">${[x.fromIds ? 'ไฟล์ IDS' : '', x.fromCat ? 'ใบราคา / เพิ่มเอง' : ''].filter(Boolean).join(' · ')}</td>
-      <td class="text-right">${can && x.fromCat ? `<button class="btn btn-ghost btn-sm" data-act="cat-del" data-k="${esc(x.mo + '|' + x.g)}">ลบ</button>` : ''}</td></tr>`).join('')}</tbody></table></div>
+      <td class="text-right nowrap">${can ? `<button class="btn btn-ghost btn-sm" data-act="cat-edit" data-k="${esc(x.mo + '|' + x.g)}">แก้ / ใส่ราคา</button>` : ''}${can && x.fromCat ? `<button class="btn btn-ghost btn-sm" data-act="cat-del" data-k="${esc(x.mo + '|' + x.g)}">ลบ</button>` : ''}</td></tr>`).join('')}</tbody></table></div>
   <p class="text-xs text-muted mt-2">รุ่น เกรด สีที่ขึ้นในไฟล์ IDS ระบบเพิ่มให้เอง ลบได้เฉพาะที่มาจากใบราคาหรือเพิ่มเอง${catIssue() && catIssue().no ? ` · ราคาจากใบราคา Issued No. ${esc(catIssue().no)}${catIssue().date ? ' (' + esc(catIssue().date) + ')' : ''}` : ''}</p>`;
 }
 // "649,000" or "649,000 · CBL +6,000 · PMW +10,000": the grade's starting price and the colours that cost more
-function priceCell(ps) {
-  if (!ps || !ps.length) return '<span class="text-muted">–</span>';
+function priceCell(all) {
+  if (!all || !all.length) return '<span class="text-muted">–</span>';
+  const ps = all.filter(p => priceTier(p) === 'cur'), olds = all.filter(p => priceTier(p) === 'old');
+  if (!ps.length) return priceCellOne(olds);
+  return priceCellOne(ps) + (olds.length ? `<div class="text-muted mt-1">ราคาเดิม ${money(Math.min(...olds.map(p => p.price)))}${olds.some(o => o.price !== Math.min(...olds.map(p => p.price))) ? ' ขึ้นไป' : ''}</div>` : '');
+}
+function priceCellOne(ps) {
   const base = Math.min(...ps.map(p => p.price)), up = {};
   ps.filter(p => p.price > base).forEach(p => { (up[p.price - base] ||= []).push(p.color); });
   return `<b>${money(base)}</b>${Object.entries(up).sort((a, b) => a[0] - b[0]).map(([d, cs]) => `<br>${cs.map(esc).join('/')} +${money(Number(d))}`).join('')}`;
