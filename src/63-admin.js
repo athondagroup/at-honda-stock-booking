@@ -4,7 +4,8 @@
 //    Deleting a row in the file never deletes anything; put "Y" in "เอาออก" to take a record out (it can be put back here).
 // Writes: the executive and the managers (bookings and locks of their own branches; the sales roster for both managers).
 // Branch admins can look and download. Only function declarations here: the first render runs before this file.
-function adminCan() { return perms().approve || S.role.role === 'admin'; }
+// หลังบ้าน: the executive only (ตกลง 14/10: managers and branch admins no longer)
+function adminCan() { return S.role.role === 'exec'; }
 function adminWrite(br) { return perms().write && perms().approve && (!br || canApproveBr(br)); }
 function adminTabs() { return [...(window.__WEB && window.__WEB.role === 'exec' ? [['users', 'ผู้ใช้งานเว็บ']] : []), ['sales', 'รายชื่อเซลล์'], ['cat', 'รุ่น เกรด สี'], ['book', 'ใบจอง'], ['lock', 'ล็อกรถ'], ['file', 'แก้ผ่าน Excel / Google Sheet'], ['log', 'ประวัติหลังบ้าน']]; }
 function viewAdmin(D) {

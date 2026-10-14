@@ -34,7 +34,7 @@ function badgeCounts(D) {
   };
 }
 // each role sees only the pages it works with: sales do not receive cars or upload IDS files
-const navFor = () => NAV.filter(n => !(isSales() && (n.id === 'receive' || n.id === 'upload' || n.id === 'admin')));
+const navFor = () => NAV.filter(n => !(isSales() && (n.id === 'receive' || n.id === 'upload')) && !(n.id === 'admin' && S.role.role !== 'exec'));
 // the menu shows 6 groups (ตกลง 13/10 แบบ ค); pages of one group switch with the tabs at the top of the page
 const GROUPS = [
   { id: 'dash', label: 'ภาพรวม', views: ['dash'] },
