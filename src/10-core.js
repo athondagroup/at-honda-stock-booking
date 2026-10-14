@@ -22,14 +22,14 @@ const ROLES = {
 const LOCK_REASONS = ['รอผลอนุมัติไฟแนนซ์', 'รอโอนเงินดาวน์/ชำระส่วนที่เหลือ', 'ลูกค้าขอดูรถก่อนตัดสินใจ', 'อื่น ๆ'];
 const FINANCE = ['HLTC', 'BAY', 'SCB', 'TTB', 'KKP', 'อื่น ๆ'];
 // the Google Form's choices (as answered in the sheet, 13/10)
-const SOURCES = ['Online – เซลล์หาเอง', 'ลูกค้าแนะนำ', 'Walk-in', 'Call', 'Lead Bot — รับเคสผ่าน Telegram', 'ลูกค้าเก่า', 'Service', 'Facebook ตัวเอง', 'Honda SPEAR', 'Telegram', 'เพื่อนแนะนำ'];
-const INSURANCE = ['Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม', 'ลูกค้าซื้อเอง'];
+const SOURCES = ['Walk-in','Call', 'ลูกค้าแนะนำ','Online – เซลล์หาเอง','Lead Bot — รับเคสผ่าน Telegram','ลูกค้าเก่า', 'Service', 'Honda SPEAR'];
+const INSURANCE = ['Honda แถม','AT แถม', 'ลูกค้าซื้อ'];
 // insurers taking part in Honda's new-car insurance (campaign 1–31 Oct 2569, HEI 26-D / Super Pack); others can be typed in
-const INSURERS = ['คุ้มภัยโตเกียวมารีนประกันภัย', 'กรุงเทพประกันภัย', 'ซมโปะประกันภัย', 'ธนชาตประกันภัย', 'ประกันภัยไทยวิวัฒน์', 'แอกซ่าประกันภัย', 'มิตซุย สุมิโตโม อินชัวรันซ์'];
+const INSURERS = ['ซมโปะประกันภัย', 'ธนชาตประกันภัย','คุ้มภัยโตเกียวมารีนประกันภัย', 'กรุงเทพประกันภัย',  'ประกันภัยไทยวิวัฒน์', 'แอกซ่าประกันภัย', 'มิตซุย สุมิโตโม อินชัวรันซ์','วิริยะประกันภัย'];
 const SRC_LABEL = { stock: 'Stock', booking: 'Booking', quota: 'Quota', invoice: 'Invoice/DL' };
 const CAR_STATUS = {
   free: ['ว่าง', 'good'], noted: ['มีชื่อจองไว้', 'warn'], booked: ['จัดสรรแล้ว (IDS)', 'neutral'],
-  sold: ['แจ้งขายแล้ว', 'muted'], invoiced: ['ออกใบกำกับแล้ว', 'muted'], delivered: ['ส่งมอบแล้ว', 'muted'],
+  sold: ['แจ้งขายแล้ว', 'muted'], invoiced: ['ออกใบกำกับแล้ว', 'neutral'], delivered: ['ส่งมอบแล้ว', 'muted'],
   company: ['รถบริษัท', 'muted'], pending: ['รออนุมัติล็อก', 'warn'], locked: ['ล็อกชั่วคราว', 'red'],
   allocated: ['แจ้งจัดสรรแล้ว รอไฟล์ IDS', 'ink']
 };
