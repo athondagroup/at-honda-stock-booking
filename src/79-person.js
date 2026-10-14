@@ -57,6 +57,7 @@ function dashPerson(D) {
     ${dCard(`เซลล์ ${mo ? fmtM(mo) : 'ปี ' + y}`, `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>เซลล์</th>${cols.map(([, t]) => `<th class="text-right">${t}</th>`).join('')}</tr></thead><tbody>
       ${rows.map(p => `<tr><td class="nowrap"><button class="underline decoration-dotted text-left" data-act="pm-who" data-n="${esc(p.n)}">${salesName(p.n)}</button></td>${cols.map(([c]) => `<td class="num text-right ${c === 'dv' ? 'font-semibold' : ''}">${pmBtn(p[c], { who: p.n, y, m: mo, c })}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length + 1}" class="text-muted">ไม่มีข้อมูล</td></tr>`}
       </tbody></table></div>`, 'กดชื่อเพื่อดูรายเดือนของคนนั้น · กดตัวเลขเพื่อดูรายคัน')}
+    ${personModelCard(D)}
     ${dCard(`ทุกคนรายเดือน ${y}`, pmMonthTable(D, '*', y, true))}`;
 }
 function pmModal(m, D) {

@@ -4,16 +4,17 @@
 // Only function declarations here: the first render runs before this part of the file.
 function dashTabs() {
   const r = S.role.role; if (r !== 'exec' && !MGR_OF[r]) return '';
-  const cur = dashSub(), tabs = r === 'exec' ? [['exec', 'สรุปผู้บริหาร'], ['sales', 'ยอดขายและเป้า'], ['person', 'รายบุคคล'], ['ana', 'วิเคราะห์'], ['acct', 'บัญชี'], ['ops', 'งานรออนุมัติและคิวรถ']] : [['ops', 'งานรออนุมัติและคิวรถ'], ['sales', 'ยอดขายและเป้า'], ['person', 'รายบุคคล'], ['ana', 'วิเคราะห์'], ['acct', 'บัญชี']];
+  const cur = dashSub(), tabs = r === 'exec' ? [['exec', 'สรุปผู้บริหาร'], ['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล'], ['acct', 'บัญชี'], ['ops', 'งานรออนุมัติและคิวรถ']] : [['ops', 'งานรออนุมัติและคิวรถ'], ['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล'], ['acct', 'บัญชี']];
   return `<div class="seg mb-4" role="group" aria-label="มุมมอง">${tabs.map(([k, t]) => `<button data-act="sub" data-key="dash" data-sub="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>`;
 }
 // a manager sees sales, targets and analysis only for the branches they look after; the executive sees all
 function dashScoped(D, sub) {
   const own = MGR_OF[S.role.role], keep = S.br;
   if (own) { S.brScope = own; if (S.br && !own.includes(S.br)) S.br = ''; }
-  try { return sub === 'sales' ? dashSalesTarget(D) : sub === 'acct' ? dashAcct(D) : sub === 'person' ? dashPerson(D) : dashAna(D); } finally { S.brScope = null; if (own && keep && !own.includes(keep)) S.br = keep; }
+  try { return sub === 'sales' ? dashSalesTarget(D) : sub === 'acct' ? dashAcct(D) : sub === 'person' ? dashPerson(D) : dashBook(D); } finally { S.brScope = null; if (own && keep && !own.includes(keep)) S.br = keep; }
 }
-function dashSub() { const s = S.sub.dash || 'exec'; if (S.role.role === 'exec') return s; return s === 'sales' || s === 'ana' || s === 'acct' || s === 'person' ? s : 'ops'; }
+// วิเคราะห์ was spread over ยอดจอง and ยอดขาย (14/10): a saved 'ana' opens ยอดจอง
+function dashSub() { let s = S.sub.dash || 'exec'; if (s === 'ana') s = 'book'; if (S.role.role === 'exec') return s; return ['sales', 'book', 'acct', 'person'].includes(s) ? s : 'ops'; }
 function monthsIn(from, to) { const out = []; let d = from.slice(0, 7); while (d <= to.slice(0, 7)) { out.push(d); const [y, m] = d.split('-').map(Number); d = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`; } return out; }
 function dCard(title, body, note) { return `<section class="bg-surface border border-line rounded-lg p-4 min-w-0"><h2 class="font-head font-semibold mb-2">${title}</h2>${body}${note ? `<p class="text-xs text-muted mt-2">${note}</p>` : ''}</section>`; }
 function pctOf(a, b) { return b ? Math.round(a / b * 100) : 0; }
@@ -89,7 +90,9 @@ function dashSalesTarget(D) {
   </div>
   ${dCard(`แยกรุ่น <span class="text-muted text-sm font-normal">เป้า ${fmtN(tT)} · ใบกำกับในเดือนที่มีเป้า ${fmtN(tIt)} (${tT ? pctOf(tIt, tT) + '%' : '–'}) · ใบกำกับทั้งช่วง ${fmtN(tI)}</span>`, `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>รุ่น</th><th class="text-right">เป้า</th><th class="text-right">ใบกำกับ</th><th class="text-right">% เป้า</th><th class="text-right">ส่งมอบ</th><th class="text-right">จอง</th></tr></thead><tbody>
     ${mrow.map(r => `<tr><td class="nowrap">${esc(r.md)}</td><td class="num text-right">${r.t ? fmtN(r.t) : '–'}</td><td class="num text-right font-semibold">${fmtN(r.i)}</td><td class="num text-right">${pctCell(r.it, r.t)}</td><td class="num text-right">${fmtN(r.d)}</td><td class="num text-right">${fmtN(r.b)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ไม่มีข้อมูลในช่วงนี้</td></tr>'}</tbody></table></div>`)}
-  ${carListCard(D, E)}`;
+  ${salesCompare(D, E)}
+  ${carListCard(D, E)}
+  ${(A => `<div class="grid lg:grid-cols-2 gap-5 my-5">${A.lead}${A.old}${A.idle}</div>${A.trade}`)(dashAna(D, true))}`;
 }
 
 // ---- analysis: what customers book, who sells, what falls through, what sits in stock
@@ -106,7 +109,7 @@ function mixOf(cur, prev, key) {
 // the finance company: what the sales confirmed, the booking form, or the invoice in DL (old form bookings have none)
 function finKey(a, D) { if (isCash(a.rec)) return 'ซื้อสด'; const v = atVin(a), i = v && D && D.invByVin.get(v); return String((a.rec.flow && a.rec.flow.fin && a.rec.flow.fin.company) || a.rec.finance || (i && i.fin) || 'ไฟแนนซ์ (ยังไม่ระบุบริษัท)').toUpperCase(); }
 function atVin(a) { return (a.match && a.match.vin) || (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || null; }
-function dashAna(D) {
+function dashAna(D, part) {
   const E = execData(D), [pf, pt] = prevRange(E.from, E.to), inR = d => !!d && d >= E.from && d <= E.to;
   const all = D.at.filter(a => !a.demo && inBr(a));
   const cur = all.filter(a => inR(a.date)), curOk = cur.filter(a => !a.cancelled);
@@ -139,6 +142,35 @@ function dashAna(D) {
   const oldRows = Object.values(old).sort((a, b) => b.n90 - a.n90 || b.n60 - a.n60);
   const idle = {}; cars.filter(c => c.status === 'free' || c.status === 'temp').forEach(c => { const sp = D.specs[c.spec]; if (sp && sp.waiting) return; const o = (idle[c.spec] ||= { s: c.spec, n: 0, max: 0 }); o.n++; o.max = Math.max(o.max, c.age ?? 0); });
   const idleRows = Object.values(idle).sort((a, b) => b.n - a.n || b.max - a.max);
+  // pieces, shown on ยอดจอง (bookings) and ยอดขาย (sales) since 14/10
+  const PARTS = { tiles: `${tiles([
+    tile('ยอดจอง', fmtN(curOk.length), { sub2: `ช่วงก่อน ${fmtN(prev.length)} (${curOk.length >= prev.length ? '+' : ''}${curOk.length - prev.length})` }),
+    tile('ยกเลิก', `${pctOf(cx.length, cur.length)}%`, { tone: pctOf(cx.length, cur.length) > 10 ? 'bad' : '', sub2: `${fmtN(cx.length)} จาก ${fmtN(cur.length)} ใบ` }),
+    tile('ไฟแนนซ์ / สด', `${pctOf(curOk.filter(a => !isCash(a.rec)).length, curOk.length)}%`, { sub2: `สด ${fmtN(curOk.filter(a => isCash(a.rec)).length)} ใบ` }),
+    tile('จองถึงส่งมอบ (มัธยฐาน)', allLead.length ? `${med(allLead)} วัน` : '–', { sub2: allLead.length ? `เฉลี่ย ${Math.round(allLead.reduce((a, b) => a + b, 0) / allLead.length)} วัน · ${allLead.length} คัน` : '' }),
+    tile('รถเกิน 90 วัน', fmtN(cars.filter(c => (c.age ?? 0) > 90).length), { tone: 'warn', view: 'stock', sub2: `เกิน 60 วัน ${fmtN(cars.filter(c => (c.age ?? 0) > 60).length)} คัน` })
+  ], 'lg:grid-cols-5')}`,
+    mix: `${dCard('การจองแยกตามรุ่น เกรด สี ไฟแนนซ์ และช่องทาง', `<div class="grid lg:grid-cols-2 gap-5">
+    ${mixTable(mixOf(curOk, prev, a => a.model), 'รุ่น')}
+    ${mixTable(mixOf(curOk, prev, a => `${a.model || ''} ${gradeShort(a.model, a.grade) || a.grade || ''}`.trim()), 'รุ่น + เกรด')}
+    ${mixTable(mixOf(curOk, prev, a => a.color), 'สี')}
+    ${mixTable(mixOf(curOk, prev, a => finKey(a, D)), 'ไฟแนนซ์ / ซื้อสด')}
+    ${mixTable(mixOf(curOk, prev, a => a.rec.source), 'ช่องทางลูกค้า')}
+    ${mixTable(mixOf(curOk, prev, a => a.spec ? specLabelText(a.spec) : ''), 'รุ่น เกรด สี (สเปก)')}</div>`, 'เปลี่ยน = เทียบช่วงก่อนหน้าที่ยาวเท่ากัน ใช้ดูว่ารุ่นหรือสีไหนคนจองเพิ่มขึ้นหรือลดลง')}`,
+    rank: `${dCard('อันดับเซลล์', `<div class="scroll-x max-h-96 overflow-auto"><table class="tbl text-sm"><thead><tr><th>เซลล์</th><th class="text-right">จอง</th><th class="text-right">ยกเลิก</th><th class="text-right">% ยกเลิก</th><th class="text-right">ใบกำกับ</th><th class="text-right">ส่งมอบ</th></tr></thead><tbody>
+      ${rank.map((p, i) => `<tr><td class="nowrap"><span class="text-muted num">${i + 1}.</span> ${salesName(p.n)}</td><td class="num text-right">${fmtN(p.bk)}</td><td class="num text-right">${fmtN(p.cx)}</td><td class="num text-right" ${pctOf(p.cx, p.bk + p.cx) > 20 ? 'style="color:var(--bad)"' : ''}>${p.bk + p.cx ? pctOf(p.cx, p.bk + p.cx) + '%' : '–'}</td><td class="num text-right">${fmtN(p.inv)}</td><td class="num text-right font-semibold">${fmtN(p.dv)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ไม่มีข้อมูล</td></tr>'}</tbody></table></div>`, 'เรียงตามส่งมอบ · ใบกำกับและส่งมอบนับจากใบจอง AT ที่ผูกกับรถ')}`,
+    cx: `${dCard(`ยกเลิก <span class="text-muted text-sm font-normal">${fmtN(cx.length)} ใบ</span>`, `<h3 class="font-medium mb-1 text-sm">เหตุผล</h3>${barList(Object.entries(cxR).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ k, v, pct: pctOf(v, cx.length) })), '--viz-2', 'ใบ')}
+      <h3 class="font-medium mt-3 mb-1 text-sm">รุ่น (อัตรายกเลิก)</h3>${barList(Object.entries(cxM).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => ({ k, v, pct: pctOf(v, cur.filter(a => a.model === k).length) })), '--viz-2', 'ใบ')}`)}`,
+    fin: `${dCard('ไฟแนนซ์ ผ่าน / ไม่ผ่าน', `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>บริษัท</th><th class="text-right">ยื่น (จอง)</th><th class="text-right">ผ่าน</th><th class="text-right">ไม่ผ่าน</th><th class="text-right">รอผล</th><th class="text-right">% ผ่าน</th></tr></thead><tbody>
+      ${finRows.map(r => `<tr><td>${esc(r.k)}</td><td class="num text-right">${fmtN(r.n)}</td><td class="num text-right">${fmtN(r.ok)}</td><td class="num text-right" ${r.no ? 'style="color:var(--bad)"' : ''}>${fmtN(r.no)}</td><td class="num text-right text-muted">${fmtN(r.n - r.ok - r.no)}</td><td class="num text-right font-semibold">${r.ok + r.no ? pctOf(r.ok, r.ok + r.no) + '%' : '–'}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ไม่มีข้อมูล</td></tr>'}</tbody></table></div>`, '% ผ่าน = ผ่าน ÷ (ผ่าน + ไม่ผ่าน) · ใบจองจากฟอร์มเดิมที่ไม่ได้บันทึกผลไฟแนนซ์นับเป็นรอผล จนกว่าจะส่งมอบ')}`,
+    lead: `${dCard('จำนวนวันจากจองถึงส่งมอบ', `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>รุ่น</th><th class="text-right">ส่งมอบ</th><th class="text-right">เฉลี่ย (วัน)</th><th class="text-right">มัธยฐาน (วัน)</th></tr></thead><tbody>
+      ${leadRows.map(r => `<tr><td>${esc(r.k)}</td><td class="num text-right">${fmtN(r.n)}</td><td class="num text-right">${r.avg}</td><td class="num text-right font-semibold">${r.med}</td></tr>`).join('') || '<tr><td colspan="4" class="text-muted">ไม่มีข้อมูล</td></tr>'}</tbody></table></div>`, 'นับใบจอง AT ที่ส่งมอบในช่วงนี้ · ใช้ตอบลูกค้าว่ารุ่นนี้รอรถประมาณกี่วัน')}`,
+    old: `${dCard('รถค้างสต็อก (เกิน 60 วัน)', `<div class="scroll-x max-h-80 overflow-auto"><table class="tbl text-sm"><thead><tr><th>รุ่น เกรด สี</th><th class="text-right">เกิน 60</th><th class="text-right">เกิน 90</th><th class="text-right">เก่าสุด (วัน)</th><th class="text-right">ยังว่าง</th></tr></thead><tbody>
+      ${oldRows.map(r => `<tr><td class="nowrap">${specLabel(r.s)}</td><td class="num text-right">${r.n60}</td><td class="num text-right" ${r.n90 ? 'style="color:var(--bad)"' : ''}>${r.n90 || '–'}</td><td class="num text-right">${r.max}</td><td class="num text-right">${r.free || '–'}</td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">ไม่มีรถเกิน 60 วัน</td></tr>'}</tbody></table></div>`, 'อายุรถนับจากวันผลิต (ถ้าไม่มี นับจากวันฝากศูนย์หรือวันเข้าสต็อก) · ไม่นับรถบริษัท')}`,
+    idle: `${dCard('สเปกที่มีรถว่าง แต่ไม่มีคนรอ', `<div class="scroll-x max-h-80 overflow-auto"><table class="tbl text-sm"><thead><tr><th>รุ่น เกรด สี</th><th class="text-right">รถว่าง</th><th class="text-right">เก่าสุด (วัน)</th></tr></thead><tbody>
+      ${idleRows.map(r => `<tr><td class="nowrap">${specLabel(r.s)}</td><td class="num text-right font-semibold">${r.n}</td><td class="num text-right" ${r.max > 90 ? 'style="color:var(--bad)"' : ''}>${r.max}</td></tr>`).join('') || '<tr><td colspan="3" class="text-muted">ทุกสเปกที่มีรถว่างมีคนรอ</td></tr>'}</tbody></table></div>`, 'ไม่มีใบจองรอสเปกนี้เลย เป็นสเปกที่ควรทำโปรหรือแนะนำลูกค้า')}`,
+    trade: tradeCard(E, dCard, pctOf) };
+  if (part) return PARTS;
   return `${pageHead('วิเคราะห์', `ยอดจองตามวันที่จอง ${fmtD(E.from)} – ${fmtD(E.to)} เทียบช่วงก่อนหน้าที่ยาวเท่ากัน (${fmtD(pf)} – ${fmtD(pt)}) · ไม่นับใบที่ยกเลิก`)}
   ${dashTabs()}${periodBar(E)}
   ${tiles([

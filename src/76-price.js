@@ -152,7 +152,8 @@ function dashAcct(D) {
     tile('FOC ที่ใช้รวม', money(sumF), { sub2: rows.length ? `เฉลี่ย ${money(Math.round(sumF / rows.length))} บาท/คัน` : '' })
   ], 'lg:grid-cols-5')}
   ${oddBox}
-  <div class="grid lg:grid-cols-2 gap-5 mb-5">
+  ${dCard('เปรียบเทียบสาขา', gTable(acctGroup(rows, r => r.a.delivBr || r.a.br), 'สาขา'), 'สาขาที่ออกรถ · ตัวแดง = % ส่วนลดสูงกว่าค่าเฉลี่ยเกิน 1.5 เท่า')}
+  <div class="grid lg:grid-cols-2 gap-5 my-5">
     ${dCard('แยกเซลล์', gTable(acctGroup(rows, r => r.a.sales), 'เซลล์'), `ตัวแดง = % ส่วนลดสูงกว่าค่าเฉลี่ยเกิน 1.5 เท่า · ไม่นับใบที่ส่วนลดเกิน ${acctOddPct()}%`)}
     ${dCard('แยกรุ่น เกรด', gTable(acctGroup(rows, r => `${r.a.model || ''} ${gradeShort(r.a.model, r.a.grade) || r.a.grade || ''}`.trim()), 'รุ่น เกรด'))}
   </div>
