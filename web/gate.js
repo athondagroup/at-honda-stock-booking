@@ -16,22 +16,69 @@
   const ROLE_TH = { sales: 'เซลล์', admin: 'แอดมินสาขา', aum: 'ผู้จัดการ PSC, ATE', nuch: 'ผู้จัดการ SPH, KPA', exec: 'ผู้บริหาร' };
 
   function screen(html) { gate.hidden = false; gate.innerHTML = `<div class="gate-card"><div class="gate-brand">AT Honda</div><div class="gate-sub">สต็อก จอง และล็อกรถ</div>${html}</div>`; }
-  function showLogin(msg) {
+  // sign-in: e-mail + password (set once after the first e-mail link); the e-mail link stays for the first time
+  // and for a forgotten password; Google shows only when it is switched on in Supabase (Authentication → Providers)
+  let googleOn = null;
+  async function googleEnabled() {
+    if (googleOn !== null) return googleOn;
+    try { const r = await fetch(CFG.url + '/auth/v1/settings', { headers: { apikey: CFG.key } }); const j = await r.json(); googleOn = !!(j && j.external && j.external.google); } catch (e) { googleOn = false; }
+    return googleOn;
+  }
+  async function showLogin(msg) {
+    const g = await googleEnabled(), last = localStorage.getItem('ath-email') || '';
     screen(`${msg ? `<p class="gate-msg">${msg}</p>` : ''}
-      <button class="gate-btn gate-google" id="g-google">เข้าสู่ระบบด้วย Google</button>
-      <div class="gate-or">หรือรับลิงก์เข้าระบบทางอีเมล</div>
-      <form id="g-mail" class="gate-row"><input id="g-email" type="email" required placeholder="อีเมลที่ลงทะเบียนไว้" autocomplete="email"><button class="gate-btn">ส่งลิงก์</button></form>
-      <p class="gate-note">ใช้อีเมลที่ผู้ดูแลระบบเพิ่มไว้แล้วเท่านั้น</p>`);
+      <form id="g-pass" class="gate-col">
+        <input id="g-email" type="email" required placeholder="อีเมลที่ลงทะเบียนไว้" autocomplete="username" value="${esc(last)}">
+        <input id="g-pw" type="password" placeholder="รหัสผ่าน" autocomplete="current-password">
+        <button class="gate-btn">เข้าสู่ระบบ</button>
+      </form>
+      <div class="gate-or">ครั้งแรก หรือลืมรหัสผ่าน</div>
+      <button class="gate-btn gate-ghost gate-wide" id="g-link">ส่งลิงก์เข้าระบบไปที่อีเมล</button>
+      <p class="gate-note">กดลิงก์ในอีเมลแล้ว ระบบให้ตั้งรหัสผ่าน ครั้งต่อไปใช้อีเมล + รหัสผ่านได้เลย · ใช้อีเมลที่ผู้ดูแลระบบเพิ่มไว้แล้วเท่านั้น</p>
+      ${g ? '<div class="gate-or">หรือ</div><button class="gate-btn gate-google" id="g-google">เข้าสู่ระบบด้วย Google</button>' : ''}`);
     const back = location.origin + location.pathname;
-    document.getElementById('g-google').onclick = async () => {
+    const emailOf = () => document.getElementById('g-email').value.trim().toLowerCase();
+    if (g) document.getElementById('g-google').onclick = async () => {
       const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: back } });
-      if (error) showLogin(`เข้าสู่ระบบด้วย Google ไม่ได้: ${esc(error.message)} (ผู้ดูแลต้องเปิด Google ใน Supabase ก่อน)`);
+      if (error) showLogin(`เข้าสู่ระบบด้วย Google ไม่ได้: ${esc(error.message)}`);
     };
-    document.getElementById('g-mail').onsubmit = async ev => {
+    document.getElementById('g-pass').onsubmit = async ev => {
       ev.preventDefault();
-      const email = document.getElementById('g-email').value.trim().toLowerCase();
+      const email = emailOf(), password = document.getElementById('g-pw').value;
+      if (!password) { showLogin('ใส่รหัสผ่าน หรือกด "ส่งลิงก์เข้าระบบไปที่อีเมล" ถ้ายังไม่เคยตั้ง'); return; }
+      localStorage.setItem('ath-email', email);
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) { showLogin(/invalid/i.test(error.message) ? 'อีเมลหรือรหัสผ่านไม่ถูก ถ้ายังไม่เคยตั้งรหัสผ่าน หรือลืม กดส่งลิงก์เข้าระบบ' : `เข้าระบบไม่ได้: ${esc(error.message)}`); return; }
+      boot();
+    };
+    document.getElementById('g-link').onclick = async () => {
+      const email = emailOf();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showLogin('ใส่อีเมลก่อน แล้วกดส่งลิงก์'); return; }
+      localStorage.setItem('ath-email', email);
       const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: back, shouldCreateUser: true } });
       showLogin(error ? `ส่งลิงก์ไม่ได้: ${esc(error.message)}` : `ส่งลิงก์ไปที่ ${esc(email)} แล้ว เปิดอีเมลแล้วกดลิงก์เพื่อเข้าระบบ`);
+    };
+  }
+  // set (or change) the password; after the first e-mail link this shows once, and from the menu "ตั้งรหัสผ่าน"
+  function showSetPass(email, done, msg) {
+    screen(`<p class="gate-msg">${msg || `ตั้งรหัสผ่านสำหรับ <b>${esc(email)}</b> ครั้งต่อไปเข้าด้วยอีเมล + รหัสผ่านได้เลย ไม่ต้องรอลิงก์`}</p>
+      <form id="g-set" class="gate-col">
+        <input type="email" value="${esc(email)}" autocomplete="username" readonly hidden>
+        <input id="g-p1" type="password" required minlength="6" placeholder="รหัสผ่านใหม่ (อย่างน้อย 6 ตัว)" autocomplete="new-password">
+        <input id="g-p2" type="password" required minlength="6" placeholder="พิมพ์รหัสผ่านอีกครั้ง" autocomplete="new-password">
+        <button class="gate-btn">บันทึกรหัสผ่าน</button>
+      </form>
+      <button class="gate-btn gate-ghost gate-wide" id="g-skip" style="margin-top:10px">ข้ามไปก่อน</button>`);
+    document.getElementById('g-skip').onclick = () => { localStorage.setItem('ath-pw-skip', email); done(); };
+    document.getElementById('g-set').onsubmit = async ev => {
+      ev.preventDefault();
+      const p1 = document.getElementById('g-p1').value, p2 = document.getElementById('g-p2').value;
+      if (p1.length < 6) { showSetPass(email, done, 'รหัสผ่านต้องมีอย่างน้อย 6 ตัว'); return; }
+      if (p1 !== p2) { showSetPass(email, done, 'รหัสผ่าน 2 ช่องไม่ตรงกัน ลองใหม่'); return; }
+      const { error } = await sb.auth.updateUser({ password: p1, data: { pw_set: true } });
+      if (error) { showSetPass(email, done, `ตั้งรหัสผ่านไม่ได้: ${esc(error.message)}`); return; }
+      localStorage.setItem('ath-email', email);
+      done();
     };
   }
   function showWaiting(email) {
@@ -167,6 +214,7 @@
     if (canSwitch) { try { const prev = JSON.parse(localStorage.getItem('ath-role') || 'null'); if (prev && prev.role) role = prev; } catch (e) { /* first visit */ } }
     localStorage.setItem('ath-role', JSON.stringify(role));
     window.__WEB = { email, name: m.name || email, role: m.role, canSwitch, logout: async () => { await sb.auth.signOut(); localStorage.removeItem('ath-role'); location.reload(); },
+      setPassword: () => showSetPass(email, () => { gate.hidden = true; gate.innerHTML = ''; }),
       // the executive manages who may sign in (RLS lets only the executive change this table)
       members: {
         async list() { const { data, error } = await sb.from('members').select('email,name,role,branch,sales_name,active,user_id,updated_at').order('role').order('email'); if (error) throw err(error); return data; },
@@ -211,6 +259,9 @@
     try { await sb.rpc('claim_member'); } catch (e) { /* names only */ }
     const { data: m } = await sb.from('members').select('*').eq('email', session.user.email.toLowerCase()).maybeSingle();
     if (!m || !m.active) { showWaiting(session.user.email); return; }
+    const em = session.user.email.toLowerCase(), meta = session.user.user_metadata || {};
+    // signed in by e-mail link and no password yet: offer to set one (once; "ข้ามไปก่อน" is remembered on this device)
+    if (!meta.pw_set && (session.user.app_metadata || {}).provider !== 'google' && localStorage.getItem('ath-pw-skip') !== em) { showSetPass(em, () => start(session, m)); return; }
     start(session, m);
   }
   sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') location.reload(); });

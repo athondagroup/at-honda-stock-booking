@@ -90,7 +90,7 @@ function roleControls(where) {
   // on the website the role comes from the login (members table); only the executive may try other roles
   const W = window.__WEB;
   if (W && !W.canSwitch) return `<div class="text-sm ${dark ? 'text-inkfg' : ''}"><div class="font-medium">${esc(W.name || W.email)}</div><div class="${dark ? 'text-inkmuted' : 'text-muted'} text-xs">${esc(roleLabel())}</div>
-    <button class="mt-2 underline text-xs ${dark ? 'text-inkmuted' : 'text-muted'}" data-act="web-logout">ออกจากระบบ</button></div>`;
+    <div class="flex gap-3 mt-2"><button class="underline text-xs ${dark ? 'text-inkmuted' : 'text-muted'}" data-act="web-pass">ตั้งรหัสผ่าน</button><button class="underline text-xs ${dark ? 'text-inkmuted' : 'text-muted'}" data-act="web-logout">ออกจากระบบ</button></div></div>`;
   const cls = dark ? 'style="background:var(--ink-line);color:var(--ink-fg);border-color:var(--ink-line)"' : '';
   const lab = dark ? 'style="color:var(--ink-muted)"' : '';
   return `<div class="field" ${lab}><label for="${where}-role">ทดลองใช้งานในบทบาท</label>
@@ -99,7 +99,7 @@ function roleControls(where) {
       <select id="${where}-rbr" data-role-field="branch" ${cls}>${BRS.map(b => `<option value="${b}" ${b === r.branch ? 'selected' : ''}>${b} ${BR[b].name}</option>`).join('')}</select></div>` : ''}
     ${r.role === 'sales' ? `<div class="field" ${lab}><label for="${where}-rs">ชื่อที่ปรึกษาขาย</label>
       <select id="${where}-rs" data-role-field="sales" ${cls}>${salesNames().map(s => `<option ${s === r.sales ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></div>` : ''}
-    ${S.me.name ? `<div class="${dark ? 'text-inkmuted' : 'text-muted'} text-xs">${W ? 'ผู้ใช้' : 'ผู้ใช้ claude.ai'}: ${esc(S.me.name)}</div>` : ''}${W ? `<button class="underline text-xs ${dark ? 'text-inkmuted' : 'text-muted'}" data-act="web-logout">ออกจากระบบ</button>` : ''}`;
+    ${S.me.name ? `<div class="${dark ? 'text-inkmuted' : 'text-muted'} text-xs">${W ? 'ผู้ใช้' : 'ผู้ใช้ claude.ai'}: ${esc(S.me.name)}</div>` : ''}${W ? `<div class="flex gap-3"><button class="underline text-xs ${dark ? 'text-inkmuted' : 'text-muted'}" data-act="web-pass">ตั้งรหัสผ่าน</button><button class="underline text-xs ${dark ? 'text-inkmuted' : 'text-muted'}" data-act="web-logout">ออกจากระบบ</button></div>` : ''}`;
 }
 
 // ------------------------------------------------------------------ views

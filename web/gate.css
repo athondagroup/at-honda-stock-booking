@@ -11,3 +11,6 @@
 .gate-row input { flex: 1; min-width: 0; min-height: 44px; border-radius: 10px; border: 1px solid #44454d; background: #17181c; color: #f4f4f5; padding: 0 12px; font: inherit; }
 .gate-msg { margin-bottom: 14px; line-height: 1.5; }
 .gate-note { color: #a1a1aa; font-size: 13px; margin-top: 12px; line-height: 1.5; }
+.gate-col { display: flex; flex-direction: column; gap: 10px; }
+.gate-col input { min-height: 44px; border-radius: 10px; border: 1px solid #44454d; background: #17181c; color: #f4f4f5; padding: 0 12px; font: inherit; }
+.gate-wide { width: 100%; }

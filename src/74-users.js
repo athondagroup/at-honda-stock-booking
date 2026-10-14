@@ -9,18 +9,18 @@ function adminUsers() {
   const roleOpt = cur => Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(v.label)}</option>`).join('');
   const brOpt = cur => `<option value="">–</option>${BRS.map(b => `<option ${b === cur ? 'selected' : ''}>${b}</option>`).join('')}`;
   const salesOpt = cur => `<option value="">–</option>${salesNames().map(s => `<option ${s === cur ? 'selected' : ''}>${esc(s)}</option>`).join('')}`;
-  return `${importBox()}<p class="text-sm text-muted mb-3">คนที่เข้าเว็บได้ต้องมีอีเมลในรายการนี้ (ล็อกอินด้วย Google หรือรับลิงก์ทางอีเมล) · เซลล์ต้องเลือกชื่อเซลล์ · แอดมินต้องเลือกสาขา · ปิดการใช้งานแทนการลบ</p>
+  return `${importBox()}<p class="text-sm text-muted mb-3">คนที่เข้าเว็บได้ต้องมีอีเมลในรายการนี้ · ครั้งแรกเข้าด้วยลิงก์ทางอีเมล แล้วตั้งรหัสผ่าน ครั้งต่อไปใช้อีเมล + รหัสผ่าน · เซลล์ต้องเลือกชื่อเซลล์ · แอดมินต้องเลือกสาขา · ผู้จัดการ (พี่อั้ม / นุช) สาขามากับบทบาท ไม่ต้องเลือก · ปิดการใช้งานแทนการลบ</p>
   <div class="bg-surface border border-line rounded-lg p-4 mb-4"><h3 class="font-medium mb-2">เพิ่ม / แก้ผู้ใช้</h3>
     <div class="grid sm:grid-cols-5 gap-3 items-end">
       <div class="field"><label for="u-em">อีเมล</label><input id="u-em" type="email" data-users="email" value="${esc(d.email || '')}" ${d.edit ? 'readonly' : ''}></div>
       <div class="field"><label for="u-nm">ชื่อที่แสดง</label><input id="u-nm" data-users="name" value="${esc(d.name || '')}"></div>
       <div class="field"><label for="u-rl">บทบาท</label><select id="u-rl" data-users="role">${roleOpt(d.role || 'sales')}</select></div>
-      <div class="field"><label for="u-br">สาขา</label><select id="u-br" data-users="branch">${brOpt(d.branch || '')}</select></div>
+      <div class="field"><label for="u-br">สาขา</label>${usersBrFixed(d.role || 'sales') ? `<div class="text-sm py-2" id="u-br">${usersBrFixed(d.role || 'sales')} <span class="text-muted">(ตามบทบาท)</span></div>` : `<select id="u-br" data-users="branch">${brOpt(d.branch || '')}</select>`}</div>
       <div class="field"><label for="u-sn">ชื่อเซลล์ (เฉพาะเซลล์)</label><select id="u-sn" data-users="sales_name">${salesOpt(d.sales_name || '')}</select></div>
     </div>
     <div class="flex flex-wrap gap-2 mt-3"><button class="btn btn-red btn-sm" data-act="users-save">${d.edit ? 'บันทึกการแก้' : '+ เพิ่มผู้ใช้'}</button>${d.edit ? '<button class="btn btn-ghost btn-sm" data-act="users-new">ยกเลิก</button>' : ''}</div></div>
   <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl text-sm"><thead><tr><th>อีเมล</th><th>ชื่อ</th><th>บทบาท</th><th>สาขา</th><th>ชื่อเซลล์</th><th>สถานะ</th><th></th></tr></thead><tbody>
-    ${U.list.map(u => `<tr ${u.active ? '' : 'class="text-muted"'}><td>${esc(u.email)}</td><td>${esc(u.name || '')}</td><td>${esc((ROLES[u.role] || {}).label || u.role)}</td><td>${esc(u.branch || '–')}</td><td>${esc(u.sales_name || '–')}</td>
+    ${U.list.map(u => `<tr ${u.active ? '' : 'class="text-muted"'}><td>${esc(u.email)}</td><td>${esc(u.name || '')}</td><td>${esc((ROLES[u.role] || {}).label || u.role)}</td><td>${esc(usersBrFixed(u.role) || u.branch || '–')}</td><td>${esc(u.sales_name || '–')}</td>
       <td>${u.active ? (u.user_id ? chip('ใช้งาน', 'good') : chip('ยังไม่เคยเข้า', 'neutral')) : chip('ปิดแล้ว', 'muted')}</td>
       <td class="text-right nowrap"><button class="btn btn-ghost btn-sm" data-act="users-edit" data-email="${esc(u.email)}">แก้</button>${u.email === window.__WEB.email ? '' : `<button class="btn btn-ghost btn-sm" data-act="users-toggle" data-email="${esc(u.email)}">${u.active ? 'ปิดการใช้งาน' : 'เปิดใช้งาน'}</button>`}</td></tr>`).join('')}</tbody></table></div>`;
 }
@@ -29,7 +29,9 @@ async function usersLoad() {
   try { S.webUsers = { list: await window.__WEB.members.list(), draft: {} }; } catch (e) { S.webUsers = { err: 'โหลดรายชื่อไม่ได้: ' + (e.message || '') }; }
   render();
 }
-document.addEventListener('input', ev => { const t = ev.target; if (t && t.dataset && t.dataset.users && S.webUsers && S.webUsers.draft) S.webUsers.draft[t.dataset.users] = t.value; });
+document.addEventListener('input', ev => { const t = ev.target; if (t && t.dataset && t.dataset.users && S.webUsers && S.webUsers.draft) { S.webUsers.draft[t.dataset.users] = t.value; if (t.dataset.users === 'role') render(); } });
+// managers' branches come with the role (พี่อั้ม: PSC, ATE · นุช: SPH, KPA); the executive sees every branch
+function usersBrFixed(role) { return MGR_OF[role] ? MGR_OF[role].join(', ') : role === 'exec' ? 'ทุกสาขา' : ''; }
 Object.assign(ACTIONS, {
   'users-reload'() { S.webUsers = null; render(); },
   'users-new'() { S.webUsers.draft = {}; render(); },
@@ -41,7 +43,7 @@ Object.assign(ACTIONS, {
     if (role === 'admin' && !d.branch) { toast('แอดมินต้องเลือกสาขา', 'bad'); return; }
     const prev = S.webUsers.list.find(x => x.email === email);
     try {
-      await window.__WEB.members.save({ email, name: String(d.name || '').trim() || null, role, branch: d.branch || (role === 'sales' ? salesBranch(d.sales_name) : null) || null, sales_name: role === 'sales' ? d.sales_name : null, active: prev ? prev.active : true });
+      await window.__WEB.members.save({ email, name: String(d.name || '').trim() || null, role, branch: usersBrFixed(role) ? null : (d.branch || (role === 'sales' ? salesBranch(d.sales_name) : null) || null), sales_name: role === 'sales' ? d.sales_name : null, active: prev ? prev.active : true });
       toast(prev ? 'บันทึกการแก้แล้ว' : `เพิ่ม ${email} แล้ว`); S.webUsers = null; render();
     } catch (e) { toast('บันทึกไม่ได้: ' + (e.message || ''), 'bad'); }
   },
