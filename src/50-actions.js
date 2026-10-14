@@ -21,6 +21,7 @@ function renderModal(D) {
   else if (m.kind === 'tgt') { body = tgtModal(m); wide = true; }
   else if (m.kind === 'cdeliv') { body = cdelivModal(m, D); wide = true; }
   else if (m.kind === 'specq') { body = specQueueModal(m, D); wide = true; }
+  else if (m.kind === 'sumcell') { body = sumCellModal(m, D); wide = true; }
   else if (m.kind === 'adsales') body = adminSalesModal(m);
   else if (m.kind === 'adbk') { body = adminBkModal(m); wide = true; }
   else if (m.kind === 'adlk') body = adminLkModal(m);

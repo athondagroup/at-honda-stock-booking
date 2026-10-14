@@ -197,10 +197,9 @@ function queueList(D) {
 }
 
 // ---------- booking summary for executives and managers (sales see counts only)
-function summaryView(D) {
-  const f = S.filters;
-  const from = f.sFrom || monthStartISO(), to = f.sTo || D.today;
-  const by = f.sBy || 'model', sort = f.sSort || 'count';
+// the bookings the summary counts (shared with the list that opens when a number is clicked)
+function sumScope(D) {
+  const f = S.filters, from = f.sFrom || monthStartISO(), to = f.sTo || D.today, by = f.sBy || 'model';
   let list = D.at.filter(a => !a.demo && inBr(a) && a.date && a.date >= from && a.date <= to);
   if (f.sModel) list = list.filter(a => a.model === f.sModel);
   if (f.sGrade) list = list.filter(a => a.grade === f.sGrade);
@@ -208,6 +207,13 @@ function summaryView(D) {
   if (f.sSales) list = list.filter(a => a.sales === f.sSales);
   const idsOnly = D.idsOnly.filter(b => inBr(b) && b.date >= from && b.date <= to && (!f.sModel || b.model === f.sModel) && (!f.sSales || b.owner === f.sSales));
   const keyOf = a => by === 'sales' ? a.sales || '–' : by === 'model' ? a.model : by === 'grade' ? `${a.model}|${a.grade}` : `${a.model}|${a.grade}|${(a.color || '?').toUpperCase()}`;
+  return { from, to, by, list, idsOnly, keyOf };
+}
+function summaryView(D) {
+  const f = S.filters;
+  const from = f.sFrom || monthStartISO(), to = f.sTo || D.today;
+  const by = f.sBy || 'model', sort = f.sSort || 'count';
+  const { list, idsOnly, keyOf } = sumScope(D);
   const label = (k) => by === 'sales' ? salesName(k) : by === 'model' ? esc(k) : by === 'grade' ? (() => { const [m, g] = k.split('|'); return `${esc(m)} ${esc(gradeShort(m, g))}`; })() : specLabel(k);
   const g = new Map();
   const bump = (k, f2, br) => { const r = g.get(k) || { k, total: 0, cancel: 0, delivered: 0, inIds: 0, noIds: 0, idsOnly: 0, idsDiff: 0, cross: 0, br: {} }; r[f2]++; if (br) r.br[br] = (r.br[br] || 0) + 1; g.set(k, r); };
@@ -222,7 +228,7 @@ function summaryView(D) {
     else if (a.match) bump(k, 'inIds');
     else bump(k, 'noIds');
   }
-  idsOnly.forEach(b => bump(by === 'sales' ? (b.owner || '–') : by === 'model' ? b.model : by === 'grade' ? `${b.model}|${b.grade}` : `${b.model}|${b.grade}|${(b.color || '?').toUpperCase()}`, 'idsOnly'));
+  idsOnly.forEach(b => bump(keyOf({ sales: b.owner, model: b.model, grade: b.grade, color: b.color }), 'idsOnly'));
   const rows = [...g.values()].sort((x, y) => sort === 'name' ? x.k.localeCompare(y.k, 'th') : (y.total - x.total) || x.k.localeCompare(y.k, 'th'));
   const tot = rows.reduce((t, r) => { ['total', 'cancel', 'delivered', 'inIds', 'noIds', 'idsOnly', 'idsDiff', 'cross'].forEach(c => { t[c] += r[c]; }); return t; }, { total: 0, cancel: 0, delivered: 0, inIds: 0, noIds: 0, idsOnly: 0, idsDiff: 0, cross: 0 });
   const models = [...new Set(D.at.map(a => a.model).filter(Boolean))].sort();
@@ -245,10 +251,10 @@ function summaryView(D) {
   <p class="text-sm mb-2">ใบจองวันที่ ${fmtD(from)} – ${fmtD(to)}${S.br ? ` · สาขา ${S.br}` : ' · ทุกสาขา'}: จอง <b class="num">${tot.total}</b> ใบ · ส่งมอบแล้ว <b class="num">${tot.delivered}</b> · อยู่ใน IDS รอรถ <b class="num">${tot.inIds}</b> · ยังไม่อยู่ใน IDS <b class="num" style="color:var(--bad)">${tot.noIds}</b> · ยกเลิก <b class="num">${tot.cancel}</b>${tot.idsOnly ? ` · มีใน IDS ไม่มีฟอร์ม <b class="num" style="color:var(--bad)">${tot.idsOnly}</b>` : ''}</p>
   ${rows.length ? `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl">
     <thead><tr><th>${{ model: 'รุ่น', grade: 'รุ่น / เกรด', spec: 'รุ่น / เกรด / สี', sales: 'เซลล์' }[by]}</th>${brs.length > 1 ? brs.map(b => `<th class="text-right hidden md:table-cell">${b}</th>`).join('') : ''}<th class="text-right">จอง</th><th class="text-right">ส่งมอบแล้ว</th><th class="text-right">อยู่ใน IDS</th><th class="text-right">ยังไม่อยู่ใน IDS</th><th class="text-right">ยกเลิก</th><th class="text-right">IDS ไม่มีฟอร์ม</th>${by === 'sales' ? '<th class="text-right">คีย์ IDS ด้วยชื่ออื่น</th><th class="text-right">ขายข้ามสาขา</th>' : ''}</tr></thead>
-    <tbody>${rows.map(r => `<tr><td class="nowrap">${label(r.k)}</td>${brs.length > 1 ? brs.map(b => `<td class="num text-right hidden md:table-cell">${r.br[b] || '<span class="text-muted">–</span>'}</td>`).join('') : ''}
-      <td class="num text-right font-semibold">${r.total}</td><td class="num text-right">${r.delivered || '–'}</td><td class="num text-right">${r.inIds || '–'}</td>
-      <td class="num text-right" ${r.noIds ? 'style="color:var(--bad)"' : ''}>${r.noIds || '–'}</td><td class="num text-right">${r.cancel || '–'}</td><td class="num text-right" ${r.idsOnly ? 'style="color:var(--bad)"' : ''}>${r.idsOnly || '–'}</td>${by === 'sales' ? `<td class="num text-right" ${r.idsDiff ? 'style="color:var(--warn)"' : ''}>${r.idsDiff || '–'}</td><td class="num text-right">${r.cross || '–'}</td>` : ''}</tr>`).join('')}
-      <tr style="font-weight:600"><td>รวม</td>${brs.length > 1 ? brs.map(b => `<td class="num text-right hidden md:table-cell">${rows.reduce((n, r) => n + (r.br[b] || 0), 0)}</td>`).join('') : ''}<td class="num text-right">${tot.total}</td><td class="num text-right">${tot.delivered}</td><td class="num text-right">${tot.inIds}</td><td class="num text-right">${tot.noIds}</td><td class="num text-right">${tot.cancel}</td><td class="num text-right">${tot.idsOnly}</td>${by === 'sales' ? `<td class="num text-right">${tot.idsDiff}</td><td class="num text-right">${tot.cross}</td>` : ''}</tr>
+    <tbody>${rows.map(r => `<tr><td class="nowrap">${label(r.k)}</td>${brs.length > 1 ? brs.map(b => `<td class="num text-right hidden md:table-cell">${r.br[b] ? sumBtn(r.k, 'total', r.br[b], b) : '<span class="text-muted">–</span>'}</td>`).join('') : ''}
+      <td class="num text-right font-semibold">${sumBtn(r.k, 'total', r.total)}</td><td class="num text-right">${sumBtn(r.k, 'delivered', r.delivered)}</td><td class="num text-right">${sumBtn(r.k, 'inIds', r.inIds)}</td>
+      <td class="num text-right" ${r.noIds ? 'style="color:var(--bad)"' : ''}>${sumBtn(r.k, 'noIds', r.noIds)}</td><td class="num text-right">${sumBtn(r.k, 'cancel', r.cancel)}</td><td class="num text-right" ${r.idsOnly ? 'style="color:var(--bad)"' : ''}>${sumBtn(r.k, 'idsOnly', r.idsOnly)}</td>${by === 'sales' ? `<td class="num text-right" ${r.idsDiff ? 'style="color:var(--warn)"' : ''}>${sumBtn(r.k, 'idsDiff', r.idsDiff)}</td><td class="num text-right">${sumBtn(r.k, 'cross', r.cross)}</td>` : ''}</tr>`).join('')}
+      <tr style="font-weight:600"><td>รวม</td>${brs.length > 1 ? brs.map(b => `<td class="num text-right hidden md:table-cell">${sumBtn('*', 'total', rows.reduce((n, r) => n + (r.br[b] || 0), 0), b)}</td>`).join('') : ''}<td class="num text-right">${sumBtn('*', 'total', tot.total)}</td><td class="num text-right">${sumBtn('*', 'delivered', tot.delivered)}</td><td class="num text-right">${sumBtn('*', 'inIds', tot.inIds)}</td><td class="num text-right">${sumBtn('*', 'noIds', tot.noIds)}</td><td class="num text-right">${sumBtn('*', 'cancel', tot.cancel)}</td><td class="num text-right">${sumBtn('*', 'idsOnly', tot.idsOnly)}</td>${by === 'sales' ? `<td class="num text-right">${sumBtn('*', 'idsDiff', tot.idsDiff)}</td><td class="num text-right">${sumBtn('*', 'cross', tot.cross)}</td>` : ''}</tr>
     </tbody></table></div>` : `<div class="bg-surface border border-line rounded-lg">${emptyBox('ไม่มีใบจองในช่วงนี้', 'ลองขยายช่วงวันที่หรือล้างตัวกรอง')}</div>`}
   <p class="text-xs text-muted mt-2">นับจากใบจอง AT Honda ตามวันที่จอง · คอลัมน์สาขานับตามสาขาที่ออกรถ (ยอดขายของสาขา) · เซลล์นับตามชื่อในฟอร์ม AT Honda (เจ้าของเคส ได้ค่าคอม) ไม่ใช่ชื่อ ID ใน IDS${isSales() ? ' · เซลล์เห็นเฉพาะตัวเลข ไม่เห็นชื่อลูกค้าของคนอื่น' : ''}</p>`;
 }

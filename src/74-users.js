@@ -52,43 +52,67 @@ Object.assign(ACTIONS, {
   }
 });
 
-// ---- one-time move from the claude.ai version: an export file with every record and photo
+// ---- moving data from the claude.ai version: an export file; the executive picks which parts to bring over (ตกลง 14/10)
+// Default: only the sales list and the models / grades / colours (with prices). Bookings, locks and IDS files already
+// come in on the web by themselves (Google Sheet, IDS upload), so they are left unticked.
+function importGroups() {
+  return [
+    ['sales', 'รายชื่อเซลล์', d => d.col === 'ref' && d.id === 'sales', true],
+    ['catalog', 'รุ่น เกรด สี (และราคาถ้ามี)', d => d.col === 'ref' && d.id === 'catalog', true],
+    ['foc', 'รายการของแถม (FOC)', d => d.col === 'ref' && d.id === 'foc', false],
+    ['fees', 'ค่าธรรมเนียม', d => d.col === 'ref' && d.id === 'fees', false],
+    ['refo', 'ตั้งค่าอื่น (Google Form, ชื่อผู้ใช้เดิม)', d => d.col === 'ref' && !['sales', 'catalog', 'foc', 'fees'].includes(d.id), false],
+    ['bookings', 'ใบจอง', d => d.col === 'bookings', false],
+    ['locks', 'ล็อกรถ', d => d.col === 'locks', false],
+    ['ids', 'ไฟล์ IDS (สต็อก ใบจอง ใบกำกับ Quota)', d => d.col === 'ids', false],
+    ['receipts', 'ใบเสร็จ', d => d.col === 'receipts', false],
+    ['other', 'อื่น ๆ', d => !['ref', 'bookings', 'locks', 'ids', 'receipts'].includes(d.col), false]
+  ];
+}
 function importBox() {
   const I = S.webImport || {};
-  if (I.done) return `<div class="p-3 rounded-lg text-sm mb-4" style="background:var(--good-soft)">นำเข้าแล้ว: ${fmtN(I.done.docs)} รายการ · รูป ${fmtN(I.done.assets)} รูป</div>`;
-  const plan = I.plan;
-  return `<div class="bg-surface border border-line rounded-lg p-4 mb-4"><h3 class="font-medium mb-1">นำเข้าข้อมูลจากระบบเดิม (claude.ai)</h3>
-    <p class="text-sm text-muted mb-2">ใช้ครั้งเดียวตอนย้ายระบบ เลือกไฟล์ข้อมูลที่ได้รับ (at-honda-data-….json) ระบบแสดงจำนวนก่อน แล้วกดนำเข้า รายการที่มีอยู่แล้วจะถูกแทนด้วยข้อมูลในไฟล์</p>
-    ${I.busy ? `<p class="text-sm"><span class="spin"></span> ${esc(I.busy)}</p>` : plan ? `<div class="text-sm mb-2">ไฟล์ ${esc(plan.name)} · ส่งออกเมื่อ ${fmtDT(plan.at)}<br>${Object.entries(plan.cols).map(([c, n]) => `${c} ${fmtN(n.all)} (มีอยู่แล้ว ${fmtN(n.have)})`).join(' · ')} · รูป ${fmtN(plan.assets)} รูป</div>
-      <div class="flex gap-2"><button class="btn btn-red btn-sm" data-act="import-run">นำเข้า</button><button class="btn btn-ghost btn-sm" data-act="import-cancel">ยกเลิก</button></div>`
+  const doneBox = I.done ? `<div class="p-3 rounded-lg text-sm mb-3" style="background:var(--good-soft)">นำเข้าแล้ว: ${esc(I.done.what || '')} · ${fmtN(I.done.docs)} รายการ${I.done.assets ? ` · รูป ${fmtN(I.done.assets)} รูป` : ''}</div>` : '';
+  const plan = I.plan, pick = (plan && plan.pick) || {};
+  const groups = plan ? importGroups().map(([k, t, f]) => { const ds = IMPORT_DATA.docs.filter(f); return { k, t, n: ds.length, have: ds.filter(d => S[d.col] && S[d.col].has && S[d.col].has(d.id)).length }; }).filter(g => g.n) : [];
+  return `<div class="bg-surface border border-line rounded-lg p-4 mb-4"><h3 class="font-medium mb-1">ดึงข้อมูลจากระบบเดิม (claude.ai)</h3>
+    <p class="text-sm text-muted mb-2">เลือกไฟล์ข้อมูล (at-honda-data-….json) แล้วติ๊กเฉพาะส่วนที่ต้องการดึง ส่วนที่ติ๊กจะแทนข้อมูลเดิมในเว็บ ส่วนที่ไม่ติ๊กไม่ถูกแตะ</p>
+    ${doneBox}
+    ${I.busy ? `<p class="text-sm"><span class="spin"></span> ${esc(I.busy)}</p>` : plan ? `<div class="text-sm mb-2">ไฟล์ ${esc(plan.name)} · ส่งออกเมื่อ ${fmtDT(plan.at)}</div>
+      <div class="grid sm:grid-cols-2 gap-1 mb-3">${groups.map(g => `<label class="flex items-center gap-2 text-sm py-1"><input type="checkbox" class="w-5 h-5" data-import-pick="${g.k}" ${pick[g.k] ? 'checked' : ''}> ${esc(g.t)} <span class="text-muted">${fmtN(g.n)} รายการ${g.have ? ` · ในเว็บมีแล้ว ${fmtN(g.have)} (จะถูกแทน)` : ''}</span></label>`).join('')}
+        ${plan.assets ? `<label class="flex items-center gap-2 text-sm py-1"><input type="checkbox" class="w-5 h-5" data-import-pick="imgs" ${pick.imgs ? 'checked' : ''}> รูปใบจอง / สลิป <span class="text-muted">${fmtN(plan.assets)} รูป</span></label>` : ''}</div>
+      <div class="flex gap-2"><button class="btn btn-red btn-sm" data-act="import-run" ${Object.values(pick).some(Boolean) ? '' : 'disabled'}>ดึงข้อมูลที่เลือก</button><button class="btn btn-ghost btn-sm" data-act="import-cancel">ยกเลิก</button></div>`
       : `<label class="btn btn-ghost btn-sm relative">เลือกไฟล์ข้อมูล<input type="file" accept=".json,application/json" data-import-bundle class="absolute w-px h-px opacity-0"></label>`}
     ${I.err ? `<p class="text-sm mt-2" style="color:var(--bad)">${esc(I.err)}</p>` : ''}</div>`;
 }
 let IMPORT_DATA = null;
 document.addEventListener('change', async ev => {
-  const t = ev.target; if (!t || !t.dataset || t.dataset.importBundle === undefined) return;
+  const t = ev.target; if (!t || !t.dataset) return;
+  if (t.dataset.importPick !== undefined && S.webImport && S.webImport.plan) { S.webImport.plan.pick[t.dataset.importPick] = t.checked; render(); return; }
+  if (t.dataset.importBundle === undefined) return;
   const f = t.files && t.files[0]; t.value = ''; if (!f) return;
   try {
     const b = JSON.parse(await f.text());
     if (b.kind !== 'at-honda-export' || !Array.isArray(b.docs)) throw new Error('ไม่ใช่ไฟล์ข้อมูล AT Honda');
-    const cols = {}; b.docs.forEach(d => { const c = (cols[d.col] ||= { all: 0, have: 0 }); c.all++; if (S[d.col] && S[d.col].has && S[d.col].has(d.id)) c.have++; });
-    IMPORT_DATA = b; S.webImport = { plan: { name: f.name, at: b.exported_at, cols, assets: Object.keys(b.assets || {}).length } };
+    const pick = {}; importGroups().forEach(([k, , , on]) => { pick[k] = on; }); pick.imgs = false;
+    IMPORT_DATA = b; S.webImport = { plan: { name: f.name, at: b.exported_at, pick, assets: Object.keys(b.assets || {}).length } };
   } catch (e) { S.webImport = { err: 'อ่านไฟล์ไม่ได้: ' + (e.message || '') }; }
   render();
 });
 Object.assign(ACTIONS, {
   'import-cancel'() { IMPORT_DATA = null; S.webImport = null; render(); },
   async 'import-run'() {
-    const b = IMPORT_DATA; if (!b) return;
-    const ids = Object.keys(b.assets || {}); let n = 0;
+    const b = IMPORT_DATA, plan = S.webImport && S.webImport.plan; if (!b || !plan) return;
+    const gs = importGroups().filter(([k]) => plan.pick[k]), docs = b.docs.filter(d => gs.some(([, , f]) => f(d)));
+    const ids = plan.pick.imgs ? Object.keys(b.assets || {}) : []; let n = 0;
+    const what = [...gs.map(([, t]) => t), ...(ids.length ? ['รูป'] : [])].join(', ');
     try {
       for (const id of ids) {
         S.webImport = { busy: `กำลังอัปโหลดรูป ${++n}/${ids.length}` }; render();
         const a = b.assets[id], bin = Uint8Array.from(atob(a.b64), c => c.charCodeAt(0));
         await window.__WEB.importAsset(id, new Blob([bin], { type: a.type }), a.type);
       }
-      await window.__WEB.importDocs(b.docs, k => { S.webImport = { busy: `กำลังนำเข้ารายการ ${k}/${b.docs.length}` }; render(); });
-      S.webImport = { done: { docs: b.docs.length, assets: ids.length } }; IMPORT_DATA = null; toast('นำเข้าข้อมูลแล้ว');
+      if (docs.length) await window.__WEB.importDocs(docs, k => { S.webImport = { busy: `กำลังนำเข้ารายการ ${k}/${docs.length}` }; render(); });
+      S.webImport = { done: { docs: docs.length, assets: ids.length, what } }; IMPORT_DATA = null; S.cache = null; toast('ดึงข้อมูลแล้ว: ' + what);
     } catch (e) { S.webImport = { err: 'นำเข้าไม่สำเร็จ: ' + (e.message || '') + ' (กดเลือกไฟล์แล้วลองอีกครั้งได้ ข้อมูลที่เข้าไปแล้วจะไม่ซ้ำ)' }; }
     render();
   }
