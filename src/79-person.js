@@ -51,12 +51,21 @@ function dashPerson(D) {
   const months = mo ? [mo] : Object.keys(st);
   const ppl = {};
   months.forEach(m => cols.forEach(([c]) => st[m][c].forEach(a => { const p = (ppl[a.sales || 'ไม่ระบุ'] ||= { n: a.sales || 'ไม่ระบุ', bk: 0, cx: 0, dv: 0, inv: 0, tr: 0 }); p[c]++; })));
-  const rows = Object.values(ppl).sort((a, b) => b.dv - a.dv || b.bk - a.bk);
+  const rows = Object.values(ppl).sort((a, b) => b.dv - a.dv || b.bk - a.bk), bkMax = Math.max(1, ...rows.map(p => p.bk));
+  // bookings in the comparison period: the month before (or the same month last year), or last year for a whole year
+  const pv = (() => {
+    const yoy = S.filters.cmp === 'yoy';
+    let pm = null, py = y - 1;
+    if (mo) { const [yy, mm] = mo.split('-').map(Number); pm = yoy ? `${yy - 1}-${String(mm).padStart(2, '0')}` : (mm === 1 ? `${yy - 1}-12` : `${yy}-${String(mm - 1).padStart(2, '0')}`); py = Number(pm.slice(0, 4)); }
+    const sp = pmStats(D, keep, py), list = pm ? (sp[pm] || {}).bk || [] : Object.values(sp).flatMap(x => x.bk);
+    const by = {}; list.forEach(a => { by[a.sales || 'ไม่ระบุ'] = (by[a.sales || 'ไม่ระบุ'] || 0) + 1; });
+    return { of: n => by[n] || 0, label: pm ? fmtM(pm) : 'ปี ' + py, long: pm ? (yoy ? 'เดือนเดียวกันปีที่แล้ว' : 'เดือนก่อนหน้า') : 'ปีก่อนหน้า' };
+  })();
   const mSel = `<div class="field"><label for="pm-m">เดือน</label><select id="pm-m" data-filter="pmMonth"><option value="">ทั้งปี</option>${Object.keys(st).map(m => `<option value="${m}" ${mo === m ? 'selected' : ''}>${fmtM(m)}</option>`).join('')}</select></div>`;
   return `${head}<div class="flex flex-wrap items-end gap-3 mb-3">${pmYearSel(D)}${mSel}</div>
-    ${dCard(`เซลล์ ${mo ? fmtM(mo) : 'ปี ' + y}`, `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>เซลล์</th>${cols.map(([, t]) => `<th class="text-right">${t}</th>`).join('')}</tr></thead><tbody>
-      ${rows.map(p => `<tr><td class="nowrap"><button class="underline decoration-dotted text-left" data-act="pm-who" data-n="${esc(p.n)}">${salesName(p.n)}</button></td>${cols.map(([c]) => `<td class="num text-right ${c === 'dv' ? 'font-semibold' : ''}">${pmBtn(p[c], { who: p.n, y, m: mo, c })}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length + 1}" class="text-muted">ไม่มีข้อมูล</td></tr>`}
-      </tbody></table></div>`, 'กดชื่อเพื่อดูรายเดือนของคนนั้น · กดตัวเลขเพื่อดูรายคัน')}
+    ${dCard(`ยอดแยกเซลล์ ${mo ? fmtM(mo) : 'ปี ' + y}`, `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>เซลล์</th>${cols.map(([c, t]) => `<th class="text-right">${t}</th>${c === 'bk' ? '<th></th>' : ''}`).join('')}<th class="text-right nowrap">จอง ${esc(pv.label)}</th></tr></thead><tbody>
+      ${rows.map(p => `<tr><td class="nowrap"><button class="underline decoration-dotted text-left" data-act="pm-who" data-n="${esc(p.n)}">${salesName(p.n)}</button></td>${cols.map(([c]) => `<td class="num text-right ${c === 'bk' || c === 'dv' ? 'font-semibold' : ''}">${pmBtn(p[c], { who: p.n, y, m: mo, c })}</td>${c === 'bk' ? `<td style="min-width:80px"><span class="viz-mark block h-3 rounded-r" style="width:${Math.max(2, p.bk / bkMax * 100)}%;background:var(--viz-1)" title="จอง ${p.bk} คัน"></span></td>` : ''}`).join('')}<td class="num text-right text-muted">${pv.of(p.n)} ${p.bk - pv.of(p.n) ? `<span class="text-xs" style="color:var(--${p.bk > pv.of(p.n) ? 'good' : 'bad'})">${p.bk > pv.of(p.n) ? '▲' : '▼'}${Math.abs(p.bk - pv.of(p.n))}</span>` : ''}</td></tr>`).join('') || `<tr><td colspan="${cols.length + 3}" class="text-muted">ไม่มีข้อมูล</td></tr>`}
+      </tbody></table></div>`, `เรียงตามยอดส่งมอบ · แถบ = ยอดจองเทียบคนที่มากที่สุด · ${esc(pv.label)} = ${esc(pv.long)} (เลือก "เทียบกับ" ได้ที่แท็บ ยอดจอง) · กดชื่อเพื่อดูรายเดือน · กดตัวเลขเพื่อดูรายคัน`)}
     ${personModelCard(D)}
     ${dCard(`ทุกคนรายเดือน ${y}`, pmMonthTable(D, '*', y, true))}`;
 }

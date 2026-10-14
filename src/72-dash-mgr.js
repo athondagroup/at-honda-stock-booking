@@ -18,7 +18,7 @@ function dashSub() { let s = S.sub.dash || 'exec'; if (s === 'ana') s = 'book'; 
 function monthsIn(from, to) { const out = []; let d = from.slice(0, 7); while (d <= to.slice(0, 7)) { out.push(d); const [y, m] = d.split('-').map(Number); d = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`; } return out; }
 function dCard(title, body, note) { return `<section class="bg-surface border border-line rounded-lg p-4 min-w-0"><h2 class="font-head font-semibold mb-2">${title}</h2>${body}${note ? `<p class="text-xs text-muted mt-2">${note}</p>` : ''}</section>`; }
 function pctOf(a, b) { return b ? Math.round(a / b * 100) : 0; }
-function periodBar(E) { return `<div class="flex flex-wrap gap-3 items-end mb-4"><div class="seg" role="group" aria-label="ช่วงเวลา">${EXEC_PERIODS.map(([k, t]) => `<button data-act="exec-period" data-k="${k}" aria-pressed="${E.key === k}">${t}</button>`).join('')}</div>${rangeInputs(E)}</div>${brSeg()}`; }
+function periodBar(E) { const [pf, pt] = prevRange(E.from, E.to); return `<div class="flex flex-wrap gap-3 items-end mb-4"><div class="seg" role="group" aria-label="ช่วงเวลา">${EXEC_PERIODS.map(([k, t]) => `<button data-act="exec-period" data-k="${k}" aria-pressed="${E.key === k}">${t}</button>`).join('')}</div>${rangeInputs(E)}${cmpSel()}<span class="text-sm text-muted pb-2">${fmtD(E.from)} – ${fmtD(E.to)} เทียบ ${fmtD(pf)} – ${fmtD(pt)}</span></div>${brSeg()}`; }
 function rangeInputs(E) {
   if (E.key !== 'custom') return '';
   const f = S.filters.eFrom || '', t = S.filters.eTo || '', bad = f && t && f > t;
@@ -96,7 +96,20 @@ function dashSalesTarget(D) {
 }
 
 // ---- analysis: what customers book, who sells, what falls through, what sits in stock
-function prevRange(from, to) { const n = daysBetween(from, to) + 1; const e = new Date(Date.parse(from + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10); const s = new Date(Date.parse(e + 'T00:00:00Z') - (n - 1) * 864e5).toISOString().slice(0, 10); return [s, e]; }
+// the period a number is compared with (ตกลง 14/10), chosen next to the period buttons:
+//  'prev' (default): this month so far → the same days of last month · a whole month → the month before ·
+//                    this quarter → the same days of last quarter · this year → the same days of last year ·
+//                    a chosen range → the same number of days right before it
+//  'yoy': the same dates one year earlier
+function prevRange(from, to) {
+  const shift = (d, months) => { const [y, m, dd] = d.split('-').map(Number), t = new Date(Date.UTC(y, m - 1 + months, 1)), last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate(); return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(Math.min(dd, last)).padStart(2, '0')}`; };
+  const monthEnd = d => { const [y, m] = d.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
+  if (S.filters.cmp === 'yoy') return [shift(from, -12), to === monthEnd(to) ? monthEnd(shift(to, -12)) : shift(to, -12)];
+  const key = S.filters.ePeriod || 'ytd', span = key === 'ytd' ? 12 : key === 'q' ? 3 : (key === 'm' || key === 'pm') ? 1 : 0;
+  if (span) return [shift(from, -span), to === monthEnd(to) ? monthEnd(shift(to, -span)) : shift(to, -span)];
+  const n = daysBetween(from, to) + 1; const e = new Date(Date.parse(from + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10); const st = new Date(Date.parse(e + 'T00:00:00Z') - (n - 1) * 864e5).toISOString().slice(0, 10); return [st, e];
+}
+function cmpSel() { return `<div class="field"><label for="e-cmp">เทียบกับ</label><select id="e-cmp" data-filter="cmp"><option value="prev" ${S.filters.cmp !== 'yoy' ? 'selected' : ''}>ช่วงก่อนหน้า (เดือน / ไตรมาส / ปีก่อน)</option><option value="yoy" ${S.filters.cmp === 'yoy' ? 'selected' : ''}>ช่วงเดียวกันปีที่แล้ว</option></select></div>`; }
 function mixTable(rows, title) {
   const tot = rows.reduce((n, r) => n + r.n, 0);
   return `<div class="min-w-0"><h3 class="font-medium mb-1">${title}</h3><div class="scroll-x"><table class="tbl text-sm"><thead><tr><th></th><th class="text-right">จอง</th><th class="text-right">%</th><th class="text-right">ช่วงก่อน</th><th class="text-right">เปลี่ยน</th></tr></thead><tbody>

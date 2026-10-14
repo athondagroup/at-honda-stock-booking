@@ -58,9 +58,9 @@ function dashBook(D) {
     ${[...new Set(all.map(a => a.sales || 'ไม่ระบุ'))].map(n => ({ n, net: cnt(net, a => (a.sales || 'ไม่ระบุ') === n), cx: cnt(cxl, a => (a.sales || 'ไม่ระบุ') === n), pv: cnt(prev, a => (a.sales || 'ไม่ระบุ') === n) })).sort((a, b) => b.net - a.net || b.cx - a.cx).map(p => `<tr><td class="nowrap">${salesName(p.n)}</td><td class="num text-right font-semibold">${p.net}</td><td style="min-width:90px"><span class="viz-mark block h-3 rounded-r" style="width:${Math.max(2, p.net / pplMax * 100)}%;background:var(--viz-1)" title="${p.net} คัน"></span></td>${brs.length > 1 ? brs.map(b => `<td class="num text-right">${cnt(net, a => (a.sales || 'ไม่ระบุ') === p.n && a.br === b) || '<span class="text-muted">–</span>'}</td>`).join('') : ''}<td class="num text-right">${p.cx || '–'}</td><td class="num text-right text-muted">${p.pv}</td></tr>`).join('') || '<tr><td colspan="9" class="text-muted">ไม่มีข้อมูล</td></tr>'}</tbody></table></div>`;
   return `${pageHead('ยอดจอง', `ใบจอง AT Honda ตามวันที่จอง ${fmtD(E.from)} – ${fmtD(E.to)} · ช่วงก่อน ${fmtD(pf)} – ${fmtD(pt)} · สุทธิ = ไม่นับใบที่ยกเลิก`)}
   ${dashTabs()}${periodBar(E)}
-  <div class="grid lg:grid-cols-2 gap-5 mb-5">${dCard('สรุปยอดจอง', summary, 'สาขาตามใบจอง · กด "เดือนนี้" เพื่อดูสรุปรายเดือน')}${dCard('เปรียบเทียบสาขา', brTable)}</div>
-  <div class="grid lg:grid-cols-2 gap-5 mb-5">${dCard('🚘 รุ่นที่จอง', modelCard)}${dCard('👤 ยอดจองแยกเซลล์', pplTable, 'เรียงตามยอดสุทธิ · แถบ = ยอดสุทธิเทียบคนที่มากที่สุด')}</div>
-  ${dCard('สาขา × รุ่น (ยอดจองสุทธิ)', countMatrix(net, a => a.br, a => a.model, { rowLabel: 'สาขา', rowOrder: brs, rowFmt: brName }), 'ช่องสีเขียว = รุ่นที่จองมากที่สุดของสาขานั้น')}
+  <div class="grid lg:grid-cols-2 gap-5 mb-5">${dCard('สรุปยอดจอง', summary, 'สาขาตามใบจอง · กด "เดือนนี้" เพื่อดูสรุปรายเดือน')}${dCard('🚘 รุ่นที่จอง', modelCard)}</div>
+  <div class="flex flex-col gap-5 mb-5">${branchCompare(D, E, 'book', 'bk')}</div>
+  ${dCard('สาขา × รุ่น (ยอดจองสุทธิ)', countMatrix(net, a => a.br, a => a.model, { rowLabel: 'สาขา', rowOrder: brs, rowFmt: brName }), 'ช่องสีเขียว = รุ่นที่จองมากที่สุดของสาขานั้น · ยอดจองแยกเซลล์อยู่ที่แท็บ รายบุคคล')}
   ${A.mix}
   <div class="grid lg:grid-cols-2 gap-5 my-5">${A.cx}${A.fin}</div>`;
 }
@@ -77,7 +77,8 @@ function salesCompare(D, E) {
     <tr style="font-weight:600"><td>รวม</td><td class="num text-right">${rows.length}</td><td class="num text-right">100%</td><td class="num text-right">${prev.length}</td><td class="num text-right">${rows.length - prev.length > 0 ? '+' : ''}${rows.length - prev.length}</td></tr></tbody></table></div>
     ${colChart('sl-br', brs.map(b => ({ k: b, label: b, test: () => true })), [{ name: 'ช่วงนี้', color: '--viz-3', values: brs.map(b => cnt(rows, b)) }, { name: 'ช่วงก่อน', color: '--viz-2', values: brs.map(b => cnt(prev, b)) }], { label: `ยอดขาย (${label}) แยกสาขา เทียบช่วงก่อน` })}`;
   return `<div class="flex flex-wrap items-center gap-3 mb-3 mt-2"><h2 class="font-head text-lg font-semibold">ยอดขายเปรียบเทียบสาขา</h2>${seg}<span class="text-sm text-muted">${fmtD(E.from)} – ${fmtD(E.to)} · เทียบ ${fmtD(pf)} – ${fmtD(pt)} · ไม่รวมรถบริษัท</span></div>
-  <div class="grid lg:grid-cols-2 gap-5 mb-5">${dCard(`เปรียบเทียบสาขา (${label})`, brT)}${dCard('สาขาไหนขายรุ่นไหนดี', `<ul class="text-sm leading-7 mb-3">${bestLines(rows, r => r.br, r => r.model, brs, brName) || '<li class="text-muted">ไม่มีข้อมูล</li>'}</ul>${countMatrix(rows, r => r.br, r => r.model, { rowLabel: 'สาขา', rowOrder: brs, rowFmt: brName })}`, 'ช่องสีเขียว = รุ่นที่ขายมากที่สุดของสาขานั้น · % = สัดส่วนในสาขา')}</div>`;
+  <div class="flex flex-col gap-5 mb-5">${branchCompare(D, E, 'sale', basis)}</div>
+  <div class="mb-5">${dCard('สาขาไหนขายรุ่นไหนดี', `<ul class="text-sm leading-7 mb-3">${bestLines(rows, r => r.br, r => r.model, brs, brName) || '<li class="text-muted">ไม่มีข้อมูล</li>'}</ul>${countMatrix(rows, r => r.br, r => r.model, { rowLabel: 'สาขา', rowOrder: brs, rowFmt: brName })}`, 'ช่องสีเขียว = รุ่นที่ขายมากที่สุดของสาขานั้น · % = สัดส่วนในสาขา')}</div>`;
 }
 
 // ---- รายบุคคล: who sells which model best
@@ -92,3 +93,45 @@ Object.assign(ACTIONS, {
   'sale-basis'(el) { S.filters.saleBasis = el.dataset.k; render(); },
   'pm-basis'(el) { S.filters.pmBasis = el.dataset.k; render(); }
 });
+
+// ---- branches compared on several measures, per month (ตกลง 14/10)
+// The table compares the branches on every measure for the chosen period, each against the comparison period
+// ("เทียบกับ" next to the period buttons). Picking a measure shows it month by month for each branch.
+function bcMetrics() { return [['bk', 'ยอดจองสุทธิ', 'n'], ['cx', 'ยกเลิก', 'n'], ['cxp', '% ยกเลิก', 'p'], ['dv', 'ส่งมอบ', 'n'], ['inv', 'ใบกำกับ', 'n'], ['tr', 'รถเก่าเทิร์น', 'n'], ['finp', '% ไฟแนนซ์', 'p']]; }
+function bcCalc(D, b, f, t) {
+  const inR = d => !!d && d >= f && d <= t, at = D.at.filter(a => !a.demo && a.br === b && inR(a.date));
+  const bk = at.filter(a => !a.cancelled).length, cx = at.filter(a => a.cancelled).length;
+  const cars = k => carListRows(D, { from: f, to: t }, k).filter(r => r.br === b).length;
+  const tr = D.at.filter(a => !a.demo && !a.cancelled && (a.delivBr || a.br) === b && pmEvents(a, D).some(([c, d]) => c === 'tr' && inR(d))).length;
+  const fin = at.filter(a => !a.cancelled && !isCash(a.rec)).length;
+  return { bk, cx, cxp: bk + cx ? cx / (bk + cx) * 100 : null, dv: cars('dv'), inv: cars('inv'), tr, finp: bk ? fin / bk * 100 : null };
+}
+function bcFmt(v, kind) { return v === null || v === undefined ? '–' : kind === 'p' ? Math.round(v) + '%' : fmtN(v); }
+function bcDiff(v, p, kind, lowGood) {
+  if (v === null || p === null || v === undefined || p === undefined) return '';
+  const d = v - p; if (!d) return '<span class="text-xs text-muted">=</span>';
+  const good = lowGood ? d < 0 : d > 0;
+  return `<span class="text-xs" style="color:var(--${good ? 'good' : 'bad'})">${d > 0 ? '▲' : '▼'}${kind === 'p' ? Math.abs(Math.round(d)) + '%' : Math.abs(d)}</span>`;
+}
+function branchCompare(D, E, page, defMetric) {
+  const brs = brsInScope(), [pf, pt] = prevRange(E.from, E.to), M = bcMetrics();
+  const cur = Object.fromEntries(brs.map(b => [b, bcCalc(D, b, E.from, E.to)])), prv = Object.fromEntries(brs.map(b => [b, bcCalc(D, b, pf, pt)]));
+  const low = k => k === 'cx' || k === 'cxp';
+  const tbl = `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>สาขา</th>${M.map(([, t]) => `<th class="text-right nowrap">${t}</th>`).join('')}</tr></thead><tbody>
+    ${brs.map(b => `<tr><td class="nowrap">${brName(b)}</td>${M.map(([k, , kind]) => `<td class="num text-right nowrap"><b>${bcFmt(cur[b][k], kind)}</b> ${bcDiff(cur[b][k], prv[b][k], kind, low(k))}<div class="text-xs text-muted">${bcFmt(prv[b][k], kind)}</div></td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <p class="text-xs text-muted mt-1">ตัวหนา = ${fmtD(E.from)} – ${fmtD(E.to)} · ตัวเล็ก = ${fmtD(pf)} – ${fmtD(pt)} · ▲▼ สีเขียว = ดีขึ้น สีแดง = แย่ลง (ยกเลิกน้อยลงถือว่าดีขึ้น)</p>`;
+  // month by month for one measure
+  const key = 'bc_' + page, mk = M.some(([k]) => k === S.filters[key]) ? S.filters[key] : defMetric, kind = (M.find(([k]) => k === mk) || [])[2];
+  let ms = monthsIn(E.from, E.to);
+  if (ms.length < 2) { const end = E.to.slice(0, 7), out = []; let [y, m] = end.split('-').map(Number); for (let i = 0; i < 6; i++) { out.unshift(`${y}-${String(m).padStart(2, '0')}`); m--; if (!m) { m = 12; y--; } } ms = out; }
+  const mEnd = m => { const [y, mo] = m.split('-').map(Number); const e = new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10); return e > D.today ? D.today : e; };
+  const grid = Object.fromEntries(brs.map(b => [b, ms.map(m => bcCalc(D, b, m + '-01', mEnd(m))[mk])]));
+  const chips = `<div class="seg mb-3" role="group" aria-label="เลือกด้านที่จะดูรายเดือน">${M.map(([k, t]) => `<button data-act="bc-metric" data-page="${page}" data-k="${k}" aria-pressed="${mk === k}">${t}</button>`).join('')}</div>`;
+  const vizC = ['--viz-1', '--viz-2', '--viz-3', '--viz-4'];
+  const chart = colChart('bc-' + page, ms.map(m => ({ k: m, label: monLabel(m), test: () => true })), brs.map((b, i) => ({ name: b, color: vizC[i % 4], values: grid[b].map(v => v === null ? 0 : Math.round(v)) })), { label: `${(M.find(([k]) => k === mk) || [])[1]} รายเดือน แยกสาขา` });
+  const mtab = `<div class="scroll-x mt-2"><table class="tbl text-sm"><thead><tr><th>สาขา</th>${ms.map(m => `<th class="text-right nowrap">${esc(monLabel(m))}</th>`).join('')}${kind === 'n' ? '<th class="text-right">รวม</th>' : ''}</tr></thead><tbody>
+    ${brs.map(b => `<tr><td class="nowrap">${brName(b)}</td>${grid[b].map(v => `<td class="num text-right">${bcFmt(v, kind)}</td>`).join('')}${kind === 'n' ? `<td class="num text-right font-semibold">${fmtN(grid[b].reduce((n, v) => n + (v || 0), 0))}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+  return `${dCard('เปรียบเทียบสาขา (ทุกด้าน)', tbl)}
+  ${dCard('เปรียบเทียบสาขา รายเดือน', chips + chart + mtab, monthsIn(E.from, E.to).length < 2 ? 'ช่วงที่เลือกมีเดือนเดียว จึงแสดง 6 เดือนล่าสุด · เลือก "ปีนี้" หรือ "เลือกช่วงวันที่" เพื่อกำหนดเดือนเอง' : 'เดือนตามช่วงที่เลือกด้านบน')}`;
+}
+Object.assign(ACTIONS, { 'bc-metric'(el) { S.filters['bc_' + el.dataset.page] = el.dataset.k; render(); } });
