@@ -139,6 +139,7 @@ Object.assign(ACTIONS, {
     if (!String(e.customer || '').trim()) { toast('ใส่ชื่อลูกค้า', 'bad'); return; }
     if (!locked && (!e.model || !e.grade || !e.color)) { toast('เลือกรุ่น เกรด และสีให้ครบ', 'bad'); return; }
     if (!e.sales) { toast('เลือกเซลล์เจ้าของเคส', 'bad'); return; }
+    if (e.source === 'อื่น ๆ') { const x = String(e.source_x || '').trim(); if (!x) { toast('พิมพ์แหล่งที่มาอื่น', 'bad'); return; } e.source = `อื่น ๆ: ${x}`; }
     if (e.booking_no && !/^\d{8,12}$/.test(String(e.booking_no).trim())) { toast('เลขที่ใบจองต้องเป็นตัวเลข 8–12 หลัก', 'bad'); return; }
     if (canAdminEdit(a)) {
       if (!validDate(e.booking_date) || e.booking_date > todayISO()) { toast('วันที่จองต้องไม่เกินวันนี้', 'bad'); return; }

@@ -60,7 +60,7 @@ function carModal(m, D) {
   </div>
   <div class="flex flex-wrap justify-end gap-2 mt-4">
     ${delivBtn(c, D, true)}
-    ${['free', 'temp', 'pending'].includes(c.status) && p.write && p.request ? `<button class="btn btn-red" data-act="lock-open" data-vin="${esc(c.vin)}">${c.status === 'pending' ? 'ขอคิวต่อ' : 'ขอล็อกรถคันนี้'}</button>` : ''}
+    ${carLockable(c) && p.write && p.request ? `<button class="btn btn-red" data-act="lock-open" data-vin="${esc(c.vin)}">${c.status === 'pending' ? 'ขอคิวต่อ' : 'ขอล็อกรถคันนี้'}</button>` : ''}
     ${p.remove && p.write && !c.lock && D.cars.has(c.vin) ? `<button class="btn btn-ghost" data-act="remove-open" data-vin="${esc(c.vin)}">นำรถออก / ย้ายสาขา</button>` : ''}
     ${m.back ? '<button class="btn btn-dark" data-act="car-back">← กลับไปหน้าก่อน</button>' : '<button class="btn btn-ghost" data-act="close">ปิด</button>'}</div>`;
 }

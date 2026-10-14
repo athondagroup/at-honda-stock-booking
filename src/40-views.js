@@ -200,7 +200,7 @@ function ageBar(a) {
   return `<span class="inline-flex items-center gap-2 num"><i class="ageb" style="width:${Math.max(4, Math.min(48, a / 6))}px;background:${tone}"></i>${a}</span>`;
 }
 // sales see only cars they can still sell, plus cars locked for their own customers
-const carVisible = c => !isSales() || c.status === 'free' || c.status === 'temp' || c.status === 'pending' || (c.lock && isMine(c.lock.owner)) || c.temps.some(t => isMine(t.owner));
+const carVisible = c => !isSales() || carLockable(c) || (c.lock && isMine(c.lock.owner)) || c.temps.some(t => isMine(t.owner));
 // names of other sales' customers stay hidden from sales
 const lockText = l => isSales() && !isMine(l.owner) ? (l.status === 'pending' ? 'มีคำขอล็อกรออนุมัติ (ขอคิวต่อได้)' : 'ล็อกแล้ว') : lockLabel(l);
 function stockCars(D) {
@@ -291,7 +291,7 @@ function carRow(c, D) {
     <div class="flex gap-2">${carActions(c, p, D)}</div></div>`;
 }
 const lockLabel = l => `${l.type === 'dealer' ? 'ดีลเลอร์ ' + esc(l.dealer_name || '') : l.type === 'temp' ? 'ล็อกชั่วคราว ' + esc(l.owner || l.sales_nick || '') : 'ใบจองของ ' + esc(l.owner || '')}${l.status === 'approved' ? (l.hold ? ` · ถือไว้จนส่งมอบ ${fmtD(l.holdUntil)}` : ` · หมด ${fmtD(l.end)}`) : l.status === 'pending' ? ' · รออนุมัติ' : ''}`;
-const carActions = (c, p, D) => `${delivBtn(c, D)}${carLockBtn(c, D)}${['free', 'temp', 'pending'].includes(c.status) && p.write && p.request ? `<button class="btn btn-ghost btn-sm" data-act="lock-open" data-vin="${esc(c.vin)}">${c.status === 'pending' ? 'ขอคิวต่อ' : 'ล็อก'}</button>` : ''}
+const carActions = (c, p, D) => `${delivBtn(c, D)}${carLockBtn(c, D)}${carLockable(c) && p.write && p.request ? `<button class="btn btn-ghost btn-sm" data-act="lock-open" data-vin="${esc(c.vin)}">${c.status === 'pending' ? 'ขอคิวต่อ' : 'ล็อก'}</button>` : ''}
   ${p.remove && p.write && !c.lock ? `<button class="btn btn-ghost btn-sm" data-act="remove-open" data-vin="${esc(c.vin)}" aria-label="นำรถ ${esc(c.vin)} ออก">− นำออก</button>` : ''}`;
 function carTable(cars, D) {
   const f = S.filters, p = perms();

@@ -152,7 +152,7 @@ function carLockModal(m, D) {
   <div class="border border-line rounded-lg divide-y divide-line">${ls.map(l => lockRow(l, D)).join('') || emptyBox('ยังไม่มีคำขอล็อกในระบบ', plan ? 'สร้างคำขอจากข้อความในชีตได้ตามกฎเดียวกับตอนอัปโหลด' : 'ขอล็อกได้จากปุ่มด้านล่าง')}</div>
   <div class="flex flex-wrap justify-end gap-2 mt-4">
     ${plan && p.upload && p.write ? `<button class="btn btn-dark" data-act="sheet-sync-one" data-vin="${esc(c.vin)}">${plan.update ? 'อัปเดตคำขอตามข้อความในชีต' : 'สร้างคำขอล็อกจากข้อความในชีต'}</button>` : ''}
-    ${['free', 'temp', 'pending'].includes(c.status) && p.write && p.request ? `<button class="btn btn-ghost" data-act="lock-open" data-vin="${esc(c.vin)}">${c.status === 'pending' ? 'ขอคิวต่อ' : 'ขอล็อกใหม่'}</button>` : ''}
+    ${carLockable(c) && p.write && p.request ? `<button class="btn btn-ghost" data-act="lock-open" data-vin="${esc(c.vin)}">${c.status === 'pending' ? 'ขอคิวต่อ' : 'ขอล็อกใหม่'}</button>` : ''}
     <button class="btn btn-ghost" data-act="close">ปิด</button></div>`;
 }
 // the status itself opens the car's locks, so a pending request is approved or changed where it is seen

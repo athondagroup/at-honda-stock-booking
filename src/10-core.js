@@ -22,6 +22,10 @@ const ROLES = {
 const LOCK_REASONS = ['รอผลอนุมัติไฟแนนซ์', 'รอโอนเงินดาวน์/ชำระส่วนที่เหลือ', 'ลูกค้าขอดูรถก่อนตัดสินใจ', 'อื่น ๆ'];
 const FINANCE = ['HLTC', 'BAY', 'SCB', 'TTB', 'KKP', 'อื่น ๆ'];
 // the Google Form's choices (as answered in the sheet, 13/10)
+// a car that can take a lock: free, held temporarily, or invoiced / reported sold in IDS but not handed over
+// (advanced invoices made for the sales target, with no real customer yet) — ตกลง 14/10
+function carLockOpen(c) { return !!c && ['free', 'temp', 'invoiced', 'sold'].includes(c.status); }
+function carLockable(c) { return carLockOpen(c) || (!!c && c.status === 'pending'); }
 const SOURCES = ['Walk-in','Call', 'ลูกค้าแนะนำ','Online – เซลล์หาเอง','Lead Bot — รับเคสผ่าน Telegram','ลูกค้าเก่า', 'Service', 'Honda SPEAR'];
 const INSURANCE = ['Honda แถม','AT แถม', 'ลูกค้าซื้อ'];
 // insurers taking part in Honda's new-car insurance (campaign 1–31 Oct 2569, HEI 26-D / Super Pack); others can be typed in

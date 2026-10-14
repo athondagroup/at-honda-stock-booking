@@ -42,13 +42,14 @@ function renderModal(D) {
 }
 // units a lock can hold: a car in stock (VIN) or a quota slot that has no booking yet (Ref)
 function unitOf(m, D) {
-  if (m.vin) { const c = D.cars.get(m.vin); return c ? { kind: 'car', key: c.vin, br: c.br, spec: c.spec, age: c.age, label: c.vin, car: c, lock: c.lock, temps: c.temps, ok: c.status === 'free' || c.status === 'temp' } : null; }
+  if (m.vin) { const c = D.cars.get(m.vin); return c ? { kind: 'car', key: c.vin, br: c.br, spec: c.spec, age: c.age, label: c.vin, car: c, lock: c.lock, temps: c.temps, ok: carLockOpen(c) } : null; }
   if (m.ref) { const q = D.quota.find(x => x.ref === m.ref); return q ? { kind: 'quota', key: q.ref, br: q.br, spec: q.spec, age: null, label: `Quota ${q.ref} (${fmtM(q.m)})`, q, lock: q.lock, temps: q.temps, ok: q.open || (!q.lock && !q.bk && (q.st === 'waiting' || q.st === 'vin')) } : null; }
   return null;
 }
 function candidates(spec, D) {
-  const open = c => c.status === 'free' || c.status === 'temp';
-  const cars = [...D.cars.values()].filter(c => c.spec === spec && (open(c) || c.status === 'pending')).sort((a, b) => open(b) - open(a) || (b.age ?? -1) - (a.age ?? -1));
+  // free cars first, then invoiced-not-delivered (advanced invoice), then cars with a request waiting
+  const open = c => c.status === 'free' || c.status === 'temp', rank = c => open(c) ? 2 : carLockOpen(c) ? 1 : 0;
+  const cars = [...D.cars.values()].filter(c => c.spec === spec && carLockable(c)).sort((a, b) => rank(b) - rank(a) || (b.age ?? -1) - (a.age ?? -1));
   const qs = D.quota.filter(q => q.spec === spec && (q.open || quotaQueue(q)) && !q.vin).sort((a, b) => (b.open - a.open) || (a.m || '').localeCompare(b.m || ''));
   return { cars, qs };
 }
@@ -77,6 +78,7 @@ function lockChecks(m, D) {
     if (!(m.dealer_name || '').trim()) block.push('ใส่ชื่อดีลเลอร์ที่แลกหรือขายรถให้');
   }
   if (!u) { block.push('เลือกรถหรือ Quota 1 คัน'); return { warn, block, u }; }
+  if (u.car && (u.car.st === 'invoiced' || u.car.st === 'sold')) warn.push(`IDS ${u.car.st === 'invoiced' ? 'ออกใบกำกับ' : 'แจ้งขาย'}คันนี้แล้ว แต่ยังไม่ส่งมอบ (เช่น advanced invoice ใบจองไม่มีลูกค้าจริง) ล็อกได้ ผู้จัดการตรวจก่อนอนุมัติ`);
   const whose = o => isSales() && !isMine(o) ? 'เซลล์อื่น' : (o || '');
   if (u.lock && u.lock.status !== 'pending') block.push(`คันนี้ล็อกให้ใบจองของ ${whose(u.lock.owner)} แล้ว`);
   else if (u.lock && m.type !== 'temp') {
@@ -107,7 +109,7 @@ function lockModal(m, D) {
   const myWaiting = wSpec ? D.bookings.filter(x => x.state === 'waiting' && (x.spec === wSpec || (b && x.key === b.key)) && (!isSales() || isMine(x.owner)) && branchOk(x.br)) : [];
   // "every car": all cars of the model, any grade or colour, with the ones that cannot be locked shown but not pickable
   const model = spec ? String(spec).split('|')[0] : null;
-  const allCars = m.all && model ? [...D.cars.values()].filter(c => c.model === model && carVisible(c)).sort((x, y) => (y.spec === spec) - (x.spec === spec) || (['free', 'temp', 'pending'].includes(y.status) - ['free', 'temp', 'pending'].includes(x.status)) || (y.age ?? -1) - (x.age ?? -1)) : [];
+  const allCars = m.all && model ? [...D.cars.values()].filter(c => c.model === model && carVisible(c)).sort((x, y) => (y.spec === spec) - (x.spec === spec) || (carLockable(y) - carLockable(x)) || (y.age ?? -1) - (x.age ?? -1)) : [];
   const offCar = c => `<div class="pick opacity-60" aria-disabled="true"><span class="flex-1 min-w-0"><span class="code font-medium">${esc(c.vin)}</span> ${statusChip(CAR_STATUS, c.status)}${c.spec !== spec ? ' ' + chip('สเปกไม่ตรง', 'warn') : ''}
       <span class="block text-xs text-muted">${c.br} ${BR[c.br]?.name || ''} · ${esc(gradeShort(c.model, c.grade))} ${esc(c.color || '')} · อายุ ${c.age ?? '–'} วัน · ล็อกไม่ได้</span></span></div>`;
   const chk = lockChecks(m, D);
@@ -115,7 +117,7 @@ function lockModal(m, D) {
   const direct = m.type !== 'dealer' ? canApproveBr(u ? u.br : null) : (p.approveDealer);
   const custTxt = x => (!isSales() || isMine(x.owner)) && x.cust ? ' · ' + x.cust : '';
   const pickCar = c => `<button class="pick text-left ${m.vin === c.vin ? 'on' : ''}" data-act="pick" data-vin="${esc(c.vin)}" aria-pressed="${m.vin === c.vin}">
-      <span class="flex-1 min-w-0"><span class="code font-medium">${esc(c.vin)}</span> ${rec.vin === c.vin ? chip('แนะนำ', 'good') : ''} ${spec && c.spec !== spec ? chip(`สเปกไม่ตรง: ${gradeShort(c.model, c.grade)} ${c.color || ''}`, 'warn') : ''} ${c.temps.length ? chip(`ล็อกชั่วคราว ${c.temps.length}`, 'warn') : ''} ${c.status === 'pending' ? chip('มีคำขอรออนุมัติ ขอคิวต่อ', 'warn') : ''}
+      <span class="flex-1 min-w-0"><span class="code font-medium">${esc(c.vin)}</span> ${rec.vin === c.vin ? chip('แนะนำ', 'good') : ''} ${spec && c.spec !== spec ? chip(`สเปกไม่ตรง: ${gradeShort(c.model, c.grade)} ${c.color || ''}`, 'warn') : ''} ${c.temps.length ? chip(`ล็อกชั่วคราว ${c.temps.length}`, 'warn') : ''} ${c.status === 'pending' ? chip('มีคำขอรออนุมัติ ขอคิวต่อ', 'warn') : ''} ${c.status === 'invoiced' || c.status === 'sold' ? chip(c.status === 'invoiced' ? 'ออกใบกำกับแล้ว ยังไม่ส่งมอบ' : 'แจ้งขายแล้ว ยังไม่ส่งมอบ', 'warn') : ''}
       <span class="block text-xs text-muted">${c.br} ${BR[c.br].name} · ${prodPlain(c)} · อายุ ${c.age ?? '–'} วัน ${c.ref ? '· Ref ' + esc(c.ref) : ''}</span></span></button>`;
   const pickQ = q => `<button class="pick text-left ${m.ref === q.ref && !m.vin ? 'on' : ''}" data-act="pick" data-ref="${esc(q.ref)}" aria-pressed="${m.ref === q.ref && !m.vin}">
       <span class="flex-1 min-w-0"><span class="code font-medium">Quota ${esc(q.ref)}</span> ${rec.ref === q.ref ? chip('แนะนำ', 'good') : ''} ${statusChip(QUOTA_STATUS, q.st)}
@@ -145,7 +147,7 @@ function lockModal(m, D) {
       <div class="flex flex-col gap-2 max-h-72 overflow-auto pr-1">
       ${m.fixedUnit ? (u ? `<div class="pick on"><span class="code font-medium">${esc(u.label)}</span> <span class="text-xs text-muted">${u.br} · ${specLabel(u.spec)}${u.car ? ` · ${prodPlain(u.car)}` : ''}${u.age !== null ? ` · อายุ ${u.age} วัน` : ''}</span></div>` : '')
         : !spec ? '<div class="text-sm text-muted">เลือกใบจองก่อน</div>'
-        : m.all ? (allCars.map(c => ['free', 'temp', 'pending'].includes(c.status) ? pickCar(c) : offCar(c)).join('') + cand.qs.map(pickQ).join('') || '<div class="text-sm text-muted">ไม่มีรถรุ่นนี้ในสต็อก</div>')
+        : m.all ? (allCars.map(c => carLockable(c) ? pickCar(c) : offCar(c)).join('') + cand.qs.map(pickQ).join('') || '<div class="text-sm text-muted">ไม่มีรถรุ่นนี้ในสต็อก</div>')
         : (cand.cars.map(pickCar).join('') + cand.qs.map(pickQ).join('') || `<div class="text-sm" style="color:var(--bad)">ไม่มีรถว่างหรือ Quota ว่างสเปกนี้ กด "แสดงทุกคัน" เพื่อดูเกรดหรือสีอื่น</div>`)}
       </div></div>
     <div class="grid sm:grid-cols-2 gap-3">
@@ -375,6 +377,7 @@ async function saveBooking() {
   if (!S.files.bk.length) missing.push('หน้าใบจอง (รูป)');
   if (!d.booking_date) missing.push('วันที่จอง');
   if (!d.sales) missing.push('ชื่อเซลล์');
+  if (d.source === 'อื่น ๆ' && !String(d.source_other || '').trim()) missing.push('แหล่งที่มาอื่น (พิมพ์)');
   if (!d.customer.trim()) missing.push('ชื่อ-นามสกุลลูกค้า');
   if (!d.model || !d.grade || !d.color) missing.push('รุ่นรถ / เกรด / สี');
   if (!d.purchase) missing.push('เงื่อนไข');
@@ -393,7 +396,7 @@ async function saveBooking() {
   const id = newId('bookings');
   const fin = d.purchase === 'ไฟแนนซ์';
   const rec = {
-    booking_no: d.booking_no.trim() || null, booking_date: d.booking_date, br: myBranch() || d.br || salesBranch(d.sales), sales: d.sales, customer: d.customer.trim(), source: d.source,
+    booking_no: d.booking_no.trim() || null, booking_date: d.booking_date, br: myBranch() || d.br || salesBranch(d.sales), sales: d.sales, customer: d.customer.trim(), source: d.source === 'อื่น ๆ' ? `อื่น ๆ: ${String(d.source_other || '').trim()}` : d.source,
     model: d.model, grade: d.grade, color: d.color, model_text: d.model_text || null, purchase: d.purchase, finance: fin ? d.finance : null,
     fin_status: fin ? 'รอผล' : null, deposit: num(d.deposit) || 0, receipt_no: (d.receipt_no || '').trim() || null, discount: num(d.discount), foc_total: num(d.foc_total), insurance: d.insurance,
     ...bookPriceSnap(d),
@@ -896,7 +899,7 @@ document.addEventListener('click', ev => {
   fn(el, ev);
 });
 function setPath(obj, path, val) { const ks = path.split('.'); let o = obj; ks.slice(0, -1).forEach(k => { if (o[k] === undefined || o[k] === null) o[k] = {}; o = o[k]; }); o[ks.at(-1)] = val; }
-const RERENDER_FIELDS = new Set(['booking.model', 'booking.grade', 'booking.color', 'booking.purchase', 'booking.br', 'booking.sales', 'booking.multi_reason', 'booking.multi_old']);
+const RERENDER_FIELDS = new Set(['booking.model', 'booking.grade', 'booking.color', 'booking.purchase', 'booking.source', 'booking.br', 'booking.sales', 'booking.multi_reason', 'booking.multi_old']);
 let poqTimer = null, searchTimer = null;
 document.addEventListener('input', ev => {
   const t = ev.target;

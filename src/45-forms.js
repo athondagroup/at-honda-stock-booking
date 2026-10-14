@@ -121,7 +121,8 @@ function bookingForm(D) {
         <div class="field"><label for="b-note">หมายเหตุ</label>${inp('note', 'text', 'placeholder="เช่น Trade in"')}</div>
         ${F('booking_date', 'วันที่จอง', inp('booking_date', 'date', `max="${todayISO()}"`), true)}
         <div class="field"><span class="text-sm font-medium">หน้าใบจอง</span><span class="text-sm ${f.bk.length ? '' : ''}" style="color:var(--${f.bk.length ? 'good' : 'bad'})">${f.bk.length ? `แนบแล้ว ${f.bk.length} รูป (ข้อ 1 ด้านบน)` : 'ยังไม่ได้แนบ แนบที่ข้อ 1 ด้านบน'}</span></div>
-        ${F('source', 'แหล่งที่มาของการจอง', sel('source', SOURCES, 'เลือกแหล่งที่มา'))}
+        ${F('source', 'แหล่งที่มาของการจอง', sel('source', [...SOURCES, 'อื่น ๆ'], 'เลือกแหล่งที่มา'))}
+        ${d.source === 'อื่น ๆ' ? F('source_other', 'แหล่งที่มาอื่น (พิมพ์)', inp('source_other', 'text', 'placeholder="เช่น TikTok, งานบูธ, ป้ายหน้าโชว์รูม" maxlength="60"'), true) : ''}
         ${F('lead_id', 'Lead ID จาก BOT (ถ้ามี)', inp('lead_id', 'text', 'placeholder="ถ้ามี"'))}
       </fieldset>
       <fieldset class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-lg" style="background:var(--surface-2)"><legend class="font-head font-semibold px-1">ข้อมูลเพิ่ม (ไม่อยู่ใน Google Form · ไม่บังคับ ใส่ทีหลังได้)</legend>

@@ -77,7 +77,7 @@ function swapCtx(D, o) {
 const swapOpen = x => !!x && !!x.fromVin && (x.a ? !x.a.cancelled && !x.a.flow.done.delivered : !!x.lock);
 const canSwap = x => swapOpen(x) && perms().write && (canApproveBr(x.bkBr) || canApproveBr(x.fromBr));
 // free cars of the same spec in every branch, oldest production first
-const swapCands = (D, x) => [...D.cars.values()].filter(c => c.vin !== x.fromVin && c.spec === x.spec && (c.status === 'free' || c.status === 'temp'))
+const swapCands = (D, x) => [...D.cars.values()].filter(c => c.vin !== x.fromVin && c.spec === x.spec && carLockOpen(c))
   .sort((p, q) => (q.age ?? -1) - (p.age ?? -1));
 function swapModal(m, D) {
   const x = swapCtx(D, m);

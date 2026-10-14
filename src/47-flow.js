@@ -140,7 +140,7 @@ function flowPanel(m, a, D) {
     if (fl.done.assign) { const ac = D.cars.get(f.assign.vin); return `<div class="text-sm text-muted">รถ <span class="code">${esc(f.assign.vin)}</span>${ac ? ` · ${esc(ac.br)} · ${prodPlain(ac)}` : ''} · ${who(f.assign)}</div>${swapHist(a)}`; }
     if (!can('assign') && !mgrAssign(a)) return (fl.next === 'assign' ? '<div class="text-sm text-muted">รอแอดมินหรือผู้จัดการจัดสรรรถให้</div>' : '') + bkLocks(a, D);
     const lockCar = [...D.cars.values()].find(c => c.lock && c.lock.bkref && (c.lock.bkref === a.key || c.lock.bkref === a.row?.key));
-    const cands = [...D.cars.values()].filter(c => c.spec === a.spec && (c.status === 'free' || c.status === 'temp' || c === lockCar)).sort((x, y) => (y === lockCar) - (x === lockCar) || (y.age ?? 0) - (x.age ?? 0));
+    const cands = [...D.cars.values()].filter(c => c.spec === a.spec && (carLockOpen(c) || c === lockCar)).sort((x, y) => (y === lockCar) - (x === lockCar) || (y.age ?? 0) - (x.age ?? 0));
     const matchVin = a.match && a.match.vin;
     const val = m.assign_vin ?? (lockCar ? lockCar.vin : matchVin || '');
     return `<div class="grid sm:grid-cols-[1fr_auto] gap-2 items-end mt-1">
