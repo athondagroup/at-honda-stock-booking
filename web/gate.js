@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   const CFG = window.AT_CONFIG;
-  const sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
+  const sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' } });
   const gate = document.getElementById('gate');
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ROLE_TH = { sales: 'เซลล์', admin: 'แอดมินสาขา', aum: 'ผู้จัดการ PSC, ATE', nuch: 'ผู้จัดการ SPH, KPA', exec: 'ผู้บริหาร' };
@@ -255,7 +255,12 @@
 
   async function boot() {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) { showLogin(new URLSearchParams(location.hash.slice(1)).get('error_description') || ''); return; }
+    if (!session) {
+      const q = new URLSearchParams(location.hash.slice(1) || location.search.slice(1)), err = q.get('error_description') || q.get('error');
+      if (err || q.get('code')) history.replaceState(null, '', location.pathname);
+      showLogin(err ? `ลิงก์เข้าระบบใช้ไม่ได้ (${esc(err)}) ลิงก์ใช้ได้ครั้งเดียวและหมดอายุใน 1 ชั่วโมง กดส่งลิงก์ใหม่ หรือเข้าด้วยรหัสผ่าน` : q.get('code') ? 'ลิงก์นี้ต้องเปิดในเบราว์เซอร์เดียวกับที่กดส่งลิงก์ กดส่งลิงก์ใหม่อีกครั้ง' : '');
+      return;
+    }
     try { await sb.rpc('claim_member'); } catch (e) { /* names only */ }
     const { data: m } = await sb.from('members').select('*').eq('email', session.user.email.toLowerCase()).maybeSingle();
     if (!m || !m.active) { showWaiting(session.user.email); return; }
@@ -264,7 +269,9 @@
     if (!meta.pw_set && (session.user.app_metadata || {}).provider !== 'google' && localStorage.getItem('ath-pw-skip') !== em) { showSetPass(em, () => start(session, m)); return; }
     start(session, m);
   }
-  sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') location.reload(); });
+  // reload only when someone who was using the app is signed out (a failed link also reports SIGNED_OUT: reloading
+  // then would loop forever — 14/10)
+  sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT' && window.__WEB) location.reload(); });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => null);
   boot();
 })();
