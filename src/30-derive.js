@@ -197,7 +197,11 @@ function deriveNow() {
   for (const l of locks) {
     l.type = l.type === 'customer' ? 'booking' : (l.type || 'booking');
     // a request read from the Stock sheet before the nickname was known: match the nickname again with today's list
-    if (!l.sales && l.sales_nick) { const s = salesOfNick(l.sales_nick); if (s) { l.sales = s; l.warnings = (l.warnings || []).filter(w => !/^ยังไม่รู้ว่า/.test(w)); } }
+    // (or the sales came from the matched booking): the old "ยังไม่รู้ว่า … คือเซลล์คนไหน" warning no longer applies
+    if (l.sales_nick || (l.warnings || []).length) {
+      const s = !l.sales && l.sales_nick ? salesOfNick(l.sales_nick) : null; if (s) l.sales = s;
+      if (l.sales || (l.sales_nick && salesOfNick(l.sales_nick))) l.warnings = (l.warnings || []).filter(w => !/^ยังไม่รู้ว่า/.test(w));
+    }
     l.days = LOCK_DAYS_BY[l.type] || 15;
     const bk = l.bkref ? bookingByKey.get(l.bkref) : null;
     const rec = bk && bk.app ? bk.app.rec : null;
