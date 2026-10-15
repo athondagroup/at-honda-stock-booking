@@ -80,11 +80,22 @@ Deno.serve(async (req) => {
   if (!m || !m.active) return out({ code: "not_granted" }, 403);
   if (body.ping) return out({ mgr: mgrReady(), sales: salesReady(), sheet: sheetReady(), drive: driveReady() });
 
+  // one booking is sent once: the result is written onto the booking here (not left to the page), and a second
+  // full send is refused; `only` re-sends just the parts that did not go out (e.g. the sales group added later)
+  const admin = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"));
+  const webId = String(body.webId || "");
+  const loadRow = async () => webId ? ((await admin.from("docs").select("data").eq("col", "bookings").eq("id", webId).maybeSingle()).data || null) : null;
+  const before = await loadRow();
+  const prev = (before && before.data && before.data.gform) || null;
+  const only: string[] | null = Array.isArray(body.only) && body.only.length ? body.only.map(String) : null;
+  if (prev && prev.sent_at && !only) return out({ code: "already", gform: prev });
+  const want = (k: string) => !only || only.includes(k);
+
   const title: string = body.title || "แบบฟอร์ม จอง เอทีฮอนด้า";
   const fields: [string, string][] = (body.fields || []).map((f: any) => [String(f[0]), String(f[1] ?? "")]);
   const salesFields: [string, string][] = (body.salesFields || []).map((f: any) => [String(f[0]), String(f[1] ?? "")]);
-  const res: Record<string, string> = {};
-  if (mgrReady()) {
+  const res: Record<string, string> = { ...((prev && prev.res) || {}) };
+  if (!want("mgr")) {} else if (mgrReady()) {
     try {
       const text = `*${escMd(title)}*\n` + fields.map(([k, v]) => `*${escMd(k)}* : ${escMd(v)}`).join("\n");
       await tg(env("TELEGRAM_MGR_BOT_TOKEN"), "sendMessage", { chat_id: env("TELEGRAM_MGR_CHAT_ID"), text, parse_mode: "MarkdownV2" });
@@ -96,36 +107,48 @@ Deno.serve(async (req) => {
       res.mgr = "ok";
     } catch (e) { console.error(e); res.mgr = "error"; }
   } else res.mgr = "off";
-  if (salesReady()) {
+  if (!want("sales")) {} else if (salesReady()) {
     try {
       const text = [`<b>${escHtml(title)}</b>`, ...salesFields.map(([k, v]) => `<b>${escHtml(k)}</b> : ${escHtml(v)}`)].join("\n");
       await tg(env("TELEGRAM_SALES_BOT_TOKEN"), "sendMessage", { chat_id: env("TELEGRAM_SALES_CHAT_ID"), text, parse_mode: "HTML", disable_web_page_preview: true });
       res.sales = "ok";
     } catch (e) { console.error(e); res.sales = "error"; }
-  } else res.sales = "off";
+  } else { console.log("sales group not set: TELEGRAM_SALES_BOT_TOKEN / TELEGRAM_SALES_CHAT_ID missing"); res.sales = "off"; }
   // booking photos → Google Drive (then the copy here is removed and the booking points to Drive, like form bookings)
   let driveUrls: string[] = [];
   const docImgs: string[] = (body.docImgs || []).slice(0, 3);
-  if (driveReady() && docImgs.length && body.webId) {
+  if (want("drive") && driveReady() && docImgs.length && webId) {
     try {
       for (let i = 0; i < docImgs.length; i++) {
         const { data: blob, error } = await sb.storage.from("assets").download(docImgs[i]);
         if (error || !blob) throw new Error("download " + docImgs[i]);
         driveUrls.push(await toDrive(blob, `${body.driveName || "ใบจอง"}${docImgs.length > 1 ? "_" + (i + 1) : ""}.jpg`));
       }
-      const admin = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"));
-      const { data: row } = await admin.from("docs").select("data").eq("col", "bookings").eq("id", String(body.webId)).maybeSingle();
-      if (row) {
-        const d = row.data || {};
-        await admin.from("docs").update({ data: { ...d, doc_url: driveUrls[0], doc_drive: driveUrls, doc_imgs: (d.doc_imgs || []).filter((x: string) => !docImgs.includes(x)) } }).eq("col", "bookings").eq("id", String(body.webId));
-        await admin.storage.from("assets").remove(docImgs);
-      }
       res.drive = "ok";
     } catch (e) { console.error(e); res.drive = "error"; driveUrls = []; }
-  } else res.drive = "off";
-  if (sheetReady() && body.sheetId) {
-    try { await appendRow(body.sheetId, body.sheetTab || "Booking", fields, String(body.webId || ""), driveUrls.length ? driveUrls.join(", ") : String(body.photoNote || "")); res.sheet = "ok"; }
+  } else if (want("drive") && !res.drive) res.drive = "off";
+  if (!want("sheet")) {} else if (sheetReady() && body.sheetId) {
+    try { await appendRow(body.sheetId, body.sheetTab || "Booking", fields, webId, driveUrls.length ? driveUrls.join(", ") : String(body.photoNote || "")); res.sheet = "ok"; }
     catch (e) { console.error(e); res.sheet = "error"; }
   } else res.sheet = "off";
-  return out(res);
+  // write the outcome onto the booking (fresh copy, so nothing keyed meanwhile is lost)
+  let recorded = false;
+  if (webId && ["mgr", "sales", "sheet"].some((k) => res[k] === "ok")) {
+    try {
+      const row = await loadRow();
+      if (row) {
+        const d = { ...(row.data || {}) };
+        const at = new Date().toISOString();
+        if (driveUrls.length) { d.doc_url = driveUrls[0]; d.doc_drive = driveUrls; d.doc_imgs = (d.doc_imgs || []).filter((x: string) => !docImgs.includes(x)); }
+        const firstSent = (prev && prev.sent_at) || at;
+        d.gform = { ...(prev || {}), sent_at: firstSent, via: "web", res, by: (prev && prev.by) || user.id, role: (prev && prev.role) || body.role || null, at: (prev && prev.at) || at, ...(only ? { resent_at: at, resent_by: user.id } : {}) };
+        d.log = [...(d.log || []), { by: user.id, role: body.role || null, at, act: only ? "ส่ง Telegram / ชีตจากเว็บ (ส่งเพิ่ม)" : "ส่ง Telegram / ชีตจากเว็บ", note: only ? only.join(", ") : "" }].slice(-40);
+        const { error } = await admin.from("docs").update({ data: d }).eq("col", "bookings").eq("id", webId);
+        if (error) throw error;
+        recorded = true;
+        if (driveUrls.length) await admin.storage.from("assets").remove(docImgs);
+      }
+    } catch (e) { console.error("record", e); }
+  }
+  return out({ ...res, recorded });
 });
