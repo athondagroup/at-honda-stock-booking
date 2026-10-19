@@ -38,7 +38,7 @@ Object.assign(ACTIONS, {
       if (!dn) { toast('ใส่ชื่อดีลเลอร์', 'bad'); $('#lb-dealer')?.focus(); return; }
       set = { type: 'dealer', bkref: null, bk_br: null, dealer_name: dn, prospect: null }; label = `ดีลเลอร์ ${dn}`;
     } else {
-      const c = sheetCands(L, D).find(x => x.key === pick) || null;
+      const c = sheetCands(L, D, m.q).find(x => x.key === pick) || sheetCands(L, D).find(x => x.key === pick) || null;
       const b = c ? c.b : D.bookingByKey.get(pick);
       if (!b) { toast('ไม่พบใบจองนี้แล้ว', 'bad'); return; }
       if (c && c.hasCar) { toast('ใบจองนี้มีรถคันอื่นแล้ว เลือกใบอื่น', 'bad'); return; }

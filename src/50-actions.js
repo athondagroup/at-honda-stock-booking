@@ -942,7 +942,7 @@ document.addEventListener('input', ev => {
     if (S.modal.kind === 'idsfix' && path === 'e.grade') S.modal.e.color = '';
     if (path.endsWith('.model') && path.startsWith('r.cars')) { const c = S.modal.r.cars[Number(path.split('.')[2])]; c.grade = ''; c.color = ''; }
     if (path.endsWith('.grade') && path.startsWith('r.cars')) { const c = S.modal.r.cars[Number(path.split('.')[2])]; c.color = ''; }
-    if (path === 'poq' || (path === 'q' && (S.modal.kind === 'idspair' || S.modal.kind === 'stassign' || S.modal.kind === 'idsview' || S.modal.kind === 'drill'))) { clearTimeout(poqTimer); poqTimer = setTimeout(render, 250); return; }
+    if (path === 'poq' || (path === 'q' && (S.modal.kind === 'idspair' || S.modal.kind === 'lockbk' || S.modal.kind === 'stassign' || S.modal.kind === 'idsview' || S.modal.kind === 'drill'))) { clearTimeout(poqTimer); poqTimer = setTimeout(render, 250); return; }
     if (t.tagName === 'SELECT' || t.type === 'radio' || (path.endsWith('.vin') && val.length === 17)) render();
   } else if (t.dataset.filter) {
     S.filters[t.dataset.filter] = t.type === 'checkbox' ? t.checked : t.value;

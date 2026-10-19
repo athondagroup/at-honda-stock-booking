@@ -39,7 +39,9 @@ function sheetAutoMatch(spec, p, D) {
 }
 // bookings a manager may pick for a request from the sheet: same customer name (AT form or IDS, any model: a 2nd car),
 // and that sales' bookings of the same model
-function sheetCands(l, D) {
+// q: the manager's own search (customer / booking no. / sales), for names spelt differently in the sheet; with no match
+// by name or sales, bookings of the same spec from any sales are offered too
+function sheetCands(l, D, q) {
   const p = parseSheetText(sheetTextOf(l) || '');
   const [model] = String(l.spec || '').split('|');
   const sales = l.sales || p.sales;
@@ -54,7 +56,12 @@ function sheetCands(l, D) {
     const sameModel = b.model === model || (a && a.model === model);
     const sameSpec = b.spec === l.spec || (a && a.spec === l.spec);
     const mine = !!sales && (b.owner === sales || (a && a.sales === sales));
-    if (!(name || (mine && sameModel))) continue;
+    // the sheet may have it the other way round (customer / sales): the first part as the customer's name
+    const name2 = !p.sales && !!p.who && (sheetNameHit(b.cust, p.who) || (a && sheetNameHit(a.cust, p.who)));
+    const qk = q ? searchKey(q) : '';
+    const qHit = !!qk && [b.cust, b.no, b.owner, b.sales, a && a.cust, a && a.sales, a && a.rec.booking_no].some(x => x && searchKey(x).includes(qk));
+    const anySpec = !qk && sameSpec && b.state !== 'idscar';
+    if (qk ? !qHit : !(name || name2 || (mine && sameModel) || anySpec)) continue;
     seen.add(key);
     const other = b.lock && b.lock.id !== l.id ? b.lock : null;
     // the car this booking already has: IDS allocation, another lock, or the car given in the delivery steps
@@ -63,19 +70,19 @@ function sheetCands(l, D) {
     const sameCar = !!(l.vin && carVin && carVin === l.vin);
     const carRef = !carVin && b.state === 'idscar' ? (b.ref || b.ws || null) : null;
     out.push({ key, b, a, name, sameModel, sameSpec, mine, other, carVin, carRef, sameCar, hasCar: !sameCar && (b.state === 'idscar' || (other && other.status !== 'pending') || !!(fa && fa.vin)),
-      score: name * 8 + sameSpec * 4 + sameModel * 2 + mine * 1 - (b.state === 'idscar' ? 6 : 0) });
+      name: name || name2, qHit, score: qHit * 16 + (name || name2) * 8 + sameSpec * 4 + sameModel * 2 + mine * 1 - (b.state === 'idscar' ? 6 : 0) });
   }
-  return out.sort((x, y) => (y.key === l.bkref) - (x.key === l.bkref) || y.score - x.score || (x.b.date || '').localeCompare(y.b.date || '')).slice(0, 12);
+  return out.sort((x, y) => (y.key === l.bkref) - (x.key === l.bkref) || y.score - x.score || (x.b.date || '').localeCompare(y.b.date || '')).slice(0, q ? 20 : 12);
 }
 function lockBkModal(m, D) {
   const l = D.locks.find(x => x.id === m.id);
   if (!l || l.status !== 'pending') return `<p>คำขอนี้ไม่ได้รออนุมัติแล้ว</p><button class="btn btn-ghost" data-act="close">ปิด</button>`;
-  const p = parseSheetText(sheetTextOf(l) || ''), cands = sheetCands(l, D);
+  const p = parseSheetText(sheetTextOf(l) || ''), cands = sheetCands(l, D, m.q);
   const cur = m.pick ?? (l.type === 'booking' ? l.bkref : l.type);
   const sales = l.sales || p.sales;
   const canApprove = perms().write && (cur === 'dealer' ? perms().approveDealer : canApproveBr(l.car_br));
   const pickBtn = (v, body, on) => `<button class="pick text-left ${on ? 'on' : ''}" data-act="lockbk-pick" data-v="${esc(v)}" aria-pressed="${on}"><span class="flex-1 min-w-0">${body}</span></button>`;
-  const tags = c => [c.name ? chip('ชื่อตรง', 'good') : '', c.sameSpec ? chip('สเปกตรง', 'good') : c.sameModel ? chip('รุ่นตรง', 'neutral') : chip('รุ่นอื่น', 'warn'), c.mine ? chip('เซลล์เดียวกัน', 'neutral') : '',
+  const tags = c => [c.name ? chip('ชื่อตรง', 'good') : c.qHit ? chip('ตรงกับที่ค้นหา', 'neutral') : '', c.sameSpec ? chip('สเปกตรง', 'good') : c.sameModel ? chip('รุ่นตรง', 'neutral') : chip('รุ่นอื่น', 'warn'), c.mine ? chip('เซลล์เดียวกัน', 'neutral') : '',
     c.key === l.bkref ? chip('ระบบจับคู่ให้', 'ink') : '', c.sameCar ? chip('IDS จัดสรรคันนี้ให้ใบจองนี้แล้ว', 'good') : c.hasCar ? chip('ใบจองนี้มีรถคันอื่นแล้ว', 'bad') : c.other ? chip('มีคำขอล็อกอื่นค้าง', 'warn') : ''].join(' ');
   const row = c => { const b = c.b, a = c.a;
     return pickBtn(c.key, `<span class="font-medium">${esc((a && a.cust) || b.cust || '–')}</span> ${tags(c)}
@@ -83,8 +90,9 @@ function lockBkModal(m, D) {
   return `<div class="flex items-start justify-between gap-3 mb-1"><h2 class="font-head text-xl font-semibold">เลือกใบจองให้คำขอล็อก</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
   <p class="text-sm mb-1"><span class="code font-medium">${esc(l.vin || 'Quota ' + l.ref)}</span> · ${esc(l.car_br || '')} · ${specLabel(l.spec)}</p>
   <p class="text-sm mb-3">ข้อความในชีต: <b>"${esc(sheetTextOf(l) || '')}"</b> · เซลล์ ${sales ? esc(sales) : `<span style="color:var(--warn)">ยังไม่รู้ว่า "${esc(p.who)}" คือใคร</span>`}${p.cust ? ` · ลูกค้า ${esc(p.cust)}` : ''}</p>
+  <div class="field mb-2"><label for="lb-q">ชื่อในชีตสะกดไม่ตรง? ค้นหาใบจอง (ชื่อลูกค้า / เลขใบจอง / เซลล์) ทุกสาขา</label><input id="lb-q" type="search" data-modal="q" value="${esc(m.q || '')}" placeholder="เช่น อนุศร หรือ 5101139295"></div>
   <div class="flex flex-col gap-2 max-h-[50vh] overflow-auto pr-1">
-    ${cands.map(row).join('') || `<div class="text-sm text-muted p-2">ไม่พบใบจองที่ชื่อตรง${sales ? ` หรือใบจองรุ่นเดียวกันของ ${esc(sales)}` : ''}</div>`}
+    ${cands.map(row).join('') || `<div class="text-sm text-muted p-2">${m.q ? `ไม่พบใบจองที่ตรงกับ "${esc(m.q)}"` : `ไม่พบใบจองที่ชื่อตรง${sales ? ` หรือใบจองรุ่นเดียวกันของ ${esc(sales)}` : ''} ลองค้นหาด้านบน`}</div>`}
     ${pickBtn('temp', `<span class="font-medium">ยังไม่มีใบจอง: ล็อกชั่วคราว ${LOCK_DAYS_BY.temp} วัน</span><span class="block text-xs text-muted">ให้ ${esc(sales || p.who || 'เซลล์')}${p.cust ? ` · ลูกค้า ${esc(p.cust)}` : ''} · เมื่อลูกค้ามาจอง เซลล์กด "ลูกค้ามาจองแล้ว"</span>`, cur === 'temp')}
     ${pickBtn('dealer', `<span class="font-medium">แลก/ขายดีลเลอร์อื่น</span><span class="block text-xs text-muted">พี่อั้มอนุมัติ</span>`, cur === 'dealer')}
   </div>
