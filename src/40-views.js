@@ -244,7 +244,7 @@ function viewStock(D) {
   ${!isSales() && D.removed.filter(inBr).length ? `<section class="mt-6"><h2 class="font-head text-lg font-semibold mb-2">รถที่นำออกในระบบนี้</h2>
     <div class="bg-surface border border-line rounded-lg divide-y divide-line">${D.removed.filter(inBr).map(c => `<div class="p-3 flex flex-wrap gap-x-4 gap-y-1 items-center">
       <span class="code font-medium">${esc(c.vin)}</span><span>${specLabel(c.spec || specKey(c.model, c.grade, c.color))}</span><span>${esc(c.br)}</span>
-      <span>${chip(c.removed.reason === 'dealer' ? 'ขาย/แลกดีลเลอร์' : 'อื่น ๆ', 'muted')} ${esc(c.removed.dealer || c.removed.note || '')}</span>
+      <span>${chip(c.removed.reason === 'dealer' ? 'ขาย/แลกดีลเลอร์' : c.removed.reason === 'other_br' ? 'ขายให้สาขาอื่น' : 'อื่น ๆ', 'muted')} ${esc(c.removed.dealer || c.removed.note || '')}</span>
       <span class="text-xs text-muted">${fmtDT(c.removed.at)} ${who(c.removed)}</span>
       ${p.remove && p.write ? `<button class="btn btn-ghost btn-sm ml-auto" data-act="restore" data-vin="${esc(c.vin)}">คืนเข้าสต็อก</button>` : ''}</div>`).join('')}</div></section>` : ''}`;
 }

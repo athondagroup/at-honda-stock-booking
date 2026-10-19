@@ -363,16 +363,16 @@ function viewUploadBase(D) {
   ${brSeg()}
   <section><h2 class="font-head text-lg font-semibold mb-2">ประวัติการอัปโหลด</h2>
     <div class="bg-surface border border-line rounded-lg divide-y divide-line">${hist.slice(0, 40).map(u => {
-      const open = S.filters.uplOpen === u.id, flagged = (u.out || []).filter(o => o.flag).length;
+      const open = S.filters.uplOpen === u.id, flagged = (u.out || []).filter(o => o.flag && !o.res).length;
       return `<div class="p-3 md:px-4">
         <div class="flex flex-wrap gap-x-5 gap-y-1 items-center text-sm">
           <span class="w-32 num text-muted">${fmtDT(u.at)}</span><span class="w-36 font-medium">${SRC_LABEL[u.src]} ${esc(u.br)}${u.m ? ' ' + fmtM(u.m) : ''}</span>
           <span>ข้อมูล ณ ${fmtD(u.asof)} · ${u.prevN ?? '?'} → <b>${u.n}</b> แถว</span>
           ${u.src === 'stock' ? `<span>ออก ${(u.out || []).length} · เข้า ${u.inN || 0}${flagged ? ` · <b style="color:var(--bad)">ไม่พบข้อมูล ${flagged} คัน</b>` : ''}</span>` : ''}
           <span class="text-muted">${who(u)}</span>
-          ${(u.out || []).length ? `<button class="ml-auto text-sm underline" data-act="upl-open" data-id="${esc(u.id)}" aria-expanded="${open}">${open ? 'ซ่อน' : 'ดูรถที่ออก'}</button>` : ''}
+          ${(u.out || []).length ? `<button class="ml-auto text-sm underline" data-act="upl-open" data-id="${esc(u.id)}" aria-expanded="${open}">${open ? 'ซ่อน' : flagged ? 'ดูและระบุรถที่ออก' : 'ดูรถที่ออก'}</button>` : ''}
         </div>
-        ${open ? `<div class="mt-2 text-sm flex flex-col gap-1">${u.out.map(o => `<div class="flex flex-wrap gap-x-4"><span class="code">${esc(o.vin)}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--${o.flag ? 'bad' : 'muted'})">${esc(o.why)}</span></div>`).join('')}</div>` : ''}
+        ${open ? outFixList(u) : ''}
       </div>`;
     }).join('') || emptyBox('ยังไม่มีการอัปโหลด', 'เมื่ออัปโหลดไฟล์ Stock ระบบจะบอกว่ารถคันไหนออกไปเพราะส่งมอบ ย้ายสาขา หรือหายไปโดยไม่มีข้อมูล')}</div>
   </section>`;
