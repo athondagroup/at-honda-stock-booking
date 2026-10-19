@@ -323,7 +323,7 @@ function lockRow(l, D, o = {}) {
   const br = l.car_br || car?.br || q?.br;
   const stTxt = l.status === 'pending' ? chip('รออนุมัติ', 'warn')
     : l.status === 'approved' ? (l.mgrDue ? chip(`ครบกำหนด ผู้จัดการต่อหรือปล่อยภายใน ${fmtD(addDays(l.releaseOn, -1))}`, 'bad') : l.autoReleased ? chip(`ปล่อยคิวแล้ว ${fmtD(l.releaseOn)} (ผู้จัดการไม่ได้ต่อ)`, 'muted') : l.hold ? chip(`ถือไว้จนส่งมอบ ${fmtD(l.holdUntil)}`, 'red') : l.expired ? chip('หมดอายุ', 'bad') : chip(`ล็อก เหลือ ${l.daysLeft} วัน`, l.daysLeft <= 2 ? 'bad' : 'red'))
-    : l.status === 'allocated' ? chip('แจ้งจัดสรรแล้ว รอไฟล์ IDS', 'ink') : l.status === 'rejected' ? chip('ไม่อนุมัติ', 'muted') : l.status === 'converted' ? chip('เปลี่ยนเป็นล็อกให้ใบจอง', 'muted') : l.status === 'bumped' ? chip(`มีคนจองก่อน (${l.bumped_by || ''})`, 'muted') : l.status === 'done' ? chip(l.type === 'dealer' ? 'ขายให้ดีลเลอร์แล้ว' : 'ส่งมอบแล้ว', 'good') : l.status === 'withdrawn' ? chip('ถอนคำขอแล้ว', 'muted') : chip('ปล่อยแล้ว', 'muted');
+    : l.status === 'allocated' ? chip('แจ้งจัดสรรแล้ว รอไฟล์ IDS', 'ink') : l.status === 'rejected' ? chip('ไม่อนุมัติ', 'muted') : l.status === 'converted' ? chip('เปลี่ยนเป็นล็อกให้ใบจอง', 'muted') : l.status === 'bumped' ? chip(`มีคนจองก่อน (${l.bumped_by || ''})`, 'muted') : l.status === 'done' ? chip(l.ids_done ? 'สำเร็จ: IDS จัดสรรให้แล้ว' : l.type === 'dealer' ? 'ขายให้ดีลเลอร์แล้ว' : 'ส่งมอบแล้ว', 'good') : l.status === 'withdrawn' ? chip('ถอนคำขอแล้ว', 'muted') : chip('ปล่อยแล้ว', 'muted');
   const took = l.idsTook && !l.idsTook.same ? l.idsTook : null;
   const canDecide = p.write && l.status === 'pending' && (l.type === 'dealer' ? p.approveDealer : canApproveBr(br));
   const sheet = sheetTextOf(l);
@@ -388,11 +388,11 @@ function approveList(D, pend) {
     <div class="bg-surface border border-line rounded-lg divide-y divide-line">${recent.map(l => lockRow(l, D)).join('')}</div>` : ''}`;
 }
 function activeList(D, vis) {
-  const act = vis.filter(l => l.live && l.status !== 'pending').sort((a, b) => (b.needExt - a.needExt) || (b.finDue - a.finDue) || (a.status === 'allocated') - (b.status === 'allocated') || (a.end || '').localeCompare(b.end || ''));
+  const act = vis.filter(l => l.live && l.status !== 'pending' && !l.idsAsk).sort((a, b) => (b.needExt - a.needExt) || (b.finDue - a.finDue) || (a.status === 'allocated') - (b.status === 'allocated') || (a.end || '').localeCompare(b.end || ''));
   // locks IDS has overtaken (to close), and queues released by themselves in the last 3 days
   const close = vis.filter(l => l.status === 'approved' && l.idsTook && !l.idsTook.same);
   const auto = vis.filter(l => l.autoReleased && !l.idsTook && daysBetween(l.releaseOn, D.today) <= 3);
-  return `${close.length ? `<h2 class="font-head text-lg font-semibold mb-2" style="color:var(--bad)">IDS จัดสรรรถไปแล้ว ต้องปิดล็อกนี้ <span class="text-base">${close.length}</span></h2><div class="bg-surface border border-line rounded-lg divide-y divide-line mb-5">${close.map(l => lockRow(l, D)).join('')}</div>` : ''}
+  return `${lockIdsList(D, vis)}${close.length ? `<h2 class="font-head text-lg font-semibold mb-2" style="color:var(--bad)">IDS จัดสรรรถไปแล้ว ต้องปิดล็อกนี้ <span class="text-base">${close.length}</span></h2><div class="bg-surface border border-line rounded-lg divide-y divide-line mb-5">${close.map(l => lockRow(l, D)).join('')}</div>` : ''}
   <div class="bg-surface border border-line rounded-lg divide-y divide-line">${act.map(l => lockRow(l, D)).join('') || emptyBox('ยังไม่มีรถที่ล็อกอยู่', `เมื่อผู้จัดการอนุมัติ รถจะเปลี่ยนเป็นล็อกและนับถอยหลัง`)}</div>
   <p class="text-xs text-muted mt-2">ล็อก ${LOCK_DAYS_BY.booking} วัน (ใบจอง / ดีลเลอร์): วันสุดท้ายแจ้งผู้จัดการให้ต่อหรือปล่อย ถ้าไม่ต่อภายใน ${MGR_GRACE} วันหลังครบกำหนด ระบบปล่อยคิวเอง · ล็อกชั่วคราว ${LOCK_DAYS_BY.temp} วัน หมดแล้วปล่อยเอง</p>
   ${auto.length ? `<h2 class="font-head text-lg font-semibold mt-6 mb-2">ปล่อยคิวอัตโนมัติ 3 วันล่าสุด <span class="text-muted text-base">${auto.length}</span></h2><div class="bg-surface border border-line rounded-lg divide-y divide-line">${auto.map(l => lockRow(l, D)).join('')}</div>` : ''}`;

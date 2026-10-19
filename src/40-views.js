@@ -215,6 +215,7 @@ function stockCars(D) {
   return cars;
 }
 function viewStock(D) {
+  if (S.sub.stock === 'hist' && perms().approve) return carHistView(D);
   const f = S.filters, p = perms(), mode = S.sub.stock === 'list' ? 'list' : 'spec';
   const all = stockCars(D);
   const counts = {}; all.forEach(c => { counts[c.status] = (counts[c.status] || 0) + 1; });
@@ -235,7 +236,7 @@ function viewStock(D) {
     perms().receive ? `<button class="btn btn-red" data-act="go" data-view="receive">+ รับรถเข้า</button>` : '')}
   ${brSeg()}
   <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-    <div class="seg" role="group" aria-label="มุมมอง"><button data-act="sub" data-key="stock" data-sub="spec" aria-pressed="${mode === 'spec'}">ตามสเปก</button><button data-act="sub" data-key="stock" data-sub="list" aria-pressed="${mode === 'list'}">รายคัน${isSales() ? '' : ' พร้อมชื่อลูกค้า'}</button></div>
+    ${stockSeg(mode)}
   </div>
   ${isSales() ? '' : delivWaitBox(D)}
   ${filters}${line}

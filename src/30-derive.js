@@ -228,14 +228,19 @@ function deriveNow() {
       const gone = l.vin ? outByVin.get(l.vin) : null;
       const car = l.vin && !gone ? cars.get(l.vin) : null;
       const qb = !l.vin && l.ref ? idsRefBk.get(l.ref) : null;
-      if (gone || (car && car.st === 'booked') || qb) {
+      // an invoice in the customer's name (not the company's) counts too: the same name closes the lock, another name asks
+      if (gone || (car && (car.st === 'booked' || (['invoiced', 'sold'].includes(car.st) && car.cust))) || qb) {
         const a = bk ? bk.app : null, idsNo = gone ? gone.bk || null : car ? car.bk : qb.no;
         const handedHere = gone && gone.handed && a && a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin === l.vin;
         const same = (l.type === 'dealer' && !!gone) || !!handedHere
           || !!(bk && ((a && a.match && (a.match.vin === l.vin || a.match.recs.some(x => (l.vin && x.vin === l.vin) || (idsNo && x.no === idsNo))))
             || (idsNo && (bk.no === idsNo || (a && a.no === idsNo))) || (bk.src === 'IDS' && l.vin && bk.vin === l.vin)));
         const src = gone || car, info = { same, st: gone ? 'delivered' : 'booked', no: idsNo || null, cust: src ? (gone && gone.inv && gone.inv.cust) || src.cust || null : (qb && qb.cust) || null };
-        if (gone || same) { l.idsTook = info; l.live = false; } else l.idsInfo = info;
+        // the customer IDS gave the car to has the lock's customer name (a temporary lock has no booking to compare): done (ตกลง 19/10)
+        const lc = (bk && bk.cust) || l.prospect || '';
+        const byName = !same && !!(lc && info.cust && keyScore(nameKey(lc), nameKey(info.cust)) >= 2);
+        if (byName) { info.same = true; info.byName = true; }
+        if (gone || same || byName) { l.idsTook = info; l.live = false; } else { l.idsInfo = info; l.idsAsk = !l.ids_keep; }
       }
     }
   }
@@ -390,6 +395,8 @@ function buildAlerts(D) {
     const br = l.car_br, who = l.owner;
     const unit = l.vin ? l.vin : `Quota ${l.ref}`;
     const cust = l.booking ? l.booking.cust || '' : l.type === 'temp' ? l.prospect || '' : l.dealer_name || '';
+    if (l.idsAsk && ['pending', 'approved', 'allocated'].includes(l.status)) add('idsask:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'bad', 'IDS จัดสรรรถที่มีล็อกให้ลูกค้าชื่ออื่น',
+      `${unit} · ล็อกให้ ${cust || '–'} (${who || ''}) · IDS จัดสรรให้ ${l.idsInfo.cust || '–'}${l.idsInfo.no ? ' ใบจอง ' + l.idsInfo.no : ''} · ผู้จัดการเลือกใบจองที่ตรง`, { act: 'go', view: 'lock', sub: 'active' });
     // IDS allocated this car to another deal (or it is sold / invoiced): the request or lock here must be closed
     if (l.idsTook && !l.idsTook.same && ['pending', 'approved'].includes(l.status)) {
       const t = l.idsTook, why = t.st === 'booked' ? `IDS จัดสรรให้ใบจอง ${t.no || ''}${t.cust ? ' ' + t.cust : ''} แล้ว` : `ส่งมอบแล้ว${t.cust ? ' ให้ ' + t.cust : ''}`;
@@ -531,6 +538,7 @@ async function connect() {
       S[col] = new Map(snap.docs.map(d => [d.id, d.data()]));
       if (col === 'ids') S.idsV++;
       S.dataV++;
+      if (col === 'ids' && !S.seedTried && typeof carlogSeed === 'function') { S.seedTried = true; setTimeout(() => carlogSeed().catch(e => console.error('carlog seed', e)), 6000); }
       scheduleRender();
     }, () => { toast('การเชื่อมต่อข้อมูลขาดหาย กรุณาโหลดหน้าใหม่', 'bad'); }));
     render();

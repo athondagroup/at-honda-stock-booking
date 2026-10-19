@@ -17,6 +17,7 @@ function renderModal(D) {
   else if (m.kind === 'recvdup') body = recvDupModal(m);
   else if (m.kind === 'idspair') { body = idsPairModal(m, D); wide = true; }
   else if (m.kind === 'idsfix') { body = idsFixModal(m, D); wide = true; }
+  else if (m.kind === 'carhist') { body = carHistModal(m, D); wide = true; }
   else if (m.kind === 'tr') { body = trModal(m, D); wide = true; }
   else if (m.kind === 'car') { body = carModal(m, D); wide = true; }
   else if (m.kind === 'tgt') { body = tgtModal(m); wide = true; }
@@ -249,7 +250,7 @@ function prepareUploads(results) {
         else if (veh && veh.removed) why = veh.removed.reason === 'dealer' ? `ขาย/แลกดีลเลอร์ ${veh.removed.dealer || ''}` : veh.removed.reason === 'other_br' ? `ขายให้สาขาอื่น ${veh.removed.note || ''}` : `นำออก: ${veh.removed.note || ''}`;
         else if (c.st === 'invoiced' || c.st === 'delivered') why = 'ออกใบกำกับแล้วตามข้อมูลเดิม';
         else { why = 'ไม่พบข้อมูลว่าไปไหน (ไม่มีใบกำกับ ไม่ได้ย้ายสาขา ไม่ได้บันทึกขายดีลเลอร์) ต้องตรวจสอบ'; flag = true; }
-        return { vin: c.vin, spec: specKey(c.model, c.grade, c.color), why, flag };
+        return { vin: c.vin, spec: specKey(c.model, c.grade, c.color), why, flag, p: c.prod || null, bk: c.bkno || null, cust: c.cust || null };
       });
       r.diff = { prevN: prev.length, out, inN: r.rows.filter(c => !prevSet.has(c.vin)).length, baseSample: !X.src[r.br].stock };
     } else if (r.src === 'booking') r.diff = { prevN: X.bookings.filter(b => b.br === r.br).length, baseSample: !X.src[r.br].booking, out: X.src[r.br].booking ? bkOutDiff(r, D) : [] };
@@ -296,7 +297,10 @@ async function saveUploads() {
   // names typed in the sheet become lock requests (IDS allocation wins; locks made here stay)
   const sh = sel.some(r => r.src === 'stock' || r.src === 'quota') ? await syncSheetLocks() : { made: 0, updated: 0 };
   const dv = sel.some(r => r.src === 'invoice') ? await syncDelivered() : 0;
-  toast(`บันทึก ${ok} ตารางแล้ว${sh.made || sh.updated ? ` · คำขอล็อกจากชีตใหม่ ${sh.made}${sh.updated ? ` อัปเดต ${sh.updated}` : ''} รอผู้จัดการอนุมัติ` : ''}${dv ? ` · บันทึกส่งมอบจาก DL ${dv} ใบ` : ''}`);
+  // each car's history (in / out / IDS allocation) is kept beyond the stock table that each upload replaces
+  try { await carlogUpdate(sel); } catch (e) { console.error('carlog', e); }
+  const lk = sel.some(r => r.src !== 'invoice') ? await lockIdsSync().catch(e => { console.error('lockids', e); return { done: 0, ask: 0 }; }) : { done: 0, ask: 0 };
+  toast(`บันทึก ${ok} ตารางแล้ว${lk.done ? ` · ล็อกสำเร็จ (IDS จัดสรรให้ลูกค้าคนเดียวกัน) ${lk.done}` : ''}${lk.ask ? ` · IDS จัดสรรรถที่มีล็อกให้คนอื่น ${lk.ask} คัน รอผู้จัดการเลือก` : ''}${sh.made || sh.updated ? ` · คำขอล็อกจากชีตใหม่ ${sh.made}${sh.updated ? ` อัปเดต ${sh.updated}` : ''} รอผู้จัดการอนุมัติ` : ''}${dv ? ` · บันทึกส่งมอบจาก DL ${dv} ใบ` : ''}`);
   render();
 }
 
@@ -944,13 +948,15 @@ document.addEventListener('input', ev => {
     S.filters[t.dataset.filter] = t.type === 'checkbox' ? t.checked : t.value;
     if (t.dataset.filter === 'qModel') { S.filters.bGrade = ''; S.filters.bColor = ''; }
     if (t.dataset.filter === 'bGrade') S.filters.bColor = '';
+    if (t.dataset.filter === 'chModel') { S.filters.chGrade = ''; S.filters.chColor = ''; }
+    if (t.dataset.filter === 'chGrade') S.filters.chColor = '';
     // a picker that redraws itself while its own drop-down is still open can crash a phone browser: let it close first
     if (t.tagName === 'SELECT') { try { t.blur(); } catch (e) { /* ignore */ } setTimeout(render, 30); } else if (t.type === 'checkbox') render();
     // search boxes update while typing (after a short pause), not only on Enter
     else if (RERENDER_ON_CHANGE.has(t.dataset.filter) && t.type === 'search') { clearTimeout(searchTimer); searchTimer = setTimeout(render, 300); }
   }
 });
-const RERENDER_ON_CHANGE = new Set(['q', 'bq', 'aq', 'rq', 'sFrom', 'sTo', 'bDFrom', 'bDTo', 'adq', 'alq', 'eFrom', 'eTo']);
+const RERENDER_ON_CHANGE = new Set(['q', 'bq', 'aq', 'rq', 'sFrom', 'sTo', 'bDFrom', 'bDTo', 'adq', 'alq', 'eFrom', 'eTo', 'chQ', 'chFrom', 'chTo', 'chAt']);
 // a field's change event fires on mousedown of the next click; redrawing then would swallow that click, so wait for the click to land
 let ptrDown = false, ptrRender = false;
 document.addEventListener('pointerdown', () => { ptrDown = true; }, true);

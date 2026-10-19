@@ -106,6 +106,20 @@ Deno.serve(async (req) => {
     catch (e) { console.error("sheetUpdate", e); return out({ sheet: "error" }); }
   }
 
+  // a short plain-text notice (locks closed / taken by IDS) to the manager and/or sales group
+  if (body.tgText) {
+    const q = body.tgText, text = escHtml(String(q.text || "")).slice(0, 3800), to: string[] = Array.isArray(q.to) ? q.to.map(String) : ["mgr", "sales"];
+    const r: Record<string, string> = {};
+    if (!text) return out({ code: "bad_request" }, 400);
+    for (const [k, ready, tok, chat] of [["mgr", mgrReady(), "TELEGRAM_MGR_BOT_TOKEN", "TELEGRAM_MGR_CHAT_ID"], ["sales", salesReady(), "TELEGRAM_SALES_BOT_TOKEN", "TELEGRAM_SALES_CHAT_ID"]] as [string, boolean, string, string][]) {
+      if (!to.includes(k)) continue;
+      if (!ready) { r[k] = "off"; continue; }
+      try { await tg(env(tok), "sendMessage", { chat_id: env(chat), text, parse_mode: "HTML", disable_web_page_preview: true }); r[k] = "ok"; }
+      catch (e) { console.error("tgText", e); r[k] = "error"; }
+    }
+    return out(r);
+  }
+
   // one booking is sent once: the result is written onto the booking here (not left to the page), and a second
   // full send is refused; `only` re-sends just the parts that did not go out (e.g. the sales group added later)
   const admin = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"));
