@@ -89,7 +89,7 @@ function matchForms(at, idsB, cars, inv) {
   }
   const matchedIds = new Set();
   for (const v of result.values()) v.recs.forEach(r => { if (r.kind === 'booking') matchedIds.add(r.row.key); });
-  const idsOnly = idsB.filter(b => !b.seed && b.match !== 'cancel' && (b.date || '') >= MATCH_FROM && !matchedIds.has(b.key));
+  const idsOnly = idsB.filter(b => !b.seed && !b.skip && b.match !== 'cancel' && (b.date || '') >= MATCH_FROM && !matchedIds.has(b.key));
   // unmatched AT bookings: records anywhere in IDS (any branch, model or date) with the same or a contained name,
   // so the admin can see e.g. the customer already took a different car on another booking
   const claimedBy = new Map();

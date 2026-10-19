@@ -68,7 +68,8 @@ function deriveNow() {
   X.inv.forEach(i => { const p = invByVin.get(i.vin); if (!p || (i.idate || '') > (p.idate || '')) invByVin.set(i.vin, i); });
 
   // IDS bookings
-  const idsB = X.bookings.map(b => ({
+  // web changes to IDS bookings (ids/bkfix) go on top of each upload
+  const idsB = X.bookings.map(idsFixApply).map(b => ({
     ...b, key: 'ids:' + b.no, src: 'IDS', spec: specKey(b.model, b.grade, b.color),
     match: b.match || (b.ids === CANCEL ? 'cancel' : b.vin ? 'car' : (b.ref || b.ws) ? 'quota' : 'waiting')
   }));
@@ -383,7 +384,7 @@ function buildAlerts(D) {
       `${a.cust} · ${specLabelText(a.spec)} · ${money((a.rec.cancel.transfer || {}).amount ?? a.deposit)} บาท · ลงใบจองใหม่ของลูกค้าแล้วกดผูก`, { act: 'tr-open', id: a.id, label: 'ผูกกับใบจองใหม่' });
   for (const b of D.idsOnly) {
     add('idsat:' + b.no, { sales: b.sales, br: b.br, roles: ['sales', 'admin', 'manager'] }, 'bad', 'มีใน IDS แต่ยังไม่ลงฟอร์ม AT Honda',
-      `ใบจอง ${b.no} · ${b.cust || ''} · ${b.model} ${gradeShort(b.model, b.grade)} ${b.color || ''} · ชื่อใน IDS: ${b.sales || '–'} กรุณาลงใบจอง AT Honda พร้อมแนบใบจอง หรือจับคู่กับฟอร์มที่ลงไว้แล้ว (ถ้าไม่ใช่ลูกค้าของคุณ แจ้งผู้จัดการ)`, { act: 'ids-claim', id: b.no, more: [{ act: 'idspair-open', id: b.key, label: 'จับคู่กับฟอร์มที่มี' }, { act: 'go', view: 'book', label: 'ดูใบจอง', q: b.no }] });
+      `ใบจอง ${b.no} · ${b.cust || ''} · ${b.model} ${gradeShort(b.model, b.grade)} ${b.color || ''} · ชื่อใน IDS: ${b.sales || '–'} กรุณาลงใบจอง AT Honda พร้อมแนบใบจอง หรือจับคู่กับฟอร์มที่ลงไว้แล้ว (ถ้าไม่ใช่ลูกค้าของคุณ แจ้งผู้จัดการ)`, { act: 'ids-claim', id: b.no, more: [{ act: 'idspair-open', id: b.key, label: 'จับคู่กับฟอร์มที่มี' }, { act: 'idsfix-open', id: b.no, label: 'แก้ไข / ไม่ต้องมีฟอร์ม' }, { act: 'go', view: 'book', label: 'ดูใบจอง', q: b.no }] });
   }
   for (const l of D.locks) {
     const br = l.car_br, who = l.owner;

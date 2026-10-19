@@ -127,12 +127,14 @@ function bookRow(r, D, p) {
   const acts = [];
   if (a) acts.push(`<button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(a.id)}">เปิด</button>`);
   else if (r.noForm && p.book && p.write && (!isSales() || isMine(r.owner))) acts.push(`<button class="btn btn-dark btn-sm" data-act="ids-claim" data-id="${esc(b.no)}">ลงฟอร์ม AT</button>`);
+  if (!a && b && r.noForm && p.write && idsFixCan(b)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="idspair-open" data-id="${esc(b.key)}">จับคู่กับฟอร์มที่มี</button>`);
+  if (!a && b && p.write && idsFixCan(b)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="idsfix-open" data-id="${esc(b.no)}">แก้ไข</button>`);
   if (p.write && p.request && row.state === 'waiting' && (!isSales() || isMine(r.owner)) && (a ? a.active : true)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="lock-open" data-bk="${esc(row.key || r.key)}">ขอล็อกรถ</button>`);
   // the booking's own locks are handled on this row: approve, allocate, extend, release, swap, undo (ตกลง 13/10)
   if (p.write) D.locks.filter(l => (l.bkref === r.key || (row.key && l.bkref === row.key) || (a && l.bkref === a.key)) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased).forEach(l => acts.push(...rowLockActs(l, D)));
   if (p.write && a && a.active && ((a.flow.next === 'assign' && canAllocBr(a.br)) || mgrAssign(a))) acts.push(`<button class="btn btn-dark btn-sm" data-act="at-open" data-id="${esc(a.id)}">จัดสรรรถ</button>`);
   const idsCell = a ? `${matchChip(a)}${a.matchAsk ? `<div>${chip('รอยืนยันการจับคู่', 'warn')}</div>` : ''}${b && b.ids ? `<div class="text-xs text-muted">${esc(b.ids)}</div>` : ''}`
-    : `${r.noForm ? chip('ยังไม่มีฟอร์ม AT', 'bad') : b.match === 'cancel' ? chip('รอยกเลิกใน IDS', 'muted') : chip('ใน IDS', 'neutral')}<div class="text-xs text-muted">${esc(b.ids || '')}</div>`;
+    : `${r.noForm ? chip('ยังไม่มีฟอร์ม AT', 'bad') : b.webCancel ? '' : b.match === 'cancel' ? chip('รอยกเลิกใน IDS', 'muted') : chip('ใน IDS', 'neutral')}<div class="text-xs text-muted">${esc(b.ids || '')}</div>${idsFixChip(b)}`;
   const stateCell = a && a.cancelled ? (a.rec.cancel && a.rec.cancel.refund === 'refund' ? chip(a.rec.refund && a.rec.refund.at ? 'ยกเลิก · ทำใบคืนเงินแล้ว' : 'ยกเลิก · รอทำใบคืนเงิน', a.rec.refund && a.rec.refund.at ? 'muted' : 'warn') : chip('ยกเลิก', 'muted'))
     : `${a && a.change ? `<div>${chip(a.change.type === 'cancel' ? 'รออนุมัติยกเลิก' : 'รออนุมัติแก้ไข', 'warn')}</div>` : ''}${a && gformDue(a) && gformCfg() && (a.rec.created_at || '') >= (gformCfg().at || '') ? `<div>${chip('ยังไม่ส่ง Google Form', 'warn')}</div>` : ''}${a && a.flow.history ? chip('ส่งมอบแล้ว (ประวัติ)', 'muted') : statusChip(BOOK_STATE, row.state || 'waiting')}${row.state === 'waiting' && row.pos ? ` <span class="text-xs text-muted">คิวที่ ${row.pos}</span>` : ''}
       ${a && a.flow.next ? `<div class="text-xs text-muted">ถัดไป: ${FLOW_LABEL[a.flow.next]}</div>` : ''}`;
