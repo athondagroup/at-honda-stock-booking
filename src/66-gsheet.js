@@ -53,7 +53,8 @@ async function gsCheck(manual) {
     if (!vals) { S.gs = { busy: false, err: 'shape', msg: 'อ่านข้อมูลจากชีตไม่ได้ (รูปแบบไม่ตรง)' }; render(); return; }
     const webIds = new Set(S.bookings.keys()), rows = [];
     let total = 0;
-    for (const r of vals) { const x = gsRow(r); if (!x) continue; total++; if (S.bookings.has(x.id) || (x.webId && webIds.has(x.webId))) continue; rows.push(x); }
+    S.gsSeenWeb = new Set();
+    for (const r of vals) { const x = gsRow(r); if (!x) continue; total++; if (x.webId && webIds.has(x.webId)) S.gsSeenWeb.add(x.webId); if (S.bookings.has(x.id) || (x.webId && webIds.has(x.webId))) continue; rows.push(x); }
     rows.sort((a, b) => (b.doc.created_at || '').localeCompare(a.doc.created_at || ''));
     S.gs = { busy: false, at: new Date().toISOString(), total, rows, pick: Object.fromEntries(rows.map(x => [x.id, !x.doc.demo])) };
   } catch (e) {

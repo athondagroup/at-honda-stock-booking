@@ -132,13 +132,15 @@ function nextStepBox(a, D, mine) {
   const head = `<div class="text-sm">${mine ? `<b>${esc(a.cust || '')}</b> · ` : ''}${esc(a.model || '')} ${esc(gradeShort(a.model, a.grade) || '')} ${esc(a.color || '')} · เซลล์ ${esc(a.sales || '')}${a.no ? ` · ใบจอง <span class="code">${esc(a.no)}</span>` : ''}${vin ? ` · รถ <span class="code">${esc(vin)}</span>` : ''}</div>`;
   const dates = [['วันที่จอง', fmtD(a.date)], ['บันทึกเข้าระบบ', r.created_at ? fmtDT(r.created_at) + (r.imported ? ' (จากฟอร์ม)' : '') : '–'], ['เริ่มคิว', fmtD(r.queue_date || r.booking_date || a.date)]];
   let due = null;
-  if (n === 'fin' && a.date) { due = addDays(a.date, 15); dates.push(['ครบกำหนดไฟแนนซ์ (15 วัน · รอยืนยันกติกา)', fmtD(due)]); }
+  if (n === 'fin' && a.date) { due = addDays(a.date, 15); dates.push(['ครบกำหนดไฟแนนซ์อนุมัติผ่าน (15 วันจากวันจอง)', fmtD(due)]); }
   if (r.delivery_plan) dates.push(['นัดรับรถ', fmtD(r.delivery_plan)]);
   const late = due && due < D.today ? daysBetween(due, D.today) : 0;
   const body = a.cancelled ? '<div class="font-semibold">ยกเลิกแล้ว</div>' : a.done ? '<div class="font-semibold" style="color:var(--good)">ส่งมอบแล้ว</div>'
     : n ? `<div class="text-xs text-muted">ขั้นต่อไป</div><div class="text-lg font-semibold">${esc(FLOW_LABEL[n] || n)}</div><div class="text-sm">${esc(nextStepWho(n))}${late ? ` · <b style="color:var(--bad)">เลยกำหนด ${late} วัน</b>` : ''}</div>
       <button class="btn btn-red btn-sm mt-2 self-start" data-act="scroll-flow">ไปที่ขั้นนี้</button>` : '<div class="text-sm">ไม่มีขั้นที่ต้องทำ</div>';
-  return `<div class="p-3 rounded-lg border-2 mb-4 flex flex-col gap-2" style="border-color:${a.cancelled || a.done ? 'var(--line)' : 'var(--red)'}">${head}<div class="flex flex-col">${body}</div>
+  const ro = !a.cancelled && !a.done && !(perms().write && canEditBooking(a)) ? `<div class="text-xs p-2 rounded" style="background:var(--surface-2)">ดูได้อย่างเดียว: ใบจองสาขา ${esc(a.br)} แก้ได้โดยเซลล์เจ้าของ (${esc(a.sales || '–')}) แอดมินสาขา ${esc(a.br)} และผู้จัดการสาขา ${esc(a.br)}${mgrNameOf(a.br) ? ` (${esc(mgrNameOf(a.br))})` : ''} · บทบาทตอนนี้: ${esc(roleLabel())}</div>` : '';
+  const holdTxt = n && n !== 'fin' && n !== 'booked' && a.rec.delivery_plan ? '<div class="text-xs" style="color:var(--good)">ไฟแนนซ์ผ่านและยืนยันวันออกรถแล้ว: ล็อกคิวไว้จนส่งมอบ ไม่ปลดล็อก ไม่ถามซ้ำ</div>' : '';
+  return `<div class="p-3 rounded-lg border-2 mb-4 flex flex-col gap-2" style="border-color:${a.cancelled || a.done ? 'var(--line)' : 'var(--red)'}">${head}<div class="flex flex-col">${body}</div>${holdTxt}${ro}
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">${dates.map(([k, v]) => `<div><div class="text-muted">${k}</div><div class="num">${v}</div></div>`).join('')}</div></div>`;
 }
 Object.assign(ACTIONS, { 'scroll-flow'(el) { const t = document.querySelector('#modal-root [data-flow-steps]') || document.querySelector('#modal-root h3'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
@@ -169,3 +171,34 @@ Object.assign(ACTIONS, {
   'gsearch-open'() { S.modal = { kind: 'gsearch', q: '', all: true }; render(); setTimeout(() => { const i = document.getElementById('gs-q'); if (i) i.focus(); }, 30); },
   'gsearch-scope'(el) { if (S.modal) { S.modal.all = el.dataset.v !== 'br'; render(); } }
 });
+function mgrNameOf(br) { const k = Object.keys(MGR_OF).find(r => MGR_OF[r].includes(br)); return k ? ROLES[k].label : ''; }
+// งานติดขัด: an open booking stuck past its expected time
+function bkStuckWhy(a, D) {
+  const r = a.rec, f = a.flow || {}, age = a.ageDays ?? 0;
+  if (a.change) return 'รออนุมัติคำขอ';
+  if (!a.match && age > 3) return `ยังไม่อยู่ใน IDS ${age} วัน`;
+  if (f.next === 'booked' && !r.imported && age > 3) return 'ยังไม่มีเลขที่ใบเสร็จมัดจำ';
+  if (f.next === 'fin' && age > 15) return `ไฟแนนซ์ยังไม่ผ่าน เกิน 15 วัน (${age} วัน)`;
+  if (r.delivery_plan && r.delivery_plan < D.today) return `เลยวันนัดส่งมอบ ${fmtD(r.delivery_plan)}`;
+  const asg = r.flow && r.flow.assign && r.flow.assign.at;
+  if (asg && !(r.flow.delivered && r.flow.delivered.date) && daysBetween(asg.slice(0, 10), D.today) > 14) return 'จัดสรรรถแล้วเกิน 14 วัน ยังไม่ส่งมอบ';
+  return '';
+}
+function bkStuck(a, D) { return !!bkStuckWhy(a, D); }
+// ---- a new version of the website: tell the person and update with one press (a home-screen app has no reload button)
+function updCheck() {
+  if (!window.__BUILD || typeof fetch !== 'function') return;
+  fetch('version.json?ts=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
+    if (!j || !j.v || j.v === window.__BUILD || document.getElementById('upd-bar')) return;
+    const d = document.createElement('div'); d.id = 'upd-bar';
+    d.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:60;background:#17181c;color:#fff;border-radius:12px;padding:12px 14px;display:flex;gap:12px;align-items:center;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:520px;margin:0 auto';
+    d.innerHTML = '<span style="flex:1">มีเว็บเวอร์ชันใหม่</span><button style="background:#c8102e;color:#fff;border:0;border-radius:8px;padding:10px 14px;font:inherit;font-weight:600" data-act="app-reload">อัปเดตเลย</button>';
+    document.body.appendChild(d);
+  }).catch(() => null);
+}
+if (typeof window !== 'undefined' && window.__BUILD) {
+  setInterval(updCheck, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') updCheck(); });
+  setTimeout(updCheck, 15000);
+}
+Object.assign(ACTIONS, { 'app-reload'() { try { location.reload(); } catch (e) { /* ignore */ } } });

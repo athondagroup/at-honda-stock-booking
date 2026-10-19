@@ -12,18 +12,19 @@ function notifyFields(a) {
 }
 function notifyResText(r) {
   if (!r) return '';
-  const lab = { ok: 'ส่งแล้ว', error: 'ไม่สำเร็จ', off: 'ยังไม่ได้ตั้งค่า' };
+  const lab = { ok: 'รับแล้ว ✓', error: 'ไม่สำเร็จ', off: 'ยังไม่ได้ตั้งค่า' };
   return ` (กลุ่มผู้จัดการ ${lab[r.mgr] || '–'} · กลุ่มเซลล์ ${lab[r.sales] || '–'} · ชีต ${lab[r.sheet] || '–'}${r.drive && r.drive !== 'off' ? ` · รูปเข้า Drive ${lab[r.drive]}` : ''})`;
 }
 function notifyBox(a, c) {
   const can = canEditBooking(a) && perms().write, R = window.__WEB.notifyReady, busy = S.notifyBusy && S.notifyBusy[a.id];
   const parts = [R.mgr ? 'กลุ่มผู้จัดการ (พร้อมรูป)' : '', R.sales ? 'กลุ่มเซลล์' : '', R.sheet ? 'Google Sheet' : '', R.drive ? 'เก็บรูปเข้า Google Drive' : ''].filter(Boolean).join(' · ');
   const photos = (a.rec.doc_imgs || []).length;
-  return box('warn', `<b>ส่งใบจองนี้เข้า Telegram และ Google Sheet</b>
-    <div class="text-sm">เลือกได้ 2 แบบ: ส่งจากเว็บเลย (${esc(parts)}) หรือเปิด Google Form ที่กรอกให้แล้วแบบเดิม${photos ? '' : ' · <span style="color:var(--bad)">ใบจองนี้ยังไม่มีรูปหน้าใบจอง</span>'}</div>
-    ${can ? `<div class="flex flex-wrap gap-2 mt-2"><button class="btn btn-red btn-sm" data-act="bk-notify" data-id="${esc(a.id)}" ${busy ? 'disabled' : ''}>${busy ? '<span class="spin"></span> กำลังส่ง…' : 'ส่งจากเว็บเลย'}</button>
-      ${c ? `<a class="btn btn-ghost btn-sm" href="${esc(gformUrl(a))}" target="_blank" rel="noopener" data-gform="${esc(a.id)}">เปิด Google Form แบบเดิม</a>
-      <button class="btn ${S.gformOpened && S.gformOpened[a.id] ? 'btn-dark' : 'btn-ghost'} btn-sm" data-act="gform-done" data-id="${esc(a.id)}">ส่งฟอร์มแล้ว</button>` : ''}</div>` : ''}`);
+  // saved bookings are sent by themselves; this box shows only while it is sending or when it did not go out
+  return box(busy ? 'surface' : 'warn', `<b>${busy ? 'กำลังส่งใบจองเข้า Telegram และ Google Sheet อัตโนมัติ…' : 'ใบจองนี้ยังไม่ได้ส่งเข้า Telegram / Google Sheet'}</b>
+    <div class="text-sm">ส่งไปที่ ${esc(parts)}${photos ? '' : ' · <span style="color:var(--bad)">ใบจองนี้ยังไม่มีรูปหน้าใบจอง</span>'}</div>
+    ${can ? `<div class="flex flex-wrap gap-2 mt-2"><button class="btn btn-red btn-sm" data-act="bk-notify" data-id="${esc(a.id)}" ${busy ? 'disabled' : ''}>${busy ? '<span class="spin"></span> กำลังส่ง…' : 'ส่งอีกครั้ง'}</button></div>
+      ${c ? `<details class="mt-2 text-sm"><summary class="cursor-pointer">ทางสำรอง: ส่งผ่าน Google Form แบบเดิม</summary><div class="flex flex-wrap gap-2 mt-2"><a class="btn btn-ghost btn-sm" href="${esc(gformUrl(a))}" target="_blank" rel="noopener" data-gform="${esc(a.id)}">เปิด Google Form ที่กรอกให้แล้ว</a>
+      <button class="btn ${S.gformOpened && S.gformOpened[a.id] ? 'btn-dark' : 'btn-ghost'} btn-sm" data-act="gform-done" data-id="${esc(a.id)}">ยืนยันว่าส่งฟอร์มแล้ว</button></div><p class="text-xs text-muted mt-1">ยืนยันเองจะขึ้นว่า "ยืนยันเอง" จนกว่าระบบจะพบแถวนี้ในชีต</p></details>` : ''}` : ''}`);
 }
 // parts of an earlier web send that did not go out but can now (e.g. the sales group was set up afterwards)
 function notifyMissing(g) {
@@ -45,7 +46,7 @@ Object.assign(ACTIONS, {
     const a = atById(el.dataset.id); if (!a || !notifyOk() || !canEditBooking(a)) return;
     const only = el.dataset.only ? el.dataset.only.split(',') : null;
     if (!only && a.rec.gform && a.rec.gform.sent_at) { toast('ใบจองนี้ส่งไปแล้ว', 'bad'); return; }
-    if (!only && !(a.rec.doc_imgs || []).length && !(a.rec.doc_drive || []).length && !confirm('ใบจองนี้ยังไม่มีรูปหน้าใบจอง ส่งต่อเลยไหม')) return;
+    if (!only && !el.dataset.auto && !(a.rec.doc_imgs || []).length && !(a.rec.doc_drive || []).length && !confirm('ใบจองนี้ยังไม่มีรูปหน้าใบจอง ส่งต่อเลยไหม')) return;
     S.notifyBusy = { ...(S.notifyBusy || {}), [a.id]: true }; render();
     let res = null;
     try {

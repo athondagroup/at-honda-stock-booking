@@ -39,7 +39,7 @@ const navFor = () => NAV.filter(n => !(isSales() && (n.id === 'receive' || n.id 
 // ปรับตามบทวิเคราะห์ 19/10 (ตัวอย่างใน artifact): งานวันนี้ / ใบจอง / รถ / รายงาน + เพิ่มเติม (เครื่องมือแอดมิน/ผู้จัดการ)
 const GROUPS = [
   { id: 'work', label: 'งานวันนี้', get views() { return perms().approve ? ['inbox', 'alerts'] : ['alerts', 'inbox']; }, icon: 'alerts' },
-  { id: 'bookg', label: 'ใบจอง', views: ['book', 'flow'], icon: 'book' },
+  { id: 'bookg', label: 'ใบจอง', views: ['book'], icon: 'book' },
   { id: 'stockg', label: 'รถ', views: ['stock', 'quota', 'lock', 'receive'], icon: 'stock' },
   { id: 'dash', get label() { return isSales() || S.role.role === 'admin' ? 'สรุป' : 'รายงาน'; }, views: ['dash'] },
   { id: 'tools', label: 'เพิ่มเติม', views: ['datafix', 'upload', 'admin'], icon: 'upload' }
@@ -127,6 +127,8 @@ function renderNow() {
   const D = derive();
   // the first page follows the role (บทวิเคราะห์ 19/10) unless a link names one
   if (!S.startSet) { S.startSet = true; if (!location.hash || location.hash === '#dash') S.view = startView(); }
+  // ขั้นตอนส่งมอบ is now a view of the booking page (ใบจอง + ขั้นตอนส่งมอบ ใช้ใบจองเดียวกัน)
+  if (S.view === 'flow') { S.view = 'book'; S.sub.book = 'steps'; }
   if (!navFor().some(n => n.id === S.view)) S.view = 'dash';
   renderChrome(D);
   const V = { dash: viewDash, alerts: viewAlerts, inbox: viewInbox, stock: viewStock, book: viewBook, quota: viewQuota, lock: viewLock, flow: viewFlow, receive: viewReceive, upload: viewUpload, admin: viewAdmin, datafix: viewDatafix }[S.view] || viewDash;

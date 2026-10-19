@@ -36,6 +36,7 @@ function renderModal(D) {
   else if (m.kind === 'adlk') body = adminLkModal(m);
   else if (m.kind === 'menu') body = `<div class="flex items-start justify-between gap-3 mb-1"><h2 class="font-head text-xl font-semibold">เมนู</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
     <nav class="sheet-menu mb-4">${groupsFor().filter(g => !bottomIds().includes(g.id)).map(g => `<a href="#${groupEntry(g)}" data-act="nav" data-view="${groupEntry(g)}">${svg(g.icon || g.views[0])}${g.label}</a>`).join('')}</nav>
+    <button class="btn btn-ghost w-full mb-3" data-act="app-reload">โหลดหน้าใหม่ / อัปเดตเว็บ</button>
     <div class="flex flex-col gap-3">${roleControls('menu')}</div>`;
   else if (m.kind === 'role') body = `<h2 class="font-head text-xl font-semibold mb-3">สลับบทบาททดลอง</h2><div class="flex flex-col gap-3">${roleControls('modal')}</div>
     <div class="flex justify-end mt-4"><button class="btn btn-red" data-act="close">เสร็จ</button></div>`;
@@ -453,6 +454,8 @@ async function saveBooking() {
     toast(imgMissing ? 'บันทึกใบจองแล้ว แต่มุมมองนี้เก็บรูปไม่ได้' : 'บันทึกใบจองเข้าคิวแล้ว');
   }
   render();
+  // the new booking goes to Telegram and the form's sheet by itself; pressing "ส่งฟอร์มแล้ว" stays only as a fallback
+  if (saved && typeof notifyOk === 'function' && notifyOk()) setTimeout(() => ACTIONS['bk-notify']({ dataset: { id, auto: '1' } }), 300);
 }
 function resetBooking() {
   S.files.bk.concat(S.files.slip).forEach(x => { try { URL.revokeObjectURL(x.url); } catch (e) { /* ignore */ } });

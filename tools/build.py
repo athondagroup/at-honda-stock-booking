@@ -26,6 +26,8 @@ open(os.path.join(DIST, 'artifact.html'), 'w', encoding='utf8').write(art)
 h = re.sub(r'<script src="https://cdn.tailwindcss.com[^"]*"></script>', '', head)
 h = re.sub(r'<script>\s*if \(window.tailwind\)[\s\S]*?</script>', '', h, count=1)
 gate_css = rd(os.path.join(WEB, 'gate.css'))
+import hashlib
+BUILD = hashlib.sha1((js + css + rd(os.path.join(WEB, 'gate.js'))).encode('utf8')).hexdigest()[:10]
 page = f'''<!doctype html>
 <html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#17181c"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
@@ -35,7 +37,7 @@ page = f'''<!doctype html>
 <div id="gate" hidden></div>
 {layout}
 <script id="seed" type="application/json">{seed_json('seed-web.json')}</script>
-<script>window.AT_CONFIG = {json.dumps(cfg)};</script>
+<script>window.AT_CONFIG = {json.dumps(cfg)}; window.__BUILD = '{BUILD}';</script>
 <script>window.__startApp = function () {{ (() => {{
 'use strict';
 {js}}})(); }};</script>
@@ -47,6 +49,7 @@ open(os.path.join(DIST, 'index.html'), 'w', encoding='utf8').write(page)
 for f in ['gate.js', 'sw.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png']:
     shutil.copy(os.path.join(WEB, f), os.path.join(DIST, f))
 open(os.path.join(DIST, '.nojekyll'), 'w').write('')
+open(os.path.join(DIST, 'version.json'), 'w').write(json.dumps({'v': BUILD}))
 open(os.path.join(DIST, 'check.js'), 'w', encoding='utf8').write("(() => {\n'use strict';\n" + js + '})();\n')
 r = subprocess.run(['node', '--check', os.path.join(DIST, 'check.js')], capture_output=True, text=True)
 os.remove(os.path.join(DIST, 'check.js'))

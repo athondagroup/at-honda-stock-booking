@@ -208,7 +208,9 @@ function deriveNow() {
     const rec = bk && bk.app ? bk.app.rec : null;
     l.booking = bk;
     l.owner = l.sales || (bk ? bk.owner : null);
-    l.hold = !!(l.type === 'booking' && rec && rec.delivery_plan && l.status === 'approved');
+    // finance approved (or cash) and the delivery date confirmed: the queue stays locked, no release, no more asking (ตกลง 19/10)
+    const finOk = !!(bk && bk.app && bk.app.flow && bk.app.flow.done && bk.app.flow.done.fin) || !!(rec && rec.fin_status === 'ผ่าน');
+    l.hold = !!(l.type === 'booking' && rec && rec.delivery_plan && finOk && l.status === 'approved');
     l.holdUntil = l.hold ? rec.delivery_plan : null;
     l.daysLeft = l.status === 'approved' && l.end ? daysBetween(today, l.end) : null;
     l.finWait = !!(l.type === 'booking' && rec && rec.purchase === 'ไฟแนนซ์' && rec.fin_status !== 'ผ่าน');

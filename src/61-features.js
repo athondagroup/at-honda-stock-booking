@@ -4,12 +4,12 @@
 
 // ---------- export: an Excel file (sheets and filters picked by the person) or a one-page summary as PDF / picture.
 // Everyone can export what their role can see on the screen; sales never get other sales' customer names.
-function exportBtn() { return ['stock', 'book', 'quota', 'lock'].includes(S.view) ? `<button class="btn btn-ghost" data-act="export-open">Export</button>` : ''; }
+function exportBtn() { return ['stock', 'book', 'quota', 'lock'].includes(S.view) ? `<button class="btn btn-ghost" data-act="export-open">ส่งออกหน้านี้ (Excel)</button>${typeof dioCan === 'function' && dioCan() ? '<button class="btn btn-ghost" data-act="dio-open">ข้อมูลทั้งหมด (Excel)</button>' : ''}` : ''; }
 function exportSheets() { return [['stock', 'Stock รายคัน'], ['book', 'Booking (ฟอร์ม AT + IDS)'], ['quota', 'Quota'], ['lock', 'ล็อกรถ'], ['spec', 'สรุปสต็อกตามสเปก']]; }
 function exportModal(m, D) {
   const ck = (k, t) => `<label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-5 h-5" data-modal="sheets.${k}" ${m.sheets[k] ? 'checked' : ''}>${t}</label>`;
   const models = [...new Set([...D.cars.values()].map(c => c.model).filter(Boolean))].sort();
-  return `<div class="flex items-start justify-between gap-3 mb-3"><h2 class="font-head text-xl font-semibold">Export ข้อมูล</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
+  return `<div class="flex items-start justify-between gap-3 mb-3"><h2 class="font-head text-xl font-semibold">ส่งออกหน้านี้</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
   <div class="flex flex-col gap-4">
     <div class="seg" role="group" aria-label="รูปแบบ"><button data-act="export-fmt" data-v="xlsx" aria-pressed="${m.fmt === 'xlsx'}">Excel (.xlsx)</button><button data-act="export-fmt" data-v="sum" aria-pressed="${m.fmt === 'sum'}">สรุป 1 หน้า (PDF / รูป)</button></div>
     ${m.fmt === 'xlsx' ? `<fieldset class="flex flex-col gap-2"><legend class="text-sm font-medium mb-1">ชีตที่ต้องการ</legend>${exportSheets().map(([k, t]) => ck(k, t)).join('')}</fieldset>` : '<p class="text-sm text-muted">สรุปรถว่าง/ทั้งหมดตามสเปกและสาขา ใบจองรอรถ และ Quota ที่ยังว่าง ใช้ส่งไลน์หรือรายงานผู้บริหาร</p>'}
