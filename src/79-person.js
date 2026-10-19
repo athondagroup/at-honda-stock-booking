@@ -121,7 +121,7 @@ async function carListXlsx() {
 // otherwise disappear. Rows the new file has (same invoice no.) are never kept twice.
 function invArchiveDocs(br) { return [...S.ids.entries()].filter(([k]) => k.startsWith(`invold_${br}_`)).map(([, d]) => d); }
 function invArchiveRows(br, liveKeys) { return invArchiveDocs(br).flatMap(d => unpack({ cols: PACK.invoice, rows: d.rows || [] })).filter(r => !liveKeys.has(invKey(r))); }
-function invKey(r) { return String(r.inv || '') + '|' + String(r.vin || ''); }
+function invKey(r) { return String(r.inv || '').replace(/^0+/, '') + '|' + String(r.vin || ''); }
 // called before an invoice table is saved: what the old doc had and the new one lacks goes to the archive
 async function invArchive(br, newRows, cutRows = []) {
   const cur = S.ids.get('invoice_' + br);

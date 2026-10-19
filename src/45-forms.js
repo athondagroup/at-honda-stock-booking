@@ -332,6 +332,7 @@ function viewUploadBase(D) {
         <td>${s.quota.length ? s.quota.map(q => `<div class="text-sm nowrap">${fmtM(q.m)} · ${q.n ?? ''} แถว</div>`).join('') + `<div class="text-xs text-muted">${fmtDT(s.quota.at(-1).at)}</div>` : cell(null)}</td>
         <td>${s.invoice ? cell(s.invoice) : '<span class="text-xs text-muted">ยังไม่มี</span>'}</td></tr>`; }).join('')}</tbody></table></div>
   </section>
+  ${idsPasteBox()}
   <section class="bg-surface border border-line rounded-lg p-4 md:p-5 mb-5">
     <label class="drop relative ${p.upload && p.write && !U.busy ? '' : 'opacity-50'}">
       <input type="file" multiple accept=".xlsx,.xls,.csv,.htm,.html,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" data-file="ids" ${p.upload && p.write && !U.busy ? '' : 'disabled'} aria-label="ไฟล์จาก IDS">
