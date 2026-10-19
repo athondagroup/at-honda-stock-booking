@@ -40,7 +40,8 @@ Deno.serve(async (req) => {
     const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(body.spreadsheetId)}`;
     const url = body.range ? `${base}/values/${encodeURIComponent(body.range)}` : `${base}?fields=${encodeURIComponent((body.fields && body.fields.length ? body.fields : ["sheets.properties.title"]).join(","))}`;
     const r = await fetch(url, { headers: { Authorization: `Bearer ${t}` } });
-    if (!r.ok) return out({ code: "tool_error", status: r.status }, 502);
+    // say why: 403 = the sheet is not shared with the service account (its e-mail goes back so the page can show it), 404 = wrong link
+    if (!r.ok) { const g = await r.json().catch(() => ({})); console.error("sheets", r.status, g && g.error && g.error.message); return out({ code: "tool_error", status: r.status, message: (g && g.error && g.error.message) || "", share_with: JSON.parse(SA).client_email || "" }, 502); }
     return out(await r.json());
   } catch (e) { console.error(e); return out({ code: "tool_error" }, 502); }
 });

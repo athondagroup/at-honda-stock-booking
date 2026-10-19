@@ -58,7 +58,10 @@ async function idsGsRun() {
     const el = document.querySelector('[data-file="ids"]'); if (el) el.closest('section').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (e) {
     const code = e && e.code;
-    S.idsGs = { ...S.idsGs, busy: null, err: code === 'not_granted' || code === 'permission_denied' ? 'ยังไม่ได้อนุญาตให้หน้านี้อ่าน Google Sheets' : 'อ่านชีตไม่ได้ ตรวจลิงก์ และว่าแชร์ชีตแล้ว (หรือใช้อัปโหลดไฟล์แทน)' };
+    S.idsGs = { ...S.idsGs, busy: null, err: code === 'not_granted' || code === 'permission_denied' ? 'ยังไม่ได้อนุญาตให้หน้านี้อ่าน Google Sheets'
+      : e && e.status === 403 ? `ระบบยังไม่มีสิทธิ์อ่านชีตนี้: เปิดชีต กด Share (แชร์) แล้วเพิ่มอีเมล ${e.share_with || 'บัญชีระบบ (อีเมลเดียวกับที่แชร์ชีตคำตอบ Google Form)'} เป็น "ผู้มีสิทธิ์อ่าน" (Viewer) จากนั้นกดดึงอีกครั้ง`
+      : e && e.status === 404 ? 'ไม่พบชีตนี้ ตรวจลิงก์ Google Sheet อีกครั้ง'
+      : `อ่านชีตไม่ได้${e && e.status ? ` (Google ตอบ ${e.status})` : ''} ตรวจลิงก์ และว่าแชร์ชีตแล้ว (หรือใช้อัปโหลดไฟล์แทน)` };
     render();
   }
 }

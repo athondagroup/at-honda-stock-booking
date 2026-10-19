@@ -84,6 +84,12 @@ h1, h2, h3 { text-wrap: balance; }
 .badge { display: inline-flex; min-width: 20px; height: 20px; padding: 0 6px; align-items: center; justify-content: center; border-radius: 999px; background: var(--red); color: var(--on-red); font-size: 11px; font-weight: 700; }
 .ageb { display: inline-block; height: 5px; border-radius: 3px; vertical-align: middle; }
 .scroll-x { overflow-x: auto; }
+/* on a computer a wide table scrolls inside its own box, so the left-right scrollbar stays on screen (not under 300 rows) and the header stays put */
+@media (min-width: 768px) {
+  .scroll-x { max-height: calc(100vh - 120px); overflow: auto; }
+  .scroll-x > table > thead th { position: sticky; top: 0; z-index: 2; }
+  #modal-root .scroll-x { max-height: none; }
+}
 table { border-collapse: collapse; width: 100%; }
 th { text-align: left; font-weight: 600; font-size: 12px; color: var(--muted); background: var(--surface-2); padding: 8px 10px; white-space: nowrap; }
 td { padding: 8px 10px; border-top: 1px solid var(--line); vertical-align: top; }

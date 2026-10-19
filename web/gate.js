@@ -199,7 +199,11 @@
     return {
       async callTool(server, tool, input) {
         const { data, error } = await sb.functions.invoke('gsheet', { body: input });
-        if (error) throw Object.assign(new Error('tool_error'), { code: 'tool_error' });
+        if (error) {
+          // the function says why (Google's status, and the account the sheet must be shared with)
+          let info = {}; try { info = (error.context && typeof error.context.json === 'function') ? await error.context.json() : {}; } catch (e) { info = {}; }
+          throw Object.assign(new Error('tool_error'), { code: 'tool_error', status: info.status || null, share_with: info.share_with || '', detail: info.message || '' });
+        }
         return { content: [], payload: data };
       }
     };
