@@ -172,7 +172,7 @@ Object.assign(ACTIONS, {
   'gsearch-scope'(el) { if (S.modal) { S.modal.all = el.dataset.v !== 'br'; render(); } }
 });
 function mgrNameOf(br) { const k = Object.keys(MGR_OF).find(r => MGR_OF[r].includes(br)); return k ? ROLES[k].label : ''; }
-// งานติดขัด: an open booking stuck past its expected time
+// ต้องเร่งตาม (stuck): an open booking stuck past its expected time
 function bkStuckWhy(a, D) {
   const r = a.rec, f = a.flow || {}, age = a.ageDays ?? 0;
   if (a.change) return 'รออนุมัติคำขอ';

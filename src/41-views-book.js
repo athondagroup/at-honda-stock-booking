@@ -28,7 +28,7 @@ function viewBook(D) {
   if (S.sub.book === 'ids' || S.sub.book === 'at') S.sub.book = 'list';
   if (S.sub.book === 'new' && !p.book) S.sub.book = 'list';
   const sub = S.sub.book;
-  const body = sub === 'new' ? bookingForm(D) : sub === 'steps' ? flowBody(D) : sub === 'queue' ? queueList(D) : sub === 'summary' ? summaryView(D) : sub === 'cancels' ? cancelHistory(D) : bookList(D);
+  const body = sub === 'new' ? bookingForm(D) : sub === 'steps' ? flowBody(D) : sub === 'queue' ? queueList(D) : sub === 'summary' ? summaryView(D) : sub === 'cancels' ? cancelHistory(D) : gsBookBox(D) + bookList(D);
   const active = bookRows(D).filter(r => rowState(r, D, 'active')).length;
   return `
   ${pageHead('Booking', 'ใบจอง AT Honda กับ Booking IDS อยู่ในรายการเดียว ระบบจับคู่ด้วยชื่อลูกค้า รุ่น และวันที่ เจ้าของเคสตามฟอร์ม AT Honda รุ่น เกรด สี ตาม IDS',
@@ -52,7 +52,7 @@ function bookRows(D) {
   return (D._bookRows = rows);
 }
 const BOOK_FILTERS = [['active', 'ยังไม่ส่งมอบ'], ['noids', 'ฟอร์ม AT ยังไม่อยู่ใน IDS'], ['noat', 'มีใน IDS แต่ไม่มีฟอร์ม AT'], ['waiting', 'รอรถ'], ['locked', 'ล็อก / รออนุมัติล็อก'], ['idscar', 'IDS จัดสรรรถแล้ว'],
-  ['assign', 'รอจัดสรรรถ'], ['confirm', 'รอยืนยันเจ้าของ / การจับคู่'], ['req', 'รออนุมัติแก้ไข / ยกเลิก'], ['refund', 'ยกเลิกแล้ว รอทำใบคืนเงิน'], ['dtoday', 'ส่งมอบวันนี้'], ['d7', 'นัดส่งมอบภายใน 7 วัน'], ['stuck', 'งานติดขัด'], ['done', 'ส่งมอบแล้ว'], ['cancel', 'ยกเลิก'], ['all', 'ทั้งหมด']];
+  ['assign', 'รอจัดสรรรถ'], ['confirm', 'รอยืนยันเจ้าของ / การจับคู่'], ['req', 'รออนุมัติแก้ไข / ยกเลิก'], ['refund', 'ยกเลิกแล้ว รอทำใบคืนเงิน'], ['dtoday', 'ส่งมอบวันนี้'], ['d7', 'นัดส่งมอบภายใน 7 วัน'], ['stuck', 'ต้องเร่งตาม'], ['done', 'ส่งมอบแล้ว'], ['cancel', 'ยกเลิก'], ['all', 'ทั้งหมด']];
 function rowState(r, D, st) {
   const a = r.a, state = r.row ? r.row.state : null;
   if (st === 'all') return true;

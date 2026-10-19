@@ -75,6 +75,14 @@ function gsErrText(g) {
     not_granted: 'ยังไม่ได้อนุญาตให้หน้านี้ใช้ Google Sheets', blocked_by_policy: 'องค์กรไม่อนุญาตให้ใช้ Google Sheets จากหน้านี้', approval_required: 'ต้องกดอนุญาตก่อน กด "ตรวจใบจองใหม่" อีกครั้ง',
     tool_error: `Google Sheets ตอบว่าอ่านไม่ได้: ${g.msg || ''} (บัญชีที่เชื่อมต้องเปิดชีตฟอร์มจองได้)`, server_unavailable: 'Google Sheets ไม่ตอบชั่วคราว ลองอีกครั้ง', shape: g.msg })[g.err] || `ดึงข้อมูลไม่ได้ (${g.err})`;
 }
+// on the bookings page: full box when there is something to import or a problem, one line otherwise
+function gsBookBox(D) {
+  if (!gsCan()) return '';
+  const g = S.gs || {};
+  if ((g.rows && g.rows.length) || g.err) return gsBox(D);
+  return `<div class="flex flex-wrap gap-2 items-center text-sm mb-3 text-muted">${g.busy ? '<span class="spin"></span> กำลังตรวจใบจองใหม่จาก Google Form…' : g.at ? `ใบจองใหม่จาก Google Form: ไม่มี (ตรวจล่าสุด ${fmtDT(g.at)})` : 'ใบจองใหม่จาก Google Form: ระบบตรวจให้เองเมื่อเปิดหน้า'}
+    <button class="btn btn-ghost btn-sm" data-act="gs-check" ${g.busy ? 'disabled' : ''}>ตรวจอีกครั้ง</button></div>`;
+}
 function gsBox(D) {
   if (!gsCan()) return '';
   const g = S.gs || {};
