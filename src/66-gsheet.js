@@ -53,7 +53,8 @@ async function gsCheck(manual) {
     if (!vals) { S.gs = { busy: false, err: 'shape', msg: 'อ่านข้อมูลจากชีตไม่ได้ (รูปแบบไม่ตรง)' }; render(); return; }
     const webIds = new Set(S.bookings.keys()), rows = [];
     let total = 0;
-    for (const r of vals) { const x = gsRow(r); if (!x) continue; total++; if (S.bookings.has(x.id) || (x.webId && webIds.has(x.webId))) continue; rows.push(x); }
+    S.gsSeenWeb = new Set();
+    for (const r of vals) { const x = gsRow(r); if (!x) continue; total++; if (x.webId && webIds.has(x.webId)) S.gsSeenWeb.add(x.webId); if (S.bookings.has(x.id) || (x.webId && webIds.has(x.webId))) continue; rows.push(x); }
     rows.sort((a, b) => (b.doc.created_at || '').localeCompare(a.doc.created_at || ''));
     S.gs = { busy: false, at: new Date().toISOString(), total, rows, pick: Object.fromEntries(rows.map(x => [x.id, !x.doc.demo])) };
   } catch (e) {
@@ -73,6 +74,14 @@ function gsErrText(g) {
     needs_reauth: 'การเชื่อม Google Sheets หมดอายุ: เชื่อมใหม่ที่ claude.ai Settings → Connectors', not_in_manifest: 'ยังไม่ได้อนุญาตให้หน้านี้ใช้ Google Sheets (กดอนุญาตเมื่อมีหน้าต่างถาม หรือเปิดที่เมนูสิทธิ์ของหน้านี้)',
     not_granted: 'ยังไม่ได้อนุญาตให้หน้านี้ใช้ Google Sheets', blocked_by_policy: 'องค์กรไม่อนุญาตให้ใช้ Google Sheets จากหน้านี้', approval_required: 'ต้องกดอนุญาตก่อน กด "ตรวจใบจองใหม่" อีกครั้ง',
     tool_error: `Google Sheets ตอบว่าอ่านไม่ได้: ${g.msg || ''} (บัญชีที่เชื่อมต้องเปิดชีตฟอร์มจองได้)`, server_unavailable: 'Google Sheets ไม่ตอบชั่วคราว ลองอีกครั้ง', shape: g.msg })[g.err] || `ดึงข้อมูลไม่ได้ (${g.err})`;
+}
+// on the bookings page: full box when there is something to import or a problem, one line otherwise
+function gsBookBox(D) {
+  if (!gsCan()) return '';
+  const g = S.gs || {};
+  if ((g.rows && g.rows.length) || g.err) return gsBox(D);
+  return `<div class="flex flex-wrap gap-2 items-center text-sm mb-3 text-muted">${g.busy ? '<span class="spin"></span> กำลังตรวจใบจองใหม่จาก Google Form…' : g.at ? `ใบจองใหม่จาก Google Form: ไม่มี (ตรวจล่าสุด ${fmtDT(g.at)})` : 'ใบจองใหม่จาก Google Form: ระบบตรวจให้เองเมื่อเปิดหน้า'}
+    <button class="btn btn-ghost btn-sm" data-act="gs-check" ${g.busy ? 'disabled' : ''}>ตรวจอีกครั้ง</button></div>`;
 }
 function gsBox(D) {
   if (!gsCan()) return '';

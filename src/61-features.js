@@ -4,12 +4,12 @@
 
 // ---------- export: an Excel file (sheets and filters picked by the person) or a one-page summary as PDF / picture.
 // Everyone can export what their role can see on the screen; sales never get other sales' customer names.
-function exportBtn() { return ['stock', 'book', 'quota', 'lock'].includes(S.view) ? `<button class="btn btn-ghost" data-act="export-open">Export</button>` : ''; }
+function exportBtn() { return ['stock', 'book', 'quota', 'lock'].includes(S.view) ? `<button class="btn btn-ghost" data-act="export-open">ส่งออกหน้านี้ (Excel)</button>${typeof dioCan === 'function' && dioCan() ? '<button class="btn btn-ghost" data-act="dio-open">ข้อมูลทั้งหมด (Excel)</button>' : ''}` : ''; }
 function exportSheets() { return [['stock', 'Stock รายคัน'], ['book', 'Booking (ฟอร์ม AT + IDS)'], ['quota', 'Quota'], ['lock', 'ล็อกรถ'], ['spec', 'สรุปสต็อกตามสเปก']]; }
 function exportModal(m, D) {
   const ck = (k, t) => `<label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-5 h-5" data-modal="sheets.${k}" ${m.sheets[k] ? 'checked' : ''}>${t}</label>`;
   const models = [...new Set([...D.cars.values()].map(c => c.model).filter(Boolean))].sort();
-  return `<div class="flex items-start justify-between gap-3 mb-3"><h2 class="font-head text-xl font-semibold">Export ข้อมูล</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
+  return `<div class="flex items-start justify-between gap-3 mb-3"><h2 class="font-head text-xl font-semibold">ส่งออกหน้านี้</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
   <div class="flex flex-col gap-4">
     <div class="seg" role="group" aria-label="รูปแบบ"><button data-act="export-fmt" data-v="xlsx" aria-pressed="${m.fmt === 'xlsx'}">Excel (.xlsx)</button><button data-act="export-fmt" data-v="sum" aria-pressed="${m.fmt === 'sum'}">สรุป 1 หน้า (PDF / รูป)</button></div>
     ${m.fmt === 'xlsx' ? `<fieldset class="flex flex-col gap-2"><legend class="text-sm font-medium mb-1">ชีตที่ต้องการ</legend>${exportSheets().map(([k, t]) => ck(k, t)).join('')}</fieldset>` : '<p class="text-sm text-muted">สรุปรถว่าง/ทั้งหมดตามสเปกและสาขา ใบจองรอรถ และ Quota ที่ยังว่าง ใช้ส่งไลน์หรือรายงานผู้บริหาร</p>'}
@@ -214,7 +214,7 @@ function viewInboxMgr(D) {
   const list = items.filter(x => tab === 'all' || inboxTopic(x) === tab).sort((x, y) => (x.at || '').localeCompare(y.at || ''));
   const label = k => topics.find(t => t[0] === k)[1];
   const row = x => tab === 'all' ? `<div><div class="px-3 md:px-4 pt-3 text-xs font-medium" style="color:var(--muted)">${label(inboxTopic(x))}</div>${inboxRowFor(x, D)}</div>` : inboxRowFor(x, D);
-  return `${pageHead('รออนุมัติ', `${S.role.role === 'exec' ? 'ทุกสาขา' : `สาขา ${mgrBranches().join(', ')}`} · แยกแท็บตามหัวข้อ เรียงจากที่รอนานที่สุด`)}
+  return `${pageHead('รอฉันอนุมัติ', `${S.role.role === 'exec' ? 'ทุกสาขา' : `สาขา ${mgrBranches().join(', ')}`} · แยกแท็บตามหัวข้อ เรียงจากที่รอนานที่สุด`)}
     <div class="flex gap-1 border-b border-line mb-3 overflow-x-auto" role="tablist">
       <button role="tab" class="tab" aria-selected="${tab === 'all'}" data-act="sub" data-key="inbox" data-sub="all">รวม <span class="badge">${items.length}</span></button>
       ${topics.map(([k, t]) => `<button role="tab" class="tab ${n(k) ? '' : 'text-muted'}" aria-selected="${tab === k}" data-act="sub" data-key="inbox" data-sub="${k}">${t}${n(k) ? ` <span class="badge">${n(k)}</span>` : ''}</button>`).join('')}</div>

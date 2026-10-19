@@ -18,6 +18,7 @@ function renderModal(D) {
   else if (m.kind === 'idspair') { body = idsPairModal(m, D); wide = true; }
   else if (m.kind === 'idsfix') { body = idsFixModal(m, D); wide = true; }
   else if (m.kind === 'carhist') { body = carHistModal(m, D); wide = true; }
+  else if (m.kind === 'gsearch') { body = gsearchModal(m, D); wide = true; }
   else if (m.kind === 'tr') { body = trModal(m, D); wide = true; }
   else if (m.kind === 'car') { body = carModal(m, D); wide = true; }
   else if (m.kind === 'tgt') { body = tgtModal(m); wide = true; }
@@ -34,7 +35,8 @@ function renderModal(D) {
   else if (m.kind === 'adbk') { body = adminBkModal(m); wide = true; }
   else if (m.kind === 'adlk') body = adminLkModal(m);
   else if (m.kind === 'menu') body = `<div class="flex items-start justify-between gap-3 mb-1"><h2 class="font-head text-xl font-semibold">เมนู</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
-    <nav class="sheet-menu mb-4">${groupsFor().filter(g => !bottomIds().includes(g.id)).map(g => `<a href="#${groupEntry(g)}" data-act="nav" data-view="${groupEntry(g)}">${svg(g.icon || g.views[0])}${g.label}</a>`).join('')}</nav>
+    ${menuItems()}
+    <button class="btn btn-ghost w-full mb-3" data-act="app-reload">โหลดหน้าใหม่ / อัปเดตเว็บ</button>
     <div class="flex flex-col gap-3">${roleControls('menu')}</div>`;
   else if (m.kind === 'role') body = `<h2 class="font-head text-xl font-semibold mb-3">สลับบทบาททดลอง</h2><div class="flex flex-col gap-3">${roleControls('modal')}</div>
     <div class="flex justify-end mt-4"><button class="btn btn-red" data-act="close">เสร็จ</button></div>`;
@@ -452,6 +454,8 @@ async function saveBooking() {
     toast(imgMissing ? 'บันทึกใบจองแล้ว แต่มุมมองนี้เก็บรูปไม่ได้' : 'บันทึกใบจองเข้าคิวแล้ว');
   }
   render();
+  // the new booking goes to Telegram and the form's sheet by itself; pressing "ส่งฟอร์มแล้ว" stays only as a fallback
+  if (saved && typeof notifyOk === 'function' && notifyOk()) setTimeout(() => ACTIONS['bk-notify']({ dataset: { id, auto: '1' } }), 300);
 }
 function resetBooking() {
   S.files.bk.concat(S.files.slip).forEach(x => { try { URL.revokeObjectURL(x.url); } catch (e) { /* ignore */ } });
@@ -508,8 +512,9 @@ function assignDefault(a, D) {
   return lockCar ? lockCar.vin : (a.match && a.match.vin) || '';
 }
 const ACTIONS = {
-  nav(el) { S.view = el.dataset.view; if (el.dataset.sub) S.sub[S.view] = el.dataset.sub; S.modal = null; setHash(); render(); window.scrollTo(0, 0); },
+  nav(el) { navPush(); S.view = el.dataset.view; if (el.dataset.sub) S.sub[S.view] = el.dataset.sub; S.modal = null; setHash(); render(); window.scrollTo(0, 0); },
   go(el) {
+    navPush();
     S.view = el.dataset.view;
     if (el.dataset.sub) S.sub[S.view] = el.dataset.sub;
     if (el.dataset.br !== undefined) setBr(el.dataset.br);
@@ -942,10 +947,11 @@ document.addEventListener('input', ev => {
     if (S.modal.kind === 'idsfix' && path === 'e.grade') S.modal.e.color = '';
     if (path.endsWith('.model') && path.startsWith('r.cars')) { const c = S.modal.r.cars[Number(path.split('.')[2])]; c.grade = ''; c.color = ''; }
     if (path.endsWith('.grade') && path.startsWith('r.cars')) { const c = S.modal.r.cars[Number(path.split('.')[2])]; c.color = ''; }
-    if (path === 'poq' || (path === 'q' && (S.modal.kind === 'idspair' || S.modal.kind === 'lockbk' || S.modal.kind === 'stassign' || S.modal.kind === 'idsview' || S.modal.kind === 'drill'))) { clearTimeout(poqTimer); poqTimer = setTimeout(render, 250); return; }
+    if (path === 'poq' || (path === 'q' && (S.modal.kind === 'idspair' || S.modal.kind === 'lockbk' || S.modal.kind === 'gsearch' || S.modal.kind === 'stassign' || S.modal.kind === 'idsview' || S.modal.kind === 'drill'))) { clearTimeout(poqTimer); poqTimer = setTimeout(render, 250); return; }
     if (t.tagName === 'SELECT' || t.type === 'radio' || (path.endsWith('.vin') && val.length === 17)) render();
   } else if (t.dataset.filter) {
     S.filters[t.dataset.filter] = t.type === 'checkbox' ? t.checked : t.value;
+    if (t.dataset.filter !== 'bPage') S.filters.bPage = 1;
     if (t.dataset.filter === 'qModel') { S.filters.bGrade = ''; S.filters.bColor = ''; }
     if (t.dataset.filter === 'bGrade') S.filters.bColor = '';
     if (t.dataset.filter === 'chModel') { S.filters.chGrade = ''; S.filters.chColor = ''; }
@@ -990,6 +996,7 @@ document.addEventListener('change', async ev => {
     S.role[t.dataset.roleField] = t.value;
     if (t.dataset.roleField === 'role' && t.value === 'sales' && !S.role.sales) S.role.sales = salesNames()[0] || '';
     if (S.role.role === 'admin') setBr(S.role.branch);
+    if (t.dataset.roleField === 'role' && typeof startView === 'function') { S.view = startView(); setHash(); }
     lsSet('ath-role', S.role);
     S.draft.booking.br = ''; render(); return;
   }

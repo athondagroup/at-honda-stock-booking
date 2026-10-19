@@ -75,7 +75,7 @@ const gformDue = a => !!((gformCfg() || notifyOk()) && !a.rec.imported && !a.can
 function gformBox(m, a) {
   if (a.rec.imported || a.cancelled) return '';
   const c = gformCfg(), sent = a.rec.gform && a.rec.gform.sent_at;
-  if (sent) return `<div class="text-xs text-muted">${a.rec.gform.via === 'web' ? `ส่ง Telegram / ชีตจากเว็บแล้ว${notifyResText(a.rec.gform.res)}` : 'ส่งเข้า Google Form แล้ว'} ${fmtDT(a.rec.gform.sent_at)} · ${who(a.rec.gform)}${a.rec.gform.via === 'web' && notifyOk() ? notifyMissingBtn(a) : ''}</div>`;
+  if (sent) return `<div class="text-xs text-muted">${a.rec.gform.via === 'web' ? `ส่งอัตโนมัติแล้ว · ระบบรับข้อมูล${notifyResText(a.rec.gform.res)}` : `ส่งผ่าน Google Form · ${S.gsSeenWeb && S.gsSeenWeb.has(a.id) ? '<span style="color:var(--good)">ตรวจกับชีตแล้ว: พบแถวนี้</span>' : 'ยืนยันเอง (ยังไม่ได้ตรวจกับชีต)'}`} ${fmtDT(a.rec.gform.sent_at)} · ${who(a.rec.gform)}${a.rec.gform.via === 'web' && notifyOk() ? notifyMissingBtn(a) : ''}</div>`;
   if (notifyOk()) return notifyBox(a, c);
   if (!c) return box('warn', `<b>ช่วงทดลอง: ส่งใบจองนี้เข้า Google Form ด้วย</b><div class="text-sm">ยังไม่ได้ตั้งค่าลิงก์ฟอร์ม ให้ผู้จัดการหรือแอดมินตั้งค่าที่หน้า "อัปเดตข้อมูล IDS" ก่อน</div>`);
   const can = canEditBooking(a) && perms().write;
@@ -102,6 +102,6 @@ function gformSettings() {
 function viewUpload(D) {
   // the Google Form box goes right under the page title
   const base = viewUploadBase(D), cut = base.indexOf('<section');
-  const top = gsCan() ? gsBox(D) : '';
+  const top = gsCan() ? `<div class="text-sm mb-4">ใบจองใหม่จาก Google Form ย้ายไปนำเข้าที่หน้า <a class="underline" href="#book">ใบจอง</a> แล้ว</div>` : '';
   return (cut > 0 ? base.slice(0, cut) + top + base.slice(cut) : top + base) + (perms().upload ? idsGsBox() + delivSyncBox(D) + sheetSyncBox(D) + gformSettings() : '');
 }
