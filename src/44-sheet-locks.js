@@ -57,7 +57,12 @@ function sheetCands(l, D) {
     if (!(name || (mine && sameModel))) continue;
     seen.add(key);
     const other = b.lock && b.lock.id !== l.id ? b.lock : null;
-    out.push({ key, b, a, name, sameModel, sameSpec, mine, other, hasCar: b.state === 'idscar' || (other && other.status !== 'pending'),
+    // the car this booking already has: IDS allocation, another lock, or the car given in the delivery steps
+    const fa = a && a.rec.flow && a.rec.flow.assign;
+    const carVin = (b.state === 'idscar' && b.vin) || (other && other.status !== 'pending' && other.vin) || (fa && fa.vin) || (b.state === 'idscar' ? b.vin || null : null);
+    const sameCar = !!(l.vin && carVin && carVin === l.vin);
+    const carRef = !carVin && b.state === 'idscar' ? (b.ref || b.ws || null) : null;
+    out.push({ key, b, a, name, sameModel, sameSpec, mine, other, carVin, carRef, sameCar, hasCar: !sameCar && (b.state === 'idscar' || (other && other.status !== 'pending') || !!(fa && fa.vin)),
       score: name * 8 + sameSpec * 4 + sameModel * 2 + mine * 1 - (b.state === 'idscar' ? 6 : 0) });
   }
   return out.sort((x, y) => (y.key === l.bkref) - (x.key === l.bkref) || y.score - x.score || (x.b.date || '').localeCompare(y.b.date || '')).slice(0, 12);
@@ -71,10 +76,10 @@ function lockBkModal(m, D) {
   const canApprove = perms().write && (cur === 'dealer' ? perms().approveDealer : canApproveBr(l.car_br));
   const pickBtn = (v, body, on) => `<button class="pick text-left ${on ? 'on' : ''}" data-act="lockbk-pick" data-v="${esc(v)}" aria-pressed="${on}"><span class="flex-1 min-w-0">${body}</span></button>`;
   const tags = c => [c.name ? chip('ชื่อตรง', 'good') : '', c.sameSpec ? chip('สเปกตรง', 'good') : c.sameModel ? chip('รุ่นตรง', 'neutral') : chip('รุ่นอื่น', 'warn'), c.mine ? chip('เซลล์เดียวกัน', 'neutral') : '',
-    c.key === l.bkref ? chip('ระบบจับคู่ให้', 'ink') : '', c.hasCar ? chip('ใบจองนี้มีรถแล้ว', 'bad') : c.other ? chip('มีคำขอล็อกอื่นค้าง', 'warn') : ''].join(' ');
+    c.key === l.bkref ? chip('ระบบจับคู่ให้', 'ink') : '', c.sameCar ? chip('IDS จัดสรรคันนี้ให้ใบจองนี้แล้ว', 'good') : c.hasCar ? chip('ใบจองนี้มีรถคันอื่นแล้ว', 'bad') : c.other ? chip('มีคำขอล็อกอื่นค้าง', 'warn') : ''].join(' ');
   const row = c => { const b = c.b, a = c.a;
     return pickBtn(c.key, `<span class="font-medium">${esc((a && a.cust) || b.cust || '–')}</span> ${tags(c)}
-      <span class="block text-xs text-muted">${a ? 'ฟอร์ม AT' : 'IDS (ยังไม่มีฟอร์ม AT)'}${b.no ? ` · ใบจอง ${esc(b.no)}` : ''} · ${esc(b.br || '')} · ${esc((a && a.sales) || b.owner || '–')} · ${specLabelText((a && a.spec) || b.spec)} · จอง ${fmtD((a && a.date) || b.date)}${b.state === 'waiting' && b.pos ? ` · คิวที่ ${b.pos}` : ''}</span>`, cur === c.key); };
+      <span class="block text-xs text-muted">${a ? 'ฟอร์ม AT' : 'IDS (ยังไม่มีฟอร์ม AT)'}${b.no ? ` · ใบจอง ${esc(b.no)}` : ''} · ${esc(b.br || '')} · ${esc((a && a.sales) || b.owner || '–')} · ${specLabelText((a && a.spec) || b.spec)} · จอง ${fmtD((a && a.date) || b.date)}${b.state === 'waiting' && b.pos ? ` · คิวที่ ${b.pos}` : ''}</span>${c.carVin || c.carRef ? `<span class="block text-xs" style="color:var(--${c.sameCar ? 'good' : 'bad'})">${c.sameCar ? 'เลขเฟรมเดียวกับคันนี้' : 'มีรถแล้ว'}: <span class="code">${esc(c.carVin || 'Quota ' + c.carRef)}</span>${c.other && c.other.vin === c.carVin ? ` (ล็อก${c.other.status === 'allocated' ? ' แจ้งจัดสรรแล้ว' : 'อยู่'})` : c.b.state === 'idscar' ? ' (IDS จัดสรร)' : ' (จัดสรรในขั้นตอนส่งมอบ)'}</span>` : ''}`, cur === c.key); };
   return `<div class="flex items-start justify-between gap-3 mb-1"><h2 class="font-head text-xl font-semibold">เลือกใบจองให้คำขอล็อก</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
   <p class="text-sm mb-1"><span class="code font-medium">${esc(l.vin || 'Quota ' + l.ref)}</span> · ${esc(l.car_br || '')} · ${specLabel(l.spec)}</p>
   <p class="text-sm mb-3">ข้อความในชีต: <b>"${esc(sheetTextOf(l) || '')}"</b> · เซลล์ ${sales ? esc(sales) : `<span style="color:var(--warn)">ยังไม่รู้ว่า "${esc(p.who)}" คือใคร</span>`}${p.cust ? ` · ลูกค้า ${esc(p.cust)}` : ''}</p>

@@ -538,7 +538,7 @@ async function connect() {
       S[col] = new Map(snap.docs.map(d => [d.id, d.data()]));
       if (col === 'ids') S.idsV++;
       S.dataV++;
-      if (col === 'ids' && !S.seedTried && typeof carlogSeed === 'function') { S.seedTried = true; setTimeout(() => carlogSeed().catch(e => console.error('carlog seed', e)), 6000); }
+      if (col === 'ids' && !S.seedTried && typeof carlogSeed === 'function') { S.seedTried = true; setTimeout(() => carlogSeed().catch(e => console.error('carlog seed', e)).then(() => perms().approve && perms().write && typeof lockIdsSync === 'function' ? lockIdsSync() : null).then(r => { if (r && (r.done || r.ask)) { toast(`ล็อกที่ IDS จัดสรรแล้ว: สำเร็จ ${r.done} · รอเลือกใบจอง ${r.ask}`); render(); } }).catch(e => console.error('lockids', e)), 6000); }
       scheduleRender();
     }, () => { toast('การเชื่อมต่อข้อมูลขาดหาย กรุณาโหลดหน้าใหม่', 'bad'); }));
     render();

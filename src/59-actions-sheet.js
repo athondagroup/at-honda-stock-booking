@@ -41,7 +41,7 @@ Object.assign(ACTIONS, {
       const c = sheetCands(L, D).find(x => x.key === pick) || null;
       const b = c ? c.b : D.bookingByKey.get(pick);
       if (!b) { toast('ไม่พบใบจองนี้แล้ว', 'bad'); return; }
-      if (c && c.hasCar) { toast('ใบจองนี้มีรถแล้ว เลือกใบอื่น', 'bad'); return; }
+      if (c && c.hasCar) { toast('ใบจองนี้มีรถคันอื่นแล้ว เลือกใบอื่น', 'bad'); return; }
       const a = c ? c.a : b.app;
       set = { type: 'booking', bkref: pick, bk_br: (a && a.br) || b.br || null, sales: (a && a.sales) || b.owner || L.sales || null, dealer_name: null };
       label = `ใบจอง ${b.no || ''} ${(a && a.cust) || b.cust || ''}`.trim();

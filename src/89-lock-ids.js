@@ -53,13 +53,14 @@ async function lockIdsSync() {
   const D = derive(), res = { done: 0, ask: 0 }, doneL = [], askL = [];
   for (const l of D.locks) {
     if (!['pending', 'approved', 'allocated'].includes(l.status)) continue;
-    if (l.idsTook && l.idsTook.byName) {
+    // IDS gave the car to this lock's own booking, or to the same customer name: the lock is done
+    if (l.idsTook && l.idsTook.same && !(l.type === 'dealer' && l.idsTook.st === 'delivered')) {
       const info = l.idsTook;
       const x = await claimFresh('locks', l.id, r => ['pending', 'approved', 'allocated'].includes(r.status)); if (!x) continue;
       x.status = 'done'; x.done_at = new Date().toISOString();
-      x.ids_done = { no: info.no || null, cust: info.cust || null, by_name: true, at: x.done_at };
+      x.ids_done = { no: info.no || null, cust: info.cust || null, by_name: !!info.byName, at: x.done_at };
       if (info.no && !x.bkref) x.ids_bk = 'ids:' + info.no;
-      if (await saveLock(l.id, x, 'สำเร็จ: IDS จัดสรรให้ลูกค้าคนนี้แล้ว (ชื่อตรง)', `${info.cust || ''}${info.no ? ' · ใบจอง ' + info.no : ''}`)) { res.done++; doneL.push('✅ ' + lockIdsLine(l, info)); }
+      if (await saveLock(l.id, x, info.byName ? 'สำเร็จ: IDS จัดสรรให้ลูกค้าคนนี้แล้ว (ชื่อตรง)' : 'สำเร็จ: IDS จัดสรรคันนี้ให้ใบจองนี้แล้ว', `${info.cust || ''}${info.no ? ' · ใบจอง ' + info.no : ''}`)) { res.done++; doneL.push('✅ ' + lockIdsLine(l, info)); }
     } else if (l.idsAsk && l.idsInfo && l.ids_tg !== (l.idsInfo.no || l.idsInfo.cust)) {
       const x = await claimFresh('locks', l.id, () => true); if (!x) continue;
       x.ids_tg = l.idsInfo.no || l.idsInfo.cust;

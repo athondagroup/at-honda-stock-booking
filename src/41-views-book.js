@@ -309,7 +309,8 @@ function viewQuota(D) {
 // ---------- locks
 function viewLock(D) {
   const vis = D.locks.filter(lockVisible);
-  const pend = vis.filter(l => l.status === 'pending');
+  // a request IDS already answered (the car went to this booking / customer) is done, not waiting
+  const pend = vis.filter(l => l.status === 'pending' && !(l.idsTook && l.idsTook.same));
   const sub = S.sub.lock;
   const body = sub === 'active' ? activeList(D, vis) : sub === 'history' ? historyList(D) : approveList(D, pend);
   return `${pageHead('ล็อกรถ', `ล็อกให้ใบจอง ${LOCK_DAYS_BY.booking} วัน (ถ้าระบุวันรับรถแล้วถือไว้จนส่งมอบ) · ล็อกชั่วคราวให้ลูกค้าที่จะมาจอง ${LOCK_DAYS_BY.temp} วัน ล็อกซ้อนกันได้ ใครแนบใบจองก่อนได้ก่อน · ทุกการล็อกต้องให้ผู้จัดการอนุมัติ`)}
