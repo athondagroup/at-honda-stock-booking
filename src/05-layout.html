@@ -5,6 +5,7 @@
       <div class="font-head font-bold text-xl tracking-tight">AT Honda</div>
       <div class="text-inkmuted text-sm">สต็อก จอง และล็อกรถ · ต้นแบบ</div>
     </div>
+    <button class="btn btn-sm justify-start" style="background: var(--ink-line); color: var(--ink-fg)" data-act="gsearch-open">ค้นหา ลูกค้า / ใบจอง / VIN</button>
     <nav class="flex flex-col gap-1" id="sidenav"></nav>
     <div class="mt-auto flex flex-col gap-3 text-sm" id="role-box"></div>
   </aside>
@@ -15,7 +16,7 @@
         <div class="font-head font-bold text-lg leading-tight">AT Honda</div>
         <div class="text-inkmuted text-xs truncate" id="mobile-role-label"></div>
       </div>
-      <button class="btn btn-sm" style="background: var(--ink-line); color: var(--ink-fg)" data-act="open-role">สลับบทบาท</button>
+      <div class="flex gap-2"><button class="btn btn-sm" style="background: var(--ink-line); color: var(--ink-fg)" data-act="gsearch-open" aria-label="ค้นหาทุกอย่าง">ค้นหา</button><button class="btn btn-sm" style="background: var(--ink-line); color: var(--ink-fg)" data-act="open-role">สลับบทบาท</button></div>
     </header>
     <div id="banner"></div>
     <main id="main" class="flex-1 px-4 md:px-8 pt-5 pb-28 md:pb-10 max-w-7xl 2xl:max-w-[1680px] w-full mx-auto"></main>

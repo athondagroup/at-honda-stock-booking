@@ -68,14 +68,15 @@ function atModal(m, D) {
   const multi = a.multi || a.multiOf ? `<div class="text-xs mt-1" style="color:var(--warn)">${a.multi ? `จอง 2 คัน: ${esc(a.multi.reason)}${a.multi.note ? ` · ${esc(a.multi.note)}` : ''}` : 'ลูกค้ารายนี้ลงใบจองเพิ่มอีกใบ'}</div>` : '';
   const canChange = p.write && canEditBooking(a) && !a.cancelled && !a.done && !a.change && !m.cancel;
   return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">ใบจอง AT Honda</h2><div class="mt-1 flex flex-wrap gap-2">${matchChip(a)} ${a.row && !a.cancelled ? statusChip(BOOK_STATE, a.row.state) : ''}${a.cross ? chip(`ขายข้ามสาขา ${a.salesBr} → ${a.delivBr}`, 'neutral') : ''}${a.multi || a.multiOf ? chip('จอง 2 คัน', 'warn') : ''}${a.change ? chip(a.change.type === 'cancel' ? 'รออนุมัติยกเลิก' : 'รออนุมัติแก้ไข', 'warn') : ''}</div>${multi}</div><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
+  ${nextStepBox(a, D, mine)}
   <div class="grid md:grid-cols-[1fr_1.25fr] gap-5">
-    <div class="flex flex-col gap-3">
+    <div class="flex flex-col gap-3 order-2 md:order-1">
       ${r.doc_url && mine ? `<a class="btn btn-ghost" href="${esc(r.doc_url)}" target="_blank" rel="noopener">เปิดรูปใบจองใน Google Drive</a><p class="text-xs text-muted -mt-1">ใบจองจากฟอร์มเดิมเก็บใน Drive หน้านี้ดึงรูปมาแสดงตรง ๆ ไม่ได้</p>` : ''}
       ${imgs.length && mine ? imgs.map(([t, id]) => `<div><div class="text-xs text-muted mb-1">${t}</div><div class="photo-pane" style="max-height:44vh"><img src="${imgSrc(id)}" alt="${t}" loading="lazy"></div></div>`).join('')
         : (!r.doc_url ? `<div class="p-4 rounded-lg text-sm text-muted" style="background:var(--surface-2)">${mine ? 'ไม่มีรูป' : 'รูปเอกสารเห็นได้เฉพาะเซลล์เจ้าของใบจองและผู้จัดการ'}</div>` : '')}
       <table class="tbl text-sm"><tbody>${rows.map(([k, v]) => `<tr><td class="text-muted nowrap">${k}</td><td style="white-space:pre-line">${esc(v || '–')}</td></tr>`).join('')}</tbody></table>
     </div>
-    <div class="flex flex-col gap-3">
+    <div class="flex flex-col gap-3 order-1 md:order-2">
       ${gformBox(m, a)}
       ${a.cancelled ? cancelledBox(m, a) : trInBox(a, D)}
       ${changeBox(m, a)}
@@ -186,7 +187,7 @@ function flowPanel(m, a, D) {
   };
   const planRow = canEditBooking(a) && !fl.done.delivered ? `<div class="grid sm:grid-cols-[1fr_auto] gap-2 items-end mb-1"><div class="field"><label for="fl-plan">วันนัดรับรถ</label><input id="fl-plan" type="date" data-modal="plan" value="${esc(m.plan ?? r.delivery_plan ?? '')}"></div>
       <button class="btn btn-ghost btn-sm" data-act="plan-save" data-id="${esc(a.id)}">บันทึกวันนัด</button></div><p class="text-xs text-muted mb-2">มีวันนัดรับรถแล้ว ล็อกรถจะถือไว้จนส่งมอบ ไม่ต้องปลดทุก 15 วัน</p>` : (r.delivery_plan ? `<p class="text-sm mb-2">วันนัดรับรถ ${fmtD(r.delivery_plan)}</p>` : '');
-  return `<section><h3 class="font-head font-semibold mb-2">ขั้นตอนส่งมอบ</h3>${planRow}
+  return `<section data-flow-steps><h3 class="font-head font-semibold mb-2">ขั้นตอนส่งมอบ</h3>${planRow}
     ${step('booked', bookedBody())}${step('fin', finBody())}${step('assign', assignBody())}${step('po', poBody())}${step('down', downBody())}${step('delivered', delivBody())}${step('confirmed', confBody())}</section>`;
 }
 

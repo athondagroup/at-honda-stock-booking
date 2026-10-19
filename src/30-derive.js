@@ -266,6 +266,8 @@ function deriveNow() {
     const basis = car.prod || car.consign || car.stockin;
     car.age = basis ? daysBetween(basis, today) : null;
     car.ageFrom = car.prod ? 'prod' : car.consign ? 'consign' : car.stockin ? 'stockin' : null;
+    // two ages shown apart (บทวิเคราะห์ 19/10): days in stock, and days since production (none = รอระบุ)
+    const inS = car.consign || car.stockin; car.stockAge = inS ? daysBetween(inS, today) : null; car.prodAge = car.prod ? daysBetween(car.prod, today) : null;
     car.spec = specKey(car.model, car.grade, car.color);
     const ls = lockStateOf(['V:' + car.vin, car.ref ? 'R:' + car.ref : null].filter(Boolean));
     car.lock = ls.hard; car.temps = ls.temps;

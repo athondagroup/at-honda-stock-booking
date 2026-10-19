@@ -16,7 +16,7 @@ const ICON = {
 const NAV = [
   { id: 'dash', label: 'ภาพรวม' }, { id: 'alerts', label: 'แจ้งเตือน' }, { id: 'inbox', get label() { return perms().approve ? 'รออนุมัติ' : 'คำขอของฉัน'; } }, { id: 'stock', label: 'สต็อก' }, { id: 'book', label: 'Booking' },
   { id: 'quota', label: 'Quota' }, { id: 'lock', label: 'ล็อกรถ' }, { id: 'flow', label: 'ขั้นตอนส่งมอบ' }, { id: 'receive', label: 'รับรถเข้า' },
-  { id: 'upload', label: 'อัปเดตข้อมูล IDS' }, { id: 'admin', label: 'หลังบ้าน' }
+  { id: 'upload', label: 'อัปเดตข้อมูล IDS' }, { id: 'admin', label: 'หลังบ้าน' }, { id: 'datafix', label: 'ข้อมูลผิด/ขาด' }
 ];
 const svg = (id, n = 20) => `<svg width="${n}" height="${n}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${ICON[id]}</svg>`;
 const isSales = () => S.role.role === 'sales';
@@ -34,34 +34,34 @@ function badgeCounts(D) {
   };
 }
 // each role sees only the pages it works with: sales do not receive cars or upload IDS files
-const navFor = () => NAV.filter(n => !(isSales() && (n.id === 'receive' || n.id === 'upload')) && !(n.id === 'admin' && S.role.role !== 'exec'));
+const navFor = () => NAV.filter(n => !(isSales() && (n.id === 'receive' || n.id === 'upload' || n.id === 'datafix')) && !(n.id === 'admin' && S.role.role !== 'exec'));
 // the menu shows 6 groups (ตกลง 13/10 แบบ ค); pages of one group switch with the tabs at the top of the page
+// ปรับตามบทวิเคราะห์ 19/10 (ตัวอย่างใน artifact): งานวันนี้ / ใบจอง / รถ / รายงาน + เพิ่มเติม (เครื่องมือแอดมิน/ผู้จัดการ)
 const GROUPS = [
-  { id: 'dash', label: 'ภาพรวม', views: ['dash'] },
-  { id: 'work', label: 'งานของฉัน', views: ['alerts', 'inbox'], icon: 'alerts' },
-  { id: 'stockg', label: 'สต็อก', views: ['stock', 'quota', 'lock'], icon: 'stock' },
-  { id: 'bookg', label: 'Booking', views: ['book', 'flow'], icon: 'book' },
-  { id: 'intake', label: 'รับรถ / อัปโหลด IDS', views: ['receive', 'upload'], icon: 'receive' },
-  { id: 'admin', label: 'หลังบ้าน', views: ['admin'] }
+  { id: 'work', label: 'งานวันนี้', get views() { return perms().approve ? ['inbox', 'alerts'] : ['alerts', 'inbox']; }, icon: 'alerts' },
+  { id: 'bookg', label: 'ใบจอง', views: ['book', 'flow'], icon: 'book' },
+  { id: 'stockg', label: 'รถ', views: ['stock', 'quota', 'lock', 'receive'], icon: 'stock' },
+  { id: 'dash', get label() { return isSales() || S.role.role === 'admin' ? 'สรุป' : 'รายงาน'; }, views: ['dash'] },
+  { id: 'tools', label: 'เพิ่มเติม', views: ['datafix', 'upload', 'admin'], icon: 'upload' }
 ];
 const groupsFor = () => { const ok = new Set(navFor().map(n => n.id)); return GROUPS.map(g => ({ ...g, views: g.views.filter(v => ok.has(v)) })).filter(g => g.views.length); };
 const groupOf = v => GROUPS.find(g => g.views.includes(v)) || GROUPS[0];
 const groupEntry = g => (S.lastIn && g.views.includes(S.lastIn[g.id])) ? S.lastIn[g.id] : g.views[0];
-const GROUP_TAB = { alerts: 'แจ้งเตือน', get inbox() { return perms().approve ? 'รออนุมัติ' : 'คำขอของฉัน'; }, stock: 'สต็อกรถ', quota: 'Quota', lock: 'ล็อกรถ', book: 'ใบจอง', flow: 'ขั้นตอนส่งมอบ', receive: 'รับรถเข้า', upload: 'อัปเดตข้อมูล IDS' };
+const GROUP_TAB = { alerts: 'งานของฉัน', get inbox() { return perms().approve ? 'รอฉันอนุมัติ' : 'คำขอของฉัน (ติดตาม)'; }, stock: 'สต็อก', quota: 'Quota', lock: 'ล็อก', book: 'ใบจอง', flow: 'ตามขั้นตอนส่งมอบ', receive: 'รับรถ', upload: 'อัปเดตข้อมูล IDS', datafix: 'ข้อมูลผิด/ขาด/ต้องจับคู่', admin: 'หลังบ้าน' };
 function groupTabs(badges) {
   const g = groupsFor().find(x => x.views.includes(S.view));
   if (!g || g.views.length < 2) return '';
   return `<div class="flex flex-wrap gap-2 mb-4" role="tablist" aria-label="${esc(g.label)}">${g.views.map(v => `<button class="btn btn-sm ${S.view === v ? 'btn-dark' : 'btn-ghost'}" role="tab" aria-selected="${S.view === v}" data-act="nav" data-view="${v}" data-grp-tab="1">${GROUP_TAB[v]}${badges[v] ? ` <span class="badge">${badges[v]}</span>` : ''}</button>`).join('')}</div>`;
 }
 // phone bar: the 3 groups used every day, the rest under เมนู
-const bottomIds = () => ['dash', 'stockg', 'bookg', 'work'];
+const bottomIds = () => ['work', 'bookg', 'stockg', 'dash'];
 function renderChrome(D) {
   D = D || derive();
   const badges = badgeCounts(D);
   const badge = id => badges[id] ? `<span class="badge ml-auto">${badges[id]}</span>` : '';
   const gs = groupsFor(), gBadge = g => g.views.reduce((t, v) => t + (badges[v] || 0), 0);
   $('#sidenav').innerHTML = gs.map(g => { const n = gBadge(g), on = g.views.includes(S.view); return `<a href="#${groupEntry(g)}" class="nav-item" data-act="nav" data-view="${groupEntry(g)}" data-group="${g.id}" ${on ? 'aria-current="page"' : ''}>${svg(g.icon || g.views[0])}${g.label}${n ? `<span class="badge ml-auto">${n}</span>` : ''}</a>`; }).join('');
-  const ids = bottomIds(), bottom = [...ids.map(id => gs.find(g => g.id === id)).filter(Boolean), { id: 'more', label: 'เมนู', views: [] }];
+  const ids = bottomIds(), bottom = [...ids.map(id => gs.find(g => g.id === id)).filter(Boolean), { id: 'more', label: 'เพิ่มเติม', views: [] }];
   const moreGs = gs.filter(g => !ids.includes(g.id)), moreViews = moreGs.flatMap(g => g.views);
   $('#bottomnav').innerHTML = bottom.map(g => {
     const on = g.id === 'more' ? moreViews.includes(S.view) : g.views.includes(S.view);
@@ -125,14 +125,16 @@ function showRenderError(e) {
 }
 function renderNow() {
   const D = derive();
+  // the first page follows the role (บทวิเคราะห์ 19/10) unless a link names one
+  if (!S.startSet) { S.startSet = true; if (!location.hash || location.hash === '#dash') S.view = startView(); }
   if (!navFor().some(n => n.id === S.view)) S.view = 'dash';
   renderChrome(D);
-  const V = { dash: viewDash, alerts: viewAlerts, inbox: viewInbox, stock: viewStock, book: viewBook, quota: viewQuota, lock: viewLock, flow: viewFlow, receive: viewReceive, upload: viewUpload, admin: viewAdmin }[S.view] || viewDash;
+  const V = { dash: viewDash, alerts: viewAlerts, inbox: viewInbox, stock: viewStock, book: viewBook, quota: viewQuota, lock: viewLock, flow: viewFlow, receive: viewReceive, upload: viewUpload, admin: viewAdmin, datafix: viewDatafix }[S.view] || viewDash;
   const ae = document.activeElement, main = $('#main');
   const fid = ae && ae.id && main.contains(ae) && /INPUT|SELECT|TEXTAREA/.test(ae.tagName) ? ae.id : null;
   let caret = null; try { caret = fid && typeof ae.selectionStart === 'number' ? ae.selectionStart : null; } catch (e) { caret = null; }
   S.lastIn = { ...(S.lastIn || {}), [groupOf(S.view).id]: S.view };
-  main.innerHTML = groupTabs(badgeCounts(D)) + V(D);
+  main.innerHTML = (groupOf(S.view).id === 'work' ? todayHead(D) : '') + groupTabs(badgeCounts(D)) + V(D);
   const fe = fid && document.getElementById(fid);
   if (fe && !S.modal) { fe.focus({ preventScroll: true }); if (caret !== null) { try { fe.setSelectionRange(caret, caret); } catch (e) { /* not a text field */ } } }
   renderModal(D);
@@ -186,7 +188,7 @@ function viewAlerts(D) {
   const mine = myAlerts(D);
   const groups = [['bad', 'ต้องทำทันที'], ['warn', 'รอดำเนินการ'], ['muted', 'ตรวจย้อนหลัง']];
   const who = isSales() ? `เซลล์ ${S.role.sales}` : S.role.role === 'admin' ? `แอดมินสาขา ${S.role.branch}` : roleLabel();
-  return `${pageHead('แจ้งเตือน', `รายการที่ ${esc(who)} ต้องทำ ระบบคำนวณใหม่ทุกครั้งที่ข้อมูลเปลี่ยน`)}
+  return `${pageHead('งานของฉัน', `รายการที่ ${esc(who)} ต้องทำ ระบบคำนวณใหม่ทุกครั้งที่ข้อมูลเปลี่ยน`)}
   ${groups.map(([t, h]) => { const list = mine.filter(a => a.tone === t); return list.length ? `<section class="mb-5"><h2 class="font-head text-lg font-semibold mb-2">${h} <span class="text-muted text-base">${list.length}</span></h2>
     <div class="bg-surface border border-line rounded-lg divide-y divide-line">${list.slice(0, 150).map(alertRow).join('')}</div></section>` : ''; }).join('')
     || `<div class="bg-surface border border-line rounded-lg">${emptyBox('ไม่มีอะไรค้าง', 'เมื่อใบจองยังไม่อยู่ใน IDS มีคำขอล็อก หรือถึงขั้นตอนที่ต้องทำ รายการจะขึ้นที่นี่')}</div>`}
@@ -225,7 +227,8 @@ function viewStock(D) {
     ${isSales() ? '' : `<div class="field"><label for="f-status">สถานะ</label><select id="f-status" data-filter="status"><option value="">ทุกสถานะ</option>
       ${mode === 'spec' ? `<option value="low" ${f.status === 'low' ? 'selected' : ''}>สเปกที่ไม่พอ (แดง)</option>` : ''}
       ${Object.entries(CAR_STATUS).map(([k, v]) => `<option value="${k}" ${f.status === k ? 'selected' : ''}>${v[0]} (${counts[k] || 0})</option>`).join('')}</select></div>`}
-    <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-q">ค้นหา VIN / Ref${isSales() ? '' : ' / เลขใบจอง / ชื่อลูกค้า'}</label><input id="f-q" type="search" data-filter="q" value="${esc(f.q)}" placeholder="เช่น MRHGN36"></div>
+    ${mode === 'list' ? `<div class="field"><label for="f-ssort">เรียง</label><select id="f-ssort" data-filter="sSort">${[['', 'สาขา → สเปก → อายุ'], ['old', 'เก่าสุดทุกสาขา'], ['free', 'รถว่างพร้อมจัดสรร']].map(([k, t]) => `<option value="${k}" ${(f.sSort || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
+    <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-q">ค้นหา VIN / Ref${isSales() ? '' : ' / เลขใบจอง / ชื่อลูกค้า'} · ${S.br ? 'ในสาขา ' + S.br : 'ทุกสาขา'}</label><input id="f-q" type="search" data-filter="q" value="${esc(f.q)}" placeholder="เช่น MRHGN36"></div>
   </div>`;
   const heldN = [...D.cars.values()].filter(inBr).filter(c => (!f.model || c.model === f.model) && !['free', 'temp', 'company'].includes(c.status)).length;
   const line = isSales() ? `<p class="text-sm mb-2">รถที่ขายได้ <b class="num" style="color:var(--good)">${(counts.free || 0) + (counts.temp || 0)}</b> คัน${counts.temp ? ` (มีคนล็อกชั่วคราวรอลูกค้าอยู่ ${counts.temp} คัน ยังจองแข่งได้)` : ''}${counts.pending ? ` · มีคำขอล็อกรออนุมัติ ${counts.pending} คัน (ขอคิวต่อได้)` : ''} · ติดจองแล้ว <b class="num">${heldN}</b> คัน (ไม่แสดงชื่อ)</p>`
@@ -287,7 +290,7 @@ function carRow(c, D) {
       <div class="text-xs">${prodText(c)} ${prodBtn(c)}</div></div>
     <div class="w-12"><b>${esc(c.br)}</b></div>
     <div class="w-32">${carStatusCell(c, D)}</div>
-    <div class="w-20 text-sm" ${ageFromNote(c) ? `title="${ageFromNote(c)}"` : ''}>${ageBar(c.age)}${c.ageFrom && c.ageFrom !== 'prod' ? '<span class="text-xs text-muted">*</span>' : ''}</div>
+    <div class="w-28 text-sm">${ageCell(c)}</div>
     <div class="text-sm min-w-0 flex-1">${l ? lockText(l) : isSales() ? '' : `${c.bk ? `<span class="text-muted">ใบจอง</span> ${esc(c.bk)} · ` : ''}${custCell(c.cust || (c.bknote ? c.bknote : null), c.sales, { company: c.company || c.status === 'company', seed: c.seed && ['booked', 'noted', 'sold', 'invoiced'].includes(c.status) })}`}</div>
     <div class="flex gap-2">${carActions(c, p, D)}</div></div>`;
 }
@@ -296,16 +299,17 @@ const lockLabel = l => `${l.type === 'dealer' ? 'ดีลเลอร์ ' + es
 const carActions = (c, p, D) => stockActions(c, p, D);
 function carTable(cars, D) {
   const f = S.filters, p = perms();
-  const list = cars.filter(c => !f.status || f.status === 'low' || c.status === f.status)
-    .sort((a, b) => (a.br || '').localeCompare(b.br || '') || a.spec.localeCompare(b.spec) || (b.age ?? -1) - (a.age ?? -1));
+  let list = cars.filter(c => !f.status || f.status === 'low' || c.status === f.status);
+  if (f.sSort === 'free') list = list.filter(c => c.status === 'free' || c.status === 'temp');
+  list.sort(f.sSort === 'old' || f.sSort === 'free' ? (a, b) => (b.age ?? -1) - (a.age ?? -1) : (a, b) => (a.br || '').localeCompare(b.br || '') || a.spec.localeCompare(b.spec) || (b.age ?? -1) - (a.age ?? -1));
   if (!list.length) return `<div class="bg-surface border border-line rounded-lg">${emptyBox('ไม่พบรถตามตัวกรองนี้', 'ลองล้างตัวกรองหรือค้นหาด้วยเลขอื่น')}</div>`;
   return `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl">
-    <thead><tr><th>หมายเลขตัวถัง</th><th>สาขา</th><th>รุ่น / เกรด / สี</th><th>สถานะ</th><th>วันผลิต</th><th class="text-right">อายุ (วัน)</th>${isSales() ? '<th>ล็อก</th>' : '<th>ชื่อลูกค้า / เลขที่ใบจอง</th><th>ที่ปรึกษาขาย</th>'}<th></th></tr></thead>
+    <thead><tr><th>หมายเลขตัวถัง</th><th>สาขา</th><th>รุ่น / เกรด / สี</th><th>สถานะ</th><th>วันผลิต</th><th class="text-right">อยู่ในสต็อก / อายุจากวันผลิต</th>${isSales() ? '<th>ล็อก</th>' : '<th>ชื่อลูกค้า / เลขที่ใบจอง</th><th>ที่ปรึกษาขาย</th>'}<th></th></tr></thead>
     <tbody>${list.map(c => `<tr>
       <td class="nowrap">${vinLink(c)}<div class="text-xs text-muted">${c.ref ? 'Ref ' + esc(c.ref) : ''}${c.src !== 'IDS' ? ' · ' + esc(c.src) : ''}</div></td>
       <td><b>${esc(c.br)}</b></td><td class="nowrap">${specLabel(c.spec)}</td><td class="nowrap">${carStatusCell(c, D)}</td>
       <td class="nowrap text-sm">${c.prod ? `<span class="num">${fmtD(c.prod)}</span>${c.prodSrc === 'key' ? ' <span class="text-xs text-muted">คีย์</span>' : ''}${c.prodDiff ? ' <span class="text-xs" style="color:var(--warn)">ไม่ตรง IDS</span>' : ''}` : '<span class="text-xs" style="color:var(--warn)">ยังไม่มี</span>'} ${prodBtn(c)}</td>
-      <td class="text-right" ${ageFromNote(c) ? `title="${ageFromNote(c)}"` : ''}>${ageBar(c.age)}${c.ageFrom && c.ageFrom !== 'prod' ? '<span class="text-xs text-muted">*</span>' : ''}</td>
+      <td class="text-right nowrap">${ageCell(c)}</td>
       ${isSales() ? `<td class="text-sm">${c.lock ? lockText(c.lock) : ''}</td>` : `<td style="min-width:150px">${c.lock ? `<div class="text-xs">${lockLabel(c.lock)}</div>` : ''}${custCell(c.cust || c.bknote, c.sales, { company: c.company || c.status === 'company', seed: c.seed && ['booked', 'noted', 'sold', 'invoiced'].includes(c.status) })}${c.bk ? `<div class="code text-xs text-muted">${esc(c.bk)}</div>` : ''}</td>
       <td class="nowrap">${esc(c.sales || '')}</td>`}<td class="nowrap text-right">${carActions(c, p, D)}</td></tr>`).join('')}</tbody></table></div>`;
 }

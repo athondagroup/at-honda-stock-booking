@@ -19,9 +19,9 @@ function viewDash(D) {
   if (r === 'sales') return dashSales(D) + salesMonthly(D);
   if (r === 'admin') return dashAdmin(D);
   const sub = dashSub();
-  if ((sub === 'sales' || sub === 'book' || sub === 'acct' || sub === 'person') && (r === 'exec' || MGR_OF[r])) return dashScoped(D, sub);
-  if (r === 'exec' && sub === 'exec') return dashExec(D);
-  return dashManager(D);
+  if ((sub === 'sales' || sub === 'book' || sub === 'acct' || sub === 'person') && (r === 'exec' || MGR_OF[r])) return (sub === 'sales' ? dataFreshBox(D) : '') + dashScoped(D, sub);
+  if (r === 'exec' && sub === 'exec') return dataFreshBox(D) + dashExec(D);
+  return dataFreshBox(D) + dashManager(D);
 }
 const execSeg = () => dashTabs();
 const totFree = D => [...D.cars.values()].filter(c => c.status === 'free' || c.status === 'temp').length;

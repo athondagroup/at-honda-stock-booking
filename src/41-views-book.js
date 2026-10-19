@@ -99,6 +99,10 @@ function bookList(D) {
   if (dRange) list = list.filter(r => bookDateOk(r, D));
   if (q) list = list.filter(r => [r.no, r.cust, r.owner, r.idsSales, r.vin, r.b && r.b.cust, r.a && r.a.atSpec && r.a.rec.customer].some(x => x && searchKey(x).includes(q)));
   if (dRange && f.bDType === 'sale') list.sort((x, y) => (saleDate(y, D) || '').localeCompare(saleDate(x, D) || '')); else list.sort((x, y) => (y.date || '').localeCompare(x.date || ''));
+  // sort (บทวิเคราะห์ 19/10): open work first / waiting longest / entered last
+  if (f.bSort === 'work') list.sort((x, y) => bkWorkRank(y, D) - bkWorkRank(x, D) || (x.date || '').localeCompare(y.date || ''));
+  else if (f.bSort === 'wait') list.sort((x, y) => (x.date || '').localeCompare(y.date || ''));
+  else if (f.bSort === 'new') list.sort((x, y) => bkEntered(y).localeCompare(bkEntered(x)));
   const filt = `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
     <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-aq">ค้นหาเลขที่ใบจอง / ชื่อลูกค้า / เซลล์ / VIN</label><input id="f-aq" type="search" data-filter="aq" value="${esc(f.aq)}"></div>
     ${f.aq ? '<button class="btn btn-ghost btn-sm" data-act="aq-clear">ล้างคำค้น</button>' : ''}
@@ -111,15 +115,17 @@ function bookList(D) {
     <div class="field"><label for="f-bdto">ถึง</label><input id="f-bdto" type="date" data-filter="bDTo" value="${esc(f.bDTo || '')}"></div>
     ${dRange || f.qModel || f.bGrade || f.bColor || f.bSales || (f.aState && f.aState !== 'active') ? '<button class="btn btn-ghost btn-sm" data-act="bd-clear">ล้างตัวกรอง</button>' : ''}
     <div class="field"><label for="f-as">แสดง</label><select id="f-as" data-filter="aState">${BOOK_FILTERS.map(([k, t]) => `<option value="${k}" ${st === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
-  </div>`;
+    <div class="field"><label for="f-bsort">เรียง</label><select id="f-bsort" data-filter="bSort">${[['', 'วันที่จองใหม่ก่อน'], ['work', 'งานค้างก่อน'], ['wait', 'รอนานก่อน'], ['new', 'บันทึกล่าสุด']].map(([k, t]) => `<option value="${k}" ${(f.bSort || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+  </div>${bkFilterBar(f, st, q)}`;
   const all = bookRows(D).filter(r => inBr(r) && rowVisible(r) && (!dRange || bookDateOk(r, D)));
   const cnt = k => all.filter(r => rowState(r, D, k)).length;
   const quick = [['noids', 'bad'], ['noat', 'bad'], ['confirm', 'warn'], ['req', 'warn'], ['assign', 'neutral']].map(([k, t]) => { const n = cnt(k); return n ? `<button class="chip" data-act="book-filter" data-st="${k}" style="cursor:pointer;${t === 'bad' ? 'background:var(--bad-soft);color:var(--bad)' : t === 'warn' ? 'background:var(--warn-soft);color:var(--warn)' : 'background:var(--surface-2);color:var(--fg)'}">${BOOK_FILTERS.find(x => x[0] === k)[1]} ${n}</button>` : ''; }).join(' ');
   if (!list.length) return `${filt}${quick && !q ? `<div class="flex flex-wrap gap-2 mb-3">${quick}</div>` : ''}<div class="bg-surface border border-line rounded-lg">${q ? emptyBox(`ไม่พบ "${esc(f.aq.trim())}"`, `ค้นหาแล้วทุกสถานะและทุกสาขา${isSales() ? ' (เซลล์ค้นหาได้เฉพาะใบจองของตัวเอง)' : S.role.role === 'admin' ? ' ของสาขาตัวเอง' : ''} ลองพิมพ์แค่ชื่อหรือนามสกุล`) : emptyBox('ไม่มีใบจองตามตัวกรองนี้', p.book ? 'กด "+ ใบจอง AT Honda" แล้วแนบรูปใบจองและสลิป' : 'ลองเปลี่ยนตัวกรองหรือสาขา')}</div>`;
-  return `${filt}<div class="flex flex-wrap gap-2 items-center mb-2"><span class="text-sm">${list.length} ใบ${q ? ` · ค้นหาทุกสาขา${st === 'active' ? ' ทุกสถานะ' : ` เฉพาะ "${BOOK_FILTERS.find(x => x[0] === st)[1]}"`}` : ''}</span>${q ? '' : quick}</div>
+  const PG = 50, pages = Math.max(1, Math.ceil(list.length / PG)), pg = Math.min(Math.max(1, Number(f.bPage) || 1), pages), from = (pg - 1) * PG;
+  return `${filt}<div class="flex flex-wrap gap-2 items-center mb-2"><span class="text-sm">แสดง ${list.length ? from + 1 : 0}–${Math.min(from + PG, list.length)} จาก ${list.length} ใบ${q ? ` · ค้นหาทุกสาขา${st === 'active' ? ' ทุกสถานะ' : ` เฉพาะ "${BOOK_FILTERS.find(x => x[0] === st)[1]}"`}` : ` · ${S.br ? 'สาขา ' + S.br : 'ทุกสาขา'}`}</span>${q ? '' : quick}</div>
   <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl">
     <thead><tr><th>วันที่จอง / เลขที่</th><th>ชื่อลูกค้า</th><th>เซลล์ / สาขา</th><th>รุ่น / เกรด / สี</th><th>IDS</th><th>สถานะ / ขั้นถัดไป</th><th></th></tr></thead>
-    <tbody>${list.slice(0, 300).map(r => bookRow(r, D, p)).join('')}</tbody></table></div>${list.length > 300 ? '<p class="text-xs text-muted mt-2">แสดง 300 ใบล่าสุด ใช้ตัวกรองเพื่อหาใบเก่า</p>' : ''}`;
+    <tbody>${list.slice(from, from + PG).map(r => bookRow(r, D, p)).join('')}</tbody></table></div>${pager(pg, pages)}`;
 }
 function bookRow(r, D, p) {
   const a = r.a, b = r.b, row = r.row || {};

@@ -214,7 +214,7 @@ function viewInboxMgr(D) {
   const list = items.filter(x => tab === 'all' || inboxTopic(x) === tab).sort((x, y) => (x.at || '').localeCompare(y.at || ''));
   const label = k => topics.find(t => t[0] === k)[1];
   const row = x => tab === 'all' ? `<div><div class="px-3 md:px-4 pt-3 text-xs font-medium" style="color:var(--muted)">${label(inboxTopic(x))}</div>${inboxRowFor(x, D)}</div>` : inboxRowFor(x, D);
-  return `${pageHead('รออนุมัติ', `${S.role.role === 'exec' ? 'ทุกสาขา' : `สาขา ${mgrBranches().join(', ')}`} · แยกแท็บตามหัวข้อ เรียงจากที่รอนานที่สุด`)}
+  return `${pageHead('รอฉันอนุมัติ', `${S.role.role === 'exec' ? 'ทุกสาขา' : `สาขา ${mgrBranches().join(', ')}`} · แยกแท็บตามหัวข้อ เรียงจากที่รอนานที่สุด`)}
     <div class="flex gap-1 border-b border-line mb-3 overflow-x-auto" role="tablist">
       <button role="tab" class="tab" aria-selected="${tab === 'all'}" data-act="sub" data-key="inbox" data-sub="all">รวม <span class="badge">${items.length}</span></button>
       ${topics.map(([k, t]) => `<button role="tab" class="tab ${n(k) ? '' : 'text-muted'}" aria-selected="${tab === k}" data-act="sub" data-key="inbox" data-sub="${k}">${t}${n(k) ? ` <span class="badge">${n(k)}</span>` : ''}</button>`).join('')}</div>
