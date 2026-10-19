@@ -35,7 +35,7 @@ function renderModal(D) {
   else if (m.kind === 'adbk') { body = adminBkModal(m); wide = true; }
   else if (m.kind === 'adlk') body = adminLkModal(m);
   else if (m.kind === 'menu') body = `<div class="flex items-start justify-between gap-3 mb-1"><h2 class="font-head text-xl font-semibold">เมนู</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
-    <nav class="sheet-menu mb-4">${groupsFor().filter(g => !bottomIds().includes(g.id)).map(g => `<a href="#${groupEntry(g)}" data-act="nav" data-view="${groupEntry(g)}">${svg(g.icon || g.views[0])}${g.label}</a>`).join('')}</nav>
+    ${menuItems()}
     <button class="btn btn-ghost w-full mb-3" data-act="app-reload">โหลดหน้าใหม่ / อัปเดตเว็บ</button>
     <div class="flex flex-col gap-3">${roleControls('menu')}</div>`;
   else if (m.kind === 'role') body = `<h2 class="font-head text-xl font-semibold mb-3">สลับบทบาททดลอง</h2><div class="flex flex-col gap-3">${roleControls('modal')}</div>
@@ -512,8 +512,9 @@ function assignDefault(a, D) {
   return lockCar ? lockCar.vin : (a.match && a.match.vin) || '';
 }
 const ACTIONS = {
-  nav(el) { S.view = el.dataset.view; if (el.dataset.sub) S.sub[S.view] = el.dataset.sub; S.modal = null; setHash(); render(); window.scrollTo(0, 0); },
+  nav(el) { navPush(); S.view = el.dataset.view; if (el.dataset.sub) S.sub[S.view] = el.dataset.sub; S.modal = null; setHash(); render(); window.scrollTo(0, 0); },
   go(el) {
+    navPush();
     S.view = el.dataset.view;
     if (el.dataset.sub) S.sub[S.view] = el.dataset.sub;
     if (el.dataset.br !== undefined) setBr(el.dataset.br);

@@ -202,3 +202,35 @@ if (typeof window !== 'undefined' && window.__BUILD) {
   setTimeout(updCheck, 15000);
 }
 Object.assign(ACTIONS, { 'app-reload'() { try { location.reload(); } catch (e) { /* ignore */ } } });
+
+// ---------- back to the previous page (the installed web app has no browser back button)
+function navPush() {
+  const h = S.navHist || (S.navHist = []);
+  const cur = { view: S.view, sub: S.sub[S.view] || '' }, last = h[h.length - 1];
+  if (!last || last.view !== cur.view || last.sub !== cur.sub) h.push(cur);
+  if (h.length > 20) h.shift();
+}
+function backBar() {
+  const h = S.navHist || [];
+  const prev = h.length ? h[h.length - 1] : null;
+  if (!prev || (prev.view === S.view && (prev.sub || '') === (S.sub[S.view] || ''))) return '';
+  const g = groupOf(prev.view), name = (GROUP_TAB[prev.view] || (g && g.label) || prev.view);
+  return `<div class="mb-2"><button class="btn btn-ghost btn-sm" data-act="nav-back" aria-label="กลับไปหน้าก่อน">← กลับ: ${esc(name)}</button></div>`;
+}
+// เมนู (เพิ่มเติม): the tools pages one by one, each with what it is for; only those this role may open
+function menuItems() {
+  const can = new Set(navFor().map(n => n.id));
+  const items = [['datafix', 'ข้อมูลผิด / ขาด / ต้องจับคู่', 'รวมเรื่องที่ต้องแก้ไว้ที่เดียว กดแล้วพาไปหน้าที่แก้'],
+    ['upload', 'อัปโหลดข้อมูล IDS', 'ไฟล์ Stock, Booking, Quota, Invoice/DL จาก IDS'],
+    ['admin', 'หลังบ้าน', S.role.role === 'exec' ? 'ผู้ใช้งาน รายชื่อเซลล์ รุ่น เกรด สี แก้ข้อมูลโดยตรง' : 'ดูได้อย่างเดียว การแก้ทำโดยผู้บริหาร']].filter(x => can.has(x[0]));
+  if (!items.length) return '';
+  return `<nav class="flex flex-col gap-2 mb-4" aria-label="เมนูเพิ่มเติม">${items.map(([v, t, d]) => `<a href="#${v}" data-act="nav" data-view="${v}" class="bg-surface border border-line rounded-lg p-3 flex items-center gap-3" style="min-height:56px;${S.view === v ? 'border-color:var(--red)' : ''}">${svg(v === 'admin' ? 'admin' : v === 'upload' ? 'upload' : 'alerts')}<span class="flex-1"><span class="font-semibold block">${t}</span><span class="text-xs text-muted">${d}</span></span><span aria-hidden="true">›</span></a>`).join('')}</nav>`;
+}
+Object.assign(ACTIONS, {
+  'nav-back'() {
+    const h = S.navHist || [];
+    const prev = h.pop() || { view: startView(), sub: '' };
+    S.view = prev.view; if (prev.sub) S.sub[S.view] = prev.sub;
+    S.modal = null; setHash(); render(); window.scrollTo(0, 0);
+  }
+});

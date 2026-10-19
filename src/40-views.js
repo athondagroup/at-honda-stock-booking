@@ -34,7 +34,7 @@ function badgeCounts(D) {
   };
 }
 // each role sees only the pages it works with: sales do not receive cars or upload IDS files
-const navFor = () => NAV.filter(n => !(isSales() && (n.id === 'receive' || n.id === 'upload' || n.id === 'datafix')) && !(n.id === 'admin' && S.role.role !== 'exec'));
+const navFor = () => NAV.filter(n => !(isSales() && (n.id === 'receive' || n.id === 'upload' || n.id === 'datafix')) && !(n.id === 'admin' && !adminCan()));
 // the menu shows 6 groups (ตกลง 13/10 แบบ ค); pages of one group switch with the tabs at the top of the page
 // ปรับตามบทวิเคราะห์ 19/10 (ตัวอย่างใน artifact): งานวันนี้ / ใบจอง / รถ / รายงาน + เพิ่มเติม (เครื่องมือแอดมิน/ผู้จัดการ)
 const GROUPS = [
@@ -136,7 +136,7 @@ function renderNow() {
   const fid = ae && ae.id && main.contains(ae) && /INPUT|SELECT|TEXTAREA/.test(ae.tagName) ? ae.id : null;
   let caret = null; try { caret = fid && typeof ae.selectionStart === 'number' ? ae.selectionStart : null; } catch (e) { caret = null; }
   S.lastIn = { ...(S.lastIn || {}), [groupOf(S.view).id]: S.view };
-  main.innerHTML = (groupOf(S.view).id === 'work' ? todayHead(D) : '') + groupTabs(badgeCounts(D)) + V(D);
+  main.innerHTML = backBar() + (groupOf(S.view).id === 'work' ? todayHead(D) : '') + groupTabs(badgeCounts(D)) + V(D);
   const fe = fid && document.getElementById(fid);
   if (fe && !S.modal) { fe.focus({ preventScroll: true }); if (caret !== null) { try { fe.setSelectionRange(caret, caret); } catch (e) { /* not a text field */ } } }
   renderModal(D);
