@@ -50,6 +50,15 @@ const IDS = (() => {
   const BK_NO = /^\d{8,12}$/;
   const isCompany = n => { const s = clean(n).replace(/\s+/g, ' '); return s.includes('เอที ฮอนด้า') || s.includes('เอทีฮอนด้า'); };
   const dealerBr = v => DEALER[clean(v).replace(/\D/g, '').replace(/^0+/, '')] || null;
+  // who bought a car (ตกลง 19/10): another AT Honda branch ("บริษัท เอที ฮอนด้า ออโตโมบิล (สามพราน) จำกัด") or another
+  // Honda dealer ("บริษัท ตากฮอนด้าคาร์ส์ จำกัด"); null for a retail customer or this branch's own company
+  const BR_WORD = [['ภาษีเจริญ', 'PSC'], ['เอกชัย', 'ATE'], ['บางบอน', 'ATE'], ['สามพราน', 'SPH'], ['กำแพงแสน', 'KPA']];
+  const buyerOf = (name, own) => {
+    const s = clean(name); if (!s) return null;
+    if (isCompany(s)) { const w = BR_WORD.find(([k]) => s.includes(k)); return w && w[1] !== own ? { kind: 'branch', to: w[1] } : null; }
+    if (/ฮอนด้า/.test(s) && /บริษัท/.test(s)) return { kind: 'dealer', to: s.replace(/^บริษัท\s*/, '').replace(/\s*จำกัด.*$/, '').trim() };
+    return null;
+  };
   // "CITY e:HEV'27 e:HEV RS (RB(Z)) ราคาเดิม" -> model "CITY e:HEV", year 2027, grade "e:HEV RS", body "RB(Z)", note "ราคาเดิม"
   function mto(name) {
     const s = clean(name);
@@ -91,7 +100,10 @@ const IDS = (() => {
       ref_no: ['text', ['เลขที่ใบสั่งซื้อศูนย์']],
       alloc_date: ['date', ['วันที่จัดสรร']],
       sale_status: ['text', ['รายละเอียดสถานะแจ้งขาย', 'สถานะแจ้งขาย']],
-      booking_date: ['date', ['วันที่ใบสั่งจอง']]
+      booking_date: ['date', ['วันที่ใบสั่งจอง']],
+      // the cost report: a car with a sale invoice has left stock
+      sale_inv: ['text', ['เลขที่ใบกำกับภาษีขาย']],
+      sale_inv_date: ['date', ['วันที่ใบกำกับภาษีขาย']]
     },
     booking: {
       dealer: ['dealer', ['ตัวแทนจำหน่าย', 'รหัสผู้จำหน่าย', 'dealer code']],
@@ -214,9 +226,16 @@ const IDS = (() => {
         if (!isVin(r.vin)) { res.warn.push(`ข้ามแถว ${r._n}: '${String(r.vin).slice(0, 30)}' ไม่ใช่เลขตัวถัง 17 หลัก`); continue; }
         if (seen.has(r.vin)) { res.warn.push(`VIN ${r.vin} ซ้ำในตาราง (แถว ${r._n}) ใช้แถวแรก`); continue; }
         seen.add(r.vin);
-        const m = mto(r.mto), bn = r.booking_no || '', st = r.sale_status || '';
+        const m = mto(r.mto), bn = r.booking_no || '', st = r.sale_status || '', buyer = buyerOf(r.customer_name, res.br);
+        // sold already (the cost report has the sale invoice): not stock; kept to explain where it went, and a car sold to
+        // another branch or dealer is kept as such (ไม่นับยอดขาย). A car invoiced to this branch's own company stays as a company car.
+        if (r.sale_inv && r.sale_inv_date && (buyer || !isCompany(r.customer_name))) {
+          res.sold.push({ inv: r.sale_inv, idate: r.sale_inv_date, ddate: null, vin: r.vin, no: BK_NO.test(bn) ? bn : null, cust: r.customer_name, sales: null, fin: null,
+            company: isCompany(r.customer_name), model: m.model, grade: m.grade, color: (r.color || '').toUpperCase() || null, other: !!buyer, to: buyer ? buyer.to : null });
+          continue;
+        }
         res.rows.push({
-          vin: r.vin, model: m.model, grade: m.grade, color: (r.color || '').toUpperCase() || null, year: m.year, note: m.note,
+          vin: r.vin, model: m.model, grade: m.grade, color: (r.color || '').toUpperCase() || null, year: m.year, note: buyer && buyer.kind === 'branch' ? [m.note, `กำลังโอนไป ${buyer.to}`].filter(Boolean).join(' · ') : m.note,
           consign: r.consign_date, stockin: r.stockin_date, prod: r.production_date, age_ids: r.age_days,
           ref: r.ref_no ? findRef(r.ref_no) : null, bkno: BK_NO.test(bn) ? bn : null, bknote: bn && !BK_NO.test(bn) ? bn : null,
           cust: r.customer_name, sold: st.startsWith('แจ้งขาย') || date(st) !== null, company: isCompany(r.customer_name),
@@ -225,6 +244,10 @@ const IDS = (() => {
       }
       res.asof = inferAsof(res.rows.map(x => [x.stockin, x.age_ids]));
       if (res.rows.length && !res.rows.some(x => x.prod)) res.note = 'ไฟล์ไม่มีวันผลิต ระบบนับอายุรถจากวันที่รถฝากศูนย์แทน';
+      if (res.sold.length) {
+        const n = k => res.sold.filter(k).length;
+        res.note = [res.note, `ไฟล์นี้มีรถที่ออกใบกำกับขายแล้ว ${res.sold.length} คัน ไม่นับเป็นสต็อก: ขายปลีก ${n(x => !x.other)} · โอนให้สาขาอื่น ${n(x => x.other && BRS.includes(x.to))} · ขายดีลเลอร์อื่น ${n(x => x.other && !BRS.includes(x.to))} (โอน/ดีลเลอร์ เก็บเป็น "ขายให้สาขาอื่น" ไม่นับยอดขาย)`].filter(Boolean).join(' · ');
+      }
     },
     booking(res, recs) {
       if (!branchFromDealer(res, recs)) return;
@@ -280,9 +303,11 @@ const IDS = (() => {
         if (seen.has(inv)) { res.warn.push(`เลขใบกำกับ ${inv} ซ้ำในตาราง (แถว ${r._n}) ใช้แถวแรก`); continue; }
         seen.add(inv);
         const m = mto(r.mto);
+        const buyer = buyerOf(r.customer_name, res.br);
         res.rows.push({
           inv, idate: r.invoice_date, ddate: r.delivery_date, vin: r.vin, no: r.booking_no, cust: r.customer_name, sales: r.sales_name,
-          fin: r.finance_company, company: isCompany(r.customer_name), model: m.model, grade: m.grade, color: (r.color || '').toUpperCase() || null
+          fin: r.finance_company, company: isCompany(r.customer_name), model: m.model, grade: m.grade, color: (r.color || '').toUpperCase() || null,
+          other: buyer ? true : null, to: buyer ? buyer.to : null
         });
       }
       const ds = res.rows.flatMap(x => [x.idate, x.ddate]).filter(d => d && d <= todayISO()).sort();
@@ -391,7 +416,7 @@ const IDS = (() => {
     const loc = locate(rows);
     if (!loc) return null;
     const { src, hdr } = loc, spec = SPECS[src];
-    const res = { file, sheet, src, br: null, rows: [], warn: [], note: null, error: null, asof: null, months: [] };
+    const res = { file, sheet, src, br: null, rows: [], sold: [], warn: [], note: null, error: null, asof: null, months: [] };
     const body = [];
     for (let i = hdr + 1; i < rows.length; i++) { const r = rows[i]; if (r && r.some(x => clean(x))) body.push({ n: i + 1, r }); }
     if (!body.length) { res.error = 'มีแต่หัวตาราง ไม่มีข้อมูล'; return res; }
@@ -424,7 +449,7 @@ const IDS = (() => {
     }
     return out;
   }
-  return { clean, date, month, int, findVin, findRef, isVin, mto, dealerBr, isCompany, parseSheet, parseWorkbook };
+  return { clean, date, month, int, findVin, findRef, isVin, mto, dealerBr, isCompany, buyerOf, parseSheet, parseWorkbook };
 })();
 
 let xlsxLoading = null;
@@ -446,7 +471,7 @@ const PACK = {
   stock: ['vin', 'model', 'grade', 'color', 'year', 'note', 'consign', 'stockin', 'prod', 'ref', 'bkno', 'bknote', 'cust', 'sold', 'company', 'alloc', 'bkdate', 'engine'],
   booking: ['no', 'date', 'model', 'grade', 'color', 'year', 'sales', 'ids', 'vin', 'ref', 'ws', 'cust', 'alloc', 'aging', 'est'],
   quota: ['ref', 'm', 'model', 'grade', 'color', 'vin', 'vnote', 'qty', 'week', 'cdate', 'ndc', 'dstock', 'ws', 'otype'],
-  invoice: ['inv', 'idate', 'ddate', 'vin', 'no', 'cust', 'sales', 'fin', 'company', 'model', 'grade', 'color', 'other']
+  invoice: ['inv', 'idate', 'ddate', 'vin', 'no', 'cust', 'sales', 'fin', 'company', 'model', 'grade', 'color', 'other', 'to']
 };
 const pack = (src, rows) => ({ cols: PACK[src], rows: rows.map(r => PACK[src].map(c => r[c] ?? null)) });
 const unpack = doc => !doc || !doc.cols ? [] : doc.rows.map(r => { const o = {}; doc.cols.forEach((c, i) => { o[c] = r[i] ?? null; }); return o; });

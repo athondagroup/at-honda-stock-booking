@@ -129,11 +129,12 @@ function invAllRows(br) { const live = unpack(S.ids.get('invoice_' + br)); retur
 function invNoName(r) { return !r.cust && !r.sales; }
 function invSame(a, b) { const n = v => String(v ?? '').replace(/^0+/, '').trim(); return ['inv', 'idate', 'ddate', 'cust', 'sales', 'fin', 'no'].every(k => n(a[k]) === n(b[k])); }
 // nameless customer rows that were really an earlier "other" file saved before the two kinds were told apart
-function invStray(m, rows) { const vins = new Set(rows.map(x => x.vin)); return [...m.entries()].filter(([, o]) => !o.other && invNoName(o) && vins.has(o.vin)).map(([k]) => k); }
+// rows saved as customer sales before the buyer was known: nameless (an earlier Other file) or invoiced to another AT branch / Honda dealer
+function invStray(m, rows, br) { const vins = new Set(rows.filter(x => x.other).map(x => x.vin)); return [...m.entries()].filter(([, o]) => !o.other && vins.has(o.vin) && (invNoName(o) || IDS.buyerOf(o.cust, br))).map(([k]) => k); }
 function invDiff(r) {
   const other = r.kind === 'other', m = new Map(invAllRows(r.br).map(x => [invKey(x), x]));
-  const rows = r.rows.map(x => ({ ...x, other: other || null }));
-  const stray = other ? invStray(m, rows) : [];
+  const rows = r.rows.map(x => ({ ...x, other: other || x.other || null }));
+  const stray = invStray(m, rows, r.br);
   stray.forEach(k => m.delete(k));
   let add = 0, upd = 0, same = 0; const lost = [];
   rows.forEach(x => {
@@ -147,9 +148,9 @@ function invDiff(r) {
 }
 async function invMergeSave(r) {
   const other = r.kind === 'other', m = new Map(invAllRows(r.br).map(x => [invKey(x), x]));
-  if (other) invStray(m, r.rows).forEach(k => m.delete(k));
+  invStray(m, r.rows.map(x => ({ ...x, other: other || x.other })), r.br).forEach(k => m.delete(k));
   for (const x0 of r.rows) {
-    const x = { ...x0, other: other || null }, k = invKey(x), o = m.get(k);
+    const x = { ...x0, other: other || x0.other || null }, k = invKey(x), o = m.get(k);
     if (o) {
       if (invNoName(x) && !invNoName(o) && r.nameChoice === 'old') ['cust', 'sales', 'no', 'fin'].forEach(c => { if (!x[c]) x[c] = o[c]; });
       if (!x.ddate && o.ddate) x.ddate = o.ddate; // a delivery already recorded is not undone by a file that lacks it

@@ -220,6 +220,8 @@ function prepareUploads(results) {
   const D = derive(), X = D.X, seen = new Set();
   const batchInv = new Map(), batchStock = new Map();
   results.filter(r => r.src === 'invoice' && !r.error).forEach(r => r.rows.forEach(i => batchInv.set(i.vin, i)));
+  // the cost report sold list explains cars leaving stock in the same batch
+  results.filter(r => r.src === 'stock' && !r.error).forEach(r => (r.sold || []).forEach(i => { if (!batchInv.has(i.vin)) batchInv.set(i.vin, i); }));
   results.filter(r => r.src === 'stock' && !r.error).forEach(r => r.rows.forEach(c => batchStock.set(c.vin, r.br)));
   for (const r of results) {
     r.on = !r.error;
@@ -239,7 +241,7 @@ function prepareUploads(results) {
         const moved = batchStock.get(c.vin) || X.cars.find(x => x.vin === c.vin && x.br !== r.br)?.br;
         const veh = S.vehicles.get(c.vin);
         let why, flag = false;
-        if (inv && inv.other) why = `ขายให้สาขาอื่น/ดีลเลอร์ (DL Other) ใบกำกับ ${inv.inv || ''} ${fmtD(inv.idate)}`;
+        if (inv && inv.other) why = `${inv.to && BRS.includes(inv.to) ? 'โอนให้สาขา ' + inv.to : inv.to ? 'ขายให้ดีลเลอร์ ' + inv.to : 'ขายให้สาขาอื่น/ดีลเลอร์'} · ใบกำกับ ${inv.inv || ''} ${fmtD(inv.idate)}`;
         else if (inv && inv.ddate) why = `ส่งมอบแล้ว ${fmtD(inv.ddate)}`;
         else if (inv) why = `ออกใบกำกับแล้ว ${fmtD(inv.idate)} รอส่งมอบ`;
         else if (moved && moved !== r.br) why = `ย้ายไปสาขา ${moved}`;
@@ -264,6 +266,12 @@ async function saveUploads() {
   // invoices first so stock statuses are right the moment stock lands
   const order = { invoice: 0, quota: 1, booking: 2, stock: 3 };
   for (const r of sel.sort((a, b) => order[a.src] - order[b.src])) {
+    if (r.src === 'stock' && (r.sold || []).some(x => x.other)) {
+      const all = invAllRows(r.br), m = new Map(all.map(x => [invKey(x), x]));
+      invStray(m, r.sold, r.br).forEach(k => m.delete(k));
+      r.sold.filter(x => x.other).forEach(x => { const k = invKey(x), o = m.get(k); m.set(k, o ? { ...o, ...Object.fromEntries(Object.entries(x).filter(([, v]) => v !== null && v !== '')) } : x); });
+      if (!await invStore(r.br, [...m.values()], { asof: null, warn: [] })) { U.busy = false; render(); return; }
+    }
     if (r.src === 'invoice') {
       // merged car by car into what is stored (see invMergeSave)
       if (!await invMergeSave(r)) { U.busy = false; render(); return; }
