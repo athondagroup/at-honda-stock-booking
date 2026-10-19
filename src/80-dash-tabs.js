@@ -97,16 +97,16 @@ Object.assign(ACTIONS, {
 // ---- branches compared on several measures, per month (ตกลง 14/10)
 // The table compares the branches on every measure for the chosen period, each against the comparison period
 // ("เทียบกับ" next to the period buttons). Picking a measure shows it month by month for each branch.
-function bcMetrics() { return [['bk', 'ยอดจองสุทธิ', 'n'], ['cx', 'ยกเลิก', 'n'], ['cxp', '% ยกเลิก', 'p'], ['dv', 'ส่งมอบ', 'n'], ['inv', 'ใบกำกับ', 'n'], ['tr', 'รถเก่าเทิร์น', 'n'], ['finp', '% ไฟแนนซ์', 'p']]; }
+function bcMetrics() { return [['bk', 'ยอดจองสุทธิ', 'n'], ['cx', 'ยกเลิก', 'n'], ['cxp', '% ยกเลิก', 'p'], ['dv', 'ส่งมอบ', 'n'], ['inv', 'ใบกำกับ', 'n'], ['tr', 'รถเก่าเทิร์น', 'n'], ['fin', 'ไฟแนนซ์', 'n'], ['finp', '% ไฟแนนซ์', 'p'], ['cash', 'ซื้อสด', 'n'], ['cashp', '% ซื้อสด', 'p']]; }
 function bcCalc(D, b, f, t) {
   const inR = d => !!d && d >= f && d <= t, at = D.at.filter(a => !a.demo && a.br === b && inR(a.date));
   const bk = at.filter(a => !a.cancelled).length, cx = at.filter(a => a.cancelled).length;
   const cars = k => carListRows(D, { from: f, to: t }, k).filter(r => r.br === b).length;
   const tr = D.at.filter(a => !a.demo && !a.cancelled && (a.delivBr || a.br) === b && pmEvents(a, D).some(([c, d]) => c === 'tr' && inR(d))).length;
-  const fin = at.filter(a => !a.cancelled && !isCash(a.rec)).length;
-  return { bk, cx, cxp: bk + cx ? cx / (bk + cx) * 100 : null, dv: cars('dv'), inv: cars('inv'), tr, finp: bk ? fin / bk * 100 : null };
+  const fin = at.filter(a => !a.cancelled && !isCash(a.rec)).length, cash = bk - fin;
+  return { bk, cx, cxp: bk + cx ? cx / (bk + cx) * 100 : null, dv: cars('dv'), inv: cars('inv'), tr, fin, finp: bk ? fin / bk * 100 : null, cash, cashp: bk ? cash / bk * 100 : null };
 }
-function bcDrillM(k) { return { bk: 'bk', cx: 'cx', cxp: 'cx', dv: 'dv', inv: 'inv', tr: 'tr', finp: 'finbk' }[k] || 'bk'; }
+function bcDrillM(k) { return { bk: 'bk', cx: 'cx', cxp: 'cx', dv: 'dv', inv: 'inv', tr: 'tr', fin: 'finbk', finp: 'finbk', cash: 'cashbk', cashp: 'cashbk' }[k] || 'bk'; }
 function bcFmt(v, kind) { return v === null || v === undefined ? '–' : kind === 'p' ? Math.round(v) + '%' : fmtN(v); }
 function bcDiff(v, p, kind, lowGood) {
   if (v === null || p === null || v === undefined || p === undefined) return '';
@@ -129,9 +129,9 @@ function branchCompare(D, E, page, defMetric) {
   const grid = Object.fromEntries(brs.map(b => [b, ms.map(m => bcCalc(D, b, m + '-01', mEnd(m))[mk])]));
   const chips = `<div class="seg mb-3" role="group" aria-label="เลือกด้านที่จะดูรายเดือน">${M.map(([k, t]) => `<button data-act="bc-metric" data-page="${page}" data-k="${k}" aria-pressed="${mk === k}">${t}</button>`).join('')}</div>`;
   const vizC = ['--viz-1', '--viz-2', '--viz-3', '--viz-4'];
-  const chart = colChart('bc-' + page, ms.map(m => ({ k: m, label: monLabel(m), test: () => true })), brs.map((b, i) => ({ name: b, color: vizC[i % 4], drill: (bb) => ({ m: bcDrillM(mk), br: b, from: bb.k + '-01', to: mEnd(bb.k), label: bb.label }), values: grid[b].map(v => v === null ? 0 : Math.round(v)) })), { label: `${(M.find(([k]) => k === mk) || [])[1]} รายเดือน แยกสาขา` });
+  const chart = colChart('bc-' + page, ms.map(m => ({ k: m, label: monLabel(m), test: () => true })), brs.map((b, i) => ({ name: b, color: vizC[i % 4], drill: (bb) => ({ m: bcDrillM(mk), br: b, from: bb.k + '-01', to: mEnd(bb.k), label: bb.label }), values: grid[b].map(v => v === null ? 0 : Math.round(v)) })), { label: `${(M.find(([k]) => k === mk) || [])[1]} รายเดือน แยกสาขา`, noTable: true, unit: kind === 'p' ? '%' : '' });
   const mtab = `<div class="scroll-x mt-2"><table class="tbl text-sm"><thead><tr><th>สาขา</th>${ms.map(m => `<th class="text-right nowrap">${esc(monLabel(m))}</th>`).join('')}${kind === 'n' ? '<th class="text-right">รวม</th>' : ''}</tr></thead><tbody>
-    ${brs.map(b => `<tr><td class="nowrap">${brName(b)}</td>${grid[b].map((v, i) => `<td class="num text-right">${drillNum(bcFmt(v, kind), v ? { m: bcDrillM(mk), br: b, from: ms[i] + '-01', to: mEnd(ms[i]), label: monLabel(ms[i]) } : null)}</td>`).join('')}${kind === 'n' ? `<td class="num text-right font-semibold">${fmtN(grid[b].reduce((n, v) => n + (v || 0), 0))}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+    ${brs.map(b => `<tr><td class="nowrap" style="position:sticky;left:0;background:var(--surface);z-index:1">${brName(b)}</td>${grid[b].map((v, i) => `<td class="num text-right">${drillNum(bcFmt(v, kind), v ? { m: bcDrillM(mk), br: b, from: ms[i] + '-01', to: mEnd(ms[i]), label: monLabel(ms[i]) } : null)}</td>`).join('')}${kind === 'n' ? `<td class="num text-right font-semibold">${fmtN(grid[b].reduce((n, v) => n + (v || 0), 0))}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
   return `${dCard('เปรียบเทียบสาขา (ทุกด้าน)', tbl)}
   ${dCard('เปรียบเทียบสาขา รายเดือน', chips + chart + mtab, monthsIn(E.from, E.to).length < 2 ? 'ช่วงที่เลือกมีเดือนเดียว จึงแสดง 6 เดือนล่าสุด · เลือก "ปีนี้" หรือ "เลือกช่วงวันที่" เพื่อกำหนดเดือนเอง' : 'เดือนตามช่วงที่เลือกด้านบน')}`;
 }

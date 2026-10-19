@@ -22,7 +22,7 @@ function drillSpecOf(base, b, i, range) {
   return { ...base, from: r[0], to: r[1], label: b.label };
 }
 const DRILL_M = { sales: 'ยอดขาย (ส่งมอบ)', invoiced: 'ยอดขาย (ใบกำกับภาษี)', trades: 'รถเก่าเทิร์น', dv: 'ส่งมอบ', inv: 'ใบกำกับภาษี', bk: 'ยอดจองสุทธิ', cx: 'ยกเลิก', bkall: 'ใบจองทั้งหมด',
-  finbk: 'ใบจองไฟแนนซ์', tr: 'รถเก่าเทิร์น', wait: 'ใบจองรอรถตอนนี้', free: 'รถว่างขายได้ตอนนี้', target: 'เป้า' };
+  finbk: 'ใบจองไฟแนนซ์', cashbk: 'ใบจองซื้อสด', tr: 'รถเก่าเทิร์น', wait: 'ใบจองรอรถตอนนี้', free: 'รถว่างขายได้ตอนนี้', target: 'เป้า' };
 // the rows behind one spec, in one shape: date, branch, model, grade, colour, VIN, customer, sales, finance, invoice, source, booking id
 function drillRows(D, sp) {
   const own = MGR_OF[S.role.role], prev = S.brScope;
@@ -41,6 +41,7 @@ function drillRows(D, sp) {
     else if (sp.m === 'cx') rows = bks().filter(a => a.cancelled).map(bkRow);
     else if (sp.m === 'bkall') rows = bks().map(bkRow);
     else if (sp.m === 'finbk') rows = bks().filter(a => !a.cancelled && !isCash(a.rec)).map(bkRow);
+    else if (sp.m === 'cashbk') rows = bks().filter(a => !a.cancelled && isCash(a.rec)).map(bkRow);
     else if (sp.m === 'tr') rows = D.at.filter(a => !a.demo && !a.cancelled && inBr({ br: a.delivBr || a.br }) && pmEvents(a, D).some(([c, d]) => c === 'tr' && inR(d)))
       .map(a => { const x = (a.rec.flow.down || {}).tradein || {}; return { ...bkRow(a), br: a.delivBr || a.br, date: (pmEvents(a, D).find(e => e[0] === 'tr') || [])[1], src: `${x.brand || ''} ${x.model || ''} ${x.year || ''}`.trim(), extra: x.price ? money(x.price) + ' บาท' : '' }; });
     else if (sp.m === 'wait') rows = D.bookings.filter(b => b.state === 'waiting' && inBr(b)).map(b => ({ date: b.qdate || b.date, br: b.br, model: b.model, grade: b.grade, color: b.color, vin: '', cust: b.cust, sales: b.owner || b.sales, fin: '', inv: '', src: b.src === 'IDS' ? 'IDS' : 'ฟอร์ม AT', id: b.app ? b.app.id : null, extra: b.pos ? 'คิวที่ ' + b.pos : '' }));
