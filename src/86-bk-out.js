@@ -73,11 +73,21 @@ function bkCands(a, D, all) {
   const sorted = list.map(b => ({ b, s: score(b) })).sort((x, y) => y.s - x.s);
   return all ? sorted.map(x => x.b) : sorted.filter(x => x.s >= 7 && salesCanon(x.b.sales || '') === a.sales && x.b.model === a.model).slice(0, 3).map(x => x.b);
 }
+// the web booking has already been paired (same customer name) with another IDS booking that is in IDS now
+function bkOutAuto(o) {
+  const a = o && o.atId && typeof atById === 'function' ? atById(o.atId) : null;
+  return a && !a.cancelled && a.ids && String(a.ids.no) !== String(o.no) ? a.ids : null;
+}
+function bkOutPending(o) { return !!(o && o.flag && !o.res && !bkOutAuto(o)); }
 function bkOutList(u, D) {
   const can = canApproveBr(u.br) && perms().write, F = S.bkOut && S.bkOut.id === u.id ? S.bkOut : { sel: {}, pick: {} };
-  const todo = (u.out || []).filter(o => o.flag && !o.res);
+  const todo = (u.out || []).filter(bkOutPending);
   const row = (o, i) => {
-    const a = o.atId ? atById(o.atId) : null, open = o.flag && !o.res && a && !a.cancelled;
+    const a = o.atId ? atById(o.atId) : null, auto = o.flag && !o.res ? bkOutAuto(o) : null, open = bkOutPending(o) && a && !a.cancelled;
+    if (auto) return `<div class="py-2 border-t border-line"><div class="flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span class="text-muted">${esc(o.sales || '')}</span>
+      <span style="color:var(--good)">ระบบจับคู่กับ IDS ใบใหม่แล้ว: ${esc(auto.no)} · ${esc(auto.cust || '')} · ${specLabel(auto.spec)}</span></div>
+      <div class="text-xs text-muted mt-1">ใบจองในเว็บจับคู่กับใบใหม่นี้แล้ว (ส่วนใหญ่ IDS ออกเลขใบจองใหม่) ไม่ต้องยกเลิก <button class="underline" data-act="at-open" data-id="${esc(a.id)}">เปิด</button>
+      ${can ? ` · <button class="underline" data-act="bkout-relink" data-id="${esc(u.id)}" data-i="${i}" data-key="${esc(auto.key)}">ยืนยัน (บันทึกเลขใหม่ในใบจองและชีต)</button>` : ''}</div></div>`;
     const head = `<div class="flex flex-wrap gap-x-4 items-center">${can && open ? `<input type="checkbox" class="w-4 h-4" data-bkout="${esc(u.id)}" data-i="${i}" ${F.sel[i] ? 'checked' : ''} aria-label="เลือกใบจอง ${esc(o.no)}">` : ''}
       <span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span class="text-muted">${esc(o.sales || '')}</span>
       ${o.res ? `<span style="color:var(--good)">ทำแล้ว: ${esc(o.res.text)}</span><span class="text-xs text-muted">${fmtDT(o.res.at)} ${esc(o.res.role || '')}</span>` : `<span style="color:var(--${o.flag ? 'bad' : 'muted'})">${esc(o.why)}</span>`}</div>`;
@@ -115,7 +125,7 @@ async function bkOutCancel(id, idxs) {
   let n = 0, sheetBad = 0; const done = [];
   try {
     for (const i of idxs) {
-      const o = u0.out[i], a = o && o.atId ? atById(o.atId) : null; if (!a || a.cancelled) continue;
+      const o = u0.out[i], a = o && o.atId ? atById(o.atId) : null; if (!a || a.cancelled || !bkOutPending(o)) continue;
       const r = await saveBk(a.id, 'ยกเลิกใบจอง (หายจาก IDS)', note, x => {
         x.status = 'cancelled'; x.cancelled_at = new Date().toISOString();
         x.cancel = { reason: 'ยกเลิกใน IDS', note, refund: null, ...actor() }; x.change = null;
@@ -129,17 +139,17 @@ async function bkOutCancel(id, idxs) {
   F.sel = {}; toast(`ยกเลิกแล้ว ${n} ใบ${sheetBad ? ` · แก้ชีตไม่ได้ ${sheetBad} ใบ` : ''}`, sheetBad ? 'bad' : 'good'); render();
 }
 Object.assign(ACTIONS, {
-  'bkout-all'(el) { const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id); F.sel = {}; if (el.dataset.v && u) (u.out || []).forEach((o, i) => { if (o.flag && !o.res) F.sel[i] = true; }); render(); },
+  'bkout-all'(el) { const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id); F.sel = {}; if (el.dataset.v && u) (u.out || []).forEach((o, i) => { if (bkOutPending(o)) F.sel[i] = true; }); render(); },
   async 'bkout-cancel'(el) { const o = (S.uploads.get(el.dataset.id) || {}).out?.[Number(el.dataset.i)]; if (!o || !confirm(`ยกเลิกใบจอง ${o.cust || ''} (${o.no}) ในเว็บทันที?`)) return; await bkOutCancel(el.dataset.id, [Number(el.dataset.i)]); },
-  async 'bkout-cancel-sel'(el) { const F = bkOutState(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k]).map(Number); if (!idxs.length || !confirm(`ยกเลิกใบจองที่เลือก ${idxs.length} ใบในเว็บทันที?`)) return; await bkOutCancel(el.dataset.id, idxs); },
+  async 'bkout-cancel-sel'(el) { const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k] && u && bkOutPending(u.out[Number(k)])).map(Number); if (!idxs.length || !confirm(`ยกเลิกใบจองที่เลือก ${idxs.length} ใบในเว็บทันที?`)) return; await bkOutCancel(el.dataset.id, idxs); },
   async 'bkout-other-sel'(el) {
-    const F = bkOutState(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k]).map(Number), note = (F.note || '').trim();
+    const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k] && u && bkOutPending(u.out[Number(k)])).map(Number), note = (F.note || '').trim();
     if (!idxs.length) return; if (!note) { toast('ใส่หมายเหตุก่อน', 'bad'); $('#bko-note')?.focus(); return; }
     if (await bkOutMark(el.dataset.id, idxs, `อื่น ๆ: ${note}`)) { F.sel = {}; toast(`บันทึกแล้ว ${idxs.length} ใบ`); render(); }
   },
   async 'bkout-relink'(el) {
     const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i), o = u && u.out[i], key = el.dataset.key; if (!o || !key || !canApproveBr(u.br)) return;
-    const D = derive(), a = atById(o.atId), b = D.idsOnly.find(x => x.key === key); if (!a || !b) { toast('ไม่พบใบจองนี้แล้ว', 'bad'); return; }
+    const D = derive(), a = atById(o.atId), b = D.idsOnly.find(x => x.key === key) || D.idsB.find(x => x.key === key); if (!a || !b) { toast('ไม่พบใบจองนี้แล้ว', 'bad'); return; }
     if (!confirm(`เปลี่ยนใบจองในเว็บ ${a.cust} → ${b.cust} (IDS ${b.no} ${b.model} ${b.color || ''})?`)) return;
     const res = await bkTakeIds(a, { key: b.key, name: b.cust, model: b.model, grade: b.grade, color: b.color, no: b.no }, 'แก้ไขใบจองตาม IDS ใบใหม่', true);
     if (!res) return;
