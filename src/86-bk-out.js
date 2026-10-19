@@ -17,6 +17,7 @@ function bkSheetSet(rec, f) {
   if ('grade' in f) set[7] = String(f.grade || '').replace(/^e:HEV\s+/i, '');
   if ('color' in f) set[8] = f.color || '';
   if (f.cancel) set[2] = 'ยกเลิก';
+  if (f.uncancel) set[2] = '';
   return set;
 }
 async function bkSheetSync(id, rec, f) {
@@ -120,8 +121,7 @@ async function bkOutCancel(id, idxs) {
         x.cancel = { reason: 'ยกเลิกใน IDS', note, refund: null, ...actor() }; x.change = null;
       });
       if (!r) continue;
-      await releaseFor(a, 'ใบจองยกเลิก (หายจาก IDS)');
-      const st = await bkSheetSync(a.id, r, { cancel: true }); if (st !== 'ok' && st !== 'skip') sheetBad++;
+      await releaseFor(a, 'ใบจองยกเลิก (หายจาก IDS)');   // the sheet's ยกเลิก column is set by saveBk
       n++; done.push(i);
     }
     if (done.length) await bkOutMark(id, done, `ยกเลิกใบจองแล้ว · ${note}`);

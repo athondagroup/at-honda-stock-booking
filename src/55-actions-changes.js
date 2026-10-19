@@ -4,9 +4,17 @@
 async function saveBk(id, act, note, fn, ok = () => true) {
   const r = await claimFresh('bookings', id, ok);
   if (!r) return null;
+  const wasCx = r.status === 'cancelled';
   if (fn(r) === false) return null;
   r.log = [...(r.log || []), { ...actor(), act, note: note || '' }].slice(-40);
-  return (await write('bookings', id, r)) ? r : null;
+  if (!(await write('bookings', id, r))) return null;
+  // a booking cancelled (or put back) anywhere in the web: column ยกเลิก of the form's response sheet follows (ตกลง 19/10)
+  const isCx = r.status === 'cancelled';
+  if (wasCx !== isCx && typeof bkSheetSync === 'function') bkSheetSync(id, r, isCx ? { cancel: true } : { uncancel: true }).then(st => {
+    if (st === 'error' || st === 'off') toast(`ยกเลิกในเว็บแล้ว แต่แก้ชีตไม่สำเร็จ (${r.customer || id})`, 'bad');
+    else if (st === 'notfound') toast(`ไม่พบแถวของ ${r.customer || id} ในชีต จึงไม่ได้ใส่ "ยกเลิก"`, 'bad');
+  });
+  return r;
 }
 const liveLocksOf = a => derive().locks.filter(x => x.live && (x.bkref === a.key || (a.row && x.bkref === a.row.key)));
 async function releaseFor(a, note) {
