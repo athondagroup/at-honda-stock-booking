@@ -208,3 +208,45 @@ document.addEventListener('change', ev => {
   if (t.dataset.diofile) { const f = t.files && t.files[0]; t.value = ''; if (f && S.modal && S.modal.kind === 'dio') dioImport(f); return; }
   if (t.dataset.dioItem !== undefined) { const p = S.modal && S.modal.plan, x = p && p.items[Number(t.dataset.dioItem)]; if (x && x.ok) x.on = t.checked; render(); }
 });
+// ---- one stored IDS table as a spreadsheet: search, sort by any column, download (ตกลง 19/10)
+function idsViewBtn(src, br, inner, has) { return has ? `<button class="text-left w-full rounded hover:bg-surface-2 p-1 -m-1" data-act="ids-view" data-src="${src}" data-br="${br}" title="ดูข้อมูลเป็นตาราง">${inner}<div class="text-xs" style="color:var(--red)">ดูตาราง ›</div></button>` : inner; }
+function idsViewHead() {
+  return { vin: 'VIN', model: 'รุ่น', grade: 'เกรด', color: 'สี', year: 'ปี', note: 'หมายเหตุ', consign: 'ฝากขาย', stockin: 'วันที่เข้าสต็อก', prod: 'ผลิต', ref: 'Quota Ref', bkno: 'เลขที่ใบจอง', bknote: 'หมายเหตุใบจอง',
+    cust: 'ลูกค้า', sold: 'แจ้งขาย', company: 'รถบริษัท', alloc: 'จัดสรร', bkdate: 'วันที่จอง', engine: 'เลขเครื่อง', no: 'เลขที่ใบจอง', date: 'วันที่จอง', sales: 'เซลล์', ids: 'IDS', ws: 'W/S Order',
+    aging: 'อายุ', est: 'ประมาณการ', m: 'เดือน', vnote: 'หมายเหตุ VIN', qty: 'จำนวน', week: 'สัปดาห์', cdate: 'Create date', ndc: 'NDC out', dstock: 'Dealer stock in', otype: 'Order type',
+    inv: 'เลขที่ใบกำกับ', idate: 'วันที่ใบกำกับ', ddate: 'วันที่ส่งมอบ', fin: 'ไฟแนนซ์', other: 'ขายให้สาขาอื่น', archived: 'เก็บสำรอง' };
+}
+function idsViewRows(src, br) {
+  if (src === 'invoice') { const live = unpack(S.ids.get('invoice_' + br)), keys = new Set(live.map(invKey)); return { cols: [...PACK.invoice, 'archived'], rows: [...live, ...invArchiveRows(br, keys).map(r => ({ ...r, archived: true }))] }; }
+  if (src === 'quota') return { cols: PACK.quota, rows: [...S.ids.values()].filter(d => d.src === 'quota' && d.br === br).sort((a, b) => String(a.m).localeCompare(String(b.m))).flatMap(d => unpack(d)) };
+  return { cols: PACK[src], rows: unpack(S.ids.get(idsDocId(src, br))) };
+}
+function idsViewModal(m) {
+  const H = idsViewHead(), { cols, rows } = idsViewRows(m.src, m.br), q = searchKey(m.q || '');
+  const show = c => rows.some(r => r[c] !== null && r[c] !== undefined && r[c] !== '' && r[c] !== false);
+  const C = cols.filter(show), val = v => v === true ? 'Y' : v === false || v === null || v === undefined ? '' : String(v);
+  let list = q ? rows.filter(r => C.some(c => searchKey(val(r[c])).includes(q))) : rows.slice();
+  if (m.sort) { const [c, dir] = m.sort; list.sort((a, b) => (dir ? -1 : 1) * val(a[c]).localeCompare(val(b[c]), 'th', { numeric: true })); }
+  const doc = m.src === 'invoice' ? S.ids.get('invoice_' + m.br) : m.src === 'quota' ? null : S.ids.get(idsDocId(m.src, m.br));
+  return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">${esc(SRC_LABEL[m.src] || m.src)} · ${esc(m.br)}</h2>
+      <div class="text-sm text-muted">${fmtN(rows.length)} แถว${doc ? ` · ข้อมูล ณ ${fmtD(doc.asof)} · ไฟล์ ${esc(doc.file || '')} · อัปโหลด ${fmtDT(doc.at)}` : ''}${m.src === 'invoice' ? ' · รวมรายการเก่าที่เก็บสำรอง' : ''}</div></div>
+    <div class="flex gap-2"><button class="btn btn-dark btn-sm" data-act="ids-view-xlsx">ดาวน์โหลด Excel</button><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div></div>
+  <div class="field mb-2" style="max-width:22rem"><label for="iv-q">ค้นหา (VIN ลูกค้า เซลล์ รุ่น …)</label><input id="iv-q" type="search" data-modal="q" value="${esc(m.q || '')}"></div>
+  <div class="text-xs text-muted mb-1">${q ? `พบ ${fmtN(list.length)} แถว · ` : ''}กดหัวคอลัมน์เพื่อเรียง${list.length > 1000 ? ' · แสดง 1,000 แถวแรก (ดาวน์โหลดเพื่อดูทั้งหมด)' : ''}</div>
+  <div class="border border-line rounded-lg overflow-auto" style="max-height:65vh"><table class="tbl text-xs"><thead><tr><th class="text-right">#</th>${C.map(c => `<th class="nowrap"><button data-act="ids-view-sort" data-c="${c}">${esc(H[c] || c)}${m.sort && m.sort[0] === c ? (m.sort[1] ? ' ▼' : ' ▲') : ''}</button></th>`).join('')}</tr></thead>
+    <tbody>${list.slice(0, 1000).map((r, i) => `<tr><td class="text-right text-muted">${i + 1}</td>${C.map(c => `<td class="nowrap">${esc(val(r[c]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+async function idsViewXlsx() {
+  const m = S.modal; if (!m || m.kind !== 'idsview') return;
+  let X; try { X = await loadXLSX(); } catch (e) { toast('โหลดตัวสร้างไฟล์ Excel ไม่สำเร็จ', 'bad'); return; }
+  const H = idsViewHead(), { cols, rows } = idsViewRows(m.src, m.br), val = v => v === true ? 'Y' : v === false || v === null || v === undefined ? '' : v;
+  const aoa = [cols.map(c => H[c] || c), ...rows.map(r => cols.map(c => val(r[c])))];
+  const wb = X.utils.book_new(), ws = X.utils.aoa_to_sheet(aoa); ws['!cols'] = cols.map(() => ({ wch: 16 })); X.utils.book_append_sheet(wb, ws, (SRC_LABEL[m.src] || m.src).replace('/', '-'));
+  const buf = X.write(wb, { type: 'array', bookType: 'xlsx' });
+  await docSave(docName('IDS', SRC_LABEL[m.src] || m.src, m.br, todayISO()) + '.xlsx', new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+}
+Object.assign(ACTIONS, {
+  'ids-view'(el) { S.modal = { kind: 'idsview', src: el.dataset.src, br: el.dataset.br, q: '', sort: null }; render(); },
+  'ids-view-sort'(el) { const m = S.modal; if (!m) return; const c = el.dataset.c; m.sort = m.sort && m.sort[0] === c ? [c, !m.sort[1]] : [c, false]; render(); },
+  async 'ids-view-xlsx'() { await idsViewXlsx(); }
+});
