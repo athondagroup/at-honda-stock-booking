@@ -117,27 +117,67 @@ async function carListXlsx() {
 }
 
 // ---- invoice history: rows an upload no longer carries are kept in yearly archive docs (ids/invold_<br>_<year>)
-// A new DL file covers only its own date range (and very large files were trimmed), so older invoices would
-// otherwise disappear. Rows the new file has (same invoice no.) are never kept twice.
+// DL tables are merged car by car (ตกลง 19/10): a car already stored is updated, a new car is added, and a car the new
+// file does not have stays as it was (IDS exports one report at a time: "mine" = invoices to customers with the delivery
+// date, "other" = cars sold to other branches, without names). When the new file has no customer/sales name for a car
+// that had one, the person saving chooses each time: keep the old names or take the new (empty) ones.
+// Recent and undelivered invoices live in ids/invoice_<br>; older delivered ones in yearly ids/invold_<br>_<year>.
 function invArchiveDocs(br) { return [...S.ids.entries()].filter(([k]) => k.startsWith(`invold_${br}_`)).map(([, d]) => d); }
-function invArchiveRows(br, liveKeys) { return invArchiveDocs(br).flatMap(d => unpack({ cols: PACK.invoice, rows: d.rows || [] })).filter(r => !liveKeys.has(invKey(r))); }
-function invKey(r) { return String(r.inv || '').replace(/^0+/, '') + '|' + String(r.vin || ''); }
-// called before an invoice table is saved: what the old doc had and the new one lacks goes to the archive
-async function invArchive(br, newRows, cutRows = []) {
-  const cur = S.ids.get('invoice_' + br);
-  const keep = new Set(newRows.map(invKey)), minNew = newRows.map(r => r.idate).filter(Boolean).sort()[0] || null;
-  // only rows older than the new file's first invoice date: inside its range a missing row means a cancelled invoice
-  const old = [...(cur ? unpack(cur).filter(r => !keep.has(invKey(r)) && r.idate && (!minNew || r.idate < minNew)) : []), ...cutRows.filter(r => r.idate && !keep.has(invKey(r)))];
-  if (!old.length) return true;
-  const byY = {}; old.forEach(r => { (byY[r.idate.slice(0, 4)] ||= []).push(r); });
-  for (const [y, rs] of Object.entries(byY)) {
-    const id = `invold_${br}_${y}`, prev = S.ids.get(id), have = prev ? unpack({ cols: PACK.invoice, rows: prev.rows || [] }) : [];
-    const m = new Map(have.map(r => [invKey(r), r])); rs.forEach(r => m.set(invKey(r), r));
-    const all = [...m.values()].sort((a, b) => (a.idate || '').localeCompare(b.idate || ''));
-    const doc = { src: 'invold', br, y: Number(y), n: all.length, cols: PACK.invoice, rows: all.map(r => PACK.invoice.map(c => r[c] ?? null)), ...actor() };
-    if (!await write('ids', id, doc)) return false;
+function invArchiveRows(br, liveKeys) { return invArchiveDocs(br).flatMap(d => unpack({ cols: d.cols || PACK.invoice, rows: d.rows || [] })).filter(r => !liveKeys.has(invKey(r))); }
+function invKey(r) { return (r.other ? 'o|' : 'm|') + (r.vin || 'inv:' + String(r.inv || '').replace(/^0+/, '')); }
+function invAllRows(br) { const live = unpack(S.ids.get('invoice_' + br)); return [...live, ...invArchiveRows(br, new Set(live.map(invKey)))]; }
+function invNoName(r) { return !r.cust && !r.sales; }
+function invSame(a, b) { const n = v => String(v ?? '').replace(/^0+/, '').trim(); return ['inv', 'idate', 'ddate', 'cust', 'sales', 'fin', 'no'].every(k => n(a[k]) === n(b[k])); }
+// nameless customer rows that were really an earlier "other" file saved before the two kinds were told apart
+function invStray(m, rows) { const vins = new Set(rows.map(x => x.vin)); return [...m.entries()].filter(([, o]) => !o.other && invNoName(o) && vins.has(o.vin)).map(([k]) => k); }
+function invDiff(r) {
+  const other = r.kind === 'other', m = new Map(invAllRows(r.br).map(x => [invKey(x), x]));
+  const rows = r.rows.map(x => ({ ...x, other: other || null }));
+  const stray = other ? invStray(m, rows) : [];
+  stray.forEach(k => m.delete(k));
+  let add = 0, upd = 0, same = 0; const lost = [];
+  rows.forEach(x => {
+    const o = m.get(invKey(x));
+    if (!o) { add++; return; }
+    if (invSame(x, o)) same++; else upd++;
+    if (invNoName(x) && !invNoName(o)) lost.push({ vin: x.vin, cust: o.cust, sales: o.sales });
+  });
+  const keys = new Set(rows.map(invKey));
+  return { prevN: m.size + stray.length, add, upd, same, keep: [...m.keys()].filter(k => !keys.has(k)).length, lost, stray: stray.length };
+}
+async function invMergeSave(r) {
+  const other = r.kind === 'other', m = new Map(invAllRows(r.br).map(x => [invKey(x), x]));
+  if (other) invStray(m, r.rows).forEach(k => m.delete(k));
+  for (const x0 of r.rows) {
+    const x = { ...x0, other: other || null }, k = invKey(x), o = m.get(k);
+    if (o) {
+      if (invNoName(x) && !invNoName(o) && r.nameChoice === 'old') ['cust', 'sales', 'no', 'fin'].forEach(c => { if (!x[c]) x[c] = o[c]; });
+      if (!x.ddate && o.ddate) x.ddate = o.ddate; // a delivery already recorded is not undone by a file that lacks it
+    }
+    m.set(k, x);
   }
-  return true;
+  const rows = [...m.values()].sort((a, b) => (b.idate || '').localeCompare(a.idate || ''));
+  const cur = S.ids.get('invoice_' + r.br) || {};
+  const asof = [cur.asof, r.asof].filter(Boolean).sort().at(-1) || todayISO();
+  const mk = list => ({ src: 'invoice', br: r.br, m: null, asof, file: r.file, sheet: r.sheet, n: list.length, ...pack('invoice', list), warn: r.warn.slice(0, 20), ...actor() });
+  let days = 240, live, old, doc;
+  for (;;) {
+    const cut = addDays(todayISO(), -days);
+    live = rows.filter(x => !x.idate || x.idate >= cut || !x.ddate); old = rows.filter(x => !(!x.idate || x.idate >= cut || !x.ddate));
+    doc = mk(live);
+    if (utf8len(doc) <= 240000 || days <= 20) break;
+    days = Math.floor(days / 2);
+  }
+  if (utf8len(doc) > 250000) { toast(`ตาราง DL ${r.br} ใหญ่เกินที่เก็บได้`, 'bad'); return false; }
+  const byY = {}; old.forEach(x => { (byY[(x.idate || '0000').slice(0, 4)] ||= []).push(x); });
+  const years = new Set([...Object.keys(byY), ...invArchiveDocs(r.br).map(d => String(d.y))]);
+  for (const y of years) {
+    const rs = (byY[y] || []).sort((a, b) => (a.idate || '').localeCompare(b.idate || ''));
+    const id = `invold_${r.br}_${y}`;
+    if (!rs.length && !S.ids.get(id)) continue;
+    if (!await write('ids', id, { src: 'invold', br: r.br, y: Number(y), n: rs.length, cols: PACK.invoice, rows: rs.map(x => PACK.invoice.map(c => x[c] ?? null)), ...actor() })) return false;
+  }
+  return await write('ids', 'invoice_' + r.br, doc);
 }
 Object.assign(ACTIONS, {
   'pm-cell'(el) { S.modal = { kind: 'pm', who: el.dataset.who, y: el.dataset.y, m: el.dataset.m || '', c: el.dataset.c }; render(); },

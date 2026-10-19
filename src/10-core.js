@@ -139,6 +139,7 @@ const canApproveBr = br => perms().approve && !!br && mgrBranches().includes(br)
 // allocating a car: the branch admin, or the manager of that branch
 const canAllocBr = br => (S.role.role === 'admin' && br === S.role.branch) || canApproveBr(br);
 function custCell(name, sales, o = {}) {
+  if (o.other) return chip('ขายให้สาขาอื่น', 'muted');
   if (o.company) return chip('รถบริษัท', 'muted');
   if (!name) return `<span class="text-muted">${o.seed ? 'ไม่มีชื่อ (ข้อมูลตัวอย่าง)' : '–'}</span>`;
   if (S.role.role === 'sales' && sales !== S.role.sales) return '<span class="text-muted">ลูกค้าของเซลล์อื่น</span>';

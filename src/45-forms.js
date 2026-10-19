@@ -352,12 +352,12 @@ function viewUploadBase(D) {
           <td><b>${esc(r.br || '?')}</b></td>
           <td>${r.error ? '–' : `<input type="date" data-upl-date="${i}" value="${esc(r.asof || '')}" max="${todayISO()}" style="background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 6px">`}</td>
           <td class="num text-right">${r.rows.length}</td>
-          <td class="text-xs">${r.diff ? `เดิม ${r.diff.prevN} → ใหม่ ${r.rows.length}${r.src === 'stock' ? `<div>ออก <b>${r.diff.out.length}</b> · เข้าใหม่ <b>${r.diff.inN}</b>${r.diff.out.filter(o => o.flag).length ? ` · <span style="color:var(--bad)">ไม่พบข้อมูล ${r.diff.out.filter(o => o.flag).length}</span>` : ''}</div>` : ''}${r.diff.baseSample ? '<div class="text-muted">(เทียบกับข้อมูลตัวอย่าง)</div>' : ''}` : '–'}</td>
+          <td class="text-xs">${r.src === 'invoice' && r.diff && !r.error ? uplInvCell(r, i) : r.diff ? `เดิม ${r.diff.prevN} → ใหม่ ${r.rows.length}${r.src === 'stock' ? `<div>ออก <b>${r.diff.out.length}</b> · เข้าใหม่ <b>${r.diff.inN}</b>${r.diff.out.filter(o => o.flag).length ? ` · <span style="color:var(--bad)">ไม่พบข้อมูล ${r.diff.out.filter(o => o.flag).length}</span>` : ''}</div>` : ''}${r.diff.baseSample ? '<div class="text-muted">(เทียบกับข้อมูลตัวอย่าง)</div>' : ''}` : '–'}</td>
           <td class="text-xs">${r.error ? `<span style="color:var(--bad)">${esc(r.error)}</span>` : ''}${r.block ? `<div style="color:var(--bad)">${esc(r.block)}</div>` : ''}${r.older ? `<div style="color:var(--warn)">${esc(r.older)}</div>` : ''}${r.note ? `<div class="text-muted">${esc(r.note)}</div>` : ''}${r.warn.slice(0, 3).map(w => `<div style="color:var(--warn)">${esc(w)}</div>`).join('')}${r.warn.length > 3 ? `<div class="text-muted">และอีก ${r.warn.length - 3} ข้อ</div>` : ''}</td></tr>`).join('')}</tbody></table></div>
       <div class="flex flex-wrap gap-3 items-center mt-3">
-        <button class="btn btn-red" data-act="upl-save" ${sel.length && !U.busy ? '' : 'disabled'}>${U.busy ? '<span class="spin"></span> กำลังบันทึก…' : `บันทึก ${sel.length} ตาราง`}</button>
+        <button class="btn btn-red" data-act="upl-save" ${sel.length && !U.busy && !sel.some(uplNeedsChoice) ? '' : 'disabled'}>${U.busy ? '<span class="spin"></span> กำลังบันทึก…' : `บันทึก ${sel.length} ตาราง`}</button>
         <button class="btn btn-ghost" data-act="upl-clear">ล้าง</button>
-        <span class="text-xs text-muted">ตาราง Stock ที่บันทึกจะเก็บประวัติรถที่ออกและเข้าไว้ด้านล่าง</span></div>
+        <span class="text-xs text-muted">${sel.some(uplNeedsChoice) ? '<span style="color:var(--bad)">ตาราง DL: เลือกก่อนว่าจะใช้ชื่อเดิมหรือข้อมูลใหม่</span>' : 'ตาราง Stock ที่บันทึกจะเก็บประวัติรถที่ออกและเข้าไว้ด้านล่าง'}</span></div>
     </div>` : ''}
   </section>
   ${brSeg()}

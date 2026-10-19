@@ -287,6 +287,8 @@ const IDS = (() => {
       }
       const ds = res.rows.flatMap(x => [x.idate, x.ddate]).filter(d => d && d <= todayISO()).sort();
       res.asof = ds.at(-1) || null;
+      // IDS "other" report (cars sold to other branches) has no customer or sales names
+      res.noCust = res.rows.length > 0 && !res.rows.some(x => x.cust || x.sales);
     }
   };
 
@@ -444,7 +446,7 @@ const PACK = {
   stock: ['vin', 'model', 'grade', 'color', 'year', 'note', 'consign', 'stockin', 'prod', 'ref', 'bkno', 'bknote', 'cust', 'sold', 'company', 'alloc', 'bkdate', 'engine'],
   booking: ['no', 'date', 'model', 'grade', 'color', 'year', 'sales', 'ids', 'vin', 'ref', 'ws', 'cust', 'alloc', 'aging', 'est'],
   quota: ['ref', 'm', 'model', 'grade', 'color', 'vin', 'vnote', 'qty', 'week', 'cdate', 'ndc', 'dstock', 'ws', 'otype'],
-  invoice: ['inv', 'idate', 'ddate', 'vin', 'no', 'cust', 'sales', 'fin', 'company', 'model', 'grade', 'color']
+  invoice: ['inv', 'idate', 'ddate', 'vin', 'no', 'cust', 'sales', 'fin', 'company', 'model', 'grade', 'color', 'other']
 };
 const pack = (src, rows) => ({ cols: PACK[src], rows: rows.map(r => PACK[src].map(c => r[c] ?? null)) });
 const unpack = doc => !doc || !doc.cols ? [] : doc.rows.map(r => { const o = {}; doc.cols.forEach((c, i) => { o[c] = r[i] ?? null; }); return o; });
@@ -468,9 +470,10 @@ function idsData() {
     if (qs.length) qs.forEach(q => unpack(q).forEach(r => d.quota.push({ ...r, br: b })));
     else SEED.quota.filter(x => x.br === b).forEach(x => d.quota.push({ ...x, seed: true }));
     const live = dl ? unpack(dl) : [];
-    live.forEach(r => d.inv.push({ ...r, br: b }));
+    // a car sold to another branch (IDS "other" report) is kept like a company invoice: not a retail sale
+    live.forEach(r => d.inv.push({ ...r, br: b, company: r.company || !!r.other }));
     // older invoices kept from earlier DL files (ids/invold_<br>_<year>)
-    invArchiveRows(b, new Set(live.map(invKey))).forEach(r => d.inv.push({ ...r, br: b, archived: true }));
+    invArchiveRows(b, new Set(live.map(invKey))).forEach(r => d.inv.push({ ...r, br: b, archived: true, company: r.company || !!r.other }));
   }
   CATALOG = buildCatalog([d.cars, d.quota, d.bookings, SEED.cars, SEED.quota, ...catalogLists()]);
   BOOK_CATALOG = buildBookCatalog(d);

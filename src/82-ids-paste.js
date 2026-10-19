@@ -78,3 +78,16 @@ document.addEventListener('paste', ev => {
   ev.preventDefault(); t.value = '';
   idsPasteRead(text);
 });
+// the check-list cell of a DL table: which IDS report it is, what changes car by car, and the name question
+function uplInvCell(r, i) {
+  const d = r.diff, lost = d.lost || [];
+  const kind = `<select data-upl-kind="${i}" class="text-xs mb-1" aria-label="ชนิดรายงาน DL" style="background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:3px 6px">
+      <option value="mine" ${r.kind !== 'other' ? 'selected' : ''}>ขายให้ลูกค้า (Mine)</option><option value="other" ${r.kind === 'other' ? 'selected' : ''}>จำหน่ายให้สาขาอื่น (Other)</option></select>`;
+  const nums = `<div>เพิ่มใหม่ <b>${fmtN(d.add)}</b> · อัปเดต <b>${fmtN(d.upd)}</b> · ไม่เปลี่ยน ${fmtN(d.same)}</div>
+    <div class="text-muted">คันเดิมที่ไม่อยู่ในไฟล์นี้ ${fmtN(d.keep)} คัน เก็บไว้เหมือนเดิม${d.stray ? ` · ย้าย ${fmtN(d.stray)} คันที่เคยบันทึกเป็นขายลูกค้า (ไม่มีชื่อ) มาเป็นจำหน่ายให้สาขาอื่น` : ''}</div>`;
+  const ask = lost.length ? `<div class="mt-2 p-2 rounded" style="background:var(--warn-soft)"><b style="color:var(--warn)">${fmtN(lost.length)} คันในไฟล์นี้ไม่มีชื่อลูกค้า/เซลล์ แต่ข้อมูลเดิมมี</b>
+      <div class="flex flex-wrap gap-3 mt-1"><label class="inline-flex items-center gap-1"><input type="radio" name="uplname${i}" value="old" data-upl-name="${i}" ${r.nameChoice === 'old' ? 'checked' : ''}> ใช้ชื่อเดิม</label>
+      <label class="inline-flex items-center gap-1"><input type="radio" name="uplname${i}" value="new" data-upl-name="${i}" ${r.nameChoice === 'new' ? 'checked' : ''}> ใช้ข้อมูลใหม่ (ไม่มีชื่อ)</label></div>
+      <details class="mt-1"><summary class="cursor-pointer">ดูรายคัน</summary>${lost.slice(0, 50).map(x => `<div class="code">${esc(x.vin || '')} · ${esc(x.cust || '–')} · ${esc(x.sales || '–')}</div>`).join('')}${lost.length > 50 ? `<div>และอีก ${lost.length - 50} คัน</div>` : ''}</details></div>` : '';
+  return kind + nums + ask;
+}

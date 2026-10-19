@@ -222,11 +222,12 @@ function prepareUploads(results) {
     r.on = !r.error;
     if (r.error) continue;
     if (myBranch() && r.br !== myBranch()) { r.block = `แอดมินอัปโหลดได้เฉพาะสาขา ${myBranch()}`; r.on = false; continue; }
-    const keys = r.src === 'quota' ? r.months.map(m => idsDocId('quota', r.br, m)) : [idsDocId(r.src, r.br)];
+    if (r.src === 'invoice' && !r.kind) r.kind = r.noCust ? 'other' : 'mine';
+    const keys = r.src === 'quota' ? r.months.map(m => idsDocId('quota', r.br, m)) : r.src === 'invoice' ? [idsDocId(r.src, r.br) + ':' + r.kind] : [idsDocId(r.src, r.br)];
     if (keys.some(k => seen.has(k))) { r.block = 'ซ้ำกับตารางก่อนหน้าในชุดนี้ ระบบใช้ตารางแรก'; r.on = false; continue; }
     keys.forEach(k => seen.add(k));
     const cur = r.src === 'quota' ? null : S.ids.get(keys[0]);
-    if (cur && r.asof && cur.asof && r.asof < cur.asof) { r.older = `ไฟล์นี้เก่ากว่าข้อมูลที่ใช้อยู่ (ณ ${fmtD(cur.asof)}) จึงไม่ได้เลือกไว้`; r.on = false; }
+    if (cur && r.src !== 'invoice' && r.asof && cur.asof && r.asof < cur.asof) { r.older = `ไฟล์นี้เก่ากว่าข้อมูลที่ใช้อยู่ (ณ ${fmtD(cur.asof)}) จึงไม่ได้เลือกไว้`; r.on = false; }
     if (!r.asof) r.asof = todayISO();
     if (r.src === 'stock') {
       const prev = X.cars.filter(c => c.br === r.br), now = new Set(r.rows.map(c => c.vin)), prevSet = new Set(prev.map(c => c.vin));
@@ -246,27 +247,32 @@ function prepareUploads(results) {
       r.diff = { prevN: prev.length, out, inN: r.rows.filter(c => !prevSet.has(c.vin)).length, baseSample: !X.src[r.br].stock };
     } else if (r.src === 'booking') r.diff = { prevN: X.bookings.filter(b => b.br === r.br).length, baseSample: !X.src[r.br].booking };
     else if (r.src === 'quota') r.diff = { prevN: X.quota.filter(q => q.br === r.br && r.months.includes(q.m)).length, baseSample: !X.src[r.br].quota.length };
-    else r.diff = { prevN: X.inv.filter(i => i.br === r.br).length };
+    else { r.diff = invDiff(r); r.nameChoice = r.diff.lost.length ? (r.nameChoice || null) : null; }
   }
 }
+function uplNeedsChoice(r) { return r.src === 'invoice' && r.diff && r.diff.lost && r.diff.lost.length && !r.nameChoice; }
 async function saveUploads() {
   const U = S.upl, sel = U.results.filter(r => r.on && !r.error && !r.block);
   if (!sel.length) return;
+  if (sel.some(uplNeedsChoice)) { toast('เลือกก่อนว่าจะใช้ชื่อลูกค้า/เซลล์เดิม หรือข้อมูลใหม่ (ตาราง DL)', 'bad'); render(); return; }
   U.busy = true; render();
   let ok = 0;
   // invoices first so stock statuses are right the moment stock lands
   const order = { invoice: 0, quota: 1, booking: 2, stock: 3 };
   for (const r of sel.sort((a, b) => order[a.src] - order[b.src])) {
+    if (r.src === 'invoice') {
+      // merged car by car into what is stored (see invMergeSave)
+      if (!await invMergeSave(r)) { U.busy = false; render(); return; }
+      await write('uploads', newId('uploads'), { src: r.src, br: r.br, m: null, asof: r.asof, file: r.file, sheet: r.sheet, n: r.rows.length, kind: r.kind,
+        prevN: r.diff ? r.diff.prevN : null, add: r.diff ? r.diff.add : 0, upd: r.diff ? r.diff.upd : 0, names: r.diff && r.diff.lost.length ? r.nameChoice : null, out: [], inN: 0, ...actor() });
+      ok++; continue;
+    }
     const parts = r.src === 'quota' ? r.months.map(m => ({ id: idsDocId('quota', r.br, m), m, rows: r.rows.filter(x => x.m === m) })) : [{ id: idsDocId(r.src, r.br), m: null, rows: r.rows }];
     for (const part of parts) {
       let rows = part.rows;
       const mk = () => ({ src: r.src, br: r.br, m: part.m, asof: r.asof, file: r.file, sheet: r.sheet, n: rows.length, ...pack(r.src, rows), warn: r.warn.slice(0, 20), ...actor() });
       let doc = mk();
-      let cutRows = [];
-      if (utf8len(doc) > 240000 && r.src === 'invoice') { const cut = addDays(r.asof, -180); cutRows = rows.filter(x => !(!x.idate || x.idate >= cut || !x.ddate)); rows = rows.filter(x => !x.idate || x.idate >= cut || !x.ddate); doc = mk(); }
       if (utf8len(doc) > 250000) { toast(`ตาราง ${SRC_LABEL[r.src]} ${r.br} ใหญ่เกินที่ต้นแบบเก็บได้`, 'bad'); continue; }
-      // invoices the new file no longer carries are kept in yearly archives, so history does not disappear
-      if (r.src === 'invoice' && !await invArchive(r.br, rows, cutRows)) { U.busy = false; render(); return; }
       if (!await write('ids', part.id, doc)) { U.busy = false; render(); return; }
       await write('uploads', newId('uploads'), { src: r.src, br: r.br, m: part.m, asof: r.asof, file: r.file, sheet: r.sheet, n: rows.length,
         prevN: r.diff ? r.diff.prevN : null, out: r.src === 'stock' ? (r.diff?.out || []).slice(0, 300) : [], inN: r.diff?.inN || 0, ...actor() });
@@ -984,6 +990,8 @@ document.addEventListener('change', async ev => {
     render(); return;
   }
   if (t.dataset.uplOn !== undefined) { const r = S.upl.results[Number(t.dataset.uplOn)]; if (r) r.on = t.checked; render(); return; }
+  if (t.dataset.uplKind !== undefined) { const r = S.upl.results[Number(t.dataset.uplKind)]; if (r) { r.kind = t.value; r.nameChoice = null; r.diff = invDiff(r); } render(); return; }
+  if (t.dataset.uplName !== undefined) { const r = S.upl.results[Number(t.dataset.uplName)]; if (r) r.nameChoice = t.value; render(); return; }
   if (t.dataset.uplDate !== undefined) { const r = S.upl.results[Number(t.dataset.uplDate)]; if (r && t.value) r.asof = t.value; return; }
   if (t.dataset.filter && RERENDER_ON_CHANGE.has(t.dataset.filter)) { S.filters[t.dataset.filter] = t.value; softRender(); return; }
   // let focus move to the next field first, then redraw and keep it there
