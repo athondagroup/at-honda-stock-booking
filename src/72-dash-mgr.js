@@ -36,12 +36,12 @@ function tgtSeries(E) {
 }
 function tgtChart(E, id) {
   const T = tgtSeries(E), has = T.tv.some(Boolean);
-  const chart = colChart(id, T.bk, [{ name: 'เป้า (ใบกำกับ)', color: '--viz-1', values: T.tv }, { name: 'ยอดขาย (ใบกำกับภาษี)', color: '--viz-3', values: T.iv }], { label: 'เป้าเทียบยอดใบกำกับภาษี' });
+  const chart = colChart(id, T.bk, [{ name: 'เป้า (ใบกำกับ)', color: '--viz-1', values: T.tv }, { name: 'ยอดขาย (ใบกำกับภาษี)', color: '--viz-3', values: T.iv, drill: { m: 'invoiced' } }], { range: [E.from, E.to], label: 'เป้าเทียบยอดใบกำกับภาษี' });
   const pr = `<div class="scroll-x"><table class="tbl text-sm mt-2"><thead><tr><th></th>${T.bk.map(b => `<th class="text-right">${esc(b.label)}</th>`).join('')}</tr></thead><tbody><tr><td class="nowrap">% ทำได้</td>${T.tv.map((t, i) => `<td class="num text-right" ${t && T.iv[i] < t ? 'style="color:var(--bad)"' : t ? 'style="color:var(--good)"' : ''}>${t ? pctOf(T.iv[i], t) + '%' : '–'}</td>`).join('')}</tr></tbody></table></div>`;
   return chart + pr + (has ? '' : `<p class="text-sm mt-2" style="color:var(--warn)">ยังไม่ได้ใส่เป้าของช่วงนี้${tgtCanEdit() ? ' กด "ใส่ / แก้เป้า"' : ''}</p>`);
 }
 function bookDelivChart(E, id) {
-  return colChart(id, E.buckets, [{ name: 'ยอดจอง', color: '--viz-1', values: E.buckets.map(b => E.count(E.booked, b)) }, { name: 'ยอดขาย (ส่งมอบ)', color: '--viz-2', values: E.buckets.map(b => E.count(E.sales, b)) }], { label: 'ยอดจองเทียบยอดส่งมอบ' });
+  return colChart(id, E.buckets, [{ name: 'ยอดจอง', color: '--viz-1', drill: { m: 'bk' }, values: E.buckets.map(b => E.count(E.booked, b)) }, { name: 'ยอดขาย (ส่งมอบ)', color: '--viz-2', drill: { m: 'sales' }, values: E.buckets.map(b => E.count(E.sales, b)) }], { range: [E.from, E.to], label: 'ยอดจองเทียบยอดส่งมอบ' });
 }
 // this month: target, invoices so far, projection and the pace needed (invoices only reach as far as the DL file)
 function monthPace(D, E) {
@@ -73,7 +73,7 @@ function dashSalesTarget(D) {
   ${dashTabs()}${periodBar(E)}
   ${tiles([
     tile(`เป้าเดือนนี้ (${monLabel(P.m)})`, P.t ? fmtN(P.t) : '–', { sub2: P.t ? 'คัน ใบกำกับภาษี' : 'ยังไม่ได้ใส่เป้า' }),
-    tile('ใบกำกับเดือนนี้', fmtN(P.inv), { tone: P.t ? (P.inv >= P.t ? 'good' : '') : '', sub2: P.t ? `ทำได้ ${pctOf(P.inv, P.t)}% · ขาด ${fmtN(Math.max(0, P.t - P.inv))} คัน` : (P.asof ? `DL ถึง ${fmtD(P.asof)}` : 'ยังไม่มี DL ของเดือนนี้') }),
+    tile('ใบกำกับเดือนนี้', fmtN(P.inv), { drill: { m: 'invoiced', from: P.m + '-01', to: D.today }, tone: P.t ? (P.inv >= P.t ? 'good' : '') : '', sub2: P.t ? `ทำได้ ${pctOf(P.inv, P.t)}% · ขาด ${fmtN(Math.max(0, P.t - P.inv))} คัน` : (P.asof ? `DL ถึง ${fmtD(P.asof)}` : 'ยังไม่มี DL ของเดือนนี้') }),
     tile('คาดการณ์สิ้นเดือน', P.proj === null ? '–' : fmtN(P.proj), { tone: P.t && P.proj !== null ? (P.proj >= P.t ? 'good' : 'bad') : '', sub2: P.asof ? `ตามอัตราถึง ${fmtD(P.asof)}` : 'ต้องอัปโหลด DL เดือนนี้' }),
     tile('ต้องออกใบกำกับต่อวัน', P.need === null ? '–' : fmtN(P.need), { sub2: P.need === null ? '' : `อีก ${P.left} วันรวมวันนี้${P.asof && P.asof < D.today ? ` · ใบกำกับนับถึง ${fmtD(P.asof)}` : !P.asof ? ' · ยังไม่มี DL เดือนนี้' : ''}` }),
     tile('ออกใบกำกับแล้ว ยังไม่ส่งมอบ', fmtN(W.length), { tone: W.some(w => w.age > 14) ? 'warn' : '', sub2: `เกิน 14 วัน ${fmtN(W.filter(w => w.age > 14).length)} คัน` })
@@ -84,12 +84,12 @@ function dashSalesTarget(D) {
   </div>
   <div class="grid lg:grid-cols-2 gap-5 mb-5">
     ${dCard('แยกสาขา', `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>สาขา</th><th class="text-right">เป้า</th><th class="text-right">ใบกำกับ</th><th class="text-right">% เป้า</th><th class="text-right">ส่งมอบ</th><th class="text-right">จอง</th></tr></thead><tbody>
-      ${brRows.map(r => `<tr><td><b>${r.b}</b> <span class="text-xs text-muted">${BR[r.b].name}</span></td><td class="num text-right">${r.t ? fmtN(r.t) : '–'}</td><td class="num text-right font-semibold">${fmtN(r.i)}</td><td class="num text-right">${pctCell(r.it, r.t)}</td><td class="num text-right">${fmtN(r.d)}</td><td class="num text-right">${fmtN(r.bk)}</td></tr>`).join('')}</tbody></table></div>`, '% เป้า นับเฉพาะใบกำกับในเดือนที่มีเป้า')}
+      ${brRows.map(r => `<tr><td><b>${r.b}</b> <span class="text-xs text-muted">${BR[r.b].name}</span></td><td class="num text-right">${r.t ? fmtN(r.t) : '–'}</td><td class="num text-right font-semibold">${drillNum(r.i, { m: 'invoiced', br: r.b, from: E.from, to: E.to })}</td><td class="num text-right">${pctCell(r.it, r.t)}</td><td class="num text-right">${drillNum(r.d, { m: 'sales', br: r.b, from: E.from, to: E.to })}</td><td class="num text-right">${drillNum(r.bk, { m: 'bk', br: r.b, from: E.from, to: E.to })}</td></tr>`).join('')}</tbody></table></div>`, '% เป้า นับเฉพาะใบกำกับในเดือนที่มีเป้า')}
     ${dCard('ออกใบกำกับแล้ว ยังไม่ส่งมอบ', `<div class="flex flex-wrap gap-2 mb-2 text-sm">${ageB.map(a => `<span class="inline-flex items-center gap-1">${chip(a.l, a.bad && a.n ? 'warn' : 'neutral')}<b class="num">${a.n}</b></span>`).join('')}</div>
       <div class="border border-line rounded-lg divide-y divide-line max-h-72 overflow-auto">${W.slice(0, 30).map(w => `<div class="p-2 px-3 text-sm flex flex-wrap gap-x-3 items-center">${w.vin ? vinLink({ vin: w.vin }) : '<span class="text-muted">ไม่มีเลขตัวถัง</span>'}<span>${esc(w.model || '')} ${esc(gradeShort(w.model, w.grade) || '')}</span><span class="text-muted">${esc(w.br)} · ใบกำกับ ${fmtD(w.idate)}${isSales() ? '' : ` · ${esc(w.cust || '')}`} · ${esc(w.sales || '')}</span><span class="ml-auto flex items-center gap-2"><span class="num ${w.age > 14 ? 'font-semibold' : ''}" ${w.age > 14 ? 'style="color:var(--warn)"' : ''}>${w.age} วัน</span>${w.vin ? delivBtn(carAny(w.vin, D) || { vin: w.vin }, D) : ''}</span></div>`).join('') || '<div class="p-3 text-sm text-muted">ไม่มี</div>'}</div>`, 'กด "ส่งมอบ" เพื่อบันทึกการส่งมอบก่อนอัปเดตไฟล์ IDS · รายการเดียวกันอยู่ที่หน้าสต็อกด้วย')}
   </div>
   ${dCard(`แยกรุ่น <span class="text-muted text-sm font-normal">เป้า ${fmtN(tT)} · ใบกำกับในเดือนที่มีเป้า ${fmtN(tIt)} (${tT ? pctOf(tIt, tT) + '%' : '–'}) · ใบกำกับทั้งช่วง ${fmtN(tI)}</span>`, `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>รุ่น</th><th class="text-right">เป้า</th><th class="text-right">ใบกำกับ</th><th class="text-right">% เป้า</th><th class="text-right">ส่งมอบ</th><th class="text-right">จอง</th></tr></thead><tbody>
-    ${mrow.map(r => `<tr><td class="nowrap">${esc(r.md)}</td><td class="num text-right">${r.t ? fmtN(r.t) : '–'}</td><td class="num text-right font-semibold">${fmtN(r.i)}</td><td class="num text-right">${pctCell(r.it, r.t)}</td><td class="num text-right">${fmtN(r.d)}</td><td class="num text-right">${fmtN(r.b)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ไม่มีข้อมูลในช่วงนี้</td></tr>'}</tbody></table></div>`)}
+    ${mrow.map(r => `<tr><td class="nowrap">${esc(r.md)}</td><td class="num text-right">${r.t ? fmtN(r.t) : '–'}</td><td class="num text-right font-semibold">${drillNum(r.i, { m: 'invoiced', model: r.md, from: E.from, to: E.to })}</td><td class="num text-right">${pctCell(r.it, r.t)}</td><td class="num text-right">${drillNum(r.d, { m: 'sales', model: r.md, from: E.from, to: E.to })}</td><td class="num text-right">${drillNum(r.b, { m: 'bk', model: r.md, from: E.from, to: E.to })}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ไม่มีข้อมูลในช่วงนี้</td></tr>'}</tbody></table></div>`)}
   ${salesCompare(D, E)}
   ${carListCard(D, E)}
   ${(A => `<div class="grid lg:grid-cols-2 gap-5 my-5">${A.lead}${A.old}${A.idle}</div>${A.trade}`)(dashAna(D, true))}`;
