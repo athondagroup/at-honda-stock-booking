@@ -239,7 +239,8 @@ function prepareUploads(results) {
         const moved = batchStock.get(c.vin) || X.cars.find(x => x.vin === c.vin && x.br !== r.br)?.br;
         const veh = S.vehicles.get(c.vin);
         let why, flag = false;
-        if (inv && inv.ddate) why = `ส่งมอบแล้ว ${fmtD(inv.ddate)}`;
+        if (inv && inv.other) why = `ขายให้สาขาอื่น/ดีลเลอร์ (DL Other) ใบกำกับ ${inv.inv || ''} ${fmtD(inv.idate)}`;
+        else if (inv && inv.ddate) why = `ส่งมอบแล้ว ${fmtD(inv.ddate)}`;
         else if (inv) why = `ออกใบกำกับแล้ว ${fmtD(inv.idate)} รอส่งมอบ`;
         else if (moved && moved !== r.br) why = `ย้ายไปสาขา ${moved}`;
         else if (veh && veh.removed) why = veh.removed.reason === 'dealer' ? `ขาย/แลกดีลเลอร์ ${veh.removed.dealer || ''}` : veh.removed.reason === 'other_br' ? `ขายให้สาขาอื่น ${veh.removed.note || ''}` : `นำออก: ${veh.removed.note || ''}`;
