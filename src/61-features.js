@@ -236,7 +236,7 @@ Object.assign(ACTIONS, {
     if (await write('receipts', id, { ...cur, extra_imgs: extra })) { S.modal = null; S.ai.receive = { state: 'done', msg: 'แนบรูปเพิ่มในใบเดิมแล้ว ไม่ได้สร้างใบซ้ำ' }; toast('แนบรูปเพิ่มในใบเดิมแล้ว'); render(); }
   },
   async 'recvdup-new'() { const doc = S.modal.doc; S.modal = null; await saveReceipt(doc); },
-  'cancel-print'(el) { const a = atById(el.dataset.id); if (a) printCancel(a); },
+  async 'cancel-print'(el) { const a = atById(el.dataset.id); if (a && a.cancelled) await printCancelDoc(a); },
   'export-preview'() { S.modal.preview = !S.modal.preview; render(); },
   'export-pv'(el) { S.modal.pv = el.dataset.k; render(); },
   'idspair-open'(el) { S.modal = { kind: 'idspair', key: el.dataset.id, q: '' }; render(); },

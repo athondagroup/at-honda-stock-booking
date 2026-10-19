@@ -155,6 +155,7 @@ function cancelPanel(m, a) {
   return box('bad', `<b>${direct ? 'ยกเลิกใบจอง' : 'ขอยกเลิกใบจอง'}</b>${direct ? '' : ' ผู้จัดการเป็นคนอนุมัติ'}
     <div class="grid sm:grid-cols-2 gap-3 mt-2"><div class="field"><label for="cn-r">เหตุผล</label><select id="cn-r" data-modal="cancel.reason">${opt(CANCEL_REASONS, c.reason)}</select></div>
       <div class="field"><label for="cn-n" class="${c.reason === 'อื่น ๆ' || direct ? 'req' : ''}">${direct ? 'เหตุผลที่อนุมัติ / รายละเอียด' : 'รายละเอียด'}</label><input id="cn-n" data-modal="cancel.note" value="${esc(c.note || '')}"></div>
+      <div class="field"><label for="cn-ph" class="req">เบอร์โทรลูกค้า (ให้ CR โทรตรวจสอบ)</label><input id="cn-ph" type="tel" inputmode="tel" data-modal="cancel.phone" value="${esc(c.phone || a.rec.phone || '')}" placeholder="08x-xxx-xxxx"></div>
       ${direct ? `<div class="field"><label for="cn-rf">เงินมัดจำ</label><select id="cn-rf" data-modal="cancel.refund">${Object.entries(REFUND).map(([k, t]) => `<option value="${k}" ${(c.refund || 'refund') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
         ${(c.refund || 'refund') === 'refund' ? `<div class="field"><label for="cn-am">ยอดคืน (บาท)</label><input id="cn-am" type="number" min="0" step="100" data-modal="cancel.amount" value="${esc(c.amount ?? a.deposit ?? '')}"></div>` : ''}
         ${c.refund === 'transfer' ? trFields('cancel', c, a, derive()) : ''}` : ''}</div>
@@ -168,16 +169,18 @@ function cancelledBox(m, a) {
     ${c.at ? `<div class="text-xs mt-1">${c.req ? `ขอโดย ${who(c.req)} · ` : ''}อนุมัติโดย ${who(c)}${c.note ? ` · ${esc(c.note)}` : ''}</div>` : ''}
     ${c.refund ? `<div class="mt-1">เงินมัดจำ: <b>${esc(REFUND[c.refund] || c.refund)}</b>${c.refund === 'refund' ? ` ${money(c.amount)} บาท` : ''}</div>` : ''}
     ${trOutBox(a, derive())}
-    ${c.refund === 'refund' ? (rf && rf.at ? `<div class="text-xs mt-1">ใบขออนุมัติคืนเงิน: ${esc(rf.bank)} ${esc(rf.account_no)} ${esc(rf.account_name)} · ${who(rf)} ${fmtDT(rf.at)}</div>` : '<div class="text-xs mt-1" style="color:var(--warn)">ยังไม่ได้ทำใบขออนุมัติคืนเงินจอง</div>')
-      + (can || (rf && rf.at) ? `<div class="flex flex-wrap gap-2 mt-2">${can ? `<button class="btn btn-dark btn-sm" data-act="refund-open" data-id="${esc(a.id)}">${rf && rf.at ? 'แก้ข้อมูลบัญชี' : 'ใบขออนุมัติคืนเงินจอง'}</button>` : ''}${rf && rf.at ? `<button class="btn btn-ghost btn-sm" data-act="refund-print" data-id="${esc(a.id)}">พิมพ์ใบขออนุมัติคืนเงินจอง</button>` : ''}</div>` : '') : ''}
-    ${c.at ? `<div class="mt-2"><button class="btn btn-ghost btn-sm" data-act="cancel-print" data-id="${esc(a.id)}">ใบอนุมัติยกเลิกใบจอง (PDF / รูป)</button></div>` : ''}
+    ${c.refund === 'refund' ? (rf && rf.at ? `<div class="text-xs mt-1">บัญชีคืนเงิน: ${esc(rf.bank)} ${esc(rf.account_no)} ${esc(rf.account_name)} · ${who(rf)} ${fmtDT(rf.at)}</div>` : '<div class="text-xs mt-1" style="color:var(--warn)">ยังไม่ได้กรอกบัญชีคืนเงินลูกค้า</div>') : ''}
+    ${c.doc_no ? `<div class="text-xs mt-1">เลขที่เอกสาร <span class="code">${esc(c.doc_no)}</span></div>` : ''}
+    <div class="flex flex-wrap gap-2 mt-2">${c.refund === 'refund' && can ? `<button class="btn btn-dark btn-sm" data-act="refund-open" data-id="${esc(a.id)}">${rf && rf.at ? 'แก้ข้อมูลบัญชี' : 'กรอกบัญชีคืนเงิน แล้วพิมพ์เอกสาร'}</button>` : ''}
+      ${c.at && (c.refund !== 'refund' || (rf && rf.at)) ? `<button class="btn btn-ghost btn-sm" data-act="cx-print" data-id="${esc(a.id)}">${c.refund === 'refund' ? 'พิมพ์ใบอนุมัติยกเลิก และขอคืนเงินจอง' : 'พิมพ์ใบอนุมัติยกเลิกการจอง'} (PDF / รูป)</button>` : ''}</div>
+    ${c.at ? cxExecBox(a) : ''}
     <div class="text-xs mt-1 text-muted">ยกเลิกใบจองใน IDS ด้วย ถ้ายังไม่ได้ยกเลิก</div>`);
 }
 function refundPanel(m, a) {
   const f = m.refund, c = a.rec.cancel || {}, ai = S.ai.refund;
   const ok = f.account_name ? nameOk(f.account_name, a.cust) : null;
   const pic = S.files.passbook[0] ? S.files.passbook[0].url : f.img ? imgSrc(f.img) : null;
-  return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">ใบขออนุมัติคืนเงินจอง</h2>
+  return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">บัญชีคืนเงินจองลูกค้า</h2>
       <p class="text-sm text-muted">${esc(a.cust)} · ${esc(a.model)} ${esc(gradeShort(a.model, a.grade))} · คืน ${money(c.amount)} บาท · ชื่อบัญชีต้องตรงกับชื่อผู้จอง</p></div><button class="btn btn-ghost btn-sm" data-act="refund-back">กลับ</button></div>
     <div class="grid md:grid-cols-2 gap-5">
       <div class="flex flex-col gap-2"><div class="font-medium req">รูปหน้าสมุดบัญชี</div>
@@ -191,6 +194,7 @@ function refundPanel(m, a) {
         ${f.bank === 'อื่น ๆ' ? `<div class="field"><label for="rf-bank2" class="req">ชื่อธนาคาร</label><input id="rf-bank2" data-modal="refund.bank_other" value="${esc(f.bank_other || '')}"></div>` : ''}
         <div class="field"><label for="rf-no" class="req">เลขที่บัญชี</label><input id="rf-no" class="code" inputmode="numeric" data-modal="refund.account_no" value="${esc(f.account_no || '')}" autocomplete="off"></div>
         <div class="field"><label for="rf-nm" class="req">ชื่อบัญชี</label><input id="rf-nm" data-modal="refund.account_name" value="${esc(f.account_name || '')}" autocomplete="off"></div>
+        <div class="field"><label for="rf-ph" class="req">เบอร์โทรลูกค้า (ให้ CR โทรตรวจสอบ)</label><input id="rf-ph" type="tel" inputmode="tel" data-modal="refund.phone" value="${esc(f.phone || '')}"></div>
         ${ok === null ? '' : `<div class="text-sm" style="color:var(--${ok ? 'good' : 'bad'})">${ok ? `✓ ชื่อบัญชีตรงกับชื่อผู้จอง (${esc(a.cust)})` : `✕ ชื่อบัญชีไม่ตรงกับชื่อผู้จอง "${esc(a.cust)}" ต้องเป็นบัญชีชื่อผู้จองเท่านั้น`}</div>`}
         <div class="flex flex-wrap gap-2"><button class="btn btn-red" data-act="refund-save" data-id="${esc(a.id)}">บันทึกและพิมพ์</button><button class="btn btn-ghost" data-act="refund-back">กลับ</button></div>
       </div></div>`;

@@ -379,7 +379,13 @@ function buildAlerts(D) {
       add('chgd:' + a.id + ':' + last.id, { sales: a.sales, br: a.br, roles: ['sales'] }, last.status === 'approved' ? 'muted' : 'bad',
         `${last.type === 'cancel' ? 'คำขอยกเลิก' : 'คำขอแก้ไข'}${last.status === 'approved' ? 'ได้รับอนุมัติแล้ว' : 'ไม่ได้รับอนุมัติ'}`, `${car}${last.decided.note ? ' · ' + last.decided.note : ''}`, go);
     if (a.cancelled && a.rec.cancel && a.rec.cancel.refund === 'refund' && !(a.rec.refund && a.rec.refund.at) && daysBetween((a.rec.cancel.at || '').slice(0, 10) || today, today) <= 30)
-      add('refund:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin'] }, 'warn', 'ยกเลิกแล้ว ทำใบขออนุมัติคืนเงินจองส่งบัญชี', `${car} · คืน ${money(a.rec.cancel.amount)} บาท แนบเลขที่บัญชีและรูปหน้าสมุดบัญชี`, go);
+      add('refund:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin'] }, 'warn', 'ยกเลิกแล้ว กรอกบัญชีคืนเงิน แล้วพิมพ์เอกสารให้เซ็น', `${car} · คืน ${money(a.rec.cancel.amount)} บาท แนบเลขที่บัญชีและรูปหน้าสมุดบัญชี`, go);
+    // the paper form: the executive presses once it is signed; the sales hears back
+    const cx = a.cancelled && a.rec.cancel && a.rec.cancel.at ? a.rec.cancel : null;
+    if (cx && !cx.exec_ok && (cx.refund !== 'refund' || (a.rec.refund && a.rec.refund.at)) && daysBetween(cx.at.slice(0, 10), today) <= 60)
+      add('cxexec:' + a.id, { br: a.br, roles: ['exec'] }, 'warn', cx.refund === 'refund' ? 'รอผู้บริหารอนุมัติจ่ายคืนเงินจอง' : 'รอผู้บริหารอนุมัติเอกสารยกเลิก', `${car} · เซลล์ ${a.sales}${cx.refund === 'refund' ? ` · คืน ${money(cx.amount)} บาท` : ''} · กดเมื่อเอกสารเซ็นครบ`, go);
+    if (cx && cx.exec_ok && daysBetween(cx.exec_ok.at.slice(0, 10), today) <= 3)
+      add('cxok:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin'] }, 'muted', cx.refund === 'refund' ? 'ผู้บริหารอนุมัติจ่ายคืนเงินจองแล้ว' : 'ผู้บริหารอนุมัติเอกสารยกเลิกแล้ว', `${car}${cx.doc_no ? ' · ' + cx.doc_no : ''}`, go);
   }
   const gf = gformCfg();
   if (gf) for (const a of D.at) if (gformDue(a) && (a.rec.created_at || '') >= (gf.at || ''))
@@ -453,7 +459,7 @@ function myAlerts(D) {
     if (r === 'sales') { if (t.roles.includes('sales') && t.sales && t.sales === S.role.sales) mine.push(a); }
     else if (r === 'admin') { if (t.roles.includes('admin') && t.br === S.role.branch) mine.push(a); }
     else if (r === 'aum' || r === 'nuch') { if (t.roles.includes('manager') && (!t.br || MGR_BR[r].includes(t.br))) mine.push(a); }
-    else if (r === 'exec') { if (t.roles.includes('manager')) mine.push(a); }
+    else if (r === 'exec') { if (t.roles.includes('manager') || t.roles.includes('exec')) mine.push(a); }
   }
   // requests waiting for a decision come first, so they are not buried under the "not in IDS" list
   const PRI = ['chg:', 'idstook:', 'lockp:', 'lockx:', 'ownerd:', 'conf:', 'swapa:', 'swapo:', 'swap:', 'swaps:', 'chgd:', 'refund:', 'gform:', 'owner:', 'matchq:'];

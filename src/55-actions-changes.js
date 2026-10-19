@@ -193,6 +193,8 @@ Object.assign(ACTIONS, {
     const a = atById(el.dataset.id), c = S.modal.cancel; if (!a || !c || !canEditBooking(a)) return;
     const note = (c.note || '').trim(), direct = canApproveBr(a.br);
     if ((c.reason === 'อื่น ๆ' || direct) && !note) { toast(direct ? 'ใส่เหตุผลที่อนุมัติยกเลิก' : 'เขียนรายละเอียดเมื่อเลือก "อื่น ๆ"', 'bad'); $('#cn-n')?.focus(); return; }
+    const phone = String(c.phone || a.rec.phone || '').trim();
+    if (phone.replace(/\D/g, '').length < 9) { toast('ใส่เบอร์โทรลูกค้า (ให้ CR โทรตรวจสอบ)', 'bad'); $('#cn-ph')?.focus(); return; }
     if (direct) {
       const refund = c.refund || 'refund', amount = refund === 'refund' ? num(c.amount) : 0;
       if (refund === 'refund' && !(amount > 0)) { toast('ใส่ยอดเงินที่คืน', 'bad'); return; }
@@ -200,16 +202,16 @@ Object.assign(ACTIONS, {
       const tr = refund === 'transfer' ? trRecord(c, a) : null;
       const r = await saveBk(a.id, 'ยกเลิกใบจอง (ผู้จัดการ)', `${c.reason} · ${note}${tr ? ` · โอนมัดจำ ${money(tr.amount)}${tr.to ? '' : ' (ค้างไว้)'}` : ''}`, x => {
         x.status = 'cancelled'; x.cancelled_at = new Date().toISOString();
-        x.cancel = { reason: c.reason, req_note: null, req: null, note, refund, amount: tr ? tr.amount : amount, ...(tr ? { transfer: tr, to: tr.to } : {}), ...actor() };
+        x.cancel = { reason: c.reason, req_note: null, req: null, note, phone, refund, amount: tr ? tr.amount : amount, ...(tr ? { transfer: tr, to: tr.to } : {}), ...actor() };
       }, x => x.status !== 'cancelled' && pendingFree(x));
       if (!r) return;
       if (tr && tr.to) await trLinkTo({ ...a, rec: r }, tr.to);
       await releaseFor(a, 'ยกเลิกใบจอง');
-      S.modal.cancel = null; toast(refund === 'refund' ? 'ยกเลิกแล้ว ทำใบขออนุมัติคืนเงินจองได้จากใบจองนี้' : 'ยกเลิกใบจองแล้ว'); render();
+      S.modal.cancel = null; toast(refund === 'refund' ? 'ยกเลิกแล้ว เซลล์กรอกบัญชีคืนเงินแล้วพิมพ์เอกสาร' : 'ยกเลิกแล้ว พิมพ์ใบอนุมัติยกเลิกได้จากใบจองนี้'); render();
       return;
     }
     const r = await saveBk(a.id, 'ขอยกเลิกใบจอง', `${c.reason}${note ? ' · ' + note : ''}`, x => {
-      x.change = { id: rid(), type: 'cancel', reason: c.reason, note, refund: /ซ้ำ|เปลี่ยนรุ่น/.test(c.reason) ? 'transfer' : 'refund', status: 'pending', ...actor() };
+      x.change = { id: rid(), type: 'cancel', reason: c.reason, note, phone, refund: /ซ้ำ|เปลี่ยนรุ่น/.test(c.reason) ? 'transfer' : 'refund', status: 'pending', ...actor() };
     }, x => x.status !== 'cancelled' && pendingFree(x));
     if (r) { S.modal.cancel = null; toast('ส่งคำขอยกเลิกให้ผู้จัดการอนุมัติแล้ว'); render(); }
   },
@@ -229,13 +231,13 @@ Object.assign(ACTIONS, {
       const tr = refund === 'transfer' ? trRecord(cxt, a) : null;
       const r = await saveBk(a.id, 'อนุมัติยกเลิกใบจอง', `${REFUND[refund]}${refund === 'refund' ? ' ' + money(amount) : tr ? ` ${money(tr.amount)}${tr.to ? '' : ' (ค้างไว้)'}` : ''} · ${note}`, x => {
         x.status = 'cancelled'; x.cancelled_at = new Date().toISOString();
-        x.cancel = { reason: x.change.reason, req_note: x.change.note || null, req: { by: x.change.by, role: x.change.role, at: x.change.at }, note, refund, amount: tr ? tr.amount : amount, ...(tr ? { transfer: tr, to: tr.to } : {}), ...actor() };
+        x.cancel = { reason: x.change.reason, req_note: x.change.note || null, req: { by: x.change.by, role: x.change.role, at: x.change.at }, note, phone: x.change.phone || x.phone || null, refund, amount: tr ? tr.amount : amount, ...(tr ? { transfer: tr, to: tr.to } : {}), ...actor() };
         finishChange(x, 'approved', note);
       }, stillThere);
       if (!r) return;
       if (tr && tr.to) await trLinkTo({ ...a, rec: r }, tr.to);
       await releaseFor(a, 'ยกเลิกใบจอง');
-      S.modal.cx = null; toast(refund === 'refund' ? 'อนุมัติยกเลิกแล้ว ปุ่มใบขออนุมัติคืนเงินจองอยู่ในใบจองนี้' : 'อนุมัติยกเลิกแล้ว'); render();
+      S.modal.cx = null; toast(refund === 'refund' ? 'อนุมัติยกเลิกแล้ว เซลล์กรอกบัญชีคืนเงินแล้วพิมพ์เอกสาร' : 'อนุมัติยกเลิกแล้ว'); render();
       return;
     }
     const specEdit = SPEC_KEYS.some(k => k in ch.fields);
@@ -267,7 +269,7 @@ Object.assign(ACTIONS, {
     S.files.passbook.forEach(x => { try { URL.revokeObjectURL(x.url); } catch (e) { /* ignore */ } });
     S.files.passbook = []; S.ai.refund = null;
     if (!S.modal || S.modal.id !== a.id) S.modal = { kind: 'at', id: a.id };
-    S.modal.refund = { bank: rf.bank || '', bank_other: rf.bank_other || '', account_no: rf.account_no || '', account_name: rf.account_name || a.cust || '', img: rf.img || null };
+    S.modal.refund = { bank: rf.bank || '', bank_other: rf.bank_other || '', account_no: rf.account_no || '', account_name: rf.account_name || a.cust || '', img: rf.img || null, phone: (a.rec.cancel || {}).phone || a.rec.phone || '' };
     render();
   },
   'refund-back'() { S.modal.refund = null; render(); },
@@ -299,13 +301,16 @@ Object.assign(ACTIONS, {
     let img = f.img;
     if (S.files.passbook[0]) { img = await storeImage(S.files.passbook[0].blob); if (!img) { toast('เก็บรูปหน้าสมุดบัญชีไม่สำเร็จ ลองอีกครั้ง', 'bad'); return; } }
     if (!img) { toast('แนบรูปหน้าสมุดบัญชี', 'bad'); return; }
+    const phone = String(f.phone || '').trim();
+    if (phone.replace(/\D/g, '').length < 9) { toast('ใส่เบอร์โทรลูกค้า (ให้ CR โทรตรวจสอบ)', 'bad'); $('#rf-ph')?.focus(); return; }
     const r = await saveBk(a.id, 'ทำใบขออนุมัติคืนเงินจอง', `${bank === 'อื่น ๆ' ? f.bank_other : bank} ${acct}`, x => {
       x.refund = { bank, bank_other: bank === 'อื่น ๆ' ? String(f.bank_other).trim() : null, account_no: acct, account_name: name, img, ...actor() };
+      if (x.cancel) x.cancel.phone = phone;
     }, x => x.status === 'cancelled');
     if (!r) return;
     S.modal.refund = null; S.files.passbook = []; render();
-    toast('บันทึกแล้ว เปิดใบขออนุมัติให้บันทึกเป็น PDF หรือรูป');
-    const fresh = atById(a.id); if (fresh) printRefund(fresh);
+    toast('บันทึกแล้ว เปิดเอกสารให้บันทึกเป็น PDF หรือรูป แล้วพิมพ์ให้เซ็น');
+    const fresh = atById(a.id); if (fresh) await printCancelDoc(fresh);
   },
-  'refund-print'(el) { const a = atById(el.dataset.id); if (a) printRefund(a); }
+  async 'refund-print'(el) { const a = atById(el.dataset.id); if (a) await printCancelDoc(a); }
 });

@@ -25,35 +25,76 @@ async function docCanvas(spec) {
   const imgs = await Promise.all(spec.blocks.map(b => b.img && !spec.noImg ? docLoadImg(b.img) : null));
   // two passes: measure, then draw on a canvas of the right height
   const run = (ctx, draw) => {
-    const W = DOC_W - DOC_M * 2, LH = 20, PAD = 6;
+    const W = DOC_W - DOC_M * 2, LH = spec.compact ? 18 : 20, PAD = spec.compact ? 4 : 6;
     let y = DOC_M;
     const font = (sz, wt = 400) => { ctx.font = `${wt} ${sz}px ${DOC_FONT}`; };
     const text = (t, x, yy, opts = {}) => { if (draw) { ctx.fillStyle = '#000'; ctx.textAlign = opts.align || 'left'; ctx.textBaseline = 'top'; ctx.fillText(t, x, yy); } };
     const line = (x1, y1, x2, y2) => { if (draw) { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); } };
     // a table row: cells [{ t, w, bold }]; returns the row height
     const row = cells => {
-      const hs = cells.map(c => { font(13, c.bold ? 600 : 400); return docWrap(ctx, c.t, c.w - PAD * 2).length; });
+      const fs = spec.compact ? 12 : 13;
+      const hs = cells.map(c => { font(fs, c.bold ? 600 : 400); return docWrap(ctx, c.t, c.w - PAD * 2).length; });
       const h = Math.max(...hs, 1) * LH + PAD * 2 - 4;
       let x = DOC_M;
       cells.forEach(c => {
-        font(13, c.bold ? 600 : 400);
+        font(fs, c.bold ? 600 : 400);
         docWrap(ctx, c.t, c.w - PAD * 2).forEach((ln, i) => text(ln, x + PAD, y + PAD + i * LH));
         if (draw) ctx.strokeRect(x, y, c.w, h);
         x += c.w;
       });
       y += h; return h;
     };
+    if (spec.compact) y -= 16;
     font(22, 600); text(spec.title, DOC_W / 2, y, { align: 'center' }); y += 34;
     if (spec.sub) { font(13); docWrap(ctx, spec.sub, W).forEach(ln => { text(ln, DOC_W / 2, y, { align: 'center' }); y += LH; }); y += 10; }
+    if (spec.meta) { font(12); if (draw) ctx.fillStyle = '#000'; text(spec.meta[0] || '', DOC_M, y); text(spec.meta[1] || '', DOC_W - DOC_M, y, { align: 'right' }); y += LH + 4; }
+    const dots = (x1, x2, yy) => { if (draw) { ctx.save(); ctx.setLineDash([1, 2]); line(x1, yy, x2, yy); ctx.restore(); } };
+    const box = (x, yy) => { if (draw) ctx.strokeRect(x, yy + 3, 12, 12); };
+    // a signature line with its label, the name in brackets and a date line
+    const signAt = (x, w, yy, label, name) => { line(x, yy, x + w, yy); font(12); text(label, x + w / 2, yy + 6, { align: 'center' }); text(`( ${name || '................................................'} )`, x + w / 2, yy + 24, { align: 'center' }); text('วันที่ ........../........../..........', x + w / 2, yy + 42, { align: 'center' }); };
     spec.blocks.forEach((b, bi) => {
-      if (b.h) { y += 8; font(15, 600); text(b.h, DOC_M, y); y += 26; }
-      if (b.kv) { const th = W * 0.19, td = W / 2 - th; b.kv.forEach(r => row(r.length === 2 ? [{ t: r[0], w: th, bold: true }, { t: r[1], w: W - th }] : [{ t: r[0], w: th, bold: true }, { t: r[1], w: td }, { t: r[2], w: th, bold: true }, { t: r[3], w: td }])); y += 10; }
+      if (b.h && !b.sec) { y += 8; font(15, 600); text(b.h, DOC_M, y); y += 26; }
+      // a numbered section heading, with who / when on the right
+      if (b.sec) {
+        y += 6;
+        if (draw) { ctx.beginPath(); ctx.arc(DOC_M + 10, y + 10, 10, 0, Math.PI * 2); ctx.fillStyle = '#000'; ctx.fill(); ctx.fillStyle = '#fff'; font(12, 600); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(b.sec), DOC_M + 10, y + 11); }
+        font(15, 600); text(b.h || '', DOC_M + 28, y);
+        if (b.by) { font(11); if (draw) { ctx.fillStyle = '#444'; ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText(b.by, DOC_W - DOC_M, y + 3); } }
+        y += spec.compact ? 24 : 28;
+      }
+      if (b.small) { font(11); docWrap(ctx, b.small, W).forEach(ln => { if (draw) { ctx.fillStyle = '#333'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(ln, DOC_M, y); } y += 16; }); y += 4; }
+      // CR: the phone check filled in by hand
+      if (b.cr) {
+        const top = y; y += 10; font(13);
+        text('วันที่โทร', DOC_M + 10, y); dots(DOC_M + 70, DOC_M + 230, y + 16); text('เวลา', DOC_M + 240, y); dots(DOC_M + 275, DOC_M + 360, y + 16); text('เบอร์ที่โทร', DOC_M + 370, y); dots(DOC_M + 445, DOC_M + W - 10, y + 16); y += 28;
+        box(DOC_M + 10, y); text('ลูกค้ายืนยันยกเลิก ยอดเงินคืนและบัญชีถูกต้อง', DOC_M + 28, y); box(DOC_M + 330, y); text('ไม่ตรง / ติดต่อไม่ได้ (ระบุในหมายเหตุ)', DOC_M + 348, y); y += 28;
+        text('หมายเหตุ CR', DOC_M + 10, y); dots(DOC_M + 90, DOC_M + W - 10, y + 16); y += 26; dots(DOC_M + 10, DOC_M + W - 10, y + 16); y += 34;
+        text('ลงชื่อ CR', DOC_M + W - 330, y); dots(DOC_M + W - 270, DOC_M + W - 130, y + 16); text('วันที่', DOC_M + W - 120, y); dots(DOC_M + W - 85, DOC_M + W - 10, y + 16); y += 30;
+        if (draw) ctx.strokeRect(DOC_M, top, W, y - top); y += 10;
+      }
+      // signatures with the names printed under the line
+      if (b.sign3) {
+        y += spec.compact ? 38 : 50; const n = b.sign3.length, gap = 24, w = (W - gap * (n - 1)) / n;
+        b.sign3.forEach((s, i) => signAt(DOC_M + i * (w + gap), w, y, s.t, s.name));
+        y += 66;
+      }
+      // the executive's approval, signed by hand
+      if (b.exec) {
+        const top = y, e = b.exec, rx = DOC_M + W * 0.6; y += 14; font(13);
+        box(DOC_M + 10, y); text(e.ok, DOC_M + 28, y); font(13); const okW = ctx.measureText(e.ok).width; box(DOC_M + 46 + okW, y); text('ไม่อนุมัติ', DOC_M + 64 + okW, y); y += 30;
+        text('หมายเหตุ', DOC_M + 10, y); dots(DOC_M + 70, rx - 20, y + 16); y += 28;
+        font(11); docWrap(ctx, e.foot || '', rx - DOC_M - 30).forEach(ln => { if (draw) { ctx.fillStyle = '#333'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(ln, DOC_M + 10, y); } y += 16; });
+        y = Math.max(y + 6, top + 120);
+        signAt(rx, DOC_M + W - rx - 10, top + 50, e.label, '');
+        if (draw) ctx.strokeRect(DOC_M, top, W, y - top); y += 10;
+      }
+      if (b.kv) { const th = W * 0.19, td = W / 2 - th; b.kv.forEach(r => row(r.length === 2 ? [{ t: r[0], w: th, bold: true }, { t: r[1], w: W - th }] : [{ t: r[0], w: th, bold: true }, { t: r[1], w: td }, { t: r[2], w: th, bold: true }, { t: r[3], w: td }])); y += spec.compact ? 4 : 10; }
       if (b.items) { row(b.items.cols.map((c, i) => ({ t: c, w: W * b.items.widths[i], bold: true }))); b.items.rows.forEach(r => row(r.map((c, i) => ({ t: c, w: W * b.items.widths[i] })))); y += 10; }
       if (b.note) { font(13); docWrap(ctx, b.note, W).forEach(ln => { text(ln, DOC_M, y); y += LH; }); y += 6; }
       if (b.label !== undefined || b.img) {
         if (b.label) { font(12); text(b.label, DOC_M, y); y += LH; }
         const im = imgs[bi];
-        if (im) { const s = Math.min(W / im.naturalWidth, 300 / im.naturalHeight, 1), w = im.naturalWidth * s, h = im.naturalHeight * s; if (draw) { ctx.drawImage(im, DOC_M, y, w, h); ctx.strokeRect(DOC_M, y, w, h); } y += h + 10; }
+        if (im) { const s = Math.min(W / im.naturalWidth, (b.maxH || 300) / im.naturalHeight, 1), w = im.naturalWidth * s, h = im.naturalHeight * s; if (draw) { ctx.drawImage(im, DOC_M, y, w, h); ctx.strokeRect(DOC_M, y, w, h); } y += h + 10; }
       }
       if (b.sign) {
         y += 60; const n = b.sign.length, gap = 18, w = (W - gap * (n - 1)) / n;
