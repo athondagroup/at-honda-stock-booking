@@ -248,7 +248,7 @@ function prepareUploads(results) {
         return { vin: c.vin, spec: specKey(c.model, c.grade, c.color), why, flag };
       });
       r.diff = { prevN: prev.length, out, inN: r.rows.filter(c => !prevSet.has(c.vin)).length, baseSample: !X.src[r.br].stock };
-    } else if (r.src === 'booking') r.diff = { prevN: X.bookings.filter(b => b.br === r.br).length, baseSample: !X.src[r.br].booking };
+    } else if (r.src === 'booking') r.diff = { prevN: X.bookings.filter(b => b.br === r.br).length, baseSample: !X.src[r.br].booking, out: X.src[r.br].booking ? bkOutDiff(r, D) : [] };
     else if (r.src === 'quota') r.diff = { prevN: X.quota.filter(q => q.br === r.br && r.months.includes(q.m)).length, baseSample: !X.src[r.br].quota.length };
     else { r.diff = invDiff(r); r.nameChoice = r.diff.lost.length ? (r.nameChoice || null) : null; }
   }
@@ -278,7 +278,7 @@ async function saveUploads() {
       if (utf8len(doc) > 250000) { toast(`ตาราง ${SRC_LABEL[r.src]} ${r.br} ใหญ่เกินที่ต้นแบบเก็บได้`, 'bad'); continue; }
       if (!await write('ids', part.id, doc)) { U.busy = false; render(); return; }
       await write('uploads', newId('uploads'), { src: r.src, br: r.br, m: part.m, asof: r.asof, file: r.file, sheet: r.sheet, n: rows.length,
-        prevN: r.diff ? r.diff.prevN : null, out: r.src === 'stock' ? (r.diff?.out || []).slice(0, 300) : [], inN: r.diff?.inN || 0, ...actor() });
+        prevN: r.diff ? r.diff.prevN : null, out: r.src === 'stock' || r.src === 'booking' ? (r.diff?.out || []).slice(0, 300) : [], inN: r.diff?.inN || 0, ...actor() });
       ok++;
     }
   }

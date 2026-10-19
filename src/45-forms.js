@@ -369,10 +369,11 @@ function viewUploadBase(D) {
           <span class="w-32 num text-muted">${fmtDT(u.at)}</span><span class="w-36 font-medium">${SRC_LABEL[u.src]} ${esc(u.br)}${u.m ? ' ' + fmtM(u.m) : ''}</span>
           <span>ข้อมูล ณ ${fmtD(u.asof)} · ${u.prevN ?? '?'} → <b>${u.n}</b> แถว</span>
           ${u.src === 'stock' ? `<span>ออก ${(u.out || []).length} · เข้า ${u.inN || 0}${flagged ? ` · <b style="color:var(--bad)">ไม่พบข้อมูล ${flagged} คัน</b>` : ''}</span>` : ''}
+          ${u.src === 'booking' && (u.out || []).length ? `<span>หายจาก IDS ${(u.out || []).length} ใบ${flagged ? ` · <b style="color:var(--bad)">ต้องตรวจ ${flagged} ใบ</b>` : ''}</span>` : ''}
           <span class="text-muted">${who(u)}</span>
-          ${(u.out || []).length ? `<button class="ml-auto text-sm underline" data-act="upl-open" data-id="${esc(u.id)}" aria-expanded="${open}">${open ? 'ซ่อน' : flagged ? 'ดูและระบุรถที่ออก' : 'ดูรถที่ออก'}</button>` : ''}
+          ${(u.out || []).length ? `<button class="ml-auto text-sm underline" data-act="upl-open" data-id="${esc(u.id)}" aria-expanded="${open}">${open ? 'ซ่อน' : u.src === 'booking' ? (flagged ? 'ดูและจัดการใบจองที่หาย' : 'ดูใบจองที่หาย') : flagged ? 'ดูและระบุรถที่ออก' : 'ดูรถที่ออก'}</button>` : ''}
         </div>
-        ${open ? outFixList(u) : ''}
+        ${open ? (u.src === 'booking' ? bkOutList(u, D) : outFixList(u)) : ''}
       </div>`;
     }).join('') || emptyBox('ยังไม่มีการอัปโหลด', 'เมื่ออัปโหลดไฟล์ Stock ระบบจะบอกว่ารถคันไหนออกไปเพราะส่งมอบ ย้ายสาขา หรือหายไปโดยไม่มีข้อมูล')}</div>
   </section>`;

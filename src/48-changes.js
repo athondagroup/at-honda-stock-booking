@@ -44,7 +44,7 @@ function matchAskBox(a) {
       ${row('ลูกค้า', a.cust, r.name)}${row('รุ่น', a.model, r.model)}${row('เกรด', gradeShort(a.model, a.grade), gradeShort(r.model, r.grade))}${row('สี', a.color, r.color)}
       ${row('สาขา', a.br, r.br)}${row('วันที่', fmtD(a.date), fmtD(r.date))}${row('เซลล์', a.sales, r.sales || '')}${row('เลขที่ใบจอง', a.rec.booking_no || '', r.no || '')}</tbody></table>
     ${can ? `<div class="flex flex-wrap gap-2 mt-2">
-      <button class="btn btn-dark btn-sm" data-act="match-yes" data-id="${esc(a.id)}" data-key="${esc(r.key)}">ใช่ ใบจองเดียวกัน (ใช้รุ่นตาม IDS คิวเดิม)</button>
+      <button class="btn btn-dark btn-sm" data-act="match-edit" data-id="${esc(a.id)}" data-key="${esc(r.key)}" title="แก้รุ่น เกรด สี และเลขที่ใบจองในเว็บและในชีตให้ตรงกับ IDS คิวเดิม">ใช่ ใบเดียวกัน → แก้ไขการจองตาม IDS</button>
       ${r.kind === 'booking' ? `<button class="btn btn-ghost btn-sm" data-act="match-more" data-id="${esc(a.id)}" data-key="${esc(r.key)}" data-no="${esc(r.no || '')}">ไม่ใช่ ลูกค้าจองเพิ่มอีกคัน → ลงใบจองคันที่ 2</button>` : ''}
       <button class="btn btn-ghost btn-sm" data-act="match-no" data-id="${esc(a.id)}" data-key="${esc(r.key)}">ไม่ใช่ คนละคน ชื่อซ้ำ</button></div>` : '<div class="text-xs mt-2">เซลล์เจ้าของ แอดมินสาขา หรือผู้จัดการเป็นคนยืนยัน</div>'}`);
 }

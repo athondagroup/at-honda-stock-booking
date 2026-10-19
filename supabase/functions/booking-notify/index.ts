@@ -70,6 +70,26 @@ async function appendRow(sheetId: string, tab: string, fields: [string, string][
   if (!r.ok) throw new Error(`sheet append ${r.status} ${(await r.text()).slice(0, 200)}`);
 }
 
+// a booking changed or cancelled in the web: the same row in the form's response sheet is changed too (ตกลง 19/10)
+// find: the web booking id (column T/U) or the booking photo's Drive id (column P, form bookings); set: {column index: value}
+async function updateRow(sheetId: string, tab: string, find: { webId?: string; driveId?: string }, set: Record<string, string>) {
+  const t = await gToken(JSON.parse(env("GOOGLE_SERVICE_ACCOUNT")));
+  const H = { Authorization: `Bearer ${t}` };
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/${encodeURIComponent(tab + "!A1:U")}`, { headers: H });
+  if (!r.ok) throw new Error(`sheet read ${r.status}`);
+  const rows: string[][] = (await r.json()).values || [];
+  const i = rows.findIndex((row, k) => k > 0 && ((find.webId && (String(row[19] || "") === find.webId || String(row[20] || "") === find.webId)) || (find.driveId && String(row[15] || "").includes(find.driveId))));
+  if (i < 0) return "notfound";
+  const col = (n: number) => String.fromCharCode(65 + n);
+  // only these columns can be changed from the web: C ยกเลิก, F ลูกค้า, G รุ่น, H เกรด, I สี
+  const data = Object.entries(set).filter(([c]) => [2, 5, 6, 7, 8].includes(Number(c))).map(([c, v]) => ({ range: `${tab}!${col(Number(c))}${i + 1}`, values: [[String(v ?? "")]] }));
+  if (!data.length) return "ok";
+  const u = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values:batchUpdate`, {
+    method: "POST", headers: { ...H, "Content-Type": "application/json" }, body: JSON.stringify({ valueInputOption: "USER_ENTERED", data }) });
+  if (!u.ok) throw new Error(`sheet update ${u.status} ${(await u.text()).slice(0, 200)}`);
+  return "ok";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   let body: any; try { body = await req.json(); } catch { return out({ code: "bad_request" }, 400); }
@@ -78,7 +98,13 @@ Deno.serve(async (req) => {
   if (!user) return out({ code: "not_granted" }, 401);
   const { data: m } = await sb.from("members").select("active").eq("email", (user.email || "").toLowerCase()).maybeSingle();
   if (!m || !m.active) return out({ code: "not_granted" }, 403);
-  if (body.ping) return out({ mgr: mgrReady(), sales: salesReady(), sheet: sheetReady(), drive: driveReady() });
+  if (body.ping) return out({ mgr: mgrReady(), sales: salesReady(), sheet: sheetReady(), drive: driveReady(), rowEdit: sheetReady() });
+  if (body.sheetUpdate) {
+    const q = body.sheetUpdate;
+    if (!sheetReady() || !q.sheetId) return out({ sheet: "off" });
+    try { return out({ sheet: await updateRow(String(q.sheetId), String(q.tab || "Booking"), { webId: q.webId ? String(q.webId) : "", driveId: q.driveId ? String(q.driveId) : "" }, q.set || {}) }); }
+    catch (e) { console.error("sheetUpdate", e); return out({ sheet: "error" }); }
+  }
 
   // one booking is sent once: the result is written onto the booking here (not left to the page), and a second
   // full send is refused; `only` re-sends just the parts that did not go out (e.g. the sales group added later)
