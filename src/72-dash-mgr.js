@@ -5,7 +5,7 @@
 function dashTabs() {
   const r = S.role.role; if (r !== 'exec' && !MGR_OF[r]) return '';
   const cur = dashSub(), tabs = r === 'exec' ? [['exec', 'สรุปผู้บริหาร'], ['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล'], ['acct', 'บัญชี'], ['ops', 'งานรออนุมัติและคิวรถ']] : [['ops', 'งานรออนุมัติและคิวรถ'], ['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล'], ['acct', 'บัญชี']];
-  return `<div class="seg mb-4" role="group" aria-label="มุมมอง">${tabs.map(([k, t]) => `<button data-act="sub" data-key="dash" data-sub="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>`;
+  return `<div class="flex flex-wrap items-center justify-between gap-2 mb-4"><div class="seg" role="group" aria-label="มุมมอง">${tabs.map(([k, t]) => `<button data-act="sub" data-key="dash" data-sub="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>${dioBtn()}</div>`;
 }
 // a manager sees sales, targets and analysis only for the branches they look after; the executive sees all
 function dashScoped(D, sub) {

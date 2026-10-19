@@ -156,10 +156,15 @@ async function invMergeSave(r) {
     }
     m.set(k, x);
   }
-  const rows = [...m.values()].sort((a, b) => (b.idate || '').localeCompare(a.idate || ''));
+  return invStore(r.br, [...m.values()], { asof: r.asof, file: r.file, sheet: r.sheet, warn: r.warn });
+}
+// every stored invoice of a branch, written back: recent and undelivered in invoice_<br>, older by year in invold_<br>_<year>
+async function invStore(br, all, meta) {
+  const r = { br, warn: meta.warn || [], file: meta.file, sheet: meta.sheet };
+  const rows = all.slice().sort((a, b) => (b.idate || '').localeCompare(a.idate || ''));
   const cur = S.ids.get('invoice_' + r.br) || {};
-  const asof = [cur.asof, r.asof].filter(Boolean).sort().at(-1) || todayISO();
-  const mk = list => ({ src: 'invoice', br: r.br, m: null, asof, file: r.file, sheet: r.sheet, n: list.length, ...pack('invoice', list), warn: r.warn.slice(0, 20), ...actor() });
+  const asof = [cur.asof, meta.asof].filter(Boolean).sort().at(-1) || todayISO();
+  const mk = list => ({ src: 'invoice', br: r.br, m: null, asof, file: r.file ?? cur.file ?? null, sheet: r.sheet ?? cur.sheet ?? null, n: list.length, ...pack('invoice', list), warn: r.warn.slice(0, 20), ...actor() });
   let days = 240, live, old, doc;
   for (;;) {
     const cut = addDays(todayISO(), -days);

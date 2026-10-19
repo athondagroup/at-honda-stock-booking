@@ -25,6 +25,7 @@ function renderModal(D) {
   else if (m.kind === 'pm') { body = pmModal(m, D); wide = true; }
   else if (m.kind === 'catedit') { body = catEditModal(m); wide = true; }
   else if (m.kind === 'stassign') { body = stAssignModal(m, D); wide = true; }
+  else if (m.kind === 'dio') { body = dioModal(m); wide = true; }
   else if (m.kind === 'adsales') body = adminSalesModal(m);
   else if (m.kind === 'adbk') { body = adminBkModal(m); wide = true; }
   else if (m.kind === 'adlk') body = adminLkModal(m);

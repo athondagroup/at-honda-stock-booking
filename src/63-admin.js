@@ -172,7 +172,11 @@ async function adImport(file) {
     }
   }
   const sa = rows('เซลล์');
-  if (sa) {
+  if (sa) adSalesPlan(sa, plan);
+  S.adImport = plan; render();
+}
+// the sales tab of a file read back: what changes per sales person (also used by the full data file)
+function adSalesPlan(sa, plan) {
     const ro = rosterOf();
     for (const row of sa.slice(1)) {
       const name = String(row[0] || '').trim(); if (!name) continue;
@@ -193,8 +197,6 @@ async function adImport(file) {
       if ([...nicks].sort().join(', ') !== oldN) ch.push(`ชื่อเล่น: ${oldN || '–'} → ${nicks.join(', ') || '–'}`);
       if (ch.length) plan.sales.push({ name, br, nicks, left, isNew: !cur, ch });
     }
-  }
-  S.adImport = plan; render();
 }
 function adminFile(D) {
   const p = S.adImport;
