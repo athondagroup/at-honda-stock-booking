@@ -288,7 +288,7 @@ function carRow(c, D) {
   const p = perms(), l = c.lock;
   return `<div class="px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2">
     <div class="min-w-[180px]"><div>${vinLink(c)}</div>
-      <div class="text-xs text-muted">${c.year ? 'ปี ' + c.year : ''} ${c.ref ? '· Ref ' + esc(c.ref) : ''} ${c.src !== 'IDS' ? '· ' + esc(c.src) : ''}</div>
+      <div class="text-xs text-muted">${c.year ? 'ปี ' + c.year : ''} ${c.ref ? '· Ref ' + esc(c.ref) : ''} ${c.src !== 'IDS' ? '· ' + esc(c.src) : ''}${c.fromBr ? ` · <b style="color:var(--warn)">โอนจาก ${esc(c.fromBr)}</b>` : ''}</div>
       <div class="text-xs">${prodText(c)} ${prodBtn(c)}</div></div>
     <div class="w-12"><b>${esc(c.br)}</b></div>
     <div class="w-32">${carStatusCell(c, D)}</div>
@@ -308,7 +308,7 @@ function carTable(cars, D) {
   return `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl">
     <thead><tr><th>หมายเลขตัวถัง</th><th>สาขา</th><th>รุ่น / เกรด / สี</th><th>สถานะ</th><th>วันผลิต</th><th class="text-right">อยู่ในสต็อก / อายุจากวันผลิต</th>${isSales() ? '<th>ล็อก</th>' : '<th>ชื่อลูกค้า / เลขที่ใบจอง</th><th>ที่ปรึกษาขาย</th>'}<th></th></tr></thead>
     <tbody>${list.map(c => `<tr>
-      <td class="nowrap">${vinLink(c)}<div class="text-xs text-muted">${c.ref ? 'Ref ' + esc(c.ref) : ''}${c.src !== 'IDS' ? ' · ' + esc(c.src) : ''}</div></td>
+      <td class="nowrap">${vinLink(c)}<div class="text-xs text-muted">${c.ref ? 'Ref ' + esc(c.ref) : ''}${c.src !== 'IDS' ? ' · ' + esc(c.src) : ''}${c.fromBr ? ` · โอนจาก ${esc(c.fromBr)}` : ''}</div></td>
       <td><b>${esc(c.br)}</b></td><td class="nowrap">${specLabel(c.spec)}</td><td class="nowrap">${carStatusCell(c, D)}</td>
       <td class="nowrap text-sm">${c.prod ? `<span class="num">${fmtD(c.prod)}</span>${c.prodSrc === 'key' ? ' <span class="text-xs text-muted">คีย์</span>' : ''}${c.prodDiff ? ' <span class="text-xs" style="color:var(--warn)">ไม่ตรง IDS</span>' : ''}` : '<span class="text-xs" style="color:var(--warn)">ยังไม่มี</span>'} ${prodBtn(c)}</td>
       <td class="text-right nowrap">${ageCell(c)}</td>

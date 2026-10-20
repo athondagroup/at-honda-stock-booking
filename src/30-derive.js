@@ -5,11 +5,19 @@ const FIN_GRACE = 1;          // days after the 15th day before a finance lock g
 const MGR_GRACE = 1;          // days after a 15-day lock ends that the manager has to extend it; then the queue is released
 const AT_TO_IDS_DAYS = 3;     // AT form not in IDS this many days after booking → alert
 const MGR_BR = { aum: MGR_OF.aum, nuch: MGR_OF.nuch, exec: BRS };
+// "บริษัท เอที ฮอนด้า ออโตโมบิล (สามพราน) จำกัด" → SPH; anything else → null
+function atBranchOf(name) {
+  const t = String(name || '').replace(/\s+/g, ' ');
+  if (!/เอที ?ฮอนด้า/.test(t)) return null;
+  const w = [['ภาษีเจริญ', 'PSC'], ['เอกชัย', 'ATE'], ['บางบอน', 'ATE'], ['สามพราน', 'SPH'], ['กำแพงแสน', 'KPA']].find(([k]) => t.includes(k));
+  return w ? w[1] : null;
+}
 function carStatus(c, inv, bkByVin) {
   if (inv && !inv.company) return inv.ddate ? 'delivered' : 'invoiced';
   if (c.company) return 'company';
   if (c.sold) return 'sold';
-  if (c.bkno || bkByVin.get(c.vin)) return 'booked';
+  const bv = bkByVin.get(c.vin);
+  if (c.bkno || (bv && (!c.fromBr || !bv.br || bv.br === c.br))) return 'booked';
   if (c.bknote) return 'noted';
   return 'free';
 }
@@ -65,7 +73,10 @@ function derive() {
 function deriveNow() {
   const today = todayISO(), X = idsData();
   const invByVin = new Map();
-  X.inv.forEach(i => { const p = invByVin.get(i.vin); if (!p || (i.idate || '') > (p.idate || '')) invByVin.set(i.vin, i); });
+  // latest invoice per car; on the same date the sale to a customer wins over the sale between AT Honda branches
+  // (PSC sells to SPH on 31/03 and SPH sells to the customer the same day: the car is SPH's customer's)
+  X.inv.forEach(i => { const p = invByVin.get(i.vin), a = i.idate || '', b = p ? p.idate || '' : '';
+    if (!p || a > b || (a === b && p.company && !i.company) || (a === b && !!p.company === !!i.company && !p.ddate && i.ddate)) invByVin.set(i.vin, i); });
 
   // IDS bookings
   // web changes to IDS bookings (ids/bkfix) go on top of each upload
@@ -78,10 +89,20 @@ function deriveNow() {
 
   // cars: IDS stock + cars received here, minus removed, with transfers applied
   const cars = new Map();
-  X.cars.forEach(c => {
+  // a car invoiced to another AT Honda branch has moved there: it is that branch's stock from now on
+  // (the old branch's file may still list it). If the new branch's file has it too, its own row is used.
+  const stockBrs = new Map(); X.cars.forEach(c => { if (!stockBrs.has(c.vin)) stockBrs.set(c.vin, new Set()); stockBrs.get(c.vin).add(c.br); });
+  X.cars.forEach(c0 => {
+    const to = c0.company ? atBranchOf(c0.cust) : null;
+    let c = c0;
+    if (to && to !== c0.br) {
+      if (stockBrs.get(c0.vin).has(to)) return;
+      c = { ...c0, br: to, fromBr: c0.br, company: false, sold: false, bkno: null, bknote: null, cust: null, note: [c0.note, `โอนจาก ${c0.br}`].filter(Boolean).join(' · ') };
+    }
     const car = { ...c, src: 'IDS', prodIds: c.prod || null };
     if (!car.st) car.st = carStatus(car, invByVin.get(car.vin), bkByVin);
-    const b = bkByVin.get(car.vin) || ((car.bkno || car.bk) ? bkByNo.get(car.bkno || car.bk) : null);
+    let b = bkByVin.get(car.vin) || ((car.bkno || car.bk) ? bkByNo.get(car.bkno || car.bk) : null);
+    if (b && car.fromBr && b.br && b.br !== car.br) b = null;
     car.bk = car.bk || car.bkno || b?.no || null;
     car.cust = car.cust || b?.cust || null;
     car.sales = b?.sales || null;
