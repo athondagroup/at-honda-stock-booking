@@ -345,7 +345,9 @@ function lockRow(l, D, o = {}) {
   const acts = [];
   // a request from the sheet: the manager can pick the booking (AT form or IDS) before approving
   if (canDecide && !took && sheet && !o.compact) acts.push(`<button class="btn btn-ghost btn-sm" data-act="lockbk-open" data-id="${l.id}">เลือกใบจอง</button>`);
-  if (canDecide && !took) acts.push(`<button class="btn btn-red btn-sm" data-act="approve" data-id="${l.id}">อนุมัติ</button>`);
+  const mv = l.status === 'pending' ? lockMoveFrom(l, D) : null;
+  if (canDecide && !took && mv) acts.push(`<button class="btn btn-red btn-sm" data-act="lockmove-new" data-id="${l.id}" data-old="${esc(mv.id)}">ใช้คันใหม่ (ย้ายล็อก)</button><button class="btn btn-dark btn-sm" data-act="lockmove-keep" data-id="${l.id}" data-old="${esc(mv.id)}">ใช้คันเดิม</button>`);
+  else if (canDecide && !took) acts.push(`<button class="btn btn-red btn-sm" data-act="approve" data-id="${l.id}">อนุมัติ</button>`);
   if (canDecide) acts.push(`<button class="btn btn-ghost btn-sm" data-act="reject-open" data-id="${l.id}">ไม่อนุมัติ</button>`);
   if (l.status === 'pending' && p.write && requester && !o.compact) acts.push(`<button class="btn btn-ghost btn-sm" data-act="withdraw" data-id="${l.id}">ถอนคำขอ</button>`);
   if (canUndo(l) && p.write && !o.compact) acts.push(`<button class="btn btn-ghost btn-sm" data-act="undo" data-id="${l.id}" title="ย้อนกลับได้ภายใน ${UNDO_HOURS} ชั่วโมง">↶ ย้อนกลับ: ${esc(l.undo.act)}</button>`);
@@ -370,7 +372,7 @@ function lockRow(l, D, o = {}) {
   const reqH = (l.history || [])[0];
   return `<div class="p-3 md:px-4 flex flex-wrap gap-x-5 gap-y-2 items-center">
     <div class="w-36">${stTxt}<div class="mt-1">${chip(LOCK_TYPE[l.type]?.[0] || l.type, LOCK_TYPE[l.type]?.[1] || 'neutral')}</div>${l.queueN > 1 ? `<div class="mt-1">${chip(`คำขอที่ ${l.queuePos}/${l.queueN} ของคันนี้`, l.queuePos === 1 ? 'ink' : 'warn')}</div>` : ''}</div>
-    <div class="min-w-[170px] flex-1"><div>${unit} <span class="text-muted">${esc(br || '')}</span></div><div class="text-sm">${specLabel(l.spec || car?.spec || q?.spec || '')}</div>${car ? `<div class="text-xs text-muted">${prodPlain(car)} · อายุ ${car.age ?? '–'} วัน</div>` : ''}${l.swap ? `<div class="text-xs" style="color:var(--warn)">เปลี่ยนคันจาก <span class="code">${esc(l.swap.from_vin)}</span> · ${esc(l.swap.reason)}</div>` : ''}</div>
+    <div class="min-w-[170px] flex-1"><div>${unit} <span class="text-muted">${esc(br || '')}</span></div><div class="text-sm">${specLabel(l.spec || car?.spec || q?.spec || '')}</div>${car ? `<div class="text-xs text-muted">${prodPlain(car)} · อายุ ${car.age ?? '–'} วัน</div>` : ''}${l.moved_from ? `<div class="text-xs" style="color:var(--warn)">ย้ายล็อกจากคัน <span class="code">${esc(l.moved_from.vin || l.moved_from.ref || '')}</span></div>` : ''}${l.swap ? `<div class="text-xs" style="color:var(--warn)">เปลี่ยนคันจาก <span class="code">${esc(l.swap.from_vin)}</span> · ${esc(l.swap.reason)}</div>` : ''}</div>
     <div class="min-w-[180px] text-sm">${l.type === 'dealer' ? `ดีลเลอร์: ${esc(l.dealer_name || '')}` : l.type === 'temp' ? `ลูกค้าที่จะมาจอง: ${isSales() && !mine ? 'ของเซลล์อื่น' : esc(l.prospect || '–')}` : `ใบจอง ${esc(bookingLabel(l.bkref, D))}${bk ? ` · ${custCell(bk.cust, bk.owner, { seed: bk.seed })}` : ''}`}
       <div class="text-xs text-muted">เซลล์: ${esc(l.owner || l.sales_nick || '–')}${rec ? ` · ${esc(rec.purchase || '')}${rec.purchase === 'ไฟแนนซ์' ? ` ${esc(rec.fin_status || 'รอผล')}` : ''}` : ''}</div>
       ${sheet ? `<div class="text-xs text-muted">ข้อความในชีต: "${esc(sheet)}"${l.status === 'pending' && l.type === 'temp' && !took ? (() => { const n = sheetCands(l, D).length; return n ? ` · <span style="color:var(--warn)">มีใบจองที่อาจใช่ ${n} ใบ</span>` : ''; })() : ''}</div>` : ''}
@@ -379,6 +381,7 @@ function lockRow(l, D, o = {}) {
       ${!l.idsTook && !l.idsInfo && car && ['invoiced', 'sold', 'company'].includes(car.st) && ['pending', 'approved'].includes(l.status) ? `<div class="text-xs" style="color:var(--warn)">IDS ${car.st === 'company' ? 'ออกใบกำกับเป็นรถบริษัท' : car.st === 'sold' ? 'แจ้งขายแล้ว' : 'ออกใบกำกับแล้ว'} แต่ยังไม่ส่งมอบ (เช่น advanced invoice) ยังอนุมัติได้</div>` : ''}
       ${l.bumped ? `<div class="text-xs" style="color:var(--bad)">มีใบจองของ ${esc(l.bumped.owner || '')} ได้รถคันนี้ไปแล้ว</div>` : l.challenged ? `<div class="text-xs" style="color:var(--warn)">มีใบจองของ ${esc(l.challenged.owner || '')} ขอล็อกคันนี้ รออนุมัติ</div>` : ''}</div>
     ${o.compact ? '' : `<div class="w-36 text-xs text-muted">${l.start ? `${fmtD(l.start)} → <b class="num" style="color:var(--fg)">${l.hold ? 'จนส่งมอบ' : fmtD(l.end)}</b>` : `ขอเมื่อ ${fmtDT(l.requested_at)}`}<div>ขอโดย ${who(reqH)}</div>${(() => { const d = l.status !== 'pending' ? decidedBy(l) : null; return d ? `<div>${esc(d.act)}: ${who(d)}</div>` : ''; })()}</div>`}
+    ${mv ? lockMoveBox(l, mv, D) : ''}
     ${(l.warnings || []).length && l.status === 'pending' ? `<div class="w-full text-xs" style="color:var(--warn)">⚠ ${l.warnings.map(esc).join(' · ')}${l.note ? `<div class="text-muted">${esc(l.note)}</div>` : ''}</div>` : ''}
     ${acts.length ? `<div class="ml-auto flex flex-wrap gap-2">${acts.join('')}</div>` : l.status === 'pending' && !o.compact ? `<div class="ml-auto text-xs text-muted">รอ${l.type === 'dealer' ? 'พี่อั้ม' : MGR_NAME[br] || 'ผู้จัดการ'}อนุมัติ${l.type === 'dealer' ? '' : ` (สาขา ${esc(br || '')})`} · ถอนคำขอได้เฉพาะคนที่ส่งคำขอ</div>` : ''}
   </div>`;
