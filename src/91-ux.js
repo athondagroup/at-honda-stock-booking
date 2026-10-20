@@ -224,7 +224,8 @@ function menuItems() {
     ['upload', 'อัปโหลดข้อมูล IDS', 'ไฟล์ Stock, Booking, Quota, Invoice/DL จาก IDS'],
     ['admin', 'หลังบ้าน', S.role.role === 'exec' ? 'ผู้ใช้งาน รายชื่อเซลล์ รุ่น เกรด สี แก้ข้อมูลโดยตรง' : 'ดูได้อย่างเดียว การแก้ทำโดยผู้บริหาร']].filter(x => can.has(x[0]));
   if (!items.length) return '';
-  return `<nav class="flex flex-col gap-2 mb-4" aria-label="เมนูเพิ่มเติม">${items.map(([v, t, d]) => `<a href="#${v}" data-act="nav" data-view="${v}" class="bg-surface border border-line rounded-lg p-3 flex items-center gap-3" style="min-height:56px;${S.view === v ? 'border-color:var(--red)' : ''}">${svg(v === 'admin' ? 'admin' : v === 'upload' ? 'upload' : 'alerts')}<span class="flex-1"><span class="font-semibold block">${t}</span><span class="text-xs text-muted">${d}</span></span><span aria-hidden="true">›</span></a>`).join('')}</nav>`;
+  const bc = badgeCounts(derive()), nOf = v => v === 'datafix' ? datafixCount(derive()) : bc[v] || 0;
+  return `<nav class="flex flex-col gap-2 mb-4" aria-label="เมนูเพิ่มเติม">${items.map(([v, t, d]) => `<a href="#${v}" data-act="nav" data-view="${v}" class="bg-surface border border-line rounded-lg p-3 flex items-center gap-3" style="min-height:56px;${S.view === v ? 'border-color:var(--red)' : ''}">${svg(v === 'admin' ? 'admin' : v === 'upload' ? 'upload' : 'alerts')}<span class="flex-1"><span class="font-semibold block">${t}</span><span class="text-xs text-muted">${d}</span></span>${nOf(v) ? `<span class="chip" style="background:var(--red);color:#fff">${nOf(v)}</span>` : ''}<span aria-hidden="true">›</span></a>`).join('')}</nav>`;
 }
 Object.assign(ACTIONS, {
   'nav-back'() {
@@ -234,3 +235,6 @@ Object.assign(ACTIONS, {
     S.modal = null; setHash(); render(); window.scrollTo(0, 0);
   }
 });
+
+// how many kinds of data problem are open (the same rows the data-fix page lists)
+function datafixCount(D) { return datafixItems(D).reduce((t, [, rows]) => t + rows.filter(r => r[1] && r[1] !== 0).length, 0); }

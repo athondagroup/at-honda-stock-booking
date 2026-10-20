@@ -25,7 +25,7 @@ function lockIdsBox(l, D) {
   return `<div class="p-3 md:px-4" style="background:var(--warn-soft)">
     <div class="text-sm"><b>IDS จัดสรรรถคันนี้ให้ ${esc(info.cust || '–')}</b>${info.no ? ` (ใบจอง ${esc(info.no)})` : ''} · ล็อกนี้ทำไว้ให้ <b>${esc(lockIdsCust(l) || '–')}</b> · เซลล์ ${esc(l.owner || '–')} · ชื่อไม่ตรงกัน</div>
     ${can ? `<div class="mt-2 flex flex-wrap gap-2 items-end">
-      <div class="field grow" style="min-width:260px"><label class="text-xs" for="lki-${esc(l.id)}">ใบจองที่ตรงกับล็อกนี้</label><select id="lki-${esc(l.id)}" data-lockids="${esc(l.id)}">
+      <div class="field grow" style="min-width:min(260px,100%);flex-basis:260px"><label class="text-xs" for="lki-${esc(l.id)}">ใบจองที่ตรงกับล็อกนี้</label><select id="lki-${esc(l.id)}" data-lockids="${esc(l.id)}">
         <option value="">เลือกใบจอง</option>${cands.map(c => `<option value="${esc(c.key)}" ${pick === c.key ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}</select></div>
       <button class="btn btn-dark btn-sm" data-act="lockids-pick" data-id="${esc(l.id)}" ${pick ? '' : 'disabled'}>ยืนยันใบจองนี้</button>
       <button class="btn btn-red btn-sm" data-act="lockids-close" data-id="${esc(l.id)}">ไม่มีใบจองที่ตรง ปิดล็อก</button>

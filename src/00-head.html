@@ -55,6 +55,9 @@ if (window.tailwind) tailwind.config = {
   color-scheme: dark;
 }
 html, body { height: 100%; }
+/* nothing may make the page wider than the phone (iOS then zooms the whole page out) */
+html { overflow-x: hidden; }
+.field select { max-width: 100%; min-width: 0; text-overflow: ellipsis; }
 body { background: var(--bg); color: var(--fg); font-family: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif; font-size: 14px; line-height: 1.55; }
 h1, h2, h3 { text-wrap: balance; }
 .num { font-variant-numeric: tabular-nums; }
