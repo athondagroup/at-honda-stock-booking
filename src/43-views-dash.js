@@ -106,7 +106,6 @@ function dashAdmin(D) {
 // ---- managers (and the executive's operations view): approvals, car queue, the four-branch picture
 function dashManager(D) {
   const own = mgrBranches(), inOwn = x => own.includes(x.br);
-  const items = inboxItems(D);
   const tot = BRS.reduce((t, b) => { Object.keys(D.sum[b]).forEach(k => { t[k] = (t[k] || 0) + D.sum[b][k]; }); return t; }, {});
   const low = Object.values(D.specs).filter(s => s.low).sort((a, b) => (a.free + a.incoming - a.waiting) - (b.free + b.incoming - b.waiting));
   const waiting = D.bookings.filter(b => b.state === 'waiting' && inOwn(b)).length;
@@ -117,19 +116,16 @@ function dashManager(D) {
     <td class="num text-right">${go('stock', 'list', b || '', s.stock)}</td><td class="num text-right">${s.free}</td><td class="num text-right">${s.held}</td><td class="num text-right">${s.locked || '–'}</td>
     <td class="num text-right">${s.ids}</td><td class="num text-right">${s.waiting}</td><td class="num text-right">${s.at}${s.atNoIds ? ` <span class="text-xs text-muted">(${s.atNoIds} ยังไม่พบใน IDS)</span>` : ''}</td>
     <td class="num text-right">${s.quotaIn}<span class="text-muted text-xs"> / ${s.quota}</span></td></tr>`;
-  const preview = items.slice(0, 5).map(x => x.l ? lockRow(x.l, D, { compact: true }) : inboxRow(x.a, INBOX_KIND[x.kind], '', '', 'เปิด')).join('');
-  return `${pageHead(S.role.role === 'exec' ? 'งานรออนุมัติและคิวรถ' : `${MGR_NAME[own[0]] || 'ผู้จัดการ'} · สาขา ${own.join(', ')}`, `ณ ${fmtD(D.today)} · อนุมัติได้เฉพาะสาขา ${own.join(', ')} ดูได้ทุกสาขา`)}
+  return `${pageHead(S.role.role === 'exec' ? 'คิวรถและภาพรวมสาขา' : `${MGR_NAME[own[0]] || 'ผู้จัดการ'} · สาขา ${own.join(', ')}`, `ณ ${fmtD(D.today)} · งานรออนุมัติอยู่ที่ "งานวันนี้ → รอฉันอนุมัติ"`)}
   ${execSeg()}
   ${tiles([
-    tile('รออนุมัติ', fmtN(items.length), { view: 'inbox', tone: items.length ? 'warn' : '', sub2: 'ล็อก แก้ไข ยกเลิก ส่งมอบ' }),
     tile('ใบจองรอรถ (สาขาฉัน)', fmtN(waiting), { view: 'book', sub: 'queue' }),
     tile('สเปกรถไม่พอคิว', fmtN(low.length), { view: 'stock', sub: 'spec', tone: low.length ? 'bad' : '' }),
     tile('ล็อกจะหมดใน 2 วัน', fmtN(expiring.length), { view: 'lock', sub: 'active', tone: expiring.length ? 'warn' : '' }),
     tile('ยังไม่อยู่ใน IDS เกิน 3 วัน', fmtN(noIds), { st: 'noids', tone: noIds ? 'bad' : '' }),
     tile('รถว่าง ขายได้ (ทุกสาขา)', fmtN(tot.free), { view: 'stock', tone: 'good' })
-  ], 'lg:grid-cols-6')}
-  <div class="grid lg:grid-cols-2 gap-x-5">
-    ${sectionBox(`รออนุมัติ <span class="text-muted text-base">${items.length}</span>`, go('inbox', '', undefined, 'ดูทั้งหมด', 'text-sm text-red'), listBox(preview, ['ไม่มีอะไรรออนุมัติ', 'คำขอยกเลิก แก้ไข ล็อก และยืนยันส่งมอบ จะขึ้นที่นี่']))}
+  ], 'lg:grid-cols-5')}
+  <div>
     ${sectionBox('คิวรถ: สเปกที่ไม่พอ', go('stock', 'spec', undefined, 'ไปหน้าสต็อก', 'text-sm text-red'), `<div class="bg-surface border border-line rounded-lg scroll-x">${low.length ? `<table class="tbl"><thead><tr><th>รุ่น / เกรด / สี</th><th class="text-right">รอรถ</th><th class="text-right">ว่าง</th><th class="text-right">Quota ว่าง</th><th class="text-right">ขาด</th></tr></thead><tbody>
       ${low.slice(0, 8).map(s => `<tr class="low"><td>${specLabel(s.key)}</td><td class="num text-right">${s.waiting}</td><td class="num text-right">${s.free}</td><td class="num text-right">${s.incoming}</td><td class="num text-right font-semibold" style="color:var(--bad)">${Math.min(0, s.free + s.incoming - s.waiting)}</td></tr>`).join('')}</tbody></table>` : emptyBox('ทุกสเปกมีรถพอกับคิว', '')}</div>`)}
   </div>
@@ -222,7 +218,7 @@ function colChart(id, buckets, series, o = {}) {
       });
     } else series.forEach((s, si) => {
       const v = s.values[i], x = gx + si * (bw + 2);
-      marks += `<path d="${rr(x, y(v), bw, Math.max(0, y(0) - y(v)), true)}" fill="var(${s.color})" class="viz-mark" tabindex="0" ${v ? drillAttr(drillSpecOf(s.drill, b, i, o.range)) : ''} data-tip="${esc(`${b.label} · ${s.name} ${fmtN(v)}${s.drill && v ? ' · กดดูรายคัน' : ''}`)}"></path>`;
+      marks += `<path d="${rr(x, y(v), bw, Math.max(0, y(0) - y(v)), true)}" fill="var(${s.color})" class="viz-mark" tabindex="0" ${v ? drillAttr(drillSpecOf(s.drill, b, i, o.range)) : ''} data-tip="${esc(`${b.label} · ${s.name} ${fmtN(v)}${o.unit || ''}${s.drill && v ? ' · กดดูรายคัน' : ''}`)}"></path>`;
       if (!v) marks += `<rect x="${x}" y="${y(0) - 1}" width="${bw}" height="1" fill="var(--line)"></rect>`;
     });
   });
@@ -230,7 +226,7 @@ function colChart(id, buckets, series, o = {}) {
   for (let v = 0; v <= top; v += step) grid += `<line x1="${padL}" x2="${W - 8}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"></line><text x="${padL - 6}" y="${y(v) + 4}" text-anchor="end" class="viz-ax">${fmtN(v)}</text>`;
   const labels = buckets.map((b, i) => `<text x="${padL + i * band + band / 2}" y="${H - 8}" text-anchor="middle" class="viz-ax">${esc(b.label)}</text>`).join('');
   const legend = series.length > 1 ? `<div class="flex flex-wrap gap-4 text-sm mb-1">${series.map(s => `<span class="inline-flex items-center gap-2"><i class="inline-block w-3 h-3 rounded-sm" style="background:var(${s.color})"></i>${esc(s.name)}</span>`).join('')}</div>` : '';
-  const table = `<details class="mt-1"><summary class="text-xs text-muted cursor-pointer">ดูเป็นตาราง</summary><div class="scroll-x"><table class="tbl text-sm mt-1"><thead><tr><th></th>${buckets.map(b => `<th class="text-right">${esc(b.label)}</th>`).join('')}<th class="text-right">รวม</th></tr></thead><tbody>
+  const table = o.noTable ? '' : `<details class="mt-1"><summary class="text-xs text-muted cursor-pointer">ดูเป็นตาราง</summary><div class="scroll-x"><table class="tbl text-sm mt-1"><thead><tr><th></th>${buckets.map(b => `<th class="text-right">${esc(b.label)}</th>`).join('')}<th class="text-right">รวม</th></tr></thead><tbody>
     ${series.map(s => `<tr><td class="nowrap">${esc(s.name)}</td>${s.values.map((v, i) => `<td class="num text-right">${drillNum(v, s.drill && v ? drillSpecOf(s.drill, buckets[i], i, o.range) : null)}</td>`).join('')}<td class="num text-right font-semibold">${fmtN(s.values.reduce((a, b) => a + b, 0))}</td></tr>`).join('')}</tbody></table></div></details>`;
   return `${legend}<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(o.label || '')}" class="viz">${grid}<line x1="${padL}" x2="${W - 8}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-width="1"></line>${marks}${labels}</svg>${table}`;
 }
@@ -332,4 +328,19 @@ ${JSON.stringify(data)}`;
   document.addEventListener('focusin', ev => { const el = ev.target.closest && ev.target.closest('.viz-mark[data-tip]'); if (el) { const r = el.getBoundingClientRect(); show(el, r.left + r.width / 2, r.top); } });
   document.addEventListener('focusout', hide);
   window.addEventListener('scroll', hide, true);
+  // touch: the first tap on a bar shows its numbers, the second tap on the same bar opens the list
+  // (a mouse already sees the numbers on hover, so one click opens the list)
+  let pType = 'mouse', armed = null;
+  document.addEventListener('pointerdown', ev => { pType = ev.pointerType || 'mouse'; }, true);
+  document.addEventListener('click', ev => {
+    const mark = ev.target.closest && ev.target.closest('.viz-mark[data-tip]');
+    const drillEl = ev.target.closest && ev.target.closest('[data-act="drill"]');
+    if (!mark || !drillEl || pType === 'mouse') { armed = null; return; }
+    if (armed === drillEl) { armed = null; hide(); return; }
+    ev.preventDefault(); ev.stopImmediatePropagation();
+    armed = drillEl;
+    const r = mark.getBoundingClientRect();
+    show(mark, r.left + r.width / 2, r.top);
+    tip.textContent = mark.dataset.tip.replace(/ · กดดูรายคัน$/, '') + ' · แตะอีกครั้งเพื่อดูรายละเอียด';
+  }, true);
 })();
