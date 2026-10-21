@@ -10,8 +10,11 @@
 // Rows marked "คีย์ซ้ำ" (sheet column C, or kept in ref/gsdup where the sheet cannot be written) are not offered again.
 // Only function declarations at the top level: the first render runs before this file.
 function bkDupKey(s) { return normName(s).replace(/\s+/g, ''); }
+// both a first name and a last name are there (two words once titles are taken off)
+function bkDupFull(s) { return stripTitles(String(s || '')).trim().split(/\s+/).filter(w => normName(w).length >= 2).length >= 2; }
 function bkDupsOf(name, D, exceptId) {
-  const k = bkDupKey(name); if (k.length < 4) return [];
+  if (!bkDupFull(name)) return [];
+  const k = bkDupKey(name);
   return D.at.filter(a => a.id !== exceptId && !a.cancelled && a.active && bkDupKey(a.cust) === k)
     .sort((x, y) => String(y.date || '').localeCompare(String(x.date || '')));
 }
