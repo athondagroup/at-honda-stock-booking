@@ -29,6 +29,7 @@ function gsRow(r) {
   const m = c(15).match(/id=([A-Za-z0-9_\-]+)/); if (!m || !c(5)) return null;
   const tail = [c(19), c(20)], delivered = tail.some(x => /^DELIVERED/i.test(x)), cancelled = c(2) === 'ยกเลิก' || tail.includes('ยกเลิก');
   const webId = tail.find(x => x && !/^DELIVERED/i.test(x) && x !== 'ยกเลิก') || null;
+  if (c(2) === 'คีย์ซ้ำ') return { id: 'F_' + m[1], keyDup: true, webId, doc: { customer: c(5) } };
   const demo = /ทดลองขับ|เทสไดร์/.test(c(6)) || c(2) === 'รถ Demon';
   const mg = gsModel(c(6), c(7)), fit = fitSpec({ model: mg.model, grade: mg.grade, color: c(8).slice(0, 3).toUpperCase(), text: `${c(6)} ${c(7)} ${c(8)}` });
   const sales = gsSales(c(4));
@@ -54,7 +55,7 @@ async function gsCheck(manual) {
     const webIds = new Set(S.bookings.keys()), rows = [];
     let total = 0;
     S.gsSeenWeb = new Set();
-    for (const r of vals) { const x = gsRow(r); if (!x) continue; total++; if (x.webId && webIds.has(x.webId)) S.gsSeenWeb.add(x.webId); if (S.bookings.has(x.id) || (x.webId && webIds.has(x.webId))) continue; rows.push(x); }
+    for (const r of vals) { const x = gsRow(r); if (!x) continue; total++; if (x.keyDup || gsIgnored(x.id)) continue; if (x.webId && webIds.has(x.webId)) S.gsSeenWeb.add(x.webId); if (S.bookings.has(x.id) || (x.webId && webIds.has(x.webId))) continue; rows.push(x); }
     rows.sort((a, b) => (b.doc.created_at || '').localeCompare(a.doc.created_at || ''));
     S.gs = { busy: false, at: new Date().toISOString(), total, rows, pick: Object.fromEntries(rows.map(x => [x.id, !x.doc.demo])) };
   } catch (e) {
@@ -92,7 +93,7 @@ function gsBox(D) {
       <div class="flex flex-wrap gap-3 items-center"><div class="flex-1 min-w-[220px] text-sm">${g.busy ? '<span class="spin"></span> กำลังอ่านชีตฟอร์มจอง…' : g.err ? `<span style="color:var(--bad)">${esc(gsErrText(g))}</span>` : g.at ? `อ่านชีตแล้ว ${fmtDT(g.at)} · ในชีต ${g.total} ใบ · <b>ใหม่ ${rows.length} ใบ</b>` : 'ระบบตรวจให้เองเมื่อเปิดหน้า หรือกดตรวจตอนนี้'}</div>
         <button class="btn btn-ghost btn-sm" data-act="gs-check" ${g.busy ? 'disabled' : ''}>ตรวจใบจองใหม่</button></div>
       ${rows.length ? `<div class="scroll-x mt-3"><table class="tbl text-sm"><thead><tr><th></th><th>ลงฟอร์มเมื่อ</th><th>ลูกค้า</th><th>เซลล์ / สาขา</th><th>รุ่น เกรด สี</th><th></th></tr></thead><tbody>
-        ${rows.map(x => `<tr><td><input type="checkbox" class="w-5 h-5" data-gspick="${esc(x.id)}" ${g.pick && g.pick[x.id] ? 'checked' : ''} aria-label="เลือก ${esc(x.doc.customer)}"></td><td class="num nowrap">${fmtDT(x.doc.created_at)}</td><td>${esc(x.doc.customer)}${x.doc.status === 'cancelled' ? ' ' + chip('ยกเลิก', 'muted') : ''}${x.doc.demo ? ' ' + chip('รถทดลองขับ', 'muted') : ''}</td>
+        ${rows.map(x => `<tr><td><input type="checkbox" class="w-5 h-5" data-gspick="${esc(x.id)}" ${g.pick && g.pick[x.id] ? 'checked' : ''} aria-label="เลือก ${esc(x.doc.customer)}"></td><td class="num nowrap">${fmtDT(x.doc.created_at)}</td><td>${esc(x.doc.customer)}${gsDupCell(x, D)}${x.doc.status === 'cancelled' ? ' ' + chip('ยกเลิก', 'muted') : ''}${x.doc.demo ? ' ' + chip('รถทดลองขับ', 'muted') : ''}</td>
           <td class="nowrap">${esc(x.doc.sales || '')}${x.doc.sales_raw ? `<div class="text-xs text-muted">ในฟอร์ม: ${esc(x.doc.sales_raw)}</div>` : ''}<div class="text-xs text-muted">${esc(x.doc.br || '?')}</div></td>
           <td>${esc(x.doc.model)} ${esc(gradeShort(x.doc.model, x.doc.grade) || x.doc.grade || '')} ${esc(x.doc.color || '')}${CATALOG[x.doc.model] && (CATALOG[x.doc.model] || {})[x.doc.grade] ? '' : ` ${chip('รุ่น/เกรดไม่อยู่ในรายการ', 'warn')}`}</td>
           <td><a class="underline text-xs" href="${esc(x.doc.doc_url)}" target="_blank" rel="noopener">รูปใบจอง</a></td></tr>`).join('')}</tbody></table></div>
@@ -107,10 +108,17 @@ Object.assign(ACTIONS, {
     const pick = g.rows.filter(x => g.pick && g.pick[x.id] && !S.bookings.has(x.id));
     if (!pick.length) { toast('เลือกใบจองที่จะนำเข้า', 'bad'); return; }
     g.saving = true; render();
-    let n = 0;
-    for (const x of pick) if (await write('bookings', x.id, { ...x.doc, log: [{ ...actor(), act: 'นำเข้าจากฟอร์ม Google', note: x.doc.sales_raw || '' }] })) n++;
-    g.saving = false; g.rows = g.rows.filter(x => !S.bookings.has(x.id));
-    toast(`นำเข้าแล้ว ${n} ใบ`); render();
+    let n = 0, dup = 0, rep = 0;
+    const done = new Set();
+    for (const x of pick) {
+      const d = await gsDupApply(x, derive());
+      if (d === 'skip') { dup++; done.add(x.id); continue; }
+      if (d === 'replaced') { rep++; done.add(x.id); continue; }
+      const note = [x.doc.sales_raw, x.doc.dup_note].filter(Boolean).join(' · '); delete x.doc.dup_note;
+      if (await write('bookings', x.id, { ...x.doc, log: [{ ...actor(), act: 'นำเข้าจากฟอร์ม Google', note }] })) n++;
+    }
+    g.saving = false; g.rows = g.rows.filter(x => !S.bookings.has(x.id) && !done.has(x.id));
+    toast(`นำเข้าแล้ว ${n} ใบ${rep ? ` · แทนใบเดิม ${rep} ใบ` : ''}${dup ? ` · คีย์ซ้ำ ไม่นำเข้า ${dup} ใบ` : ''}`); render();
   }
 });
 document.addEventListener('change', ev => {

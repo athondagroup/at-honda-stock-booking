@@ -187,7 +187,7 @@ function bookingHistory(a) {
   if (a.rec.created_at) log.push({ at: a.rec.created_at, by: a.rec.created_by, role: a.rec.created_role, act: 'ลงใบจอง', note: '' });
   log.sort((x, y) => (y.at || '').localeCompare(x.at || ''));
   if (log.length < 2) return '';
-  return `<details class="text-sm"><summary class="cursor-pointer font-medium">ประวัติใบจอง (${log.length})</summary><div class="mt-2 flex flex-col gap-1">${log.slice(0, 40).map(h => `<div class="flex flex-wrap gap-x-3"><span class="num text-muted w-28">${fmtDT(h.at)}</span><span class="font-medium">${esc(h.act || '')}</span><span class="text-muted">${esc(h.note || '')}</span><span class="text-xs text-muted">${who(h)}</span></div>`).join('')}</div></details>`;
+  return `<details class="text-sm"><summary class="cursor-pointer font-medium">ประวัติใบจอง / การแก้ไข (${log.length})${log.some(h => bkMoneyNote(h.note)) ? ' <span class="chip" style="background:var(--bad-soft);color:var(--bad)">มีการแก้ส่วนลด / FOC / ราคา</span>' : ''}</summary><div class="mt-2 flex flex-col gap-1">${log.slice(0, 40).map(h => `<div class="flex flex-wrap gap-x-3"><span class="num text-muted w-28">${fmtDT(h.at)}</span><span class="font-medium">${esc(h.act || '')}</span>${bkMoneyNote(h.note) ? `<span class="font-semibold" style="color:var(--bad)">${esc(h.note || '')}</span>` : `<span class="text-muted">${esc(h.note || '')}</span>`}<span class="text-xs text-muted">${who(h)}</span></div>`).join('')}</div></details>`;
 }
 
 // ---------- approval inbox: a combined tab and one tab per topic (lock for a booking, cancel, model change, …), oldest first
@@ -247,3 +247,6 @@ Object.assign(ACTIONS, {
     if (r) { S.modal = null; toast(`จับคู่ ${a.cust} กับ IDS ${b ? b.no : ''} แล้ว`); render(); }
   }
 });
+
+// a history line that changes money the customer gets (discount, FOC, price) stands out
+function bkMoneyNote(n) { return /(ส่วนลด|FOC|ราคา)[^·]*→/.test(String(n || '')); }

@@ -23,7 +23,7 @@ function bkSheetSet(rec, f) {
 async function bkSheetSync(id, rec, f) {
   if (!(window.__WEB && window.__WEB.sheetUpdate)) return 'skip';
   const set = bkSheetSet(rec, f); if (!Object.keys(set).length) return 'skip';
-  const c = gsCfg(), driveId = id.startsWith('F_') ? id.slice(2) : '', webId = driveId ? '' : id;
+  const c = gsCfg(), driveId = (rec && rec.sheet_drive_id) || (id.startsWith('F_') ? id.slice(2) : ''), webId = driveId ? '' : id;
   const r = await window.__WEB.sheetUpdate({ sheetId: c.id, tab: (c.range || 'Booking!A2:U').split('!')[0], webId, driveId, set });
   return (r && r.sheet) || 'error';
 }
