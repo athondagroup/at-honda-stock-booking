@@ -53,7 +53,7 @@ function atModal(m, D) {
   if (m.edit) return editPanel(m, a);
   if (m.refund) return refundPanel(m, a);
   const imgs = [...(r.doc_imgs || []).map(id => ['ใบจอง', id]), ...(r.slip_imgs || []).map(id => ['สลิป', id]), ...((r.flow?.fin?.docs) || []).map(id => ['เอกสารไฟแนนซ์', id])];
-  const rows = [['วันที่จอง', fmtD(a.date)], ['สาขา', `${a.br || ''} ${BR[a.br]?.name || ''}`], ['เซลล์เจ้าของ (AT)', `${a.sales || ''}${a.salesBr ? ` (สาขา ${a.salesBr})` : ''}`],
+  const rows = [...(a.custForm ? [['ชื่อลูกค้า', `${a.cust} (ตาม IDS) · ในฟอร์ม AT สะกด "${a.custForm}"`]] : []), ['วันที่จอง', fmtD(a.date)], ['สาขา', `${a.br || ''} ${BR[a.br]?.name || ''}`], ['เซลล์เจ้าของ (AT)', `${a.sales || ''}${a.salesBr ? ` (สาขา ${a.salesBr})` : ''}`],
     ['สาขาที่ออกรถ', a.cross ? `${a.delivBr} · ขายข้ามสาขา: ยอดขายนับให้สาขา ${a.delivBr} ค่าคอมเป็นของ ${a.sales}` : null], ['ลงคิวใหม่เมื่อ', r.queue_date && r.queue_date !== r.booking_date ? `${fmtD(r.queue_date)} (เปลี่ยนรุ่น/สี)` : null], ['ลูกค้า', mine ? a.cust : 'ลูกค้าของเซลล์อื่น'],
     ['รุ่น', `${a.model} ${a.grade} ${a.color}${a.specFromIds ? ' (ตาม IDS)' : ''}`], ['ฟอร์ม AT ลงไว้', a.specFromIds ? `${a.atSpec.model} ${a.atSpec.grade} ${a.atSpec.color} · ระบบใช้รุ่นตาม IDS คิวเดิม` : null], ['เงื่อนไข', [r.purchase, r.finance].filter(Boolean).join(' · ')], ['ประกันภัย', r.insurance], ['ราคารถ', bookPriceLine(a, D)], ['ส่วนลด', money(r.discount)], ['FOC ที่ใช้ทั้งหมด', money(r.foc_total)],
     ['มัดจำ', r.deposit ? money(r.deposit) : (r.imported ? 'ไม่มีในฟอร์มเดิม' : '–')], ['แหล่งที่มา', r.source], ['Lead ID', r.lead_id], ['หมายเหตุ', r.note], ['ข้อความในฟอร์มเดิม', r.imported ? r.model_text : null]].filter(([, v]) => v !== null && v !== undefined && v !== '');

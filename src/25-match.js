@@ -25,8 +25,25 @@ function keyScore(a, b) {
   if (x === y) return 3;
   if (x.length >= 6 && y.length >= 6 && (x.includes(y) || y.includes(x))) return 2;
   if (x.length >= 8 && a.t === b.t) return 2;
+  // one typo in a full name (a letter added, dropped, changed, or two side by side swapped: นรนม ↔ นรมน)
+  if (x.length >= 8 && y.length >= 8 && Math.abs(x.length - y.length) <= 1 && osaDist(x, y, 1) <= 1) return 2;
   if (a.f.length >= 3 && a.f === b.f) return 1;
   return 0;
+}
+// optimal string alignment distance, stopping once it passes max
+function osaDist(a, b, max) {
+  const n = a.length, m = b.length; let p2 = null, p1 = Array.from({ length: m + 1 }, (_, j) => j);
+  for (let i = 1; i <= n; i++) {
+    const c = [i]; let lo = i;
+    for (let j = 1; j <= m; j++) {
+      let v = Math.min(p1[j] + 1, c[j - 1] + 1, p1[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (p2 && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, p2[j - 2] + 1);
+      c.push(v); if (v < lo) lo = v;
+    }
+    if (lo > max) return max + 1;
+    p2 = p1; p1 = c;
+  }
+  return p1[m];
 }
 const nameScore = (a, b) => keyScore(nameKey(a), nameKey(b));
 const MATCH_FROM = '2026-01-01';

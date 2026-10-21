@@ -152,7 +152,7 @@ function gsearchModal(m, D) {
   if (q.length >= 2) {
     const vinHit = v => v && (String(v).toUpperCase().endsWith(up) || (up.length >= 6 && String(v).toUpperCase().includes(up)));
     cars = [...D.cars.values(), ...D.deliveredOut].filter(c => inScope(c) && (vinHit(c.vin) || (c.ref && String(c.ref).toUpperCase().includes(up)))).slice(0, 10);
-    bks = bookRows(D).filter(r => rowVisible(r) && inScope(r) && ([r.no, r.owner, r.idsSales].some(x => x && searchKey(x).includes(k)) || vinHit(r.vin) || ((!isSales() || isMine(r.owner)) && [r.cust, r.b && r.b.cust].some(x => x && searchKey(x).includes(k))))).slice(0, 12);
+    bks = bookRows(D).filter(r => rowVisible(r) && inScope(r) && ([r.no, r.owner, r.idsSales].some(x => x && searchKey(x).includes(k)) || vinHit(r.vin) || ((!isSales() || isMine(r.owner)) && [r.cust, r.b && r.b.cust, r.a && r.a.rec.customer].some(x => x && searchKey(x).includes(k))))).slice(0, 12);
     qs = D.quota.filter(x => inScope(x) && ((x.ref && String(x.ref).toUpperCase().includes(up)) || vinHit(x.vin))).slice(0, 8);
   }
   const vinShow = v => { const s = String(v || ''); return up && s.toUpperCase().endsWith(up) ? `${esc(s.slice(0, s.length - up.length))}<b style="background:var(--warn-soft)">${esc(s.slice(-up.length))}</b>` : esc(s); };

@@ -100,7 +100,7 @@ function bookList(D) {
   if (f.bColor) list = list.filter(r => (sp(r)[2] || '').toUpperCase() === f.bColor);
   if (f.bSales) list = list.filter(r => r.owner === f.bSales || r.idsSales === f.bSales);
   if (dRange) list = list.filter(r => bookDateOk(r, D));
-  if (q) list = list.filter(r => [r.no, r.cust, r.owner, r.idsSales, r.vin, r.b && r.b.cust, r.a && r.a.atSpec && r.a.rec.customer].some(x => x && searchKey(x).includes(q)));
+  if (q) list = list.filter(r => [r.no, r.cust, r.owner, r.idsSales, r.vin, r.b && r.b.cust, r.a && r.a.rec.customer].some(x => x && searchKey(x).includes(q)));
   if (dRange && f.bDType === 'sale') list.sort((x, y) => (saleDate(y, D) || '').localeCompare(saleDate(x, D) || '')); else list.sort((x, y) => (y.date || '').localeCompare(x.date || ''));
   // sort (บทวิเคราะห์ 19/10): open work first / waiting longest / entered last
   if (f.bSort === 'work') list.sort((x, y) => bkWorkRank(y, D) - bkWorkRank(x, D) || (x.date || '').localeCompare(y.date || ''));
