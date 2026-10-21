@@ -7,14 +7,19 @@
 // Only function declarations here: the first render runs before this part of the file.
 function outFixReasons() { return [['other_br', 'ขายให้สาขาอื่น'], ['dealer', 'ขาย/แลกดีลเลอร์'], ['other', 'นำออก (อื่น ๆ)'], ['still', 'ยังอยู่ (ไฟล์ Stock ไม่ครบ)']]; }
 function outFixWhy(r) { const t = (outFixReasons().find(x => x[0] === r.reason) || [, r.reason])[1]; return t + (r.text ? ' · ' + r.text : ''); }
+// a car flagged by an older upload that a later Stock file of the same branch lists again never left (the older file
+// was incomplete): it is no longer a question
+function outBack(u, o) { const c = derive().cars.get(o.vin); return !!(c && c.src === 'IDS' && c.br === u.br && !c.fromBr); }
+function outOpen(u, o) { return !!(o && o.flag && !o.res && !outBack(u, o)); }
 function outOpenLocks(vin) { return [...S.locks.entries()].filter(([, l]) => l.vin === vin && !l.hidden && ['pending', 'approved', 'allocated'].includes(l.status)); }
 function outFixList(u) {
   const can = canApproveBr(u.br) && perms().write, F = S.outFix && S.outFix.id === u.id ? S.outFix : null;
-  const todo = (u.out || []).filter(o => o.flag && !o.res), sel = F ? todo.filter(o => F.sel[o.vin]) : [];
+  const todo = (u.out || []).filter(o => outOpen(u, o)), sel = F ? todo.filter(o => F.sel[o.vin]) : [];
   const row = o => {
-    const lk = o.flag && !o.res ? outOpenLocks(o.vin).length : 0;
-    return `<div class="flex flex-wrap gap-x-4 items-center">${can && o.flag && !o.res ? `<input type="checkbox" class="w-4 h-4" data-outfix="${esc(u.id)}" data-vin="${esc(o.vin)}" ${F && F.sel[o.vin] ? 'checked' : ''} aria-label="เลือก ${esc(o.vin)}">` : ''}<span class="code">${esc(o.vin)}</span><span class="text-muted">${specLabel(o.spec)}</span>
+    const back = o.flag && !o.res && outBack(u, o), lk = outOpen(u, o) ? outOpenLocks(o.vin).length : 0;
+    return `<div class="flex flex-wrap gap-x-4 items-center">${can && outOpen(u, o) ? `<input type="checkbox" class="w-4 h-4" data-outfix="${esc(u.id)}" data-vin="${esc(o.vin)}" ${F && F.sel[o.vin] ? 'checked' : ''} aria-label="เลือก ${esc(o.vin)}">` : ''}<span class="code">${esc(o.vin)}</span><span class="text-muted">${specLabel(o.spec)}</span>
       ${o.res ? `<span style="color:var(--good)">ระบุแล้ว: ${esc(outFixWhy(o.res))}</span><span class="text-xs text-muted">${fmtDT(o.res.at)} ${esc(o.res.role || '')}</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>`
+        : back ? `<span style="color:var(--good)">กลับมาอยู่ในไฟล์ Stock ล่าสุดแล้ว (ไม่ได้ออกจริง ไฟล์รอบนั้นไม่ครบ)</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>`
         : `<span style="color:var(--${o.flag ? 'bad' : 'muted'})">${esc(o.why)}</span>${lk ? `<span class="text-xs" style="color:var(--warn)">ล็อกเปิดอยู่ ${lk}</span>` : ''}`}</div>`;
   };
   const bar = can && todo.length ? `<div class="p-3 rounded-lg mb-2" style="background:var(--warn-soft)">
@@ -33,7 +38,7 @@ function outFixList(u) {
 function outFixState(id) { if (!S.outFix || S.outFix.id !== id) S.outFix = { id, sel: {}, reason: 'other_br', text: '', closeLocks: true }; return S.outFix; }
 async function outFixSave(id) {
   const F = S.outFix, u0 = S.uploads.get(id); if (!F || F.id !== id || !u0 || !canApproveBr(u0.br) || F.busy) return;
-  const vins = (u0.out || []).filter(o => o.flag && !o.res && F.sel[o.vin]).map(o => o.vin); if (!vins.length) return;
+  const vins = (u0.out || []).filter(o => outOpen(u0, o) && F.sel[o.vin]).map(o => o.vin); if (!vins.length) return;
   const text = (F.text || '').trim();
   if (F.reason === 'dealer' && !text) { toast('ใส่ชื่อดีลเลอร์', 'bad'); return; }
   F.busy = true; render();
@@ -57,7 +62,7 @@ async function outFixSave(id) {
   toast(`บันทึกแล้ว ${vins.length} คัน${closed ? ` · ปิดล็อก ${closed} รายการ` : ''}`); render();
 }
 Object.assign(ACTIONS, {
-  'outfix-all'(el) { const F = outFixState(el.dataset.id), u = S.uploads.get(el.dataset.id); F.sel = {}; if (el.dataset.v && u) (u.out || []).filter(o => o.flag && !o.res).forEach(o => { F.sel[o.vin] = true; }); render(); },
+  'outfix-all'(el) { const F = outFixState(el.dataset.id), u = S.uploads.get(el.dataset.id); F.sel = {}; if (el.dataset.v && u) (u.out || []).filter(o => outOpen(u, o)).forEach(o => { F.sel[o.vin] = true; }); render(); },
   async 'outfix-save'(el) { await outFixSave(el.dataset.id); }
 });
 document.addEventListener('change', ev => {

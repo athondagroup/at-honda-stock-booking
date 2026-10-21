@@ -51,7 +51,7 @@ function datafixItems(D) {
   const f = freshInfo(D);
   const at = D.at.filter(a => inBr(a));
   const upl = [...S.uploads.values()].filter(u => inBr(u));
-  const outStock = upl.filter(u => u.src === 'stock').reduce((n, u) => n + (u.out || []).filter(o => o.flag && !o.res).length, 0);
+  const outStock = upl.filter(u => u.src === 'stock').reduce((n, u) => n + (u.out || []).filter(o => outOpen(u, o)).length, 0);
   const outBk = upl.filter(u => u.src === 'booking').reduce((n, u) => n + (u.out || []).filter(o => typeof bkOutPending === 'function' ? bkOutPending(o) : o.flag && !o.res).length, 0);
   return [
     ['ไฟล์ IDS', [
