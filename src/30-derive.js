@@ -153,6 +153,8 @@ function deriveNow() {
     a.near = M.near.get(a.key) || null;
     const bk = a.match && a.match.recs.find(r => r.kind === 'booking');
     a.ids = bk ? idsByKey.get(bk.key) : null;
+    // matched to an IDS booking whose name is spelt differently: IDS is the reference, the form's spelling is kept beside it
+    if (a.ids && a.ids.cust && normName(a.ids.cust) !== normName(a.cust)) { a.custForm = a.cust; a.cust = a.ids.cust; }
     if (!a.no && a.match) a.no = a.match.no;
     a.idsSales = a.match ? a.match.idsSales : null;
     // IDS is the reference for model / grade / colour; the booking keeps its place in the queue and nobody retypes it.

@@ -10,15 +10,20 @@
 // Rows marked "คีย์ซ้ำ" (sheet column C, or kept in ref/gsdup where the sheet cannot be written) are not offered again.
 // Only function declarations at the top level: the first render runs before this file.
 function bkDupKey(s) { return normName(s).replace(/\s+/g, ''); }
-// both a first name and a last name are there (two words once titles are taken off)
-function bkDupFull(s) { return stripTitles(String(s || '')).trim().split(/\s+/).filter(w => normName(w).length >= 2).length >= 2; }
+// same person: the whole name (titles and spacing ignored, so "ภาคภูมิพีรยวัฒนา" = "ภาคภูมิ พีรยวัฒนา") is the same,
+// or differs by one typo (one letter added, dropped, changed, or two side by side swapped: นรนม ↔ นรมน) in a name long
+// enough to be first name + last name. A first name alone never matches a full name.
+function bkDupSame(x, y) {
+  const a = bkDupKey(x), b = bkDupKey(y);
+  if (!a || !b) return false;
+  if (a === b) return a.length >= 4;
+  return Math.min(a.length, b.length) >= 8 && Math.abs(a.length - b.length) <= 1 && osaDist(a, b, 1) <= 1;
+}
 function bkDupsOf(name, D, exceptId) {
-  if (!bkDupFull(name)) return [];
-  const k = bkDupKey(name);
-  return D.at.filter(a => a.id !== exceptId && !a.cancelled && a.active && bkDupKey(a.cust) === k)
+  return D.at.filter(a => a.id !== exceptId && !a.cancelled && a.active && (bkDupSame(name, a.cust) || bkDupSame(name, a.rec.customer)))
     .sort((x, y) => String(y.date || '').localeCompare(String(x.date || '')));
 }
-function bkDupLine(a) { return `${esc(a.cust)} · ${esc(a.model || '')} ${esc(gradeShort(a.model, a.grade) || a.grade || '')} ${esc(a.color || '')} · จอง ${fmtD(a.date)} · ${esc(a.sales || '–')} · ${esc(a.br || '')}`; }
+function bkDupLine(a) { return `${esc(a.cust)}${a.custForm ? ` (ฟอร์ม: ${esc(a.custForm)})` : ''} · ${esc(a.model || '')} ${esc(gradeShort(a.model, a.grade) || a.grade || '')} ${esc(a.color || '')} · จอง ${fmtD(a.date)} · ${esc(a.sales || '–')} · ${esc(a.br || '')}`; }
 // the form's fields that a replacement copies onto the old booking
 function gsDupFields() { return ['booking_date', 'br', 'sales', 'customer', 'source', 'model', 'grade', 'color', 'purchase', 'insurance', 'discount', 'foc_total', 'note', 'lead_id', 'doc_url']; }
 function gsDupDiff(doc, rec) {
@@ -42,7 +47,7 @@ function gsDupCell(x, D) {
   const dups = bkDupsOf(x.doc.customer, D, x.id); if (!dups.length) return '';
   const g = S.gs || {}, act = (g.dupAct || {})[x.id] || 'dup', old = dups[0], r = S.bookings.get(old.id) || {};
   const diff = gsDupDiff(x.doc, r).filter(k => k !== 'doc_url');
-  return `<div class="mt-1 p-2 rounded text-xs" style="background:var(--warn-soft)"><b style="color:var(--bad)">⚠ ลูกค้าชื่อนี้เคยคีย์จองแล้ว</b>
+  return `<div class="mt-1 p-2 rounded text-xs" style="background:var(--warn-soft)"><b style="color:var(--bad)">⚠ ลูกค้าชื่อนี้เคยคีย์จองแล้ว${dups.some(a => bkDupKey(a.cust) !== bkDupKey(x.doc.customer) && bkDupKey(a.rec.customer) !== bkDupKey(x.doc.customer)) ? ' (ชื่อใกล้เคียง อาจสะกดผิด)' : ''}</b>
     ${dups.slice(0, 3).map(a => `<div>${bkDupLine(a)}</div>`).join('')}
     ${diff.length ? `<div class="mt-1">ต่างจากใบเดิม: ${diff.map(k => `<b>${esc(CHANGE_KEYS[k] || INSTANT_KEYS[k] || k)}</b> ${esc(fieldVal(k, r[k]))} → ${esc(fieldVal(k, x.doc[k]))}`).join(' · ')}</div>` : '<div class="mt-1">ข้อมูลตรงกับใบเดิมทุกช่อง</div>'}
     <select class="mt-1 w-full" style="max-width:100%;min-height:36px;border:1px solid var(--line);border-radius:6px;background:var(--surface)" data-gsdup="${esc(x.id)}" aria-label="ชื่อซ้ำ ทำอย่างไร">

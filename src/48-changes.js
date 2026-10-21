@@ -220,10 +220,8 @@ function printRefund(a) {
 function dupBookings(d, D) {
   const n = (d.customer || '').trim();
   if (!n) return [];
-  // first name and last name must both match (titles and spacing ignored); a first name alone never warns (ตกลง 21/10)
-  if (!bkDupFull(n)) return [];
-  const k = bkDupKey(n);
-  return D.at.filter(x => !x.cancelled && !x.demo && (x.active || (x.date && daysBetween(x.date, D.today) <= 90)) && bkDupKey(x.cust) === k);
+  // the whole name must match (titles and spacing ignored, or one typo); a first name alone never warns (ตกลง 21/10)
+  return D.at.filter(x => !x.cancelled && !x.demo && (x.active || (x.date && daysBetween(x.date, D.today) <= 90)) && (bkDupSame(n, x.cust) || bkDupSame(n, x.rec.customer)));
 }
 function multiBlock(d, D) {
   const dups = dupBookings(d, D);
