@@ -160,7 +160,7 @@ function flowPanel(m, a, D) {
   const delivBody = () => {
     const dv = f.delivered || {};
     if (fl.done.delivered && dv.src === 'IDS' && !(dv.plate && dv.insurer)) return `<div class="text-sm">ส่งมอบแล้วตาม IDS (DL) ${fmtD(dv.date)} · บันทึกเข้าระบบแล้ว</div>${stepAllowed(a, 'delivered') ? `<details class="mt-1"><summary class="text-sm cursor-pointer" style="color:var(--warn)">เพิ่มเลขทะเบียนป้ายแดงและบริษัทประกัน (ไม่บังคับ)</summary>${delivForm()}</details>` : ''}${commBody()}`;
-    if (fl.done.delivered) return `<div class="text-sm text-muted">ส่งมอบ ${fmtD(dv.date)} · ป้ายแดง <span class="code">${esc(dv.plate)}</span> · ประกัน ${esc(dv.insurer)} · ${who(dv)}</div>${commBody()}`;
+    if (fl.done.delivered) return `<div class="text-sm text-muted">ส่งมอบ ${fmtD(dv.date)} · ป้ายแดง <span class="code">${esc(dv.plate)}</span> · ประกัน ${esc(dv.insurer)} · ${who(dv)}</div><div class="text-sm text-muted">รถเก่าเทิร์น: ${esc(tradeLine(r))}</div>${commBody()}`;
     if (fl.lateUpdate) return `<div class="text-sm">ส่งมอบแล้วตาม IDS (DL) ${fmtD(fl.deliveredDate)}</div>${stepAllowed(a, 'delivered') ? `<details class="mt-1"><summary class="text-sm cursor-pointer" style="color:var(--warn)">เพิ่มเลขทะเบียนป้ายแดงและบริษัทประกัน (ไม่บังคับ)</summary>${delivForm()}</details>` : ''}${commBody()}`;
     if (!can('delivered')) return fl.next === 'delivered' && !stepAllowed(a, 'delivered') ? '<div class="text-sm text-muted">รอเซลล์อัปเดตการส่งมอบ</div>' : '';
     return delivForm();
@@ -168,9 +168,9 @@ function flowPanel(m, a, D) {
   function delivForm() {
     const v = m.deliv || {}, dv = f.delivered || {};
     return `      <div class="grid sm:grid-cols-3 gap-3 items-end mt-1">
-      <div class="field"><label for="fl-dd">วันที่ส่งมอบรถ</label><input id="fl-dd" type="date" data-modal="deliv.date" value="${esc(v.date ?? (fl.deliveredDate || todayISO()))}" max="${todayISO()}"></div>
-      <div class="field"><label for="fl-pl">เลขทะเบียนป้ายแดง</label><input id="fl-pl" data-modal="deliv.plate" value="${esc(v.plate ?? dv.plate ?? '')}" placeholder="เช่น ป-1234 นครปฐม" autocomplete="off"></div>
-      <div class="field"><label for="fl-in">บริษัทประกันที่ทำ</label><input id="fl-in" list="fl-ins" data-modal="deliv.insurer" value="${esc(v.insurer ?? dv.insurer ?? '')}" placeholder="เลือกหรือพิมพ์"><datalist id="fl-ins">${INSURERS.map(x => `<option value="${esc(x)}">`).join('')}</datalist></div></div>
+      <div class="field"><label for="fl-dd" class="req">วันที่ส่งมอบรถ (ลูกค้ารับรถจริง)</label><input id="fl-dd" type="date" data-modal="deliv.date" value="${esc(v.date ?? (fl.deliveredDate || ''))}" max="${todayISO()}"></div>
+      <div class="field"><label for="fl-pl" class="req">เลขทะเบียนป้ายแดง</label><input id="fl-pl" data-modal="deliv.plate" value="${esc(v.plate ?? dv.plate ?? '')}" placeholder="เช่น ป-1234 นครปฐม" autocomplete="off"></div>
+      <div class="field"><label for="fl-in" class="req">บริษัทประกันที่ทำ</label><input id="fl-in" list="fl-ins" data-modal="deliv.insurer" value="${esc(v.insurer ?? dv.insurer ?? '')}" placeholder="เลือกหรือพิมพ์"><datalist id="fl-ins">${INSURERS.map(x => `<option value="${esc(x)}">`).join('')}</datalist></div></div>
       <div class="text-xs text-muted mt-1">ประกันในใบจอง: ${esc(r.insurance || '–')}</div>
       ${tradeDelivFields('deliv', (m.deliv = m.deliv || tradePre(r)), 'fl', tradeCur(r), true)}
       <button class="btn btn-dark btn-sm mt-2" data-act="flow-deliver" data-id="${esc(a.id)}">บันทึกส่งมอบ</button>`;

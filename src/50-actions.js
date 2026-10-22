@@ -802,7 +802,8 @@ const ACTIONS = {
     const idsDv = a && a.rec.flow && a.rec.flow.delivered && a.rec.flow.delivered.src === 'IDS';
     if (!a || !(a.flow.next === 'delivered' || a.flow.lateUpdate || idsDv) || !stepAllowed(a, 'delivered')) { toast('ส่งมอบได้หลังบันทึกการชำระดาวน์แล้ว', 'bad'); return; }
     const v = S.modal.deliv || {}, prev = (a.rec.flow && a.rec.flow.delivered) || {};
-    const date = v.date ?? (a.flow.deliveredDate || todayISO());
+    const date = v.date ?? (a.flow.deliveredDate || '');
+    if (!date) { toast('ใส่วันที่ส่งมอบรถ (วันที่ลูกค้ารับรถจริง)', 'bad'); $('#fl-dd')?.focus(); return; }
     const plate = String(v.plate ?? prev.plate ?? '').trim(), insurer = String(v.insurer ?? prev.insurer ?? '').trim();
     if (!plate) { toast('ใส่เลขทะเบียนป้ายแดง', 'bad'); $('#fl-pl')?.focus(); return; }
     if (!insurer) { toast('เลือกบริษัทประกันที่ทำ', 'bad'); $('#fl-in')?.focus(); return; }

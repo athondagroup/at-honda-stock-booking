@@ -39,24 +39,27 @@ function exportPreview(m, D) {
       <p class="text-xs text-muted mt-1">${aoa.length - 1 > N ? `แสดง ${N} แถวแรกจาก ${aoa.length - 1} แถว` : `ทั้งหมด ${aoa.length - 1} แถว`} · ไฟล์จริงมีครบทุกแถว</p>` : '<p class="text-sm text-muted">ไม่มีข้อมูลตามตัวกรองนี้</p>'}</div>`;
 }
 // an IDS booking with no AT form: pair it with an AT form already keyed (name typed differently, another spelling)
-function idsPairCands(b, D) {
-  const bk = nameKey(b.cust || '');
-  return D.at.filter(a => !a.cancelled && !a.demo && !a.match && atVisible(a) && canEditBooking(a))
-    .map(a => ({ a, ns: keyScore(nameKey(a.cust || ''), bk), same: a.model === b.model, br: a.br === b.br, sales: b.sales && sameName(a.sales || '', b.sales) }))
-    .filter(x => x.ns || x.same)
+// q: the person's own search — every AT form (any name, also one already paired with another IDS booking: the customer
+// may have changed name, ตกลง 22/10); without a search: unpaired forms, the same name / model / branch first
+function idsPairCands(b, D, q) {
+  const bk = nameKey(b.cust || ''), k = q ? searchKey(q) : '';
+  return D.at.filter(a => !a.cancelled && !a.demo && (k || !a.match) && atVisible(a) && canEditBooking(a)
+      && (!k || searchKey([a.cust, a.sales, a.no, a.rec.customer].filter(Boolean).join(' ')).includes(k)))
+    .map(a => ({ a, ns: keyScore(nameKey(a.cust || ''), bk), same: a.model === b.model, br: a.br === b.br, sales: b.sales && sameName(a.sales || '', b.sales), other: a.match ? (a.match.no || a.match.vin || 'IDS') : null }))
+    .filter(x => k || x.ns || x.same || x.br)
     .sort((x, y) => y.ns - x.ns || (y.same && y.br) - (x.same && x.br) || y.sales - x.sales || Math.abs(daysBetween(x.a.date || b.date, b.date)) - Math.abs(daysBetween(y.a.date || b.date, b.date)))
-    .slice(0, 30);
+    .slice(0, 60);
 }
 function idsPairModal(m, D) {
   const b = D.idsB.find(x => x.key === m.key);
   if (!b) return '<p>ไม่พบใบจองนี้ใน IDS แล้ว</p><div class="flex justify-end mt-3"><button class="btn btn-ghost" data-act="close">ปิด</button></div>';
-  const list = idsPairCands(b, D).filter(x => !m.q || searchKey(x.a.cust + ' ' + (x.a.sales || '')).includes(searchKey(m.q)));
+  const list = idsPairCands(b, D, (m.q || '').trim());
   return `<div class="flex items-start justify-between gap-3 mb-2"><h2 class="font-head text-xl font-semibold">จับคู่ใบจอง IDS กับฟอร์ม AT ที่มีอยู่</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
   <div class="p-3 rounded-lg text-sm mb-3" style="background:var(--surface-2)"><b>IDS ${esc(b.no || '')}</b> · ${esc(b.cust || '')} · ${esc(b.br || '')} · ${esc(specLabelText(b.spec))} · จอง ${fmtD(b.date)} · ชื่อเซลล์ใน IDS ${esc(b.sales || '–')}</div>
   <div class="field mb-2"><label for="ip-q">ค้นหาชื่อลูกค้าหรือเซลล์ในฟอร์ม AT</label><input id="ip-q" type="search" data-modal="q" value="${esc(m.q || '')}"></div>
-  <p class="text-xs text-muted mb-2">แสดงฟอร์ม AT ที่ยังไม่ได้จับคู่กับ IDS ชื่อใกล้เคียงหรือรุ่นเดียวกันขึ้นก่อน เลือกแล้วระบบใช้ข้อมูล IDS ใบนี้กับฟอร์มนั้น</p>
+  <p class="text-xs text-muted mb-2">ยังไม่พิมพ์: แสดงฟอร์ม AT ที่ยังไม่จับคู่ ชื่อใกล้เคียง / รุ่นเดียวกัน / สาขาเดียวกันขึ้นก่อน · พิมพ์ค้นหา: ค้นทุกฟอร์ม AT ไม่ว่าชื่อจะตรงหรือไม่ (เช่น ลูกค้าเปลี่ยนชื่อ) รวมใบที่จับคู่ IDS อื่นอยู่</p>
   <div class="border border-line rounded-lg divide-y divide-line max-h-80 overflow-auto">${list.map(x => `<div class="p-3 flex flex-wrap gap-x-4 gap-y-1 items-center text-sm">
-    <div class="flex-1 min-w-[180px]"><div class="font-medium">${esc(x.a.cust || '')} ${x.ns >= 2 ? chip('ชื่อใกล้เคียง', 'good') : ''}</div><div class="text-xs text-muted">${esc(specLabelText(x.a.spec))} ${x.same ? '' : chip('คนละรุ่น', 'warn')} · จอง ${fmtD(x.a.date)} · ${esc(x.a.br || '')} · ${esc(x.a.sales || '')}</div></div>
+    <div class="flex-1 min-w-[180px]"><div class="font-medium">${esc(x.a.cust || '')} ${x.ns >= 2 ? chip('ชื่อใกล้เคียง', 'good') : chip('ชื่อไม่ตรง', 'muted')} ${x.other ? chip(`จับคู่ IDS ${x.other} อยู่ (เลือกแล้วจะย้ายมาใบนี้)`, 'warn') : ''}</div><div class="text-xs text-muted">${esc(specLabelText(x.a.spec))} ${x.same ? '' : chip('คนละรุ่น', 'warn')} · จอง ${fmtD(x.a.date)} · ${esc(x.a.br || '')} · ${esc(x.a.sales || '')}</div></div>
     <button class="btn btn-ghost btn-sm" data-act="idspair-pick" data-id="${esc(x.a.id)}">จับคู่ใบนี้</button></div>`).join('') || `<div class="p-3">${emptyBox('ไม่พบฟอร์ม AT ที่ยังไม่จับคู่', 'ถ้ายังไม่ได้ลงฟอร์ม กด "ลงฟอร์ม AT"')}</div>`}</div>
   <div class="flex flex-wrap justify-end gap-2 mt-3"><button class="btn btn-ghost" data-act="close">ยกเลิก</button><button class="btn btn-dark" data-act="ids-claim" data-id="${esc(b.no)}">ไม่มี ลงฟอร์ม AT ใหม่</button></div>`;
 }
