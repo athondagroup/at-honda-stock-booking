@@ -2,7 +2,7 @@
 // After a Stock upload, a car the old stock had and the new file lacks, with no invoice, no other branch's stock and
 // no removal on record, is flagged "ไม่พบข้อมูลว่าไปไหน". The executive or the branch manager says where each went
 // (one by one or all at once): sold to another branch, sold/traded to a dealer, taken out, or still here (the file was
-// incomplete). Locks still open on those cars can be closed at the same time. The answer is kept on the upload record,
+// incomplete). Locks still open on those cars: cancel them (the booking waits for another car) or keep them, picked by name. The answer is kept on the upload record,
 // and on the car, so the next Stock upload gives the reason instead of flagging it again.
 // Only function declarations here: the first render runs before this part of the file.
 function outFixReasons() { return [['other_br', 'ขายให้สาขาอื่น'], ['dealer', 'ขาย/แลกดีลเลอร์'], ['other', 'นำออก (อื่น ๆ)'], ['still', 'ยังอยู่ (ไฟล์ Stock ไม่ครบ)']]; }
@@ -30,10 +30,21 @@ function outFixList(u) {
         ${(F && F.reason || 'other_br') === 'other_br' ? `<div class="field"><label for="of-b">สาขา / ดีลเลอร์ที่รับ</label><input id="of-b" data-outfixf="text" value="${esc(F && F.text || '')}" placeholder="เช่น ฮอนด้า …"></div>`
           : (F && F.reason) === 'dealer' ? `<div class="field"><label for="of-d" class="req">ชื่อดีลเลอร์</label><input id="of-d" data-outfixf="text" value="${esc(F.text || '')}"></div>`
           : `<div class="field"><label for="of-n">หมายเหตุ</label><input id="of-n" data-outfixf="text" value="${esc(F && F.text || '')}"></div>`}
-        <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-4 h-4" data-outfixf="closeLocks" ${(F ? F.closeLocks : true) ? 'checked' : ''}> ยกเลิกล็อกที่ค้างของรถที่เลือก (รถออกจากสต็อกแล้ว ใบจองกลับไปรอรถ)</label>
+        ${outFixLockField(sel, F)}
         <button class="btn btn-red btn-sm" data-act="outfix-save" data-id="${esc(u.id)}" ${sel.length && !(F && F.busy) ? '' : 'disabled'}>${F && F.busy ? '<span class="spin"></span> กำลังบันทึก…' : `บันทึก ${sel.length} คัน`}</button></div>
       <p class="text-xs text-muted mt-1">"ยังอยู่" ไม่เอารถออกจากระบบ ใช้เมื่อไฟล์ Stock ไม่ครบ ให้อัปโหลดไฟล์ที่ครบภายหลัง · ขายให้สาขาอื่น / ดีลเลอร์ / นำออก จะจำไว้ อัปโหลดครั้งหน้าจะไม่ขึ้นแดงอีก</p></div>` : '';
   return `<div class="mt-2 text-sm flex flex-col gap-1">${bar}${u.out.map(row).join('')}</div>`;
+}
+// what to do with the locks still open on the chosen cars: said in words, no unclear tick box (22/10)
+function outFixLockField(sel, F) {
+  const L = sel.flatMap(o => outOpenLocks(o.vin).map(([, l]) => ({ vin: o.vin, l })));
+  if (!L.length) return '';
+  const v = F && F.closeLocks === false ? 'keep' : 'release';
+  const who = L.map(({ vin, l }) => `${esc(vin.slice(-6))} ${l.type === 'dealer' ? 'ดีลเลอร์ ' + esc(l.dealer_name || '') : l.type === 'temp' ? 'ชั่วคราว ' + esc(l.prospect || l.sales || '') : 'ใบจองของ ' + esc(l.owner || l.sales || '')}`).join(' · ');
+  return `<div class="field"><label for="of-l">รถที่เลือกมีล็อกค้าง ${L.length} รายการ ทำอย่างไร</label><select id="of-l" data-outfixf="lockAct">
+      <option value="release" ${v === 'release' ? 'selected' : ''}>ยกเลิกล็อก · ใบจองกลับไปรอรถคันอื่น</option>
+      <option value="keep" ${v === 'keep' ? 'selected' : ''}>คงล็อกไว้ก่อน (ยังไม่แน่ใจ / รถยังอยู่)</option></select>
+    <div class="text-xs text-muted">${who}</div></div>`;
 }
 function outFixState(id) { if (!S.outFix || S.outFix.id !== id) S.outFix = { id, sel: {}, reason: 'other_br', text: '', closeLocks: true }; return S.outFix; }
 async function outFixSave(id) {
@@ -68,6 +79,6 @@ Object.assign(ACTIONS, {
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t || !t.dataset) return;
   if (t.dataset.outfix) { const F = outFixState(t.dataset.outfix); F.sel[t.dataset.vin] = t.checked; render(); return; }
-  if (t.dataset.outfixf && S.outFix) { const k = t.dataset.outfixf; S.outFix[k] = t.type === 'checkbox' ? t.checked : t.value; if (k === 'reason') { S.outFix.closeLocks = t.value !== 'still'; render(); } else if (k === 'closeLocks') render(); }
+  if (t.dataset.outfixf && S.outFix) { const k = t.dataset.outfixf; S.outFix[k] = t.type === 'checkbox' ? t.checked : t.value; if (k === 'reason') { S.outFix.closeLocks = t.value !== 'still'; render(); } else if (k === 'lockAct') { S.outFix.closeLocks = t.value === 'release'; render(); } }
 });
 document.addEventListener('input', ev => { const t = ev.target; if (t && t.dataset && t.dataset.outfixf === 'text' && S.outFix) S.outFix.text = t.value; });

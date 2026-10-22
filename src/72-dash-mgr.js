@@ -55,7 +55,11 @@ function monthPace(D, E) {
 }
 function invWaitingList(D) {
   // the latest invoice per car only: a car invoiced again (e.g. a cancelled and re-issued invoice) counts once, by its newest invoice
-  return D.X.inv.filter(i => !i.company && !i.archived && i.idate && !i.ddate && inBr(i) && (!i.vin || D.invByVin.get(i.vin) === i) && !(i.vin && (carBookingOf(i.vin, D) || {}).done)).map(i => ({ ...i, age: daysBetween(i.idate, D.today) })).sort((a, b) => b.age - a.age);
+  // a booking marked delivered only in the form sheet (not in the web, and no delivery date in DL) still counts here:
+  // IDS has not been told the car was handed over (22/10)
+  const webDone = a => !!(a && a.done && a.flow && a.flow.done && a.flow.done.delivered);
+  return D.X.inv.filter(i => !i.company && !i.archived && i.idate && !i.ddate && inBr(i) && (!i.vin || D.invByVin.get(i.vin) === i) && !(i.vin && webDone(carBookingOf(i.vin, D))))
+    .map(i => { const a = i.vin ? carBookingOf(i.vin, D) : null; return { ...i, age: daysBetween(i.idate, D.today), sheetDone: !!(a && a.done && !webDone(a)) }; }).sort((a, b) => b.age - a.age);
 }
 function dashSalesTarget(D) {
   const E = execData(D), P = monthPace(D, E), W = invWaitingList(D);
