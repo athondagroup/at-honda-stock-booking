@@ -123,6 +123,37 @@ function showRenderError(e) {
     <div class="flex flex-wrap gap-2"><button class="btn btn-red" data-act="render-reset">ล้างตัวกรองแล้วลองใหม่</button><button class="btn btn-ghost" data-act="nav" data-view="dash">กลับหน้าหลัก</button></div></div>`;
   if (S.modal && renderFail < 3) { S.modal = null; }
 }
+// ---------- in-place page update: same-position nodes of the same kind are kept and changed, others replaced
+function morphInto(el, html) {
+  const t = document.createElement('template'); t.innerHTML = html;
+  morphKids(el, t.content);
+}
+function morphKids(a, b) {
+  const an = a.childNodes, bn = [...b.childNodes];
+  let i = 0;
+  for (; i < bn.length; i++) {
+    const o = an[i], n = bn[i];
+    if (!o) { a.appendChild(n); continue; }
+    if (o.nodeType !== n.nodeType || o.nodeName !== n.nodeName || (o.nodeType === 1 && (o.id || '') !== (n.id || ''))) { a.replaceChild(n, o); continue; }
+    if (o.nodeType === 3 || o.nodeType === 8) { if (o.nodeValue !== n.nodeValue) o.nodeValue = n.nodeValue; continue; }
+    if (o.nodeType !== 1) { a.replaceChild(n, o); continue; }
+    morphNode(o, n);
+  }
+  while (an.length > bn.length) a.removeChild(a.lastChild);
+}
+function morphNode(o, n) {
+  for (const at of [...o.attributes]) if (!n.hasAttribute(at.name)) o.removeAttribute(at.name);
+  for (const at of [...n.attributes]) if (o.getAttribute(at.name) !== at.value) o.setAttribute(at.name, at.value);
+  const tag = o.nodeName, focused = document.activeElement === o;
+  if (tag === 'INPUT') {
+    if (o.type === 'checkbox' || o.type === 'radio') o.checked = n.checked;
+    else if (o.type !== 'file' && !focused && o.value !== n.value) o.value = n.value;
+    return;
+  }
+  if (tag === 'TEXTAREA') { if (!focused && o.value !== n.value) o.value = n.value; return; }
+  morphKids(o, n);
+  if (tag === 'SELECT') { const k = [...n.options].findIndex(x => x.hasAttribute('selected')); o.selectedIndex = k >= 0 ? k : 0; }
+}
 function renderNow() {
   const D = derive();
   // the first page follows the role (บทวิเคราะห์ 19/10) unless a link names one
@@ -136,7 +167,12 @@ function renderNow() {
   const fid = ae && ae.id && main.contains(ae) && /INPUT|SELECT|TEXTAREA/.test(ae.tagName) ? ae.id : null;
   let caret = null; try { caret = fid && typeof ae.selectionStart === 'number' ? ae.selectionStart : null; } catch (e) { caret = null; }
   S.lastIn = { ...(S.lastIn || {}), [groupOf(S.view).id]: S.view };
-  main.innerHTML = backBar() + (groupOf(S.view).id === 'work' ? todayHead(D) : '') + groupTabs(badgeCounts(D)) + V(D);
+  // update the page in place instead of rebuilding it (22/10): typing in a search box keeps the keyboard and the
+  // field, and pressing a number keeps the page where it is
+  const sy = window.scrollY;
+  morphInto(main, backBar() + (groupOf(S.view).id === 'work' ? todayHead(D) : '') + groupTabs(badgeCounts(D)) + V(D));
+  if (Math.abs(window.scrollY - sy) > 2 && !S.scrollTop) window.scrollTo(0, sy);
+  S.scrollTop = false;
   const fe = fid && document.getElementById(fid);
   if (fe && !S.modal) { fe.focus({ preventScroll: true }); if (caret !== null) { try { fe.setSelectionRange(caret, caret); } catch (e) { /* not a text field */ } } }
   renderModal(D);
