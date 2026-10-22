@@ -56,7 +56,7 @@ function atModal(m, D) {
   const rows = [...(a.custForm ? [['ชื่อลูกค้า', `${a.cust} (ตาม IDS) · ในฟอร์ม AT สะกด "${a.custForm}"`]] : []), ['วันที่จอง', fmtD(a.date)], ['สาขา', `${a.br || ''} ${BR[a.br]?.name || ''}`], ['เซลล์เจ้าของ (AT)', `${a.sales || ''}${a.salesBr ? ` (สาขา ${a.salesBr})` : ''}`],
     ['สาขาที่ออกรถ', a.cross ? `${a.delivBr} · ขายข้ามสาขา: ยอดขายนับให้สาขา ${a.delivBr} ค่าคอมเป็นของ ${a.sales}` : null], ['ลงคิวใหม่เมื่อ', r.queue_date && r.queue_date !== r.booking_date ? `${fmtD(r.queue_date)} (เปลี่ยนรุ่น/สี)` : null], ['ลูกค้า', mine ? a.cust : 'ลูกค้าของเซลล์อื่น'],
     ['รุ่น', `${a.model} ${a.grade} ${a.color}${a.specFromIds ? ' (ตาม IDS)' : ''}`], ['ฟอร์ม AT ลงไว้', a.specFromIds ? `${a.atSpec.model} ${a.atSpec.grade} ${a.atSpec.color} · ระบบใช้รุ่นตาม IDS คิวเดิม` : null], ['เงื่อนไข', [r.purchase, r.finance].filter(Boolean).join(' · ')], ['ประกันภัย', r.insurance], ['ราคารถ', bookPriceLine(a, D)], ['ส่วนลด', money(r.discount)], ['FOC ที่ใช้ทั้งหมด', money(r.foc_total)],
-    ['มัดจำ', r.deposit ? money(r.deposit) : (r.imported ? 'ไม่มีในฟอร์มเดิม' : '–')], ['แหล่งที่มา', r.source], ['Lead ID', r.lead_id], ['หมายเหตุ', r.note], ['ข้อความในฟอร์มเดิม', r.imported ? r.model_text : null]].filter(([, v]) => v !== null && v !== undefined && v !== '');
+    ['มัดจำ', r.deposit ? money(r.deposit) : (r.imported ? 'ไม่มีในฟอร์มเดิม' : '–')], ['แหล่งที่มา', r.source], ['Lead ID', r.lead_id], ['รถเก่าเทิร์น', tradeText(r)], ['หมายเหตุ', r.note], ['ข้อความในฟอร์มเดิม', r.imported ? r.model_text : null]].filter(([, v]) => v !== null && v !== undefined && v !== '');
   const mm = a.match;
   const matchInfo = mm ? `<div class="p-3 rounded-lg text-sm" style="background:var(--surface-2)"><b>พบใน IDS</b>${mm.status === 'possible' ? ` <span style="color:var(--warn)">(ชื่อตรงแต่รุ่นใน IDS คือ ${esc(mm.idsModel)} ${esc(mm.idsGrade || '')})</span>` : ''}
       ${mm.recs.map(x => `<div>· ${{ booking: 'Booking IDS', stock: 'Stock IDS', dl: 'Invoice/DL' }[x.kind]} ${x.no ? `เลขที่ใบจอง <span class="code">${esc(x.no)}</span>` : ''} ${x.kind === 'dl' && mm.ddate ? `ส่งมอบ ${fmtD(mm.ddate)}` : ''} ${x.vin ? `<span class="code">${esc(x.vin)}</span>` : ''}</div>`).join('')}
@@ -134,7 +134,7 @@ function flowPanel(m, a, D) {
       <div class="field"><label for="fl-dn">เลขที่ใบเสร็จ${isCash(r) ? 'ชำระครบ' : 'เงินดาวน์'}</label><input id="fl-dn" data-modal="down.receipt_no" value="${esc(m.down?.receipt_no ?? '')}" autocomplete="off"></div>
       <div class="field"><label for="fl-da">ยอดเงิน (บาท)</label><input id="fl-da" type="number" min="0" step="100" inputmode="numeric" data-modal="down.amount" value="${esc(m.down?.amount ?? '')}"></div>
       <div class="field"><label for="fl-dd2">วันที่ชำระ</label><input id="fl-dd2" type="date" data-modal="down.date" value="${esc(m.down?.date ?? todayISO())}" max="${todayISO()}"></div></div>
-      ${tradeFields('down', m.down || {}, 'fl')}
+      ${tradeFields('down', (m.down = m.down || tradePre(r)), 'fl')}
       <button class="btn btn-dark btn-sm mt-2" data-act="flow-down" data-id="${esc(a.id)}">บันทึกการชำระ</button>`;
   };
   const assignBody = () => {

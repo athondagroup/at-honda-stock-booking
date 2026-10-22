@@ -412,6 +412,8 @@ async function saveBooking() {
   if (!d.insurance) missing.push('ประกันภัย');
   if (d.discount === '' || d.discount === null || d.discount === undefined) missing.push('ส่วนลด (ไม่มีใส่ 0)');
   if (d.foc_total === '' || d.foc_total === null || d.foc_total === undefined) missing.push('FOC (ไม่มีใส่ 0)');
+  if (d.trade !== 'yes' && d.trade !== 'no') missing.push('มีรถเก่าเทิร์นไหม');
+  else if (d.trade === 'yes' && (!String(d.t_brand || '').trim() || !String(d.t_model || '').trim())) missing.push('ยี่ห้อ / รุ่นรถเก่า');
   if (d.booking_no && !/^\d{8,12}$/.test(d.booking_no.trim())) missing.push('เลขที่ใบจองต้องเป็นตัวเลข 8–12 หลัก');
   const checks = bookingChecks(d, D);
   const block = checks.find(c => c.block);
@@ -428,6 +430,7 @@ async function saveBooking() {
     model: d.model, grade: d.grade, color: d.color, model_text: d.model_text || null, purchase: d.purchase, finance: fin ? d.finance : null,
     fin_status: fin ? 'รอผล' : null, deposit: num(d.deposit) || 0, receipt_no: (d.receipt_no || '').trim() || null, discount: num(d.discount), foc_total: num(d.foc_total), insurance: d.insurance,
     ...bookPriceSnap(d),
+    trade: bookTradeRec(d),
     delivery_plan: validDate(d.delivery_plan), lead_id: d.lead_id || null, note: d.note || null, ids_claim: d.ids_claim || null,
     doc_imgs, slip_imgs, img_missing: imgMissing, slip: S.files.slip.length > 0, flow: {},
     ai: d.ai, ai_ok: !!d.ai, ai_fields: d.aiFields, checks: checks.map(({ t, bad }) => ({ t, bad: !!bad })),
@@ -939,6 +942,7 @@ document.addEventListener('input', ev => {
     if (t.dataset.draft === 'booking.model') { S.draft.booking.grade = ''; S.draft.booking.color = ''; }
     if (t.dataset.draft === 'booking.grade') S.draft.booking.color = '';
     if (RERENDER_FIELDS.has(t.dataset.draft) && t.tagName === 'SELECT') render();
+    if (t.dataset.draft === 'booking.trade') render();
   } else if (t.dataset.modal && S.modal) {
     const path = t.dataset.modal, val = t.type === 'checkbox' ? t.checked : t.value;
     setPath(S.modal, path, val);

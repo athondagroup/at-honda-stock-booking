@@ -3,7 +3,7 @@ function newBookingDraft() {
   return {
     booking_no: '', booking_date: todayISO(), br: '', sales: '', customer: '', source: 'Walk-in', model: '', grade: '', color: '', model_text: '',
     purchase: 'ไฟแนนซ์', finance: 'HLTC', deposit: '', insurance: 'Honda แถม', price: '', discount: '', foc_items: '', down: '', fin_amount: '',
-    rate: '', term: '', campaign: '', trade_in: '', lead_id: '', note: '', foc_total: '', delivery_plan: '', ids_claim: '', receipt_no: '', multi_reason: '', multi_note: '', multi_old: '', ai: null, aiFields: [], slip_ai: null, unreadable: []
+    rate: '', term: '', campaign: '', trade_in: '', trade: '', t_brand: '', t_model: '', t_year: '', t_price: '', lead_id: '', note: '', foc_total: '', delivery_plan: '', ids_claim: '', receipt_no: '', multi_reason: '', multi_note: '', multi_old: '', ai: null, aiFields: [], slip_ai: null, unreadable: []
   };
 }
 S.draft.booking = newBookingDraft();
@@ -118,6 +118,7 @@ function bookingForm(D) {
         ${F('insurance', 'ประกันภัย', sel('insurance', d.insurance && !['Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม'].includes(d.insurance) ? [d.insurance, 'Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม'] : ['Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม']), true)}
         ${F('discount', 'ส่วนลด ระบุจำนวน ไม่มี ใส่ 0 บาท', inp('discount', 'number', 'min="0" step="100" inputmode="numeric" placeholder="0"'), true)}
         ${F('foc_total', 'FOC ที่ใช้ทั้งหมด', inp('foc_total', 'number', 'min="0" step="100" inputmode="numeric" placeholder="0"'), true)}
+        ${bookTradeFields(d)}
         <div class="field"><label for="b-note">หมายเหตุ</label>${inp('note', 'text', 'placeholder="เช่น Trade in"')}</div>
         ${F('booking_date', 'วันที่จอง', inp('booking_date', 'date', `max="${todayISO()}"`), true)}
         <div class="field"><span class="text-sm font-medium">หน้าใบจอง</span><span class="text-sm ${f.bk.length ? '' : ''}" style="color:var(--${f.bk.length ? 'good' : 'bad'})">${f.bk.length ? `แนบแล้ว ${f.bk.length} รูป (ข้อ 1 ด้านบน)` : 'ยังไม่ได้แนบ แนบที่ข้อ 1 ด้านบน'}</span></div>
