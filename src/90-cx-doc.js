@@ -34,7 +34,8 @@ async function printCancelDoc(a) {
   const no = await cxEnsureNo(a), fresh = atById(a.id) || a;
   const c = fresh.rec.cancel || {}, req = c.req || null, rf = fresh.rec.refund || {}, refund = cxRefund(fresh);
   const to = c.to ? derive().at.find(x => x.id === c.to) : null;
-  const res = c.refund === 'refund' ? 'อนุมัติยกเลิก · คืนมัดจำ' : c.refund === 'transfer' ? `อนุมัติยกเลิก · โอนมัดจำไปใบจอง ${to ? `${to.no || ''} ${to.cust || ''}`.trim() : '(ค้างไว้ รอใบจองใหม่)'}` : 'อนุมัติยกเลิก · ไม่คืนมัดจำ';
+  const resMoney = c.refund === 'refund' ? 'คืนมัดจำ' : c.refund === 'transfer' ? `โอนมัดจำไปใบจอง ${to ? `${to.no || ''} ${to.cust || ''}`.trim() : '(ค้างไว้ รอใบจองใหม่)'}` : 'ไม่คืนมัดจำ';
+  const reqDay = c.req_date || (req && req.at ? req.at.slice(0, 10) : c.at ? c.at.slice(0, 10) : null);
   const mgrName = cxWho(c);
   const blocks = [
     { sec: 1, h: 'ข้อมูลใบจอง' },
@@ -43,13 +44,12 @@ async function printCancelDoc(a) {
       ['เลขที่ใบจองสาขา', fresh.rec.paper_no || '–', 'กำหนดส่งมอบรถ', fresh.rec.delivery_plan ? fmtD(fresh.rec.delivery_plan) : '–'],
       ['เลขที่ใบเสร็จ', fresh.rec.receipt_no || '', 'จำนวนเงินจอง', (fresh.rec.deposit || fresh.deposit) ? money(fresh.rec.deposit || fresh.deposit) + ' บาท' : '–']] },
     { sec: 2, h: 'คำขอถอนจอง / ยกเลิก', by: req ? `ส่งในระบบ ${cxWho(req)} ${cxWhen(req.at)}` : `ผู้จัดการยกเลิกในระบบ ${cxWhen(c.at)}` },
-    { kv: [['วันที่ลูกค้าขอ', c.req_date ? fmtD(c.req_date) : '–', 'เหตุผล', c.reason || ''],
+    { kv: [['เหตุผล', c.reason || ''],
       ...((c.fin_tried || []).length ? [['ยื่นไฟแนนซ์ไม่ผ่าน', c.fin_tried.join(', ')]] : []),
       ['รายละเอียด', [req ? c.req_note : c.note].filter(Boolean).join(' · ') || '–'],
       ['เอกสารแนบ', cxDocList(c).map(([k, t]) => `${(c.docs || {})[k] || (k === 'passbook' && rf.passbook_ok) ? '[✓]' : '[  ]'} ${t}`).join('\n')]] },
-    { small: 'เงื่อนไขการถอนจอง: 1. บริษัทขอสงวนสิทธิ์ในการโอนเงิน ตามเลขที่บัญชีในนาม "ชื่อลูกค้า" ที่ระบุในใบจองเท่านั้น  2. เมื่อถอนจองแล้ว บริษัทจะยกเลิกการจองและเงื่อนไขทั้งหมดทันที · ข้าพเจ้าได้รับทราบเงื่อนไขของบริษัทฯ และยืนยันที่จะถอนจอง' },
-    { sec: 3, h: 'ผู้จัดการสาขาอนุมัติยกเลิก', by: 'อนุมัติในระบบ' },
-    { kv: [['ผล', res, 'ผู้อนุมัติ', `${mgrName} · ${cxWhen(c.at)}`], ...(req ? [['หมายเหตุผู้จัดการ', c.note || '–']] : [])] }
+    // one line, no box (ตกลง 23/10): ผู้จัดการอนุมัติยกเลิก วันที่ … · คืนมัดจำ / ไม่คืนมัดจำ in bold
+    { sec: 3, runs: [{ t: `ผู้จัดการอนุมัติยกเลิก วันที่ ${c.at ? fmtD(c.at.slice(0, 10)) : '–'}  ` }, { t: resMoney, b: true }, { t: `  · ${mgrName}${req && c.note ? ' · หมายเหตุ: ' + c.note : ''}` }], by: 'อนุมัติในระบบ' }
   ];
   let n = 4;
   if (refund) {
@@ -59,6 +59,7 @@ async function printCancelDoc(a) {
       { sec: n++, h: 'CR โทรตรวจสอบกับลูกค้า' }, { cr: true });
   }
   blocks.push({ sec: n++, h: 'ลายเซ็น' },
+    { note: 'เงื่อนไขการถอนจอง: 1. บริษัทขอสงวนสิทธิ์ในการโอนเงิน ตามเลขที่บัญชีในนาม "ชื่อลูกค้า" ที่ระบุในใบจองเท่านั้น  2. เมื่อถอนจองแล้ว บริษัทจะยกเลิกการจองและเงื่อนไขทั้งหมดทันที\nข้าพเจ้าได้รับทราบเงื่อนไขของบริษัทฯ และยืนยันที่จะถอนจอง' },
     { sign3: [{ t: refund ? 'ลูกค้า (ผู้รับเงิน)' : 'ลูกค้า (ผู้จอง)', name: fresh.cust }, { t: 'พนักงานขาย', name: fresh.sales }, { t: 'ผู้จัดการสาขา', name: (c.by && S.profiles[c.by]) || '' }] },
     { sec: n++, h: refund ? 'ผู้บริหารอนุมัติจ่าย' : 'ผู้บริหารอนุมัติ' },
     { exec: refund ? { ok: 'อนุมัติจ่ายคืนเงินจอง ตามยอดและบัญชีในข้อ 4', foot: 'ส่งฝ่ายบัญชีทำจ่ายเมื่อมีลายเซ็นผู้บริหาร (ไม่ต้องมีลายเซ็นฝ่ายบัญชี)', label: 'ผู้บริหาร (ผู้อนุมัติจ่าย)' }
@@ -66,7 +67,7 @@ async function printCancelDoc(a) {
     ...(refund ? [{ sec: n++, h: 'สำหรับเจ้าหน้าที่ฝ่ายบัญชี (ต้องมีใบลดหนี้แนบเท่านั้น)' }, { acct: true }] : []),
     { small: `เลขที่เอกสารระบบออกให้อัตโนมัติ ใช้อ้างอิงกับบัญชี · เมื่อเอกสารครบ ผู้บริหารกด "${refund ? 'อนุมัติจ่าย' : 'อนุมัติ'}" ในระบบเพื่อแจ้งเซลล์` });
   const title = refund ? 'ใบอนุมัติยกเลิกการจอง และขอคืนเงินจอง' : 'ใบอนุมัติยกเลิกการจอง';
-  const spec = { title, compact: true, onePage: true, sub: cxCompany(fresh.br), meta: [`เลขที่เอกสาร ${no}`, `พิมพ์จากระบบ ${fmtDT(new Date().toISOString())}`], blocks };
+  const spec = { title, compact: true, onePage: true, sub: cxCompany(fresh.br), meta: [`เลขที่เอกสาร ${no}`, `วัน/เดือน/ปี ที่ขออนุมัติ ${reqDay ? fmtD(reqDay) : '–'} · พิมพ์จากระบบ ${fmtDT(new Date().toISOString())}`], blocks };
   openDoc(spec, docName(title, fresh.cust, todayISO()), S.modal && S.modal.kind === 'at' ? { ...S.modal, refund: null } : null);
 }
 // the executive presses this once the paper form is complete; the sales is told

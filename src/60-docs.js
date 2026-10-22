@@ -58,7 +58,8 @@ async function docCanvas(spec) {
       if (b.sec) {
         y += 6;
         if (draw) { ctx.beginPath(); ctx.arc(DOC_M + 10, y + 10, 10, 0, Math.PI * 2); ctx.fillStyle = '#000'; ctx.fill(); ctx.fillStyle = '#fff'; font(12, 600); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(b.sec), DOC_M + 10, y + 11); }
-        font(15, 600); text(b.h || '', DOC_M + 28, y);
+        if (b.runs) { let x = DOC_M + 28; b.runs.forEach(r => { font(14, r.b ? 700 : 400); text(r.t, x, y + 1); x += ctx.measureText(r.t).width; }); }
+        else { font(15, 600); text(b.h || '', DOC_M + 28, y); }
         if (b.by) { font(11); if (draw) { ctx.fillStyle = '#444'; ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText(b.by, DOC_W - DOC_M, y + 3); } }
         y += spec.compact ? 24 : 28;
       }
