@@ -68,7 +68,8 @@ async function docCanvas(spec) {
         const top = y; y += 10; font(13);
         text('วันที่โทร', DOC_M + 10, y); dots(DOC_M + 70, DOC_M + 230, y + 16); text('เวลา', DOC_M + 240, y); dots(DOC_M + 275, DOC_M + 360, y + 16); text('เบอร์ที่โทร', DOC_M + 370, y); dots(DOC_M + 445, DOC_M + W - 10, y + 16); y += 28;
         box(DOC_M + 10, y); text('ลูกค้ายืนยันยกเลิก ยอดเงินคืนและบัญชีถูกต้อง', DOC_M + 28, y); box(DOC_M + 330, y); text('ไม่ตรง / ติดต่อไม่ได้ (ระบุในหมายเหตุ)', DOC_M + 348, y); y += 28;
-        text('หมายเหตุ CR', DOC_M + 10, y); dots(DOC_M + 90, DOC_M + W - 10, y + 16); y += 26; dots(DOC_M + 10, DOC_M + W - 10, y + 16); y += 34;
+        text('หมายเหตุ CR', DOC_M + 10, y); dots(DOC_M + 90, DOC_M + W - 10, y + 16); y += (spec.onePage ? 30 : 26);
+        if (!spec.onePage) { dots(DOC_M + 10, DOC_M + W - 10, y + 16); y += 34; }
         text('ลงชื่อ CR', DOC_M + W - 330, y); dots(DOC_M + W - 270, DOC_M + W - 130, y + 16); text('วันที่', DOC_M + W - 120, y); dots(DOC_M + W - 85, DOC_M + W - 10, y + 16); y += 30;
         if (draw) ctx.strokeRect(DOC_M, top, W, y - top); y += 10;
       }
@@ -82,7 +83,7 @@ async function docCanvas(spec) {
       }
       // signatures with the names printed under the line
       if (b.sign3) {
-        y += spec.compact ? 38 : 50; const n = b.sign3.length, gap = 24, w = (W - gap * (n - 1)) / n;
+        y += spec.onePage ? 30 : spec.compact ? 38 : 50; const n = b.sign3.length, gap = 24, w = (W - gap * (n - 1)) / n;
         b.sign3.forEach((s, i) => signAt(DOC_M + i * (w + gap), w, y, s.t, s.name));
         y += 66;
       }
@@ -92,7 +93,7 @@ async function docCanvas(spec) {
         box(DOC_M + 10, y); text(e.ok, DOC_M + 28, y); font(13); const okW = ctx.measureText(e.ok).width; box(DOC_M + 46 + okW, y); text('ไม่อนุมัติ', DOC_M + 64 + okW, y); y += 30;
         text('หมายเหตุ', DOC_M + 10, y); dots(DOC_M + 70, rx - 20, y + 16); y += 28;
         font(11); docWrap(ctx, e.foot || '', rx - DOC_M - 30).forEach(ln => { if (draw) { ctx.fillStyle = '#333'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(ln, DOC_M + 10, y); } y += 16; });
-        y = Math.max(y + 6, top + 120);
+        y = Math.max(y + 6, top + (spec.onePage ? 104 : 120));
         signAt(rx, DOC_M + W - rx - 10, top + 50, e.label, '');
         if (draw) ctx.strokeRect(DOC_M, top, W, y - top); y += 10;
       }
@@ -113,11 +114,16 @@ async function docCanvas(spec) {
     return y + DOC_M;
   };
   const probe = document.createElement('canvas').getContext('2d');
-  const H = Math.max(DOC_PAGE_H, Math.ceil(run(probe, false)));
+  const need = Math.ceil(run(probe, false));
+  // onePage: the whole form shrinks to fit one A4 sheet (ตกลง 22/10), otherwise a tall form runs onto more pages
+  const k = spec.onePage && need > DOC_PAGE_H ? DOC_PAGE_H / need : 1;
+  const H = spec.onePage ? DOC_PAGE_H : Math.max(DOC_PAGE_H, need);
   const cv = document.createElement('canvas');
   cv.width = DOC_W * DOC_SCALE; cv.height = H * DOC_SCALE;
   const ctx = cv.getContext('2d');
-  ctx.scale(DOC_SCALE, DOC_SCALE); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, DOC_W, H); ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
+  ctx.scale(DOC_SCALE, DOC_SCALE); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, DOC_W, H);
+  if (k < 1) { ctx.translate(DOC_W * (1 - k) / 2, 0); ctx.scale(k, k); }
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
   run(ctx, true);
   return cv;
 }

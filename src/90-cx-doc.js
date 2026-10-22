@@ -46,10 +46,10 @@ async function printCancelDoc(a) {
     { kv: [['วันที่ลูกค้าขอ', c.req_date ? fmtD(c.req_date) : '–', 'เหตุผล', c.reason || ''],
       ...((c.fin_tried || []).length ? [['ยื่นไฟแนนซ์ไม่ผ่าน', c.fin_tried.join(', ')]] : []),
       ['รายละเอียด', [req ? c.req_note : c.note].filter(Boolean).join(' · ') || '–'],
-      ...cxDocList(c).map(([k, t], i) => [i ? '' : 'เอกสารแนบ (ตรวจจากกระดาษ)', `${(c.docs || {})[k] || (k === 'passbook' && rf.passbook_ok) ? '[✓]' : '[  ]'} ${t}`])] },
+      ['เอกสารแนบ', cxDocList(c).map(([k, t]) => `${(c.docs || {})[k] || (k === 'passbook' && rf.passbook_ok) ? '[✓]' : '[  ]'} ${t}`).join('\n')]] },
     { small: 'เงื่อนไขการถอนจอง: 1. บริษัทขอสงวนสิทธิ์ในการโอนเงิน ตามเลขที่บัญชีในนาม "ชื่อลูกค้า" ที่ระบุในใบจองเท่านั้น  2. เมื่อถอนจองแล้ว บริษัทจะยกเลิกการจองและเงื่อนไขทั้งหมดทันที · ข้าพเจ้าได้รับทราบเงื่อนไขของบริษัทฯ และยืนยันที่จะถอนจอง' },
     { sec: 3, h: 'ผู้จัดการสาขาอนุมัติยกเลิก', by: 'อนุมัติในระบบ' },
-    { kv: [['ผล', res, 'ผู้อนุมัติ', `${mgrName} · ${cxWhen(c.at)}`], ['หมายเหตุผู้จัดการ', (req ? c.note : '') || '–']] }
+    { kv: [['ผล', res, 'ผู้อนุมัติ', `${mgrName} · ${cxWhen(c.at)}`], ...(req ? [['หมายเหตุผู้จัดการ', c.note || '–']] : [])] }
   ];
   let n = 4;
   if (refund) {
@@ -66,7 +66,7 @@ async function printCancelDoc(a) {
     ...(refund ? [{ sec: n++, h: 'สำหรับเจ้าหน้าที่ฝ่ายบัญชี (ต้องมีใบลดหนี้แนบเท่านั้น)' }, { acct: true }] : []),
     { small: `เลขที่เอกสารระบบออกให้อัตโนมัติ ใช้อ้างอิงกับบัญชี · เมื่อเอกสารครบ ผู้บริหารกด "${refund ? 'อนุมัติจ่าย' : 'อนุมัติ'}" ในระบบเพื่อแจ้งเซลล์` });
   const title = refund ? 'ใบอนุมัติยกเลิกการจอง และขอคืนเงินจอง' : 'ใบอนุมัติยกเลิกการจอง';
-  const spec = { title, compact: true, sub: cxCompany(fresh.br), meta: [`เลขที่เอกสาร ${no}`, `พิมพ์จากระบบ ${fmtDT(new Date().toISOString())}`], blocks };
+  const spec = { title, compact: true, onePage: true, sub: cxCompany(fresh.br), meta: [`เลขที่เอกสาร ${no}`, `พิมพ์จากระบบ ${fmtDT(new Date().toISOString())}`], blocks };
   openDoc(spec, docName(title, fresh.cust, todayISO()), S.modal && S.modal.kind === 'at' ? { ...S.modal, refund: null } : null);
 }
 // the executive presses this once the paper form is complete; the sales is told
