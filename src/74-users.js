@@ -12,7 +12,7 @@ function adminUsers() {
   return `${importBox()}<p class="text-sm text-muted mb-3">คนที่เข้าเว็บได้ต้องมีอีเมลในรายการนี้ · ครั้งแรกเข้าด้วยลิงก์ทางอีเมล แล้วตั้งรหัสผ่าน ครั้งต่อไปใช้อีเมล + รหัสผ่าน · เซลล์ต้องเลือกชื่อเซลล์ · แอดมินต้องเลือกสาขา · ผู้จัดการ (พี่อั้ม / นุช) สาขามากับบทบาท ไม่ต้องเลือก · ปิดการใช้งานแทนการลบ</p>
   <div class="bg-surface border border-line rounded-lg p-4 mb-4"><h3 class="font-medium mb-2">เพิ่ม / แก้ผู้ใช้</h3>
     <div class="grid sm:grid-cols-5 gap-3 items-end">
-      <div class="field"><label for="u-em">อีเมล</label><input id="u-em" type="email" data-users="email" value="${esc(d.email || '')}" ${d.edit ? 'readonly' : ''}></div>
+      <div class="field"><label for="u-em">อีเมล</label><input id="u-em" type="email" data-users="email" value="${esc(d.email || '')}">${d.edit && d.orig && String(d.email || '').trim().toLowerCase() !== d.orig ? `<span class="text-xs" style="color:var(--warn)">เปลี่ยนจาก ${esc(d.orig)} · ครั้งแรกต้องเข้าด้วยอีเมลใหม่</span>` : ''}</div>
       <div class="field"><label for="u-nm">ชื่อที่แสดง</label><input id="u-nm" data-users="name" value="${esc(d.name || '')}"></div>
       <div class="field"><label for="u-rl">บทบาท</label><select id="u-rl" data-users="role">${roleOpt(d.role || 'sales')}</select></div>
       <div class="field"><label for="u-br">สาขา</label>${usersBrFixed(d.role || 'sales') ? `<div class="text-sm py-2" id="u-br">${usersBrFixed(d.role || 'sales')} <span class="text-muted">(ตามบทบาท)</span></div>` : `<select id="u-br" data-users="branch">${brOpt(d.branch || '')}</select>`}</div>
@@ -35,16 +35,23 @@ function usersBrFixed(role) { return MGR_OF[role] ? MGR_OF[role].join(', ') : ro
 Object.assign(ACTIONS, {
   'users-reload'() { S.webUsers = null; render(); },
   'users-new'() { S.webUsers.draft = {}; render(); },
-  'users-edit'(el) { const u = S.webUsers.list.find(x => x.email === el.dataset.email); if (u) { S.webUsers.draft = { ...u, edit: true }; render(); } },
+  'users-edit'(el) { const u = S.webUsers.list.find(x => x.email === el.dataset.email); if (u) { S.webUsers.draft = { ...u, edit: true, orig: u.email }; render(); } },
   async 'users-save'() {
     const d = S.webUsers.draft, email = String(d.email || '').trim().toLowerCase(), role = d.role || 'sales';
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('ใส่อีเมลให้ถูกต้อง', 'bad'); return; }
     if (role === 'sales' && !d.sales_name) { toast('เซลล์ต้องเลือกชื่อเซลล์', 'bad'); return; }
     if (role === 'admin' && !d.branch) { toast('แอดมินต้องเลือกสาขา', 'bad'); return; }
-    const prev = S.webUsers.list.find(x => x.email === email);
+    // a changed e-mail (ตกลง 22/10): the person gets a row under the new address; the old row is switched off and kept,
+    // so names in past history still show
+    const orig = d.edit ? d.orig : null, moved = !!(orig && orig !== email);
+    if (moved && S.webUsers.list.some(x => x.email === email)) { toast(`มีอีเมล ${email} ในรายการแล้ว`, 'bad'); return; }
+    if (moved && orig === window.__WEB.email) { toast('เปลี่ยนอีเมลของตัวเองที่นี่ไม่ได้ (จะเข้าเว็บไม่ได้) ให้ผู้บริหารอีกคนเปลี่ยนให้', 'bad'); return; }
+    const prev = S.webUsers.list.find(x => x.email === (moved ? orig : email));
+    if (moved && !confirm(`เปลี่ยนอีเมล ${orig} → ${email}?\nอีเมลเดิมจะเข้าเว็บไม่ได้ ครั้งแรกให้เข้าด้วยอีเมลใหม่ (ลิงก์ทางอีเมล หรือ Google)`)) return;
     try {
       await window.__WEB.members.save({ email, name: String(d.name || '').trim() || null, role, branch: usersBrFixed(role) ? null : (d.branch || (role === 'sales' ? salesBranch(d.sales_name) : null) || null), sales_name: role === 'sales' ? d.sales_name : null, active: prev ? prev.active : true });
-      toast(prev ? 'บันทึกการแก้แล้ว' : `เพิ่ม ${email} แล้ว`); S.webUsers = null; render();
+      if (moved && prev) await window.__WEB.members.save({ email: orig, name: prev.name, role: prev.role, branch: prev.branch, sales_name: prev.sales_name, active: false });
+      toast(moved ? `เปลี่ยนอีเมลเป็น ${email} แล้ว (อีเมลเดิมปิดใช้งาน)` : prev ? 'บันทึกการแก้แล้ว' : `เพิ่ม ${email} แล้ว`); S.webUsers = null; render();
     } catch (e) { toast('บันทึกไม่ได้: ' + (e.message || ''), 'bad'); }
   },
   async 'users-toggle'(el) {
