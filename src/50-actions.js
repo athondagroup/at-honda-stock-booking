@@ -31,6 +31,7 @@ function renderModal(D) {
   else if (m.kind === 'dio') { body = dioModal(m); wide = true; }
   else if (m.kind === 'drill') { body = drillModal(m, D); wide = true; }
   else if (m.kind === 'specquota') { body = specQuotaModal(m, D); wide = true; }
+  else if (m.kind === 'merge') { body = mergeModal(m, D); wide = true; }
   else if (m.kind === 'idsview') { body = idsViewModal(m); wide = true; }
   else if (m.kind === 'adsales') body = adminSalesModal(m);
   else if (m.kind === 'adbk') { body = adminBkModal(m); wide = true; }

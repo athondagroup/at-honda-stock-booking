@@ -110,21 +110,56 @@ async function bkMerge(a, into, how) {
   if (drive) { const st = await gsMarkDupRow(drive); if (st === 'notfound' || st === 'error') toast(`ไม่ได้เขียน "คีย์ซ้ำ" ในชีต (${a.cust})`, 'bad'); }
   return true;
 }
+// what IDS has for a booking, in words
+function mergeIdsText(a) {
+  const mm = a.match; if (!mm) return '';
+  const dl = mm.recs.find(r => r.kind === 'dl'), bk = mm.recs.find(r => r.kind === 'booking'), st = mm.recs.find(r => r.kind === 'stock');
+  return [dl ? `IDS DL ใบกำกับ ${dl.row && dl.row.inv ? dl.row.inv : ''}${dl.ddate ? ` ส่งมอบ ${fmtD(dl.ddate)}` : ''}` : '', bk ? `IDS ใบจอง ${bk.no || ''}` : '', !dl && !bk && st ? `IDS Stock ${st.vin || ''}` : ''].filter(Boolean).join(' · ');
+}
+// which of two bookings to keep: the one IDS knows (DL, then booking), then the one further along, then the earlier one
+function mergeAdvice(x, y) {
+  const score = a => (a.match ? (a.match.recs.some(r => r.kind === 'dl') ? 300 : a.match.recs.some(r => r.kind === 'booking') ? 200 : 100) : 0)
+    + (a.rec.receipt_no ? 20 : 0) + Object.keys((a.rec.flow || {})).length;
+  const sx = score(x), sy = score(y);
+  const pick = sx !== sy ? (sx > sy ? x : y) : (String(x.date || '') <= String(y.date || '') ? x : y), other = pick === x ? y : x;
+  const why = mergeIdsText(pick) && !mergeIdsText(other) ? `ตรงกับ ${mergeIdsText(pick)}`
+    : pick.rec.receipt_no && !other.rec.receipt_no ? `มีเลขที่ใบเสร็จมัดจำ ${pick.rec.receipt_no}`
+    : sx !== sy ? 'ทำขั้นตอนไปมากกว่า' : 'จองก่อน';
+  return { id: pick.id, why };
+}
+function mergeModal(m, D) {
+  const x = D.at.find(t => t.id === m.a), y = D.at.find(t => t.id === m.b);
+  if (!x || !y) return `<p>ไม่พบใบจอง</p><button class="btn btn-ghost" data-act="close">ปิด</button>`;
+  const adv = mergeAdvice(x, y), keep = m.keep || adv.id;
+  const card = a => `<button class="pick text-left ${keep === a.id ? 'on' : ''}" data-act="merge-keep" data-id="${esc(a.id)}" aria-pressed="${keep === a.id}"><span class="flex-1 min-w-0">
+      <span class="font-semibold">${esc(a.cust)}</span> · ${esc(a.model)} ${esc(gradeShort(a.model, a.grade) || a.grade || '')} ${esc(a.color || '')} · จอง ${fmtD(a.date)}
+      ${adv.id === a.id ? `<span class="chip" style="background:var(--good-soft, var(--surface-2));color:var(--good)">แนะนำ · ${esc(adv.why)}</span>` : ''}
+      <span class="block text-xs text-muted">เซลล์ ${esc(a.sales || '–')} · ${esc(a.br || '')}${a.rec.receipt_no ? ` · ใบเสร็จ ${esc(a.rec.receipt_no)}` : ''}${a.rec.discount ? ` · ส่วนลด ${money(a.rec.discount)}` : ''}${mergeIdsText(a) ? ` · ${esc(mergeIdsText(a))}` : ' · ยังไม่พบใน IDS'}${a.custForm ? ` · ฟอร์มสะกด "${esc(a.custForm)}"` : ''}</span>
+      <span class="block text-xs mt-1">${keep === a.id ? '<b style="color:var(--good)">✓ ใช้ใบนี้เป็นหลัก</b>' : '<span style="color:var(--bad)">ใบนี้จะถูกเอาออก (ไม่นับยกเลิก)</span>'}</span></span></button>`;
+  const drop = keep === x.id ? y : x;
+  return `<div class="flex items-start justify-between gap-3 mb-2"><h2 class="font-head text-xl font-semibold">รวมใบจองที่ลงซ้ำ</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
+  <p class="text-sm mb-3">เลือกใบที่ใช้เป็นหลัก อีกใบจะถูกเอาออก ไม่นับเป็นการยกเลิก ล็อกของใบที่เอาออกถูกปิด และแถวในชีตเขียนว่า "คีย์ซ้ำ" · ข้อมูลของใบที่เอาออกเก็บไว้ในประวัติของใบหลัก</p>
+  <div class="flex flex-col gap-2">${card(x)}${card(y)}</div>
+  <div class="flex flex-wrap justify-end gap-2 mt-4"><button class="btn btn-ghost" data-act="close">ยกเลิก</button>
+    <button class="btn btn-red" data-act="merge-go">${canDecideBooking(drop) ? 'รวมใบจอง' : 'ส่งคำขอให้ผู้จัดการรวม'}</button></div>`;
+}
 Object.assign(ACTIONS, {
-  async 'merge-open'(el) {
-    const D = derive(), a = D.at.find(x => x.id === el.dataset.id), into = D.at.find(x => x.id === el.dataset.into);
-    if (!a || !into) { toast('ไม่พบใบจอง', 'bad'); return; }
-    const txt = `ใบนี้: ${a.cust} · ${a.model} · จอง ${fmtD(a.date)} · ${a.sales}\nใช้ใบเดิม: ${into.cust} · ${into.model} · จอง ${fmtD(into.date)} · ${into.sales}`;
-    if (canDecideBooking(a)) {
-      if (!confirm(`รวมใบจองที่ลงซ้ำ (ไม่นับเป็นยกเลิก)?\n\n${txt}\n\nใบนี้จะถูกเอาออก ล็อกที่เปิดอยู่ของใบนี้ถูกปิด`)) return;
-      if (await bkMerge(a, into, 'ผู้จัดการรวมเอง')) { S.modal = null; toast('รวมใบจองแล้ว ไม่นับเป็นการยกเลิก'); render(); }
+  'merge-open'(el) { S.modal = { kind: 'merge', a: el.dataset.id, b: el.dataset.into, keep: null }; render(); },
+  'merge-keep'(el) { if (S.modal && S.modal.kind === 'merge') { S.modal.keep = el.dataset.id; render(); } },
+  async 'merge-go'() {
+    const m = S.modal; if (!m || m.kind !== 'merge') return;
+    const D = derive(), x = D.at.find(t => t.id === m.a), y = D.at.find(t => t.id === m.b);
+    if (!x || !y) { toast('ไม่พบใบจอง', 'bad'); return; }
+    const keepId = m.keep || mergeAdvice(x, y).id, keep = keepId === x.id ? x : y, drop = keep === x ? y : x;
+    if (canDecideBooking(drop)) {
+      if (!confirm(`ใช้ใบของ ${keep.cust} (จอง ${fmtD(keep.date)}) เป็นหลัก และเอาใบของ ${drop.cust} (จอง ${fmtD(drop.date)}) ออก?\nไม่นับเป็นยกเลิก ล็อกของใบที่เอาออกถูกปิด`)) return;
+      if (await bkMerge(drop, keep, 'ผู้จัดการรวมเอง')) { S.modal = null; toast('รวมใบจองแล้ว ไม่นับเป็นการยกเลิก'); render(); }
       return;
     }
-    if (!confirm(`ขอผู้จัดการรวมใบจองที่ลงซ้ำ?\n\n${txt}`)) return;
-    const r = await saveBk(a.id, 'ขอรวมใบจอง (ลงซ้ำ)', `กับใบจอง ${into.cust} จอง ${fmtD(into.date)}`, x => {
-      x.change = { id: rid(), type: 'merge', into: into.id, into_label: `${into.cust} ${into.model} จอง ${fmtD(into.date)} (${into.sales || ''})`, reason: 'ลงซ้ำ', status: 'pending', ...actor() };
-    }, x => x.status !== 'cancelled' && pendingFree(x));
-    if (r) { toast('ส่งคำขอรวมใบให้ผู้จัดการอนุมัติแล้ว'); render(); }
+    const r = await saveBk(drop.id, 'ขอรวมใบจอง (ลงซ้ำ)', `ใช้ใบ ${keep.cust} จอง ${fmtD(keep.date)} เป็นหลัก`, t => {
+      t.change = { id: rid(), type: 'merge', into: keep.id, into_label: `${keep.cust} ${keep.model} จอง ${fmtD(keep.date)} (${keep.sales || ''})`, reason: 'ลงซ้ำ', status: 'pending', ...actor() };
+    }, t => t.status !== 'cancelled' && pendingFree(t));
+    if (r) { S.modal = null; toast('ส่งคำขอรวมใบให้ผู้จัดการอนุมัติแล้ว'); render(); }
   },
   async 'merge-approve'(el) {
     const D = derive(), a = D.at.find(x => x.id === el.dataset.id); if (!a || !a.change || a.change.type !== 'merge' || !canDecideBooking(a)) return;
