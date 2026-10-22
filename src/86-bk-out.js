@@ -78,12 +78,22 @@ function bkOutAuto(o) {
   const a = o && o.atId && typeof atById === 'function' ? atById(o.atId) : null;
   return a && !a.cancelled && a.ids && String(a.ids.no) !== String(o.no) ? a.ids : null;
 }
-function bkOutPending(o) { return !!(o && o.flag && !o.res && !bkOutAuto(o)); }
+// gone from the Booking file because the car was delivered (DL has that booking number, or the booking is delivered)
+function bkOutDelivered(o) {
+  if (!o) return null;
+  const a = o.atId && typeof atById === 'function' ? atById(o.atId) : null;
+  if (a && !a.cancelled && a.flow && a.flow.done && a.flow.done.delivered) return { date: a.flow.deliveredDate || (a.rec.flow && a.rec.flow.delivered && a.rec.flow.delivered.date) || null };
+  const inv = o.no ? derive().X.inv.find(i => String(i.no || '') === String(o.no) && !i.company) : null;
+  return inv ? { date: inv.ddate || inv.idate || null, inv: inv.inv } : null;
+}
+function bkOutPending(o) { return !!(o && o.flag && !o.res && !bkOutAuto(o) && !bkOutDelivered(o)); }
 function bkOutList(u, D) {
   const can = canApproveBr(u.br) && perms().write, F = S.bkOut && S.bkOut.id === u.id ? S.bkOut : { sel: {}, pick: {} };
   const todo = (u.out || []).filter(bkOutPending);
   const row = (o, i) => {
     const a = o.atId ? atById(o.atId) : null, auto = o.flag && !o.res ? bkOutAuto(o) : null, open = bkOutPending(o) && a && !a.cancelled;
+    const dv = o.flag && !o.res && !auto ? bkOutDelivered(o) : null;
+    if (dv) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">ส่งมอบแล้ว${dv.date ? ' ' + fmtD(dv.date) : ''}${dv.inv ? ` (DL ใบกำกับ ${esc(dv.inv)})` : ''} · หายจากไฟล์ Booking เพราะส่งมอบ ไม่ต้องทำอะไร</span></div>`;
     if (auto) return `<div class="py-2 border-t border-line"><div class="flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span class="text-muted">${esc(o.sales || '')}</span>
       <span style="color:var(--good)">ระบบจับคู่กับ IDS ใบใหม่แล้ว: ${esc(auto.no)} · ${esc(auto.cust || '')} · ${specLabel(auto.spec)}</span></div>
       <div class="text-xs text-muted mt-1">ใบจองในเว็บจับคู่กับใบใหม่นี้แล้ว (ส่วนใหญ่ IDS ออกเลขใบจองใหม่) ไม่ต้องยกเลิก <button class="underline" data-act="at-open" data-id="${esc(a.id)}">เปิด</button>
