@@ -115,17 +115,18 @@ function flowPanel(m, a, D) {
   const finBody = () => {
     const fin = f.fin || {};
     if (isCash(r)) return '<div class="text-sm text-muted">ซื้อสด ไม่ต้องผ่านไฟแนนซ์</div>';
-    if (fl.done.fin) return `<div class="text-sm text-muted">${esc(fin.company || r.finance || '')} อนุมัติ ${fmtD(fin.date)} ${fin.docs?.length ? `· แนบ ${fin.docs.length} รูป` : ''} · ${who(fin)}</div>`;
+    if (fl.done.fin) return `<div class="text-sm text-muted">${esc(fin.company || r.finance || '')}${r.dsp ? ' · DSP (Double Smile Plus)' : ''} อนุมัติ ${fmtD(fin.date)} ${fin.docs?.length ? `· แนบ ${fin.docs.length} รูป` : ''} · ${who(fin)}</div>${finDocsN(r) ? '' : finDocsLater(a)}`;
     const status = m.fin_status ?? r.fin_status ?? 'รอผล';
     const company = m.fin_company ?? fin.company ?? r.finance ?? '';
     return `<div class="text-sm text-muted mb-2">ยื่น ${esc(r.finance || '–')} สถานะตอนนี้ <b>${esc(r.fin_status || 'รอผล')}</b> · เมื่อผ่าน ให้ยืนยันบริษัทไฟแนนซ์และแนบใบอนุมัติ</div>
       ${stepAllowed(a, 'fin') ? `<div class="grid sm:grid-cols-3 gap-3 items-end">
         <div class="field"><label for="fl-fc">บริษัทไฟแนนซ์ (ยืนยัน)</label><select id="fl-fc" data-modal="fin_company">${opt(FINANCE, company, 'เลือก')}</select></div>
+        ${/HLTC/i.test(company) ? `<label class="flex items-center gap-2 text-sm self-center"><input type="checkbox" class="w-5 h-5" data-modal="fin_dsp" ${(m.fin_dsp ?? r.dsp) ? 'checked' : ''}> DSP (Double Smile Plus)</label>` : ''}
         <div class="field"><label for="fl-fs">สถานะไฟแนนซ์</label><select id="fl-fs" data-modal="fin_status">${opt(FIN_STATUS, status)}</select></div>
         <div class="flex flex-col gap-1"><label class="btn btn-ghost btn-sm relative">${S.files.fin.length ? `แนบแล้ว ${S.files.fin.length} รูป` : 'แนบใบอนุมัติ'}<input type="file" accept="image/*" multiple data-file="fin" class="absolute w-px h-px opacity-0"></label></div>
       </div>
       <div class="mt-2 flex gap-2"><button class="btn btn-dark btn-sm" data-act="flow-fin" data-id="${esc(a.id)}">บันทึก</button>
-      <span class="text-xs text-muted self-center">เลือก "ผ่าน" พร้อมแนบเอกสาร จึงไปขั้นถัดไปได้</span></div>` : ''}`;
+      <span class="text-xs text-muted self-center">เลือก "ผ่าน" แล้วไปขั้นถัดไปได้ · ใบอนุมัติแนบภายหลังได้ แต่ต้องแนบก่อนส่งมอบ</span></div>` : ''}`;
   };
   const downBody = () => {
     const d = f.down || {};

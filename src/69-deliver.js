@@ -43,7 +43,7 @@ function cdelivModal(m, D) {
     sec('booked', fl.done.booked, fl.done.booked ? done(`ใบเสร็จมัดจำ ${esc(r.receipt_no)}`) : `<div class="grid sm:grid-cols-2 gap-3 mt-1">${F('cd-rc', 'เลขที่ใบเสร็จมัดจำ', 'receipt_no', '')}</div>`),
     sec('fin', fl.done.fin, isCash(r) ? done('ซื้อสด') : fl.done.fin ? done(`${esc((f.fin && f.fin.company) || r.finance || '')} อนุมัติ`) : `<div class="grid sm:grid-cols-2 gap-3 mt-1 items-end"><div class="field"><label for="cd-fc">บริษัทไฟแนนซ์ที่อนุมัติ</label><select id="cd-fc" data-modal="v.fin_company">${opt(FINANCE, v.fin_company ?? (f.fin && f.fin.company) ?? r.finance ?? '', 'เลือก')}</select></div>
       <label class="btn btn-ghost btn-sm relative">${S.files.fin.length ? `แนบแล้ว ${S.files.fin.length} รูป` : 'แนบใบอนุมัติ (ถ้ามี)'}<input type="file" accept="image/*" multiple data-file="fin" class="absolute w-px h-px opacity-0"></label></div>
-      <div class="text-xs text-muted mt-1">ออกใบกำกับแล้ว ถือว่าไฟแนนซ์ผ่าน ใบอนุมัติแนบภายหลังได้</div>`),
+      <div class="text-xs text-muted mt-1">ออกใบกำกับแล้ว ถือว่าไฟแนนซ์ผ่าน แต่ต้องแนบใบอนุมัติก่อนส่งมอบ · ได้</div>`),
     sec('assign', true, done(`รถ <span class="code">${esc(c.vin)}</span>${linked ? '' : ' · จะบันทึกการจัดสรรให้ใบจองนี้'}`)),
     sec('po', fl.done.po, fl.done.po ? done(`สั่งแต่ง ${(f.po.items || []).length} รายการ`) : `<label class="flex items-center gap-2 text-sm mt-1"><input type="checkbox" data-modal="v.po_none" ${v.po_none ? 'checked' : ''}> ไม่มีแต่งรถ (บันทึกเป็น "ไม่มีรายการแต่ง")</label>
       <button class="btn btn-ghost btn-sm mt-1" data-act="cdeliv-po" data-id="${esc(a.id)}">ทำใบสั่งแต่ง (PO)</button>`),
@@ -78,9 +78,11 @@ Object.assign(ACTIONS, {
       if (!company) return bad('เลือกบริษัทไฟแนนซ์ที่อนุมัติ', 'cd-fc');
       const docs = [...((f.fin && f.fin.docs) || [])];
       for (const x of S.files.fin) { const id = await storeImage(x.blob); if (id) docs.push(id); }
+      if (!docs.length) return bad('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ');
       patch.fin_status = 'ผ่าน'; patch.finance = company;
       patch.flow.fin = { ...actor(), ok: true, date: t, docs, status: 'ผ่าน', company, via: 'invoice' };
     }
+    if (fl.done.fin && !isCash(r) && !finDocsN(r)) return bad('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ (เปิดใบจอง ขั้น "ไฟแนนซ์ผ่าน")');
     const linked = !!carBookingOf(c.vin, D);
     if (!linked) {
       if (c.lock && !(c.lock.bkref === a.key || c.lock.bkref === (a.row && a.row.key))) return bad(`รถคันนี้ล็อกให้ ${c.lock.owner || 'ใบจองอื่น'} อยู่ ปล่อยล็อกก่อน`);

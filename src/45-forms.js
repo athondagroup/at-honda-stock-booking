@@ -129,6 +129,7 @@ function bookingForm(D) {
       <fieldset class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-lg" style="background:var(--surface-2)"><legend class="font-head font-semibold px-1">ข้อมูลเพิ่ม (ไม่อยู่ใน Google Form · ไม่บังคับ ใส่ทีหลังได้)</legend>
         ${F('booking_no', 'เลขที่ใบจอง IDS', inp('booking_no', 'text', 'inputmode="numeric" maxlength="12" placeholder="10 หลักจาก IDS"'), false, 'ยังไม่ได้ลง IDS เว้นไว้ก่อนได้ ระบบจะเตือนจนกว่าจะใส่')}
         ${d.purchase === 'ไฟแนนซ์' ? F('finance', 'บริษัทไฟแนนซ์ที่ยื่น', sel('finance', FINANCE)) : ''}
+        ${d.purchase === 'ไฟแนนซ์' && /HLTC/i.test(d.finance || '') ? `<label class="flex items-center gap-2 text-sm self-end pb-2"><input type="checkbox" class="w-5 h-5" data-draft="booking.dsp" ${d.dsp ? 'checked' : ''}> DSP (Double Smile Plus)</label>` : ''}
         ${F('deposit', 'ยอดมัดจำ (บาท)', inp('deposit', 'number', 'min="0" step="100" inputmode="numeric"'))}
         ${F('receipt_no', 'เลขที่ใบเสร็จมัดจำ', inp('receipt_no', 'text', 'autocomplete="off"'), false, 'ต้องใส่ก่อนไปขั้นไฟแนนซ์ ใส่ทีหลังในใบจองได้')}
         ${F('delivery_plan', 'วันนัดรับรถ (ถ้ามี)', inp('delivery_plan', 'date', `min="${todayISO()}"`), false, 'ใส่แล้วล็อกรถจะถือไว้จนส่งมอบ ไม่ต้องปลดล็อกทุก 15 วัน')}

@@ -110,9 +110,9 @@ function prevRange(from, to) {
   const n = daysBetween(from, to) + 1; const e = new Date(Date.parse(from + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10); const st = new Date(Date.parse(e + 'T00:00:00Z') - (n - 1) * 864e5).toISOString().slice(0, 10); return [st, e];
 }
 function cmpSel() { return `<div class="field"><label for="e-cmp">เทียบกับ</label><select id="e-cmp" data-filter="cmp"><option value="prev" ${S.filters.cmp !== 'yoy' ? 'selected' : ''}>ช่วงก่อนหน้า (เดือน / ไตรมาส / ปีก่อน)</option><option value="yoy" ${S.filters.cmp === 'yoy' ? 'selected' : ''}>ช่วงเดียวกันปีที่แล้ว</option></select></div>`; }
-function mixTable(rows, title) {
+function mixTable(rows, title, unit = 'จอง') {
   const tot = rows.reduce((n, r) => n + r.n, 0);
-  return `<div class="min-w-0"><h3 class="font-medium mb-1">${title}</h3><div class="scroll-x"><table class="tbl text-sm"><thead><tr><th></th><th class="text-right">จอง</th><th class="text-right">%</th><th class="text-right">ช่วงก่อน</th><th class="text-right">เปลี่ยน</th></tr></thead><tbody>
+  return `<div class="min-w-0"><h3 class="font-medium mb-1">${title}</h3><div class="scroll-x"><table class="tbl text-sm"><thead><tr><th></th><th class="text-right">${unit}</th><th class="text-right">%</th><th class="text-right">ช่วงก่อน</th><th class="text-right">เปลี่ยน</th></tr></thead><tbody>
     ${rows.slice(0, 12).map(r => { const d = r.n - r.p; return `<tr><td class="truncate" style="max-width:200px">${esc(r.k)}</td><td class="num text-right font-semibold">${fmtN(r.n)}</td><td class="num text-right text-muted">${pctOf(r.n, tot)}%</td><td class="num text-right text-muted">${fmtN(r.p)}</td><td class="num text-right" style="color:var(--${d > 0 ? 'good' : d < 0 ? 'bad' : 'muted'})">${d > 0 ? '+' : ''}${d}${r.p ? ` (${d > 0 ? '+' : ''}${Math.round(d / r.p * 100)}%)` : ''}</td></tr>`; }).join('') || '<tr><td colspan="5" class="text-muted">ไม่มีข้อมูล</td></tr>'}</tbody></table></div></div>`;
 }
 function mixOf(cur, prev, key) {
@@ -120,7 +120,8 @@ function mixOf(cur, prev, key) {
   return [...new Set([...Object.keys(c), ...Object.keys(p)])].map(k => ({ k, n: c[k] || 0, p: p[k] || 0 })).sort((a, b) => b.n - a.n || b.p - a.p);
 }
 // the finance company: what the sales confirmed, the booking form, or the invoice in DL (old form bookings have none)
-function finKey(a, D) { if (isCash(a.rec)) return 'ซื้อสด'; const v = atVin(a), i = v && D && D.invByVin.get(v); return String((a.rec.flow && a.rec.flow.fin && a.rec.flow.fin.company) || a.rec.finance || (i && i.fin) || 'ไฟแนนซ์ (ยังไม่ระบุบริษัท)').toUpperCase(); }
+function finKey(a, D) { if (isCash(a.rec)) return 'ซื้อสด'; const k0 = finKey0(a, D); return k0 === 'HLTC' && a.rec.dsp ? 'HLTC · DSP' : k0; }
+function finKey0(a, D) { const v = atVin(a), i = v && D && D.invByVin.get(v); return String((a.rec.flow && a.rec.flow.fin && a.rec.flow.fin.company) || a.rec.finance || (i && i.fin) || 'ไฟแนนซ์ (ยังไม่ระบุบริษัท)').toUpperCase(); }
 function atVin(a) { return (a.match && a.match.vin) || (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || null; }
 function dashAna(D, part) {
   const E = execData(D), [pf, pt] = prevRange(E.from, E.to), inR = d => !!d && d >= E.from && d <= E.to;
@@ -167,7 +168,7 @@ function dashAna(D, part) {
     ${mixTable(mixOf(curOk, prev, a => a.model), 'รุ่น')}
     ${mixTable(mixOf(curOk, prev, a => `${a.model || ''} ${gradeShort(a.model, a.grade) || a.grade || ''}`.trim()), 'รุ่น + เกรด')}
     ${mixTable(mixOf(curOk, prev, a => a.color), 'สี')}
-    ${mixTable(mixOf(curOk, prev, a => finKey(a, D)), 'ไฟแนนซ์ / ซื้อสด')}
+    <div>${mixTable(mixOf(curOk, prev, a => finKey(a, D)), 'ไฟแนนซ์ / ซื้อสด')}${dspNote(curOk, a => finKey(a, D))}</div>
     ${mixTable(mixOf(curOk, prev, a => a.rec.source), 'ช่องทางลูกค้า')}
     ${mixTable(mixOf(curOk, prev, a => a.spec ? specLabelText(a.spec) : ''), 'รุ่น เกรด สี (สเปก)')}</div>`, 'เปลี่ยน = เทียบช่วงก่อนหน้าที่ยาวเท่ากัน ใช้ดูว่ารุ่นหรือสีไหนคนจองเพิ่มขึ้นหรือลดลง')}`,
     rank: `${dCard('อันดับเซลล์', `<div class="scroll-x max-h-96 overflow-auto"><table class="tbl text-sm"><thead><tr><th>เซลล์</th><th class="text-right">จอง</th><th class="text-right">ยกเลิก</th><th class="text-right">% ยกเลิก</th><th class="text-right">ใบกำกับ</th><th class="text-right">ส่งมอบ</th></tr></thead><tbody>
@@ -197,7 +198,7 @@ function dashAna(D, part) {
     ${mixTable(mixOf(curOk, prev, a => a.model), 'รุ่น')}
     ${mixTable(mixOf(curOk, prev, a => `${a.model || ''} ${gradeShort(a.model, a.grade) || a.grade || ''}`.trim()), 'รุ่น + เกรด')}
     ${mixTable(mixOf(curOk, prev, a => a.color), 'สี')}
-    ${mixTable(mixOf(curOk, prev, a => finKey(a, D)), 'ไฟแนนซ์ / ซื้อสด')}
+    <div>${mixTable(mixOf(curOk, prev, a => finKey(a, D)), 'ไฟแนนซ์ / ซื้อสด')}${dspNote(curOk, a => finKey(a, D))}</div>
     ${mixTable(mixOf(curOk, prev, a => a.rec.source), 'ช่องทางลูกค้า')}
     ${mixTable(mixOf(curOk, prev, a => a.spec ? specLabelText(a.spec) : ''), 'รุ่น เกรด สี (สเปก)')}</div>`, 'เปลี่ยน = เทียบช่วงก่อนหน้าที่ยาวเท่ากัน ใช้ดูว่ารุ่นหรือสีไหนคนจองเพิ่มขึ้นหรือลดลง')}
   <div class="grid lg:grid-cols-2 gap-5 my-5">

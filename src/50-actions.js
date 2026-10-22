@@ -426,7 +426,7 @@ async function saveBooking() {
   const rec = {
     booking_no: d.booking_no.trim() || null, booking_date: d.booking_date, br: myBranch() || d.br || salesBranch(d.sales), sales: d.sales, customer: d.customer.trim(), source: d.source === 'อื่น ๆ' ? `อื่น ๆ: ${String(d.source_other || '').trim()}` : d.source,
     model: d.model, grade: d.grade, color: d.color, model_text: d.model_text || null, purchase: d.purchase, finance: fin ? d.finance : null,
-    fin_status: fin ? 'รอผล' : null, deposit: num(d.deposit) || 0, receipt_no: (d.receipt_no || '').trim() || null, discount: num(d.discount), foc_total: num(d.foc_total), insurance: d.insurance,
+    fin_status: fin ? 'รอผล' : null, dsp: fin && /HLTC/i.test(d.finance || '') ? !!d.dsp : false, deposit: num(d.deposit) || 0, receipt_no: (d.receipt_no || '').trim() || null, discount: num(d.discount), foc_total: num(d.foc_total), insurance: d.insurance,
     ...bookPriceSnap(d),
     trade: bookTradeRec(d),
     delivery_plan: validDate(d.delivery_plan), lead_id: d.lead_id || null, note: d.note || null, ids_claim: d.ids_claim || null,
@@ -749,13 +749,12 @@ const ACTIONS = {
     const pass = status === 'ผ่าน';
     const have = (prev.docs || []).length + S.files.fin.length;
     if (pass && !company) { toast('เลือกบริษัทไฟแนนซ์ที่อนุมัติ', 'bad'); $('#fl-fc')?.focus(); return; }
-    if (pass && !have) { toast('แนบใบอนุมัติไฟแนนซ์ก่อน', 'bad'); return; }
     const docs = [...(prev.docs || [])];
     for (const x of S.files.fin) { const id = await storeImage(x.blob); if (id) docs.push(id); }
-    if (pass && !docs.length) { toast('เก็บรูปเอกสารไม่สำเร็จ ลองอีกครั้ง', 'bad'); return; }
-    const fin = { ...actor(), ok: pass, date: pass ? todayISO() : null, docs, status, company: company || null };
+    const dsp = /HLTC/i.test(company || '') ? !!(S.modal.fin_dsp ?? r.dsp) : false;
+    const fin = { ...actor(), ok: pass, date: pass ? todayISO() : null, docs, status, company: company || null, dsp };
     const msg = pass ? `ไฟแนนซ์ ${company} ผ่านแล้ว ไปขั้นจัดสรรรถ` : status === 'ไม่ผ่าน' ? 'บันทึกว่าไฟแนนซ์ไม่ผ่าน ถ้าลูกค้าไม่ไปต่อ ให้ปล่อยล็อก' : `บันทึกสถานะ "${status}" แล้ว`;
-    if (await saveFlow(a, { fin_status: status, finance: company || r.finance || null, flow: { fin } }, msg)) {
+    if (await saveFlow(a, { fin_status: status, finance: company || r.finance || null, dsp, flow: { fin } }, msg + (pass && !docs.length ? ' · ยังไม่แนบใบอนุมัติ ต้องแนบก่อนส่งมอบ' : ''))) {
       S.files.fin = []; delete S.modal.fin_status; delete S.modal.fin_company; render();
     }
   },
@@ -809,6 +808,7 @@ const ACTIONS = {
     if (!insurer) { toast('เลือกบริษัทประกันที่ทำ', 'bad'); $('#fl-in')?.focus(); return; }
     if (!validDate(date) || date > todayISO()) { toast('วันที่ส่งมอบต้องไม่เกินวันนี้', 'bad'); return; }
     if (a.date && date < a.date) { toast('วันที่ส่งมอบต้องไม่ก่อนวันจอง', 'bad'); return; }
+    if (!isCash(a.rec) && !finDocsN(a.rec)) { toast('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ (ที่ขั้น "ไฟแนนซ์ผ่าน")', 'bad'); return; }
     const tr = await tradeDelivOf(v, tradeCur(a.rec), 'fl', true); if (tr.err) { toast(tr.err, 'bad'); if (tr.id) $('#' + tr.id)?.focus(); return; }
     tradeFilesClear();
     if (!await saveFlow(a, { trade: tr.rec, flow: { delivered: { ...actor(), date, plate, insurer } } }, 'บันทึกส่งมอบแล้ว กรอกข้อมูลค่าคอมแล้วรอผู้จัดการยืนยัน')) return;
@@ -933,7 +933,7 @@ document.addEventListener('click', ev => {
   fn(el, ev);
 });
 function setPath(obj, path, val) { const ks = path.split('.'); let o = obj; ks.slice(0, -1).forEach(k => { if (o[k] === undefined || o[k] === null) o[k] = {}; o = o[k]; }); o[ks.at(-1)] = val; }
-const RERENDER_FIELDS = new Set(['booking.model', 'booking.grade', 'booking.color', 'booking.purchase', 'booking.source', 'booking.br', 'booking.sales', 'booking.multi_reason', 'booking.multi_old']);
+const RERENDER_FIELDS = new Set(['booking.finance', 'booking.model', 'booking.grade', 'booking.color', 'booking.purchase', 'booking.source', 'booking.br', 'booking.sales', 'booking.multi_reason', 'booking.multi_old']);
 let poqTimer = null, searchTimer = null;
 document.addEventListener('input', ev => {
   const t = ev.target;
