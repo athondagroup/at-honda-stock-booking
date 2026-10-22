@@ -30,7 +30,7 @@ function outFixList(u) {
         ${(F && F.reason || 'other_br') === 'other_br' ? `<div class="field"><label for="of-b">สาขา / ดีลเลอร์ที่รับ</label><input id="of-b" data-outfixf="text" value="${esc(F && F.text || '')}" placeholder="เช่น ฮอนด้า …"></div>`
           : (F && F.reason) === 'dealer' ? `<div class="field"><label for="of-d" class="req">ชื่อดีลเลอร์</label><input id="of-d" data-outfixf="text" value="${esc(F.text || '')}"></div>`
           : `<div class="field"><label for="of-n">หมายเหตุ</label><input id="of-n" data-outfixf="text" value="${esc(F && F.text || '')}"></div>`}
-        <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-4 h-4" data-outfixf="closeLocks" ${(F ? F.closeLocks : true) ? 'checked' : ''}> ปิดล็อกที่ยังเปิดของรถที่เลือก</label>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-4 h-4" data-outfixf="closeLocks" ${(F ? F.closeLocks : true) ? 'checked' : ''}> ยกเลิกล็อกที่ค้างของรถที่เลือก (รถออกจากสต็อกแล้ว ใบจองกลับไปรอรถ)</label>
         <button class="btn btn-red btn-sm" data-act="outfix-save" data-id="${esc(u.id)}" ${sel.length && !(F && F.busy) ? '' : 'disabled'}>${F && F.busy ? '<span class="spin"></span> กำลังบันทึก…' : `บันทึก ${sel.length} คัน`}</button></div>
       <p class="text-xs text-muted mt-1">"ยังอยู่" ไม่เอารถออกจากระบบ ใช้เมื่อไฟล์ Stock ไม่ครบ ให้อัปโหลดไฟล์ที่ครบภายหลัง · ขายให้สาขาอื่น / ดีลเลอร์ / นำออก จะจำไว้ อัปโหลดครั้งหน้าจะไม่ขึ้นแดงอีก</p></div>` : '';
   return `<div class="mt-2 text-sm flex flex-col gap-1">${bar}${u.out.map(row).join('')}</div>`;
@@ -59,7 +59,7 @@ async function outFixSave(id) {
     }
   } finally { F.busy = false; }
   S.outFix = { ...F, sel: {} };
-  toast(`บันทึกแล้ว ${vins.length} คัน${closed ? ` · ปิดล็อก ${closed} รายการ` : ''}`); render();
+  toast(`บันทึกแล้ว ${vins.length} คัน${closed ? ` · ยกเลิกล็อก ${closed} รายการ` : ''}`); render();
 }
 Object.assign(ACTIONS, {
   'outfix-all'(el) { const F = outFixState(el.dataset.id), u = S.uploads.get(el.dataset.id); F.sel = {}; if (el.dataset.v && u) (u.out || []).filter(o => outOpen(u, o)).forEach(o => { F.sel[o.vin] = true; }); render(); },

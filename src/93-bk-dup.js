@@ -107,7 +107,7 @@ async function bkMerge(a, into, how) {
   });
   const closed = [];
   for (const l of liveLocksOf(a)) { const cur = findLock(l.id); if (!cur) continue; closed.push({ id: l.id, from: cur.status }); cur.status = 'released'; await saveLock(l.id, cur, 'ปล่อยล็อก', 'รวมใบจอง (ลงซ้ำ)'); }
-  if (closed.length) await saveBk(a.id, 'ปิดล็อกของใบที่รวม', closed.map(x => x.id).join(', '), x => { x.merge_locks = closed; });
+  if (closed.length) await saveBk(a.id, 'ยกเลิกล็อกของใบที่รวม', closed.map(x => x.id).join(', '), x => { x.merge_locks = closed; });
   const drive = ra.sheet_drive_id || (a.id.startsWith('F_') ? a.id.slice(2) : null);
   if (drive) { const st = await gsMarkDupRow(drive); if (st === 'notfound' || st === 'error') toast(`ไม่ได้เขียน "คีย์ซ้ำ" ในชีต (${a.cust})`, 'bad'); }
   return true;
