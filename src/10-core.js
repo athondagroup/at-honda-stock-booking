@@ -85,7 +85,7 @@ const S = {
   me: { id: null, name: '' },
   bookings: new Map(), locks: new Map(), vehicles: new Map(), receipts: new Map(), ids: new Map(), uploads: new Map(), ref: new Map(),
   idsV: 0, dataV: 0, cache: null,
-  draft: { booking: null }, files: { bk: [], slip: [], fin: [], passbook: [] },
+  draft: { booking: null }, files: { bk: [], slip: [], fin: [], passbook: [], trade: [] },
   ai: { booking: null, receive: null, refund: null, exec: null }, ctl: { booking: null, receive: null },
   upl: { results: [], busy: false, msg: '' },
   filters: { model: '', status: '', q: '', specOpen: null, qModel: '', qMine: false, bq: '', bState: '', aq: '', qm: '', qs: '', rq: '' },
