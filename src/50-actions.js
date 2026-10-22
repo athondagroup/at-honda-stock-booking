@@ -428,6 +428,7 @@ async function saveBooking() {
     model: d.model, grade: d.grade, color: d.color, model_text: d.model_text || null, purchase: d.purchase, finance: fin ? d.finance : null,
     fin_status: fin ? 'รอผล' : null, deposit: num(d.deposit) || 0, receipt_no: (d.receipt_no || '').trim() || null, discount: num(d.discount), foc_total: num(d.foc_total), insurance: d.insurance,
     ...bookPriceSnap(d),
+    trade: bookTradeRec(d),
     delivery_plan: validDate(d.delivery_plan), lead_id: d.lead_id || null, note: d.note || null, ids_claim: d.ids_claim || null,
     doc_imgs, slip_imgs, img_missing: imgMissing, slip: S.files.slip.length > 0, flow: {},
     ai: d.ai, ai_ok: !!d.ai, ai_fields: d.aiFields, checks: checks.map(({ t, bad }) => ({ t, bad: !!bad })),
@@ -738,8 +739,7 @@ const ACTIONS = {
     const d = S.modal.down || {}, no = String(d.receipt_no || '').trim(), date = d.date || todayISO();
     if (!no) { toast('ใส่เลขที่ใบเสร็จ', 'bad'); $('#fl-dn')?.focus(); return; }
     if (!validDate(date) || date > todayISO()) { toast('วันที่ชำระต้องไม่เกินวันนี้', 'bad'); return; }
-    const tr = tradeOf(d, 'fl'); if (tr.err) { toast(tr.err, 'bad'); if (tr.id) $('#' + tr.id)?.focus(); return; }
-    if (await saveFlow(a, { flow: { down: { ...actor(), receipt_no: no, amount: num(d.amount), date, tradein: tr.rec } } }, isCash(a.rec) ? 'บันทึกชำระครบแล้ว' : 'บันทึกชำระดาวน์แล้ว')) { S.modal.down = null; render(); }
+    if (await saveFlow(a, { flow: { down: { ...actor(), receipt_no: no, amount: num(d.amount), date } } }, isCash(a.rec) ? 'บันทึกชำระครบแล้ว' : 'บันทึกชำระดาวน์แล้ว')) { S.modal.down = null; render(); }
   },
   async 'flow-fin'(el) {
     const a = atById(el.dataset.id); if (!a || a.flow.next !== 'fin' || !stepAllowed(a, 'fin')) { toast('ทำขั้นนี้ไม่ได้ตอนนี้', 'bad'); return; }
@@ -808,7 +808,9 @@ const ACTIONS = {
     if (!insurer) { toast('เลือกบริษัทประกันที่ทำ', 'bad'); $('#fl-in')?.focus(); return; }
     if (!validDate(date) || date > todayISO()) { toast('วันที่ส่งมอบต้องไม่เกินวันนี้', 'bad'); return; }
     if (a.date && date < a.date) { toast('วันที่ส่งมอบต้องไม่ก่อนวันจอง', 'bad'); return; }
-    if (!await saveFlow(a, { flow: { delivered: { ...actor(), date, plate, insurer } } }, 'บันทึกส่งมอบแล้ว กรอกข้อมูลค่าคอมแล้วรอผู้จัดการยืนยัน')) return;
+    const tr = await tradeDelivOf(v, tradeCur(a.rec), 'fl', true); if (tr.err) { toast(tr.err, 'bad'); if (tr.id) $('#' + tr.id)?.focus(); return; }
+    tradeFilesClear();
+    if (!await saveFlow(a, { trade: tr.rec, flow: { delivered: { ...actor(), date, plate, insurer } } }, 'บันทึกส่งมอบแล้ว กรอกข้อมูลค่าคอมแล้วรอผู้จัดการยืนยัน')) return;
     for (const l of derive().locks.filter(x => x.live && x.type === 'booking' && (x.bkref === a.key || x.bkref === a.row?.key))) {
       const cur = findLock(l.id); if (!cur) continue;
       cur.status = 'done'; await saveLock(l.id, cur, 'ส่งมอบแล้ว', fmtD(date));
@@ -939,6 +941,7 @@ document.addEventListener('input', ev => {
     if (t.dataset.draft === 'booking.model') { S.draft.booking.grade = ''; S.draft.booking.color = ''; }
     if (t.dataset.draft === 'booking.grade') S.draft.booking.color = '';
     if (RERENDER_FIELDS.has(t.dataset.draft) && t.tagName === 'SELECT') render();
+    if (t.dataset.draft === 'booking.trade') render();
   } else if (t.dataset.modal && S.modal) {
     const path = t.dataset.modal, val = t.type === 'checkbox' ? t.checked : t.value;
     setPath(S.modal, path, val);
@@ -1010,7 +1013,7 @@ document.addEventListener('change', async ev => {
     if (kind === 'ids') { handleIdsFiles(files); return; }
     if (kind === 'recv') { if (files.length > 1) handleReceiveFiles(files); else handleReceiveFile(files[0]); return; }
     if (kind === 'passbook') { S.files.passbook.forEach(x => { try { URL.revokeObjectURL(x.url); } catch (e) { /* ignore */ } }); S.files.passbook = []; S.ai.refund = null; }
-    const max = kind === 'bk' ? 3 : kind === 'fin' ? 4 : kind === 'passbook' ? 1 : 2, room = max - S.files[kind].length;
+    const max = kind === 'bk' ? 3 : kind === 'fin' || kind === 'trade' ? 4 : kind === 'passbook' ? 1 : 2, room = max - S.files[kind].length;
     if (files.length > room) toast(`แนบได้สูงสุด ${max} รูป`, 'bad');
     for (const f of files.slice(0, Math.max(0, room))) {
       let blob;

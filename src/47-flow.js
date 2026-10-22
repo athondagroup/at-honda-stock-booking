@@ -80,6 +80,7 @@ function atModal(m, D) {
       ${gformBox(m, a)}
       ${a.cancelled ? cancelledBox(m, a) : trInBox(a, D)}
       ${changeBox(m, a)}
+      ${tradeEditBox(m, a)}
       ${mergedBox(a, D)}
       ${m.cancel ? cancelPanel(m, a) : ''}
       ${ownerBox(m, a)}
@@ -134,7 +135,6 @@ function flowPanel(m, a, D) {
       <div class="field"><label for="fl-dn">เลขที่ใบเสร็จ${isCash(r) ? 'ชำระครบ' : 'เงินดาวน์'}</label><input id="fl-dn" data-modal="down.receipt_no" value="${esc(m.down?.receipt_no ?? '')}" autocomplete="off"></div>
       <div class="field"><label for="fl-da">ยอดเงิน (บาท)</label><input id="fl-da" type="number" min="0" step="100" inputmode="numeric" data-modal="down.amount" value="${esc(m.down?.amount ?? '')}"></div>
       <div class="field"><label for="fl-dd2">วันที่ชำระ</label><input id="fl-dd2" type="date" data-modal="down.date" value="${esc(m.down?.date ?? todayISO())}" max="${todayISO()}"></div></div>
-      ${tradeFields('down', m.down || {}, 'fl')}
       <button class="btn btn-dark btn-sm mt-2" data-act="flow-down" data-id="${esc(a.id)}">บันทึกการชำระ</button>`;
   };
   const assignBody = () => {
@@ -172,6 +172,7 @@ function flowPanel(m, a, D) {
       <div class="field"><label for="fl-pl">เลขทะเบียนป้ายแดง</label><input id="fl-pl" data-modal="deliv.plate" value="${esc(v.plate ?? dv.plate ?? '')}" placeholder="เช่น ป-1234 นครปฐม" autocomplete="off"></div>
       <div class="field"><label for="fl-in">บริษัทประกันที่ทำ</label><input id="fl-in" list="fl-ins" data-modal="deliv.insurer" value="${esc(v.insurer ?? dv.insurer ?? '')}" placeholder="เลือกหรือพิมพ์"><datalist id="fl-ins">${INSURERS.map(x => `<option value="${esc(x)}">`).join('')}</datalist></div></div>
       <div class="text-xs text-muted mt-1">ประกันในใบจอง: ${esc(r.insurance || '–')}</div>
+      ${tradeDelivFields('deliv', (m.deliv = m.deliv || tradePre(r)), 'fl', tradeCur(r), true)}
       <button class="btn btn-dark btn-sm mt-2" data-act="flow-deliver" data-id="${esc(a.id)}">บันทึกส่งมอบ</button>`;
   };
   const commBody = () => {
