@@ -3,7 +3,7 @@ function newBookingDraft() {
   return {
     booking_no: '', booking_date: todayISO(), br: '', sales: '', customer: '', source: 'Walk-in', model: '', grade: '', color: '', model_text: '',
     purchase: 'ไฟแนนซ์', finance: 'HLTC', deposit: '', insurance: 'Honda แถม', price: '', discount: '', foc_items: '', down: '', fin_amount: '',
-    rate: '', term: '', campaign: '', trade_in: '', trade: '', t_brand: '', t_model: '', t_year: '', t_price: '', lead_id: '', note: '', foc_total: '', delivery_plan: '', ids_claim: '', receipt_no: '', multi_reason: '', multi_note: '', multi_old: '', ai: null, aiFields: [], slip_ai: null, unreadable: []
+    rate: '', term: '', campaign: '', trade_in: '', trade: '', t_brand: '', t_model: '', t_year: '', t_price: '', lead_id: '', note: '', foc_total: '', delivery_plan: '', ids_claim: '', receipt_no: '', paper_no: '', multi_reason: '', multi_note: '', multi_old: '', ai: null, aiFields: [], slip_ai: null, unreadable: []
   };
 }
 S.draft.booking = newBookingDraft();
@@ -132,6 +132,7 @@ function bookingForm(D) {
         ${d.purchase === 'ไฟแนนซ์' && /HLTC/i.test(d.finance || '') ? `<label class="flex items-center gap-2 text-sm self-end pb-2"><input type="checkbox" class="w-5 h-5" data-draft="booking.dsp" ${d.dsp ? 'checked' : ''}> DSP (Double Smile Plus)</label>` : ''}
         ${F('deposit', 'ยอดมัดจำ (บาท)', inp('deposit', 'number', 'min="0" step="100" inputmode="numeric"'))}
         ${F('receipt_no', 'เลขที่ใบเสร็จมัดจำ', inp('receipt_no', 'text', 'autocomplete="off"'), false, 'ต้องใส่ก่อนไปขั้นไฟแนนซ์ ใส่ทีหลังในใบจองได้')}
+        ${F('paper_no', 'เลขที่ใบจองสาขา (เช่น SPH 60/21)', inp('paper_no', 'text', 'autocomplete="off"'), false, 'เลขบนใบจองกระดาษของสาขา ไม่บังคับ')}
         ${F('delivery_plan', 'วันนัดรับรถ (ถ้ามี)', inp('delivery_plan', 'date', `min="${todayISO()}"`), false, 'ใส่แล้วล็อกรถจะถือไว้จนส่งมอบ ไม่ต้องปลดล็อกทุก 15 วัน')}
       </fieldset>
       ${multiBlock(d, D)}

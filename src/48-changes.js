@@ -1,9 +1,9 @@
 // ---------- one booking: owner confirmation, match confirmation, edit / cancel requests, refund form
 // Key fields change only after a manager approves; the rest take effect at once.
 const CHANGE_KEYS = { customer: 'ชื่อลูกค้า', model: 'Model', grade: 'Grade', color: 'รหัสสี', sales: 'เซลล์เจ้าของเคส', purchase: 'เงื่อนไขการซื้อ', finance: 'บริษัทไฟแนนซ์', discount: 'ส่วนลด', foc_total: 'FOC ที่ใช้ทั้งหมด',
-  booking_date: 'วันที่จอง', deposit: 'ยอดมัดจำ', receipt_no: 'เลขที่ใบเสร็จมัดจำ' };
+  booking_date: 'วันที่จอง', deposit: 'ยอดมัดจำ', receipt_no: 'เลขที่ใบเสร็จมัดจำ', paper_no: 'เลขที่ใบจองสาขา' };
 // money and document fields: only the branch admin (or the manager) changes them, the manager confirms
-const ADMIN_KEYS = ['booking_date', 'deposit', 'receipt_no'];
+const ADMIN_KEYS = ['booking_date', 'deposit', 'receipt_no', 'paper_no'];
 // the manager keeps the old queue place only with a reason
 const QUEUE_KEEP_REASONS = ['ลงรุ่น/เกรด/สีผิดตั้งแต่แรก ลูกค้าไม่ได้เปลี่ยน', 'ลูกค้าเปลี่ยนก่อนมีรถให้จัดสรร ไม่กระทบคิวคนอื่น', 'สเปกใหม่มีรถว่าง ไม่ต้องแย่งคิว', 'ผู้บริหารอนุมัติเป็นกรณีพิเศษ', 'อื่น ๆ'];
 const canAdminEdit = a => (S.role.role === 'admin' && a.br === S.role.branch) || canApproveBr(a.br);
@@ -129,6 +129,7 @@ function editPanel(m, a) {
       ${F('booking_date', 'วันที่จอง', inp('booking_date', 'date', `max="${todayISO()}" ${adm ? '' : 'disabled'}`))}
       ${F('deposit', 'ยอดมัดจำ (บาท)', inp('deposit', 'number', `min="0" step="100" ${adm ? '' : 'disabled'}`))}
       ${F('receipt_no', 'เลขที่ใบเสร็จมัดจำ', inp('receipt_no', 'text', `autocomplete="off" ${adm ? '' : 'disabled'}`))}
+      ${F('paper_no', 'เลขที่ใบจองสาขา (เช่น SPH 60/21)', inp('paper_no', 'text', `autocomplete="off" ${adm ? '' : 'disabled'}`))}
       ${adm ? '' : '<div class="sm:col-span-3 text-xs text-muted">วันที่จอง ยอดมัดจำ และเลขที่ใบเสร็จมัดจำ แอดมินสาขาเป็นคนแก้ แล้วผู้จัดการยืนยัน</div>'}
       ${specDiff && direct ? `<div class="sm:col-span-3">${queuePick('eq', m.eq, a)}</div>` : specDiff ? '<div class="sm:col-span-3 text-xs" style="color:var(--bad)">เปลี่ยนรุ่น เกรด หรือสี: ผู้จัดการจะเลือกต่อคิวใหม่หรือใช้คิวเดิม และระบบปล่อยล็อก/การจัดสรรรถเดิม อย่าลืมแก้ใน IDS ด้วย</div>' : ''}
     </fieldset>
@@ -155,8 +156,12 @@ function cancelPanel(m, a) {
   const c = m.cancel, direct = canApproveBr(a.br);
   return box('bad', `<b>${direct ? 'ยกเลิกใบจอง' : 'ขอยกเลิกใบจอง'}</b>${direct ? '' : ' ผู้จัดการเป็นคนอนุมัติ'}
     <div class="grid sm:grid-cols-2 gap-3 mt-2"><div class="field"><label for="cn-r">เหตุผล</label><select id="cn-r" data-modal="cancel.reason">${opt(CANCEL_REASONS, c.reason)}</select></div>
-      <div class="field"><label for="cn-n" class="${c.reason === 'อื่น ๆ' || direct ? 'req' : ''}">${direct ? 'เหตุผลที่อนุมัติ / รายละเอียด' : 'รายละเอียด'}</label><input id="cn-n" data-modal="cancel.note" value="${esc(c.note || '')}"></div>
+      <div class="field"><label for="cn-n" class="${c.reason === 'อื่น ๆ' || c.reason === 'ไฟแนนซ์ไม่ผ่าน' || direct ? 'req' : ''}">${direct ? 'เหตุผลแบบเต็ม (ตามใบถอนจอง)' : 'รายละเอียด (ตามใบถอนจอง)'}</label><textarea id="cn-n" rows="2" data-modal="cancel.note">${esc(c.note || '')}</textarea></div>
       <div class="field"><label for="cn-ph" class="req">เบอร์โทรลูกค้า (ให้ CR โทรตรวจสอบ)</label><input id="cn-ph" type="tel" inputmode="tel" data-modal="cancel.phone" value="${esc(c.phone || a.rec.phone || '')}" placeholder="08x-xxx-xxxx"></div>
+      <div class="field"><label for="cn-dt" class="req">วันที่ลูกค้าขอถอนจอง</label><input id="cn-dt" type="date" max="${todayISO()}" data-modal="cancel.req_date" value="${esc(c.req_date || todayISO())}"></div>
+      ${cxBkFields(c, a)}
+      ${c.reason === 'ไฟแนนซ์ไม่ผ่าน' ? cxFinTried(c) : ''}
+      <div class="sm:col-span-2">${cxDocTicks(c)}</div>
       ${direct ? `<div class="field"><label for="cn-rf">เงินมัดจำ</label><select id="cn-rf" data-modal="cancel.refund">${Object.entries(REFUND).map(([k, t]) => `<option value="${k}" ${(c.refund || 'refund') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
         ${(c.refund || 'refund') === 'refund' ? `<div class="field"><label for="cn-am">ยอดคืน (บาท)</label><input id="cn-am" type="number" min="0" step="100" data-modal="cancel.amount" value="${esc(c.amount ?? a.deposit ?? '')}"></div>` : ''}
         ${c.refund === 'transfer' ? trFields('cancel', c, a, derive()) : ''}` : ''}</div>
@@ -184,12 +189,9 @@ function refundPanel(m, a) {
   return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">บัญชีคืนเงินจองลูกค้า</h2>
       <p class="text-sm text-muted">${esc(a.cust)} · ${esc(a.model)} ${esc(gradeShort(a.model, a.grade))} · คืน ${money(c.amount)} บาท · ชื่อบัญชีต้องตรงกับชื่อผู้จอง</p></div><button class="btn btn-ghost btn-sm" data-act="refund-back">กลับ</button></div>
     <div class="grid md:grid-cols-2 gap-5">
-      <div class="flex flex-col gap-2"><div class="font-medium req">รูปหน้าสมุดบัญชี</div>
-        ${pic ? `<div class="photo-pane" style="max-height:40vh"><img src="${pic}" alt="หน้าสมุดบัญชี"></div>` : ''}
-        <label class="btn btn-ghost btn-sm relative">${pic ? 'เปลี่ยนรูป' : 'แนบรูปหน้าสมุดบัญชี'}<input type="file" accept="image/*" data-file="passbook" class="absolute w-px h-px opacity-0"></label>
-        ${aiReady() && S.files.passbook[0] ? `<button class="btn btn-dark btn-sm" data-act="ai-passbook" ${ai && ai.state === 'running' ? 'disabled' : ''}>${ai && ai.state === 'running' ? '<span class="spin"></span> AI กำลังอ่าน…' : 'ให้ AI อ่านธนาคาร เลขที่บัญชี ชื่อบัญชี'}</button>` : ''}
-        ${ai && ai.state === 'error' ? `<span class="text-sm" style="color:var(--bad)">${esc(ai.msg)}</span>` : ai && ai.state === 'done' ? '<span class="text-sm" style="color:var(--good)">อ่านแล้ว ตรวจกับรูปก่อนบันทึก</span>' : ''}
-      </div>
+      <div class="flex flex-col gap-2 text-sm"><div class="font-medium">ตรวจหน้าสมุดบัญชีจากเอกสารกระดาษ</div>
+        <label class="flex items-start gap-2"><input type="checkbox" class="w-5 h-5 mt-0.5" data-modal="refund.passbook_ok" ${f.passbook_ok ? 'checked' : ''}><span class="req">แนบสำเนาหน้าสมุดบัญชี (กระดาษ) แล้ว และตรวจว่าเลขบัญชี ชื่อบัญชีตรงกับที่กรอก</span></label>
+        <p class="text-xs text-muted">ไม่ต้องถ่ายรูปเก็บในเว็บ ฝ่ายบัญชีตรวจจากเอกสารที่แนบกับใบถอนจอง</p></div>
       <div class="flex flex-col gap-3">
         <div class="field"><label for="rf-bank" class="req">ธนาคาร</label><select id="rf-bank" data-modal="refund.bank">${opt(THAI_BANKS, f.bank, 'เลือกธนาคาร')}</select></div>
         ${f.bank === 'อื่น ๆ' ? `<div class="field"><label for="rf-bank2" class="req">ชื่อธนาคาร</label><input id="rf-bank2" data-modal="refund.bank_other" value="${esc(f.bank_other || '')}"></div>` : ''}

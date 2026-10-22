@@ -186,7 +186,7 @@ Object.assign(ACTIONS, {
     if (a.change) { toast('มีคำขอที่รออนุมัติอยู่ ให้ผู้จัดการตัดสินก่อน', 'bad'); return; }
     if (!S.modal || S.modal.id !== a.id) S.modal = { kind: 'at', id: a.id };
     const reason = el.dataset.reason || CANCEL_REASONS[0];
-    S.modal.cancel = { reason, note: '', refund: /ซ้ำ|เปลี่ยนรุ่น/.test(reason) ? 'transfer' : 'refund', amount: a.deposit || '' }; render();
+    S.modal.cancel = { reason, note: '', refund: /ซ้ำ|เปลี่ยนรุ่น/.test(reason) ? 'transfer' : 'refund', amount: a.deposit || '', req_date: todayISO(), docs: {}, fin_tried: [] }; render();
   },
   'cancel-close'() { S.modal.cancel = null; render(); },
   async 'cancel-submit'(el) {
@@ -195,14 +195,16 @@ Object.assign(ACTIONS, {
     if ((c.reason === 'อื่น ๆ' || direct) && !note) { toast(direct ? 'ใส่เหตุผลที่อนุมัติยกเลิก' : 'เขียนรายละเอียดเมื่อเลือก "อื่น ๆ"', 'bad'); $('#cn-n')?.focus(); return; }
     const phone = String(c.phone || a.rec.phone || '').trim();
     if (phone.replace(/\D/g, '').length < 9) { toast('ใส่เบอร์โทรลูกค้า (ให้ CR โทรตรวจสอบ)', 'bad'); $('#cn-ph')?.focus(); return; }
+    const bad = cxCheck(c, a); if (bad) { toast(bad[0], 'bad'); if (bad[1]) $(bad[1])?.focus(); return; }
     if (direct) {
-      const refund = c.refund || 'refund', amount = refund === 'refund' ? num(c.amount) : 0;
+      const refund = c.refund || 'refund', amount = refund === 'refund' ? (num(c.amount) || num(c.bk_deposit)) : 0;
       if (refund === 'refund' && !(amount > 0)) { toast('ใส่ยอดเงินที่คืน', 'bad'); return; }
       const trBad = refund === 'transfer' ? trCheck(c, a) : null; if (trBad) { toast(trBad, 'bad'); return; }
       const tr = refund === 'transfer' ? trRecord(c, a) : null;
       const r = await saveBk(a.id, 'ยกเลิกใบจอง (ผู้จัดการ)', `${c.reason} · ${note}${tr ? ` · โอนมัดจำ ${money(tr.amount)}${tr.to ? '' : ' (ค้างไว้)'}` : ''}`, x => {
         x.status = 'cancelled'; x.cancelled_at = new Date().toISOString();
-        x.cancel = { reason: c.reason, req_note: null, req: null, note, phone, refund, amount: tr ? tr.amount : amount, ...(tr ? { transfer: tr, to: tr.to } : {}), ...actor() };
+        x.cancel = { reason: c.reason, req_note: null, req: null, note, phone, refund, amount: tr ? tr.amount : amount, ...(tr ? { transfer: tr, to: tr.to } : {}), ...cxExtra(c), ...actor() };
+        cxBkPatch(c, x);
       }, x => x.status !== 'cancelled' && pendingFree(x));
       if (!r) return;
       if (tr && tr.to) await trLinkTo({ ...a, rec: r }, tr.to);
@@ -211,7 +213,7 @@ Object.assign(ACTIONS, {
       return;
     }
     const r = await saveBk(a.id, 'ขอยกเลิกใบจอง', `${c.reason}${note ? ' · ' + note : ''}`, x => {
-      x.change = { id: rid(), type: 'cancel', reason: c.reason, note, phone, refund: /ซ้ำ|เปลี่ยนรุ่น/.test(c.reason) ? 'transfer' : 'refund', status: 'pending', ...actor() };
+      x.change = { id: rid(), type: 'cancel', reason: c.reason, note, phone, refund: /ซ้ำ|เปลี่ยนรุ่น/.test(c.reason) ? 'transfer' : 'refund', status: 'pending', ...cxExtra(c), bk: { paper_no: c.bk_paper_no ?? null, receipt_no: c.bk_receipt_no ?? null, deposit: c.bk_deposit ?? null }, ...actor() };
     }, x => x.status !== 'cancelled' && pendingFree(x));
     if (r) { S.modal.cancel = null; toast('ส่งคำขอยกเลิกให้ผู้จัดการอนุมัติแล้ว'); render(); }
   },
@@ -231,7 +233,9 @@ Object.assign(ACTIONS, {
       const tr = refund === 'transfer' ? trRecord(cxt, a) : null;
       const r = await saveBk(a.id, 'อนุมัติยกเลิกใบจอง', `${REFUND[refund]}${refund === 'refund' ? ' ' + money(amount) : tr ? ` ${money(tr.amount)}${tr.to ? '' : ' (ค้างไว้)'}` : ''} · ${note}`, x => {
         x.status = 'cancelled'; x.cancelled_at = new Date().toISOString();
-        x.cancel = { reason: x.change.reason, req_note: x.change.note || null, req: { by: x.change.by, role: x.change.role, at: x.change.at }, note, phone: x.change.phone || x.phone || null, refund, amount: tr ? tr.amount : amount, ...(tr ? { transfer: tr, to: tr.to } : {}), ...actor() };
+        x.cancel = { reason: x.change.reason, req_note: x.change.note || null, req: { by: x.change.by, role: x.change.role, at: x.change.at }, note, phone: x.change.phone || x.phone || null, refund, amount: tr ? tr.amount : amount, ...(tr ? { transfer: tr, to: tr.to } : {}),
+          req_date: x.change.req_date || null, fin_tried: x.change.fin_tried || [], docs: x.change.docs || {}, ...actor() };
+        if (x.change.bk) cxBkPatch({ bk_paper_no: x.change.bk.paper_no, bk_receipt_no: x.change.bk.receipt_no, bk_deposit: x.change.bk.deposit }, x);
         finishChange(x, 'approved', note);
       }, stillThere);
       if (!r) return;
@@ -269,7 +273,7 @@ Object.assign(ACTIONS, {
     S.files.passbook.forEach(x => { try { URL.revokeObjectURL(x.url); } catch (e) { /* ignore */ } });
     S.files.passbook = []; S.ai.refund = null;
     if (!S.modal || S.modal.id !== a.id) S.modal = { kind: 'at', id: a.id };
-    S.modal.refund = { bank: rf.bank || '', bank_other: rf.bank_other || '', account_no: rf.account_no || '', account_name: rf.account_name || a.cust || '', img: rf.img || null, phone: (a.rec.cancel || {}).phone || a.rec.phone || '' };
+    S.modal.refund = { bank: rf.bank || '', bank_other: rf.bank_other || '', account_no: rf.account_no || '', account_name: rf.account_name || a.cust || '', img: rf.img || null, passbook_ok: !!rf.passbook_ok, phone: (a.rec.cancel || {}).phone || a.rec.phone || '' };
     render();
   },
   'refund-back'() { S.modal.refund = null; render(); },
@@ -298,13 +302,12 @@ Object.assign(ACTIONS, {
     if (digits.length < 10 || digits.length > 15) { toast('เลขที่บัญชีต้องเป็นตัวเลข 10–15 หลัก', 'bad'); $('#rf-no')?.focus(); return; }
     if (!name) { toast('ใส่ชื่อบัญชี', 'bad'); return; }
     if (!nameOk(name, a.cust)) { toast(`ชื่อบัญชีต้องตรงกับชื่อผู้จอง (${a.cust})`, 'bad'); $('#rf-nm')?.focus(); return; }
-    let img = f.img;
-    if (S.files.passbook[0]) { img = await storeImage(S.files.passbook[0].blob); if (!img) { toast('เก็บรูปหน้าสมุดบัญชีไม่สำเร็จ ลองอีกครั้ง', 'bad'); return; } }
-    if (!img) { toast('แนบรูปหน้าสมุดบัญชี', 'bad'); return; }
+    if (!f.passbook_ok) { toast('ติ๊กว่าแนบสำเนาหน้าสมุดบัญชี (กระดาษ) และตรวจแล้ว', 'bad'); return; }
+    const img = f.img || null;
     const phone = String(f.phone || '').trim();
     if (phone.replace(/\D/g, '').length < 9) { toast('ใส่เบอร์โทรลูกค้า (ให้ CR โทรตรวจสอบ)', 'bad'); $('#rf-ph')?.focus(); return; }
     const r = await saveBk(a.id, 'ทำใบขออนุมัติคืนเงินจอง', `${bank === 'อื่น ๆ' ? f.bank_other : bank} ${acct}`, x => {
-      x.refund = { bank, bank_other: bank === 'อื่น ๆ' ? String(f.bank_other).trim() : null, account_no: acct, account_name: name, img, ...actor() };
+      x.refund = { bank, bank_other: bank === 'อื่น ๆ' ? String(f.bank_other).trim() : null, account_no: acct, account_name: name, img, passbook_ok: true, ...actor() };
       if (x.cancel) x.cancel.phone = phone;
     }, x => x.status === 'cancelled');
     if (!r) return;
