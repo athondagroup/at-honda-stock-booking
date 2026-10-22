@@ -967,7 +967,7 @@ document.addEventListener('input', ev => {
     else if (RERENDER_ON_CHANGE.has(t.dataset.filter) && t.type === 'search') { clearTimeout(searchTimer); searchTimer = setTimeout(render, 300); }
   }
 });
-const RERENDER_ON_CHANGE = new Set(['q', 'bq', 'aq', 'rq', 'sFrom', 'sTo', 'bDFrom', 'bDTo', 'adq', 'alq', 'eFrom', 'eTo', 'chQ', 'chFrom', 'chTo', 'chAt']);
+const RERENDER_ON_CHANGE = new Set(['lkq', 'q', 'bq', 'aq', 'rq', 'sFrom', 'sTo', 'bDFrom', 'bDTo', 'adq', 'alq', 'eFrom', 'eTo', 'chQ', 'chFrom', 'chTo', 'chAt']);
 // a field's change event fires on mousedown of the next click; redrawing then would swallow that click, so wait for the click to land
 let ptrDown = false, ptrRender = false;
 document.addEventListener('pointerdown', () => { ptrDown = true; }, true);

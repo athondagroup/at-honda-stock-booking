@@ -17,7 +17,8 @@ function carWhyBox(c, D, inv, bk, hideCust) {
     allocated: 'แอดมินแจ้งว่าจัดสรรใน IDS แล้ว รอไฟล์ IDS รอบหน้ายืนยัน',
     assigned: `จัดสรรให้ใบจอง AT แล้ว${bk ? ` · ${name(bk.cust)} (${esc(bk.sales || '')})` : ''} รอส่งมอบ`
   }[c.status] || (CAR_STATUS[c.status] || [c.status])[0];
-  return `<div class="p-3 rounded-lg text-sm mb-3" style="background:var(--surface-2)"><b>รถคันนี้ติดอะไร:</b> ${t}
+  const advT = c.advance ? ` · ${esc(advLabel(c.advance))}${c.advance.cust ? ` (ชื่อในใบกำกับ ${name(c.advance.cust)})` : ''}` : '';
+  return `<div class="p-3 rounded-lg text-sm mb-3" style="background:var(--surface-2)"><b>รถคันนี้ติดอะไร:</b> ${t}${advT}
     ${bk && (!isSales() || isMine(bk.sales)) ? `<div class="mt-1"><button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(bk.id)}">เปิดใบจอง ${esc(bk.cust)}</button></div>` : ''}</div>`;
 }
 function specQuotaModal(m, D) {
@@ -30,6 +31,7 @@ function specQuotaModal(m, D) {
       <td class="text-right">${p.write && p.request ? `<button class="btn btn-red btn-sm" data-act="lock-open" data-ref="${esc(q.ref)}">ขอล็อกคิว</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">ไม่มี Quota ว่างของสเปกนี้</td></tr>'}</tbody></table></div>`;
 }
 Object.assign(ACTIONS, {
+  'lk-clear'() { S.filters.lkq = ''; S.filters.lkType = ''; render(); },
   speccat(el) { S.filters.specOpen = el.dataset.key; S.filters.specCat = el.dataset.cat || ''; render(); },
   specquota(el) { S.modal = { kind: 'specquota', key: el.dataset.key }; render(); },
   carwhy(el) { ACTIONS['car-open']({ dataset: { vin: el.dataset.vin } }); }
