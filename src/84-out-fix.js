@@ -27,7 +27,7 @@ function outFixList(u) {
       <div class="flex flex-wrap gap-2 mb-2"><button class="btn btn-ghost btn-sm" data-act="outfix-all" data-id="${esc(u.id)}" data-v="1">เลือกทั้งหมด</button><button class="btn btn-ghost btn-sm" data-act="outfix-all" data-id="${esc(u.id)}" data-v="">ไม่เลือกเลย</button></div>
       <div class="flex flex-wrap gap-3 items-end">
         <div class="field"><label for="of-r">ไปไหน</label><select id="of-r" data-outfixf="reason">${outFixReasons().map(([k, t]) => `<option value="${k}" ${(F && F.reason || 'other_br') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
-        ${(F && F.reason || 'other_br') === 'other_br' ? `<div class="field"><label for="of-b">สาขา / ดีลเลอร์ที่รับ</label><input id="of-b" data-outfixf="text" value="${esc(F && F.text || '')}" placeholder="เช่น ฮอนด้า …"></div>`
+        ${(F && F.reason || 'other_br') === 'other_br' ? `<div class="field"><label for="of-b" class="req">ขายให้สาขาไหน</label><select id="of-b" data-outfixf="text"><option value="">เลือกสาขา</option>${BRS.filter(b => b !== u.br).map(b => `<option value="${b}" ${(F && F.text) === b ? 'selected' : ''}>${b} ${esc(BR[b].name)}</option>`).join('')}</select></div>`
           : (F && F.reason) === 'dealer' ? `<div class="field"><label for="of-d" class="req">ชื่อดีลเลอร์</label><input id="of-d" data-outfixf="text" value="${esc(F.text || '')}"></div>`
           : `<div class="field"><label for="of-n">หมายเหตุ</label><input id="of-n" data-outfixf="text" value="${esc(F && F.text || '')}"></div>`}
         ${outFixLockField(sel, F)}
@@ -52,6 +52,7 @@ async function outFixSave(id) {
   const vins = (u0.out || []).filter(o => outOpen(u0, o) && F.sel[o.vin]).map(o => o.vin); if (!vins.length) return;
   const text = (F.text || '').trim();
   if (F.reason === 'dealer' && !text) { toast('ใส่ชื่อดีลเลอร์', 'bad'); return; }
+  if (F.reason === 'other_br' && !text) { toast('เลือกสาขาที่ขายให้', 'bad'); $('#of-b')?.focus(); return; }
   F.busy = true; render();
   let closed = 0;
   try {
@@ -79,6 +80,6 @@ Object.assign(ACTIONS, {
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t || !t.dataset) return;
   if (t.dataset.outfix) { const F = outFixState(t.dataset.outfix); F.sel[t.dataset.vin] = t.checked; render(); return; }
-  if (t.dataset.outfixf && S.outFix) { const k = t.dataset.outfixf; S.outFix[k] = t.type === 'checkbox' ? t.checked : t.value; if (k === 'reason') { S.outFix.closeLocks = t.value !== 'still'; render(); } else if (k === 'lockAct') { S.outFix.closeLocks = t.value === 'release'; render(); } }
+  if (t.dataset.outfixf && S.outFix) { const k = t.dataset.outfixf; S.outFix[k] = t.type === 'checkbox' ? t.checked : t.value; if (k === 'reason') { S.outFix.closeLocks = t.value !== 'still'; S.outFix.text = ''; render(); } else if (k === 'lockAct') { S.outFix.closeLocks = t.value === 'release'; render(); } }
 });
 document.addEventListener('input', ev => { const t = ev.target; if (t && t.dataset && t.dataset.outfixf === 'text' && S.outFix) S.outFix.text = t.value; });
