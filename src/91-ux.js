@@ -62,6 +62,7 @@ function datafixItems(D) {
       ['มีใน IDS แต่ไม่มีฟอร์ม AT', D.idsOnly.filter(b => inBr(b)).length, 'bad', { act: 'book-filter', st: 'noat' }],
       ['รอยืนยันการจับคู่ / รุ่นไม่ตรง / เจ้าของเคส', at.filter(a => a.matchAsk || a.ownerCheck === 'pending' || a.ownerCheck === 'disputed').length, 'warn', { act: 'book-filter', st: 'confirm' }],
       ['หายจาก IDS ต้องตรวจ', outBk, 'warn', { act: 'go', view: 'upload' }],
+      ['ยกเลิกในเว็บแล้ว แต่ IDS ยังมีใบจอง (ให้ยกเลิกใน IDS)', at.filter(a => a.cancelled && a.idsLeft).length, 'warn', { act: 'book-filter', st: 'cxids' }],
       ['ใบจองยังไม่มีเลขที่ใบเสร็จมัดจำ', at.filter(a => a.active && !a.rec.receipt_no && !a.rec.imported).length, 'neutral', { act: 'go', view: 'flow', sub: 'booked' }]]],
     ['รถและล็อก', [
       ['รถออกจากสต็อก ไม่รู้ว่าไปไหน', outStock, 'bad', { act: 'go', view: 'upload' }],

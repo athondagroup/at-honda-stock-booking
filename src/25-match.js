@@ -106,7 +106,18 @@ function matchForms(at, idsB, cars, inv) {
   }
   const matchedIds = new Set();
   for (const v of result.values()) v.recs.forEach(r => { if (r.kind === 'booking') matchedIds.add(r.row.key); });
-  const idsOnly = idsB.filter(b => !b.seed && !b.skip && b.match !== 'cancel' && (b.date || '') >= MATCH_FROM && !matchedIds.has(b.key));
+  let idsOnly = idsB.filter(b => !b.seed && !b.skip && b.match !== 'cancel' && (b.date || '') >= MATCH_FROM && !matchedIds.has(b.key));
+  // a booking cancelled in the web whose IDS booking is still open (ตกลง 22/10): the IDS booking belongs to it — it is not a
+  // booking without a form, it is waiting to be cancelled in IDS
+  const idsCx = new Map();
+  for (const a of at) {
+    if (!a.cancelled || a.demo) continue;
+    const pick = a.rec.match_pick && a.rec.match_pick.key, ak = nameKey(a.cust);
+    const b = idsOnly.find(x => !idsCx.has(x.key) && (x.key === pick || (a.no && x.no === a.no)))
+      || idsOnly.find(x => !idsCx.has(x.key) && keyScore(ak, nameKey(x.cust)) >= 2 && x.model === a.model && a.date && x.date && Math.abs(daysBetween(a.date, x.date)) <= 25);
+    if (b) idsCx.set(b.key, a);
+  }
+  idsOnly = idsOnly.filter(b => !idsCx.has(b.key));
   // unmatched AT bookings: records anywhere in IDS (any branch, model or date) with the same or a contained name,
   // so the admin can see e.g. the customer already took a different car on another booking
   const claimedBy = new Map();
@@ -118,5 +129,5 @@ function matchForms(at, idsB, cars, inv) {
     for (const r of recs) { if (skip.has(r.key)) continue; const ns = keyScore(ak, r.k); if (ns >= 2) hits.push({ key: r.key, ns, kind: r.kind, br: r.br, no: r.no, inv: r.kind === 'dl' ? r.row.inv : null, date: r.date, ddate: r.ddate || null, name: r.name, model: r.model, grade: r.grade, usedBy: claimedBy.get(r.key) || null }); }
     if (hits.length) near.set(a.key, hits.sort((x, y) => y.ns - x.ns || (y.kind === 'dl') - (x.kind === 'dl')).slice(0, 3));
   }
-  return { result, idsOnly, near };
+  return { result, idsOnly, near, idsCx };
 }

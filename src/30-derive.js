@@ -149,15 +149,17 @@ function deriveNow() {
   }
   const M = matchForms(at, idsB, [...cars.values()], X.inv);
   const idsByKey = new Map(idsB.map(b => [b.key, b]));
+  for (const [k, a] of M.idsCx) a.idsLeftKey = k;
   for (const a of at) {
     a.match = M.result.get(a.key) || null;
     a.near = M.near.get(a.key) || null;
+    a.idsLeft = a.idsLeftKey ? idsByKey.get(a.idsLeftKey) || null : null;
     const bk = a.match && a.match.recs.find(r => r.kind === 'booking');
     a.ids = bk ? idsByKey.get(bk.key) : null;
     // matched to an IDS booking whose name is spelt differently: IDS is the reference, the form's spelling is kept beside it
     if (a.ids && a.ids.cust && normName(a.ids.cust) !== normName(a.cust)) { a.custForm = a.cust; a.cust = a.ids.cust; }
     if (!a.no && a.match) a.no = a.match.no;
-    a.idsSales = a.match ? a.match.idsSales : null;
+    a.idsSales = a.match ? a.match.idsSales : a.idsLeft ? a.idsLeft.sales || null : null;
     // IDS is the reference for model / grade / colour; the booking keeps its place in the queue and nobody retypes it.
     // Any difference in model / grade / colour is shown side by side for a person to confirm first (still in progress);
     // delivered bookings take the IDS values straight away.

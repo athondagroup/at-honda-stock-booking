@@ -9,7 +9,7 @@ const atVisible = a => isSales() ? isMine(a.sales) : S.role.role === 'admin' ? a
 const monthStartISO = () => todayISO().slice(0, 8) + '01';
 function matchChip(a) {
   const m = a.match;
-  if (a.cancelled) return chip('ยกเลิก', 'muted');
+  if (a.cancelled) return a.idsLeft ? chip(`ยกเลิกแล้ว · IDS ยังมีใบจอง ${a.idsLeft.no || ''} รอยกเลิกใน IDS`, 'warn') : chip('ยกเลิก', 'muted');
   if (!m) {
     if (a.demo) return chip('รถทดลองขับ', 'muted');
     if (a.flow.history) return chip('ส่งมอบแล้ว (ฟอร์มเดิม)', 'muted');
@@ -42,8 +42,9 @@ function bookRows(D) {
   const rows = [], used = new Set();
   for (const a of D.at) {
     if (a.demo) continue;
-    if (a.ids) used.add(a.ids.key);
-    rows.push({ key: a.key, a, b: a.ids || null, row: a.row, date: a.date, no: a.no, cust: a.cust, owner: a.sales, idsSales: a.idsSales, br: a.br, spec: a.spec, model: a.model, vin: a.match && a.match.vin });
+    const ib = a.ids || a.idsLeft;   // a cancelled booking keeps its IDS booking that is still open (one row, not two)
+    if (ib) used.add(ib.key);
+    rows.push({ key: a.key, a, b: ib || null, row: a.row, date: a.date, no: a.no, cust: a.cust, owner: a.sales, idsSales: a.idsSales, br: a.br, spec: a.spec, model: a.model, vin: a.match && a.match.vin });
   }
   for (const b of D.idsB) {
     if (used.has(b.key)) continue;
@@ -52,7 +53,7 @@ function bookRows(D) {
   return (D._bookRows = rows);
 }
 const BOOK_FILTERS = [['active', 'ยังไม่ส่งมอบ'], ['noids', 'ฟอร์ม AT ยังไม่อยู่ใน IDS'], ['noat', 'มีใน IDS แต่ไม่มีฟอร์ม AT'], ['waiting', 'รอรถ'], ['locked', 'ล็อก / รออนุมัติล็อก'], ['idscar', 'IDS จัดสรรรถแล้ว'],
-  ['assign', 'รอจัดสรรรถ'], ['confirm', 'รอยืนยันเจ้าของ / การจับคู่'], ['req', 'รออนุมัติแก้ไข / ยกเลิก'], ['refund', 'ยกเลิกแล้ว รอทำใบคืนเงิน'], ['dtoday', 'ส่งมอบวันนี้'], ['d7', 'นัดส่งมอบภายใน 7 วัน'], ['stuck', 'ต้องเร่งตาม'], ['done', 'ส่งมอบแล้ว'], ['cancel', 'ยกเลิก'], ['all', 'ทั้งหมด']];
+  ['assign', 'รอจัดสรรรถ'], ['confirm', 'รอยืนยันเจ้าของ / การจับคู่'], ['req', 'รออนุมัติแก้ไข / ยกเลิก'], ['refund', 'ยกเลิกแล้ว รอทำใบคืนเงิน'], ['dtoday', 'ส่งมอบวันนี้'], ['d7', 'นัดส่งมอบภายใน 7 วัน'], ['stuck', 'ต้องเร่งตาม'], ['done', 'ส่งมอบแล้ว'], ['cancel', 'ยกเลิก'], ['cxids', 'ยกเลิกแล้ว รอยกเลิกใน IDS'], ['all', 'ทั้งหมด']];
 function rowState(r, D, st) {
   const a = r.a, state = r.row ? r.row.state : null;
   if (st === 'all') return true;
@@ -71,6 +72,7 @@ function rowState(r, D, st) {
   if (st === 'stuck') return !!(a && a.active && bkStuck(a, D));
   if (st === 'done') return !!(a && !a.cancelled && a.done);
   if (st === 'cancel') return a ? a.cancelled : r.b.match === 'cancel';
+  if (st === 'cxids') return !!(a && a.cancelled && a.idsLeft);
   return true;
 }
 const rowVisible = r => isSales() ? isMine(r.owner) : S.role.role === 'admin' ? r.br === S.role.branch : true;
