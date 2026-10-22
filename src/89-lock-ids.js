@@ -28,9 +28,9 @@ function lockIdsBox(l, D) {
       <div class="field grow" style="min-width:min(260px,100%);flex-basis:260px"><label class="text-xs" for="lki-${esc(l.id)}">ใบจองที่ตรงกับล็อกนี้</label><select id="lki-${esc(l.id)}" data-lockids="${esc(l.id)}">
         <option value="">เลือกใบจอง</option>${cands.map(c => `<option value="${esc(c.key)}" ${pick === c.key ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}</select></div>
       <button class="btn btn-dark btn-sm" data-act="lockids-pick" data-id="${esc(l.id)}" ${pick ? '' : 'disabled'}>ยืนยันใบจองนี้</button>
-      <button class="btn btn-red btn-sm" data-act="lockids-close" data-id="${esc(l.id)}">ไม่มีใบจองที่ตรง ปิดล็อก</button>
+      <button class="btn btn-red btn-sm" data-act="lockids-close" data-id="${esc(l.id)}">ไม่มีใบจองที่ตรง ยกเลิกล็อกและปล่อยรถ</button>
       <button class="btn btn-ghost btn-sm" data-act="lockids-keep" data-id="${esc(l.id)}">คงล็อกไว้ (advanced invoice)</button></div>
-      <p class="text-xs text-muted mt-1">เลือกใบจอง IDS ที่ได้รถ = ลูกค้าคนเดียวกัน (ชื่อสะกดต่าง) ล็อกสำเร็จ · เลือกใบจองอื่น หรือกดปิดล็อก = คนอื่นได้รถไป ปิดล็อกและแจ้งเซลล์ทาง Telegram</p>`
+      <p class="text-xs text-muted mt-1">เลือกใบจอง IDS ที่ได้รถ = ลูกค้าคนเดียวกัน (ชื่อสะกดต่าง) ล็อกสำเร็จ · เลือกใบจองอื่น หรือกดยกเลิกล็อก = คนอื่นได้รถไป ยกเลิกล็อกและแจ้งเซลล์ทาง Telegram</p>`
       : '<p class="text-xs text-muted mt-1">รอผู้จัดการสาขาของรถเลือกใบจองที่ตรง</p>'}</div>`;
 }
 function lockIdsList(D, vis) {
@@ -75,14 +75,14 @@ async function lockIdsClose(id, why, extra) {
   const l = derive().locks.find(x => x.id === id); if (!l || !canApproveBr(l.car_br)) return;
   const info = l.idsInfo || {};
   const x = await claimFresh('locks', id, r => ['pending', 'approved', 'allocated'].includes(r.status)); if (!x) return;
-  markUndo(x, 'ปิดล็อก (IDS จัดสรรให้คนอื่น)', x.status);
+  markUndo(x, 'ยกเลิกล็อก (IDS จัดสรรให้คนอื่น)', x.status);
   x.status = x.status === 'pending' ? 'rejected' : 'released';
   x.ids_closed = { no: info.no || null, cust: info.cust || null, ...(extra || {}), ...actor() };
   if (extra && extra.bk) x.bkref = x.bkref || extra.bk;
-  if (!await saveLock(id, x, 'ปิดล็อก: IDS จัดสรรให้คนอื่น', why)) return;
-  const st = await lockIdsTg([`🔓 ปิดล็อก ${lockIdsLine(l, info)}`, why ? `หมายเหตุ: ${why}` : ''].filter(Boolean));
+  if (!await saveLock(id, x, 'ยกเลิกล็อก: IDS จัดสรรให้คนอื่น', why)) return;
+  const st = await lockIdsTg([`🔓 ยกเลิกล็อก ${lockIdsLine(l, info)}`, why ? `หมายเหตุ: ${why}` : ''].filter(Boolean));
   delete (S.lockIds || {})[id];
-  toast(`ปิดล็อกแล้ว${st && (st.sales === 'ok' || st.mgr === 'ok') ? ' · แจ้ง Telegram แล้ว' : ''}`); render();
+  toast(`ยกเลิกล็อกแล้ว${st && (st.sales === 'ok' || st.mgr === 'ok') ? ' · แจ้ง Telegram แล้ว' : ''}`); render();
 }
 Object.assign(ACTIONS, {
   async 'lockids-pick'(el) {
@@ -91,7 +91,7 @@ Object.assign(ACTIONS, {
     const c = lockIdsCands(l, D).find(x => x.key === key); if (!c) return;
     if (!c.took) {
       const b = D.bookingByKey.get(key);
-      if (!confirm(`ล็อกนี้เป็นของใบจอง ${b ? b.cust : key} ซึ่งไม่ได้รถคันนี้ ปิดล็อกและแจ้งเซลล์?`)) return;
+      if (!confirm(`ล็อกนี้เป็นของใบจอง ${b ? b.cust : key} ซึ่งไม่ได้รถคันนี้ ยกเลิกล็อกและแจ้งเซลล์?`)) return;
       await lockIdsClose(id, `ล็อกนี้เป็นของใบจอง ${b ? (b.no || '') + ' ' + (b.cust || '') : key}`, { bk: key }); return;
     }
     const info = l.idsInfo || {};
@@ -103,7 +103,7 @@ Object.assign(ACTIONS, {
     await lockIdsTg([`✅ ล็อกสำเร็จ (ผู้จัดการยืนยันว่าเป็นลูกค้าคนเดียวกัน) ${lockIdsLine(l, info)}`]);
     delete S.lockIds[id]; toast('บันทึกแล้ว ล็อกสำเร็จ'); render();
   },
-  async 'lockids-close'(el) { if (confirm('ปิดล็อกนี้ เพราะ IDS จัดสรรรถให้คนอื่นแล้ว และแจ้งเซลล์ทาง Telegram?')) await lockIdsClose(el.dataset.id, 'ไม่มีใบจองที่ตรง'); },
+  async 'lockids-close'(el) { if (confirm('ยกเลิกล็อกนี้ เพราะ IDS จัดสรรรถให้คนอื่นแล้ว และแจ้งเซลล์ทาง Telegram?')) await lockIdsClose(el.dataset.id, 'ไม่มีใบจองที่ตรง'); },
   async 'lockids-keep'(el) {
     const id = el.dataset.id, l = derive().locks.find(x => x.id === id); if (!l || !canApproveBr(l.car_br)) return;
     const x = await claimFresh('locks', id, () => true); if (!x) return;

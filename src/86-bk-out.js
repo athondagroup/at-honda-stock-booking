@@ -109,7 +109,8 @@ function bkOutList(u, D) {
       ${sug.length ? `<div class="mt-1 flex flex-wrap gap-2 items-center"><span class="text-xs">ระบบเดาว่าเปลี่ยนเป็น:</span>${sug.map(b => `<button class="btn btn-ghost btn-sm" data-act="bkout-relink" data-id="${esc(u.id)}" data-i="${i}" data-key="${esc(b.key)}" title="เปลี่ยนใบจองในเว็บให้เป็นใบนี้">${esc(b.no)} · ${esc(b.cust)} · ${esc(b.color || '')}</button>`).join('')}</div>` : '<div class="text-xs text-muted mt-1">ไม่พบใบ IDS ใหม่ที่เซลล์ สาขา และรุ่นเดียวกัน</div>'}
       <div class="mt-1 flex flex-wrap gap-2 items-end"><div class="field"><label class="text-xs" for="bko-${i}">หรือเลือกจับคู่เอง (ใบ IDS ที่ยังไม่มีฟอร์ม สาขา ${esc(a.br)})</label><select id="bko-${i}" data-bkoutpick="${esc(u.id)}" data-i="${i}"><option value="">–</option>${all.map(b => `<option value="${esc(b.key)}" ${pick === b.key ? 'selected' : ''}>${esc(opt(b))}</option>`).join('')}</select></div>
         <button class="btn btn-dark btn-sm" data-act="bkout-relink" data-id="${esc(u.id)}" data-i="${i}" data-key="${esc(pick)}" ${pick ? '' : 'disabled'}>แก้ไขใบจองเป็นใบนี้</button>
-        <button class="btn btn-red btn-sm" data-act="bkout-cancel" data-id="${esc(u.id)}" data-i="${i}">ยกเลิกใบจอง</button></div></div>`;
+        <button class="btn btn-red btn-sm" data-act="bkout-cancel" data-id="${esc(u.id)}" data-i="${i}">ยกเลิกใบจอง</button>
+        <button class="btn btn-ghost btn-sm" data-act="bkout-wait" data-id="${esc(u.id)}" data-i="${i}" title="ใบจองยังอยู่ในเว็บ ไม่ยกเลิก รอไฟล์ DL รอบหน้า">แจ้งขายแล้ว รออัปเดต DL</button></div></div>`;
   };
   const sel = todo.filter(o => F.sel[(u.out || []).indexOf(o)]).length;
   const bar = can && todo.length ? `<div class="p-3 rounded-lg mb-2" style="background:var(--warn-soft)">
@@ -117,8 +118,9 @@ function bkOutList(u, D) {
       <div class="flex flex-wrap gap-2 items-end"><button class="btn btn-ghost btn-sm" data-act="bkout-all" data-id="${esc(u.id)}" data-v="1">เลือกทั้งหมด</button><button class="btn btn-ghost btn-sm" data-act="bkout-all" data-id="${esc(u.id)}" data-v="">ไม่เลือกเลย</button>
         <div class="field"><label for="bko-note" class="text-xs">เหตุผล / หมายเหตุ</label><input id="bko-note" data-bkoutnote="${esc(u.id)}" value="${esc(F.note || '')}" placeholder="เช่น ลูกค้าไม่ซื้อแล้ว"></div>
         <button class="btn btn-red btn-sm" data-act="bkout-cancel-sel" data-id="${esc(u.id)}" ${sel && !F.busy ? '' : 'disabled'}>ยกเลิกที่เลือก (${sel})</button>
+        <button class="btn btn-ghost btn-sm" data-act="bkout-wait-sel" data-id="${esc(u.id)}" ${sel && !F.busy ? '' : 'disabled'}>แจ้งขายแล้ว รออัปเดต DL (${sel})</button>
         <button class="btn btn-ghost btn-sm" data-act="bkout-other-sel" data-id="${esc(u.id)}" ${sel && !F.busy ? '' : 'disabled'}>อื่น ๆ (ใส่หมายเหตุ)</button></div>
-      <p class="text-xs text-muted mt-1">ยกเลิก = ยกเลิกใบจองในเว็บทันที ปล่อยล็อก และใส่ "ยกเลิก" ในชีตคำตอบฟอร์ม · แก้ไขใบจอง = เปลี่ยนชื่อลูกค้า เลขที่ใบจอง และรุ่นตาม IDS ใบใหม่ (ทั้งเว็บและชีต)</p></div>` : '';
+      <p class="text-xs text-muted mt-1">ยกเลิก = ยกเลิกใบจองในเว็บทันที ปล่อยล็อก และใส่ "ยกเลิก" ในชีตคำตอบฟอร์ม · แก้ไขใบจอง = เปลี่ยนชื่อลูกค้า เลขที่ใบจอง และรุ่นตาม IDS ใบใหม่ (ทั้งเว็บและชีต) · แจ้งขายแล้ว รออัปเดต DL = ใบจองยังอยู่ ไม่ยกเลิก (IDS ตัดใบจองออกเพราะออกใบกำกับแล้ว) พอ DL รอบหน้ามีใบกำกับ ระบบขึ้นว่าส่งมอบ/ขายแล้วให้เอง</p></div>` : '';
   return `<div class="mt-2 text-sm flex flex-col">${bar}${(u.out || []).map(row).join('')}</div>`;
 }
 function bkOutState(id) { if (!S.bkOut || S.bkOut.id !== id) S.bkOut = { id, sel: {}, pick: {}, note: '' }; return S.bkOut; }
@@ -152,6 +154,15 @@ Object.assign(ACTIONS, {
   'bkout-all'(el) { const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id); F.sel = {}; if (el.dataset.v && u) (u.out || []).forEach((o, i) => { if (bkOutPending(o)) F.sel[i] = true; }); render(); },
   async 'bkout-cancel'(el) { const o = (S.uploads.get(el.dataset.id) || {}).out?.[Number(el.dataset.i)]; if (!o || !confirm(`ยกเลิกใบจอง ${o.cust || ''} (${o.no}) ในเว็บทันที?`)) return; await bkOutCancel(el.dataset.id, [Number(el.dataset.i)]); },
   async 'bkout-cancel-sel'(el) { const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k] && u && bkOutPending(u.out[Number(k)])).map(Number); if (!idxs.length || !confirm(`ยกเลิกใบจองที่เลือก ${idxs.length} ใบในเว็บทันที?`)) return; await bkOutCancel(el.dataset.id, idxs); },
+  async 'bkout-wait'(el) {
+    const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !canApproveBr(u.br) || !bkOutPending(u.out[i])) return;
+    if (await bkOutMark(el.dataset.id, [i], 'แจ้งขายแล้ว รออัปเดต DL')) { toast('บันทึกแล้ว: แจ้งขายแล้ว รออัปเดต DL (ใบจองยังอยู่)'); render(); }
+  },
+  async 'bkout-wait-sel'(el) {
+    const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k] && u && bkOutPending(u.out[Number(k)])).map(Number);
+    if (!idxs.length || !canApproveBr(u.br)) return;
+    if (await bkOutMark(el.dataset.id, idxs, 'แจ้งขายแล้ว รออัปเดต DL')) { F.sel = {}; toast(`บันทึกแล้ว ${idxs.length} ใบ: แจ้งขายแล้ว รออัปเดต DL`); render(); }
+  },
   async 'bkout-other-sel'(el) {
     const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k] && u && bkOutPending(u.out[Number(k)])).map(Number), note = (F.note || '').trim();
     if (!idxs.length) return; if (!note) { toast('ใส่หมายเหตุก่อน', 'bad'); $('#bko-note')?.focus(); return; }

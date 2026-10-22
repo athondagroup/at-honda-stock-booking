@@ -623,8 +623,8 @@ const ACTIONS = {
     if (!await saveLock(id, l, act, direct ? `หมด ${fmtD(l.end)}` : (l.note || l.reason))) return;
     if (conv) { conv.status = 'converted'; conv.converted_to = id; await saveLock(m.convertFrom, conv, 'ลูกค้ามาจองแล้ว', `เปลี่ยนเป็นล็อกให้ใบจอง${direct ? '' : ' รอผู้จัดการอนุมัติ'}`); }
     if (direct && m.type !== 'temp') await settleUnit(derive(), l, id);
-    S.modal = null; S.view = 'lock'; S.sub.lock = direct ? 'active' : 'approve'; setHash();
-    toast(direct ? `ล็อกแล้วถึง ${fmtD(l.end)}` : 'ส่งให้ผู้จัดการอนุมัติแล้ว'); render();
+    S.modal = null; if (S.view === 'lock') { S.sub.lock = direct ? 'active' : 'approve'; setHash(); }
+    toast(direct ? `ล็อกแล้วถึง ${fmtD(l.end)}` : 'ส่งให้ผู้จัดการอนุมัติแล้ว (ดูได้ที่หน้าล็อก)'); render();
   },
   async approve(el) {
     const cur0 = S.locks.get(el.dataset.id);
