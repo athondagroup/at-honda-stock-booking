@@ -124,7 +124,7 @@ function delivWaitBox(D) {
     <div class="border-t border-line divide-y divide-line max-h-96 overflow-auto">${W.map(w => { const c = carAny(w.vin, D) || { vin: w.vin }; return `<div class="p-2 px-4 text-sm flex flex-wrap gap-x-3 gap-y-1 items-center">${advCheck(w)}
       ${w.vin ? vinLink({ vin: w.vin }) : '<span class="text-muted">ไม่มีเลขตัวถัง</span>'}<span>${esc(w.model || '')} ${esc(gradeShort(w.model, w.grade) || '')} ${esc(w.color || '')}</span>
       <span class="text-muted">${esc(w.br)} · ใบกำกับ ${esc(w.inv || '')} ${fmtD(w.idate)} · ${esc(w.cust || '')} · ${esc(w.sales || '')}</span>
-      ${advChip(w)}
-      <span class="ml-auto flex items-center gap-2"><span class="num ${w.age > 14 ? 'font-semibold' : 'text-muted'}" ${w.age > 14 ? 'style="color:var(--warn)"' : ''}>${w.age} วัน</span>${w.vin ? delivBtn(c, D) : ''}</span></div>`; }).join('')}</div>${advBar(W)}</details>`;
+      ${advChip(w, c)}
+      <span class="ml-auto flex flex-wrap items-center gap-2"><span class="num ${w.age > 14 ? 'font-semibold' : 'text-muted'}" ${w.age > 14 ? 'style="color:var(--warn)"' : ''}>${w.age} วัน</span>${advActs(w, c, D)}</span></div>`; }).join('')}</div>${advBar(W)}</details>`;
 }
 document.addEventListener('toggle', ev => { const t = ev.target; if (t && t.dataset && t.dataset.delivBox !== undefined) S.delivOpen = t.open; }, true);
