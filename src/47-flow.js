@@ -80,6 +80,7 @@ function atModal(m, D) {
       ${gformBox(m, a)}
       ${a.cancelled ? cancelledBox(m, a) : trInBox(a, D)}
       ${changeBox(m, a)}
+      ${mergedBox(a, D)}
       ${m.cancel ? cancelPanel(m, a) : ''}
       ${ownerBox(m, a)}
       ${matchInfo}
