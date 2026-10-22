@@ -102,7 +102,13 @@ function deriveNow() {
     }
     const car = { ...c, src: 'IDS', prodIds: c.prod || null };
     if (!car.st) car.st = carStatus(car, invByVin.get(car.vin), bkByVin);
-    let b = bkByVin.get(car.vin) || ((car.bkno || car.bk) ? bkByNo.get(car.bkno || car.bk) : null);
+    // invoiced but not handed over (advance invoice, ตกลง 22/10): what the branch said about it
+    const inv0 = invByVin.get(car.vin), adv = ['invoiced', 'sold'].includes(car.st) && !(inv0 && (inv0.company || inv0.ddate)) ? advOf(car.vin, inv0) : null;
+    if (adv) {
+      car.advance = { ...adv, cust: (inv0 && inv0.cust) || car.cust || null };
+      if (adv.kind === 'fake') { car.advFake = true; car.st = 'free'; car.advCust = car.advance.cust; car.cust = null; car.bkno = null; car.bk = null; }
+    }
+    let b = car.advFake ? null : bkByVin.get(car.vin) || ((car.bkno || car.bk) ? bkByNo.get(car.bkno || car.bk) : null);
     if (b && car.fromBr && b.br && b.br !== car.br) b = null;
     car.bk = car.bk || car.bkno || b?.no || null;
     car.cust = car.cust || b?.cust || null;
@@ -257,7 +263,7 @@ function deriveNow() {
       const car = l.vin && !gone ? cars.get(l.vin) : null;
       const qb = !l.vin && l.ref ? idsRefBk.get(l.ref) : null;
       // an invoice in the customer's name (not the company's) counts too: the same name closes the lock, another name asks
-      if (gone || (car && (car.st === 'booked' || (['invoiced', 'sold'].includes(car.st) && car.cust))) || qb) {
+      if (gone || (car && !car.advFake && (car.st === 'booked' || (['invoiced', 'sold'].includes(car.st) && car.cust))) || qb) {
         const a = bk ? bk.app : null, idsNo = gone ? gone.bk || null : car ? car.bk : qb.no;
         const handedHere = gone && gone.handed && a && a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin === l.vin;
         const same = (l.type === 'dealer' && !!gone) || !!handedHere

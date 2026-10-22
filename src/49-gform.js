@@ -103,5 +103,6 @@ function viewUpload(D) {
   // the Google Form box goes right under the page title
   const base = viewUploadBase(D), cut = base.indexOf('<section');
   const top = gsCan() ? `<div class="text-sm mb-4">ใบจองใหม่จาก Google Form ย้ายไปนำเข้าที่หน้า <a class="underline" href="#book">ใบจอง</a> แล้ว</div>` : '';
-  return (cut > 0 ? base.slice(0, cut) + top + base.slice(cut) : top + base) + (perms().upload ? idsGsBox() + delivSyncBox(D) + sheetSyncBox(D) + gformSettings() : '');
+  const extra = `${delivWaitBox(D)}${typeof lockIdsList === 'function' ? lockIdsList(D, D.locks.filter(lockVisible)) : ''}`;
+  return (cut > 0 ? base.slice(0, cut) + top + extra + base.slice(cut) : top + extra + base) + (perms().upload ? idsGsBox() + delivSyncBox(D) + sheetSyncBox(D) + gformSettings() : '');
 }

@@ -330,7 +330,7 @@ function carRow(c, D) {
   const p = perms(), l = c.lock;
   return `<div class="px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2">
     <div class="min-w-[180px]"><div>${vinLink(c)}</div>
-      <div class="text-xs text-muted">${c.year ? 'ปี ' + c.year : ''} ${c.ref ? '· Ref ' + esc(c.ref) : ''} ${c.src !== 'IDS' ? '· ' + esc(c.src) : ''}${c.fromBr ? ` · <b style="color:var(--warn)">โอนจาก ${esc(c.fromBr)}</b>` : ''}</div>
+      <div class="text-xs text-muted">${c.year ? 'ปี ' + c.year : ''} ${c.ref ? '· Ref ' + esc(c.ref) : ''} ${c.src !== 'IDS' ? '· ' + esc(c.src) : ''}${c.fromBr ? ` · <b style="color:var(--warn)">โอนจาก ${esc(c.fromBr)}</b>` : ''}${c.advance ? ` · <b style="color:var(--${c.advance.kind === 'fake' ? 'good' : 'warn'})">${esc(advLabel(c.advance))}</b>` : ''}</div>
       <div class="text-xs">${prodText(c)} ${prodBtn(c)}</div></div>
     <div class="w-12"><b>${esc(c.br)}</b></div>
     <div class="w-32">${carStatusCell(c, D)}</div>

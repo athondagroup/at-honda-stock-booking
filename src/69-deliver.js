@@ -43,12 +43,12 @@ function cdelivModal(m, D) {
     sec('booked', fl.done.booked, fl.done.booked ? done(`ใบเสร็จมัดจำ ${esc(r.receipt_no)}`) : `<div class="grid sm:grid-cols-2 gap-3 mt-1">${F('cd-rc', 'เลขที่ใบเสร็จมัดจำ', 'receipt_no', '')}</div>`),
     sec('fin', fl.done.fin, isCash(r) ? done('ซื้อสด') : fl.done.fin ? done(`${esc((f.fin && f.fin.company) || r.finance || '')} อนุมัติ`) : `<div class="grid sm:grid-cols-2 gap-3 mt-1 items-end"><div class="field"><label for="cd-fc">บริษัทไฟแนนซ์ที่อนุมัติ</label><select id="cd-fc" data-modal="v.fin_company">${opt(FINANCE, v.fin_company ?? (f.fin && f.fin.company) ?? r.finance ?? '', 'เลือก')}</select></div>
       <label class="btn btn-ghost btn-sm relative">${S.files.fin.length ? `แนบแล้ว ${S.files.fin.length} รูป` : 'แนบใบอนุมัติ (ถ้ามี)'}<input type="file" accept="image/*" multiple data-file="fin" class="absolute w-px h-px opacity-0"></label></div>
-      <div class="text-xs text-muted mt-1">ออกใบกำกับแล้ว ถือว่าไฟแนนซ์ผ่าน ใบอนุมัติแนบภายหลังได้</div>`),
+      <div class="text-xs text-muted mt-1">ออกใบกำกับแล้ว ถือว่าไฟแนนซ์ผ่าน แต่ต้องแนบใบอนุมัติก่อนส่งมอบ · ได้</div>`),
     sec('assign', true, done(`รถ <span class="code">${esc(c.vin)}</span>${linked ? '' : ' · จะบันทึกการจัดสรรให้ใบจองนี้'}`)),
     sec('po', fl.done.po, fl.done.po ? done(`สั่งแต่ง ${(f.po.items || []).length} รายการ`) : `<label class="flex items-center gap-2 text-sm mt-1"><input type="checkbox" data-modal="v.po_none" ${v.po_none ? 'checked' : ''}> ไม่มีแต่งรถ (บันทึกเป็น "ไม่มีรายการแต่ง")</label>
       <button class="btn btn-ghost btn-sm mt-1" data-act="cdeliv-po" data-id="${esc(a.id)}">ทำใบสั่งแต่ง (PO)</button>`),
     sec('down', fl.done.down, fl.done.down ? done(`ใบเสร็จ ${esc(f.down.receipt_no)}`) : `<div class="grid sm:grid-cols-3 gap-3 mt-1">${F('cd-dn', `เลขที่ใบเสร็จ${isCash(r) ? 'ชำระครบ' : 'เงินดาวน์'}`, 'down_no', '')}${F('cd-da', 'ยอดเงิน (บาท)', 'down_amount', '', 'type="number" min="0" inputmode="numeric"')}${F('cd-dd2', 'วันที่ชำระ', 'down_date', todayISO(), `type="date" max="${todayISO()}"`)}</div>`),
-    sec('delivered', false, `<div class="grid sm:grid-cols-3 gap-3 mt-1">${F('cd-dd', 'วันที่ส่งมอบรถ', 'date', todayISO(), `type="date" max="${todayISO()}"`)}${F('cd-pl', 'เลขทะเบียนป้ายแดง', 'plate', (f.delivered && f.delivered.plate) || '', 'placeholder="เช่น ป-1234 นครปฐม"')}
+    sec('delivered', false, `<div class="grid sm:grid-cols-3 gap-3 mt-1">${F('cd-dd', 'วันที่ส่งมอบรถ (ลูกค้ารับรถจริง) *', 'date', '', `type="date" max="${todayISO()}"`)}${F('cd-pl', 'เลขทะเบียนป้ายแดง', 'plate', (f.delivered && f.delivered.plate) || '', 'placeholder="เช่น ป-1234 นครปฐม"')}
       <div class="field"><label for="cd-in">บริษัทประกันที่ทำ</label><input id="cd-in" list="cd-ins" data-modal="v.insurer" value="${esc(v.insurer ?? (f.delivered && f.delivered.insurer) ?? '')}" placeholder="เลือกหรือพิมพ์"><datalist id="cd-ins">${INSURERS.map(x => `<option value="${esc(x)}">`).join('')}</datalist></div></div>
       <div class="text-xs text-muted mt-1">ประกันในใบจอง: ${esc(r.insurance || '–')}</div>${tradeDelivFields('v', v, 'cd', tradeCur(r), true)}`)
   ];
@@ -78,9 +78,11 @@ Object.assign(ACTIONS, {
       if (!company) return bad('เลือกบริษัทไฟแนนซ์ที่อนุมัติ', 'cd-fc');
       const docs = [...((f.fin && f.fin.docs) || [])];
       for (const x of S.files.fin) { const id = await storeImage(x.blob); if (id) docs.push(id); }
+      if (!docs.length) return bad('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ');
       patch.fin_status = 'ผ่าน'; patch.finance = company;
       patch.flow.fin = { ...actor(), ok: true, date: t, docs, status: 'ผ่าน', company, via: 'invoice' };
     }
+    if (fl.done.fin && !isCash(r) && !finDocsN(r)) return bad('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ (เปิดใบจอง ขั้น "ไฟแนนซ์ผ่าน")');
     const linked = !!carBookingOf(c.vin, D);
     if (!linked) {
       if (c.lock && !(c.lock.bkref === a.key || c.lock.bkref === (a.row && a.row.key))) return bad(`รถคันนี้ล็อกให้ ${c.lock.owner || 'ใบจองอื่น'} อยู่ ปล่อยล็อกก่อน`);
@@ -96,7 +98,8 @@ Object.assign(ACTIONS, {
       if (!validDate(date) || date > t) return bad('วันที่ชำระต้องไม่เกินวันนี้', 'cd-dd2');
       patch.flow.down = { ...actor(), receipt_no: no, amount: num(v.down_amount), date };
     }
-    const date = v.date || t, plate = String(v.plate ?? (f.delivered && f.delivered.plate) ?? '').trim(), insurer = String(v.insurer ?? (f.delivered && f.delivered.insurer) ?? '').trim();
+    if (!v.date) return bad('ใส่วันที่ส่งมอบรถ (วันที่ลูกค้ารับรถจริง)', 'cd-dd');
+    const date = v.date, plate = String(v.plate ?? (f.delivered && f.delivered.plate) ?? '').trim(), insurer = String(v.insurer ?? (f.delivered && f.delivered.insurer) ?? '').trim();
     if (!plate) return bad('ใส่เลขทะเบียนป้ายแดง', 'cd-pl');
     if (!insurer) return bad('เลือกบริษัทประกันที่ทำ', 'cd-in');
     if (!validDate(date) || date > t) return bad('วันที่ส่งมอบต้องไม่เกินวันนี้', 'cd-dd');
@@ -118,9 +121,10 @@ function delivWaitBox(D) {
   const W = invWaitingList(D); if (!W.length) return '';
   const late = W.filter(w => w.age > 14).length;
   return `<details class="bg-surface border border-line rounded-lg mb-4" ${S.delivOpen ? 'open' : ''} data-deliv-box><summary class="p-3 px-4 cursor-pointer flex flex-wrap items-center gap-2"><b>ออกใบกำกับแล้ว ยังไม่ส่งมอบ</b> ${chip(`${fmtN(W.length)} คัน`, 'neutral')}${late ? chip(`เกิน 14 วัน ${fmtN(late)}`, 'warn') : ''}<span class="text-sm text-muted">กด "ส่งมอบ" เพื่อบันทึกการส่งมอบเองได้เลย ไม่ต้องรอไฟล์ IDS</span></summary>
-    <div class="border-t border-line divide-y divide-line max-h-96 overflow-auto">${W.map(w => { const c = carAny(w.vin, D) || { vin: w.vin }; return `<div class="p-2 px-4 text-sm flex flex-wrap gap-x-3 gap-y-1 items-center">
+    <div class="border-t border-line divide-y divide-line max-h-96 overflow-auto">${W.map(w => { const c = carAny(w.vin, D) || { vin: w.vin }; return `<div class="p-2 px-4 text-sm flex flex-wrap gap-x-3 gap-y-1 items-center">${advCheck(w)}
       ${w.vin ? vinLink({ vin: w.vin }) : '<span class="text-muted">ไม่มีเลขตัวถัง</span>'}<span>${esc(w.model || '')} ${esc(gradeShort(w.model, w.grade) || '')} ${esc(w.color || '')}</span>
       <span class="text-muted">${esc(w.br)} · ใบกำกับ ${esc(w.inv || '')} ${fmtD(w.idate)} · ${esc(w.cust || '')} · ${esc(w.sales || '')}</span>
-      <span class="ml-auto flex items-center gap-2"><span class="num ${w.age > 14 ? 'font-semibold' : 'text-muted'}" ${w.age > 14 ? 'style="color:var(--warn)"' : ''}>${w.age} วัน</span>${w.vin ? delivBtn(c, D) : ''}</span></div>`; }).join('')}</div></details>`;
+      ${advChip(w)}
+      <span class="ml-auto flex items-center gap-2"><span class="num ${w.age > 14 ? 'font-semibold' : 'text-muted'}" ${w.age > 14 ? 'style="color:var(--warn)"' : ''}>${w.age} วัน</span>${w.vin ? delivBtn(c, D) : ''}</span></div>`; }).join('')}</div>${advBar(W)}</details>`;
 }
 document.addEventListener('toggle', ev => { const t = ev.target; if (t && t.dataset && t.dataset.delivBox !== undefined) S.delivOpen = t.open; }, true);

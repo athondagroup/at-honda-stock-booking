@@ -319,15 +319,23 @@ function viewQuota(D) {
 
 // ---------- locks
 function viewLock(D) {
-  const vis = D.locks.filter(lockVisible);
+  const f = S.filters, all = D.locks.filter(lockVisible), q = searchKey(f.lkq || '');
+  // search and lock type (ตกลง 22/10): applies to every tab
+  const hay = l => [l.vin, l.ref, l.owner, l.prospect, l.dealer_name, l.sales, l.sales_nick, sheetTextOf(l), bookingLabel(l.bkref, D), l.booking && l.booking.cust].filter(Boolean).join(' ');
+  const vis = all.filter(l => (!f.lkType || l.type === f.lkType) && (!q || searchKey(hay(l)).includes(q)));
+  const nT = t => all.filter(l => l.type === t && (l.live || l.status === 'pending')).length;
+  const bar = `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
+    <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-lkq">ค้นหา VIN / Ref / ลูกค้า / เซลล์ / ดีลเลอร์</label><input id="f-lkq" type="search" data-filter="lkq" value="${esc(f.lkq || '')}"></div>
+    <div class="field col-span-2 sm:col-span-1"><label for="f-lkt">ประเภทล็อก</label><select id="f-lkt" data-filter="lkType"><option value="">ทุกประเภท</option>${Object.entries(LOCK_TYPE).map(([k, v]) => `<option value="${k}" ${f.lkType === k ? 'selected' : ''}>${v[0]} (${nT(k)})</option>`).join('')}</select></div>
+    ${f.lkq || f.lkType ? '<button class="btn btn-ghost btn-sm" data-act="lk-clear">ล้างตัวกรอง</button>' : ''}</div>`;
   // a request IDS already answered (the car went to this booking / customer) is done, not waiting
   const pend = vis.filter(l => l.status === 'pending' && !(l.idsTook && l.idsTook.same));
   const sub = S.sub.lock;
   const body = sub === 'active' ? activeList(D, vis) : sub === 'history' ? historyList(D) : approveList(D, pend);
   return `${pageHead('ล็อกรถ', `ล็อกให้ใบจอง ${LOCK_DAYS_BY.booking} วัน (ถ้าระบุวันรับรถแล้วถือไว้จนส่งมอบ) · ล็อกชั่วคราวให้ลูกค้าที่จะมาจอง ${LOCK_DAYS_BY.temp} วัน ล็อกซ้อนกันได้ ใครแนบใบจองก่อนได้ก่อน · ทุกการล็อกต้องให้ผู้จัดการอนุมัติ`)}
-  ${tabs('lock', [['approve', 'รออนุมัติ', pend.length], ['active', 'ล็อกที่ใช้อยู่', String(vis.filter(l => l.live && l.status !== 'pending').length)], ['history', 'ประวัติ']])}${body}`;
+  ${tabs('lock', [['approve', 'รออนุมัติ', pend.length], ['active', 'ล็อกรวม', String(vis.filter(l => l.live && l.status !== 'pending').length)], ['history', 'ประวัติ']])}${bar}${body}`;
 }
-const LOCK_TYPE = { booking: ['ล็อกให้ใบจอง', 'neutral'], temp: ['ล็อกชั่วคราว 7 วัน', 'warn'], dealer: ['แลก/ขายดีลเลอร์', 'neutral'] };
+const LOCK_TYPE = { booking: ['ล็อกให้ใบจอง', 'neutral'], temp: ['ล็อกชั่วคราว 7 วัน', 'warn'], dealer: ['ล็อกขายดีลเลอร์ / สาขา', 'neutral'] };
 function lockRow(l, D, o = {}) {
   const p = perms();
   const car = l.vin ? D.cars.get(l.vin) : null;

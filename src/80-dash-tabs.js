@@ -77,7 +77,8 @@ function salesCompare(D, E) {
     <tr style="font-weight:600"><td>รวม</td><td class="num text-right">${drillNum(rows.length, { m: basis, from: E.from, to: E.to })}</td><td class="num text-right">100%</td><td class="num text-right">${drillNum(prev.length, { m: basis, from: pf, to: pt })}</td><td class="num text-right">${rows.length - prev.length > 0 ? '+' : ''}${rows.length - prev.length}</td></tr></tbody></table></div>
     ${colChart('sl-br', brs.map(b => ({ k: b, label: b, test: () => true })), [{ name: 'ช่วงนี้', color: '--viz-3', drill: (bb) => ({ m: basis, br: bb.k, from: E.from, to: E.to }), values: brs.map(b => cnt(rows, b)) }, { name: 'ช่วงก่อน', color: '--viz-2', values: brs.map(b => cnt(prev, b)) }], { label: `ยอดขาย (${label}) แยกสาขา เทียบช่วงก่อน` })}`;
   return `<div class="flex flex-wrap items-center gap-3 mb-3 mt-2"><h2 class="font-head text-lg font-semibold">ยอดขายเปรียบเทียบสาขา</h2>${seg}<span class="text-sm text-muted">${fmtD(E.from)} – ${fmtD(E.to)} · เทียบ ${fmtD(pf)} – ${fmtD(pt)} · ไม่รวมรถบริษัท</span></div>
-  <div class="flex flex-col gap-5 mb-5">${branchCompare(D, E, 'sale', basis)}</div>
+  <div class="flex flex-col gap-5 mb-5">${branchCompare(D, E, 'sale', basis)}
+  ${dCard('ไฟแนนซ์ / ซื้อสด (ตาม Invoice / DL)', mixTable(mixOf(rows, prev, r => finOfSale(r, D)), 'ไฟแนนซ์', 'คัน') + dspNote(rows, r => finOfSale(r, D)), 'มีชื่อไฟแนนซ์ใน DL = ไฟแนนซ์นั้น · ไม่มี = ซื้อสด · DSP ดูจากใบจองที่ติ๊ก DSP (HLTC) · % = สัดส่วนของรถที่ขายในช่วงนี้')}</div>
   <div class="mb-5">${dCard('สาขาไหนขายรุ่นไหนดี', `<ul class="text-sm leading-7 mb-3">${bestLines(rows, r => r.br, r => r.model, brs, brName) || '<li class="text-muted">ไม่มีข้อมูล</li>'}</ul>${countMatrix(rows, r => r.br, r => r.model, { rowLabel: 'สาขา', rowOrder: brs, rowFmt: brName, drill: (r, c) => ({ m: basis, br: r, model: c, from: E.from, to: E.to }) })}`, 'ช่องสีเขียว = รุ่นที่ขายมากที่สุดของสาขานั้น · % = สัดส่วนในสาขา')}</div>`;
 }
 
