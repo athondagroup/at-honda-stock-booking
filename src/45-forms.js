@@ -321,15 +321,6 @@ function viewUploadBase(D) {
   const sel = U.results.filter(r => r.on);
   return `
   ${pageHead('อัปเดตข้อมูล IDS', 'อัปโหลดไฟล์ Excel ที่ export จาก IDS หรือ Google Sheets ที่ดาวน์โหลดเป็น .xlsx ได้หลายไฟล์พร้อมกัน ระบบอ่านทุกชีตและแยกเองว่าเป็น Stock, Booking, Quota หรือ Invoice/DL ของสาขาไหน')}
-  <section class="mb-5">
-    <h2 class="font-head text-lg font-semibold mb-2">ข้อมูลที่ใช้อยู่ตอนนี้ <span class="text-sm font-normal text-muted">กดช่องเพื่อดูข้อมูลเป็นตาราง</span></h2>
-    <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl">
-      <thead><tr><th>สาขา</th><th>Stock</th><th>Booking</th><th>Quota</th><th>Invoice/DL</th></tr></thead>
-      <tbody>${BRS.map(b => { const s = X.src[b]; return `<tr><td class="nowrap"><b>${b}</b> <span class="text-xs text-muted">${BR[b].name}</span></td>
-        <td>${idsViewBtn('stock', b, cell(s.stock), !!s.stock)}</td><td>${idsViewBtn('booking', b, cell(s.booking), !!s.booking)}</td>
-        <td>${idsViewBtn('quota', b, s.quota.length ? s.quota.map(q => `<div class="text-sm nowrap">${fmtM(q.m)} · ${q.n ?? ''} แถว</div>`).join('') + `<div class="text-xs text-muted">${fmtDT(s.quota.at(-1).at)}</div>` : cell(null), !!s.quota.length)}</td>
-        <td>${s.invoice ? idsViewBtn('invoice', b, cell(s.invoice), true) : '<span class="text-xs text-muted">ยังไม่มี</span>'}</td></tr>`; }).join('')}</tbody></table></div>
-  </section>
   ${idsPasteBox()}
   <section class="bg-surface border border-line rounded-lg p-4 md:p-5 mb-5">
     <label class="drop relative ${p.upload && p.write && !U.busy ? '' : 'opacity-50'}">
@@ -358,6 +349,16 @@ function viewUploadBase(D) {
         <span class="text-xs text-muted">${sel.some(uplNeedsChoice) ? '<span style="color:var(--bad)">ตาราง DL: เลือกก่อนว่าจะใช้ชื่อเดิมหรือข้อมูลใหม่</span>' : 'ตาราง Stock ที่บันทึกจะเก็บประวัติรถที่ออกและเข้าไว้ด้านล่าง'}</span></div>
     </div>` : ''}
   </section>
+  <section class="mb-5">
+    <h2 class="font-head text-lg font-semibold mb-2">ข้อมูลที่ใช้อยู่ตอนนี้ <span class="text-sm font-normal text-muted">กดช่องเพื่อดูข้อมูลเป็นตาราง</span></h2>
+    <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl">
+      <thead><tr><th>สาขา</th><th>Stock</th><th>Booking</th><th>Quota</th><th>Invoice/DL</th></tr></thead>
+      <tbody>${BRS.map(b => { const s = X.src[b]; return `<tr><td class="nowrap"><b>${b}</b> <span class="text-xs text-muted">${BR[b].name}</span></td>
+        <td>${idsViewBtn('stock', b, cell(s.stock), !!s.stock)}</td><td>${idsViewBtn('booking', b, cell(s.booking), !!s.booking)}</td>
+        <td>${idsViewBtn('quota', b, s.quota.length ? s.quota.map(q => `<div class="text-sm nowrap">${fmtM(q.m)} · ${q.n ?? ''} แถว</div>`).join('') + `<div class="text-xs text-muted">${fmtDT(s.quota.at(-1).at)}</div>` : cell(null), !!s.quota.length)}</td>
+        <td>${s.invoice ? idsViewBtn('invoice', b, cell(s.invoice), true) : '<span class="text-xs text-muted">ยังไม่มี</span>'}</td></tr>`; }).join('')}</tbody></table></div>
+  </section>
+  <!--UPL-EXTRA-->
   ${brSeg()}
   <section><h2 class="font-head text-lg font-semibold mb-2">ประวัติการอัปโหลด</h2>
     <div class="bg-surface border border-line rounded-lg divide-y divide-line">${hist.slice(0, 40).map(u => {

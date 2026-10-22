@@ -100,9 +100,10 @@ function gformSettings() {
     </div></section>`;
 }
 function viewUpload(D) {
-  // the Google Form box goes right under the page title
+  // paste box first (ตกลง 22/10), then the file box, the data in use, then the advance / lock boxes
   const base = viewUploadBase(D), cut = base.indexOf('<section');
   const top = gsCan() ? `<div class="text-sm mb-4">ใบจองใหม่จาก Google Form ย้ายไปนำเข้าที่หน้า <a class="underline" href="#book">ใบจอง</a> แล้ว</div>` : '';
   const extra = `${delivWaitBox(D)}${typeof lockIdsList === 'function' ? lockIdsList(D, D.locks.filter(lockVisible)) : ''}`;
-  return (cut > 0 ? base.slice(0, cut) + top + extra + base.slice(cut) : top + extra + base) + (perms().upload ? idsGsBox() + delivSyncBox(D) + sheetSyncBox(D) + gformSettings() : '');
+  const b2 = base.includes('<!--UPL-EXTRA-->') ? base.replace('<!--UPL-EXTRA-->', () => extra) : base + extra;
+  return (cut > 0 ? b2.slice(0, cut) + top + b2.slice(cut) : top + b2) + (perms().upload ? idsGsBox() + delivSyncBox(D) + sheetSyncBox(D) + gformSettings() : '');
 }
