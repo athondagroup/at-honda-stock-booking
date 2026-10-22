@@ -40,18 +40,22 @@ async function printCancelDoc(a) {
     { sec: 1, h: 'ข้อมูลใบจอง' },
     { kv: [['เลขที่ใบจอง IDS', fresh.no || fresh.rec.booking_no || '', 'วันที่จอง', fmtD(fresh.date)], ['ชื่อผู้จอง', fresh.cust || '', 'เบอร์โทรลูกค้า', c.phone || fresh.rec.phone || ''],
       ['พนักงานขาย', fresh.sales || '', 'สาขา', `${fresh.br} ${(BR[fresh.br] || {}).name || ''}`], ['รุ่นรถ', `${fresh.model || ''} ${fresh.grade || ''}`, 'สี', fresh.color || ''],
-      ['เลขที่ใบเสร็จมัดจำ', fresh.rec.receipt_no || '', 'ยอดมัดจำ', fresh.deposit ? money(fresh.deposit) + ' บาท' : '–']] },
-    { sec: 2, h: 'คำขอยกเลิก', by: req ? `ส่งในระบบ ${cxWho(req)} ${cxWhen(req.at)}` : `ผู้จัดการยกเลิกในระบบ ${cxWhen(c.at)}` },
-    { kv: [['เหตุผล', c.reason || ''], ['รายละเอียด', (req ? c.req_note : c.note) || '–']] },
+      ['เลขที่ใบจองสาขา', fresh.rec.paper_no || '–', 'กำหนดส่งมอบรถ', fresh.rec.delivery_plan ? fmtD(fresh.rec.delivery_plan) : '–'],
+      ['เลขที่ใบเสร็จ', fresh.rec.receipt_no || '', 'จำนวนเงินจอง', (fresh.rec.deposit || fresh.deposit) ? money(fresh.rec.deposit || fresh.deposit) + ' บาท' : '–']] },
+    { sec: 2, h: 'คำขอถอนจอง / ยกเลิก', by: req ? `ส่งในระบบ ${cxWho(req)} ${cxWhen(req.at)}` : `ผู้จัดการยกเลิกในระบบ ${cxWhen(c.at)}` },
+    { kv: [['วันที่ลูกค้าขอ', c.req_date ? fmtD(c.req_date) : '–', 'เหตุผล', c.reason || ''],
+      ...((c.fin_tried || []).length ? [['ยื่นไฟแนนซ์ไม่ผ่าน', c.fin_tried.join(', ')]] : []),
+      ['รายละเอียด', [req ? c.req_note : c.note].filter(Boolean).join(' · ') || '–'],
+      ...cxDocList(c).map(([k, t], i) => [i ? '' : 'เอกสารแนบ (ตรวจจากกระดาษ)', `${(c.docs || {})[k] || (k === 'passbook' && rf.passbook_ok) ? '[✓]' : '[  ]'} ${t}`])] },
+    { small: 'เงื่อนไขการถอนจอง: 1. บริษัทขอสงวนสิทธิ์ในการโอนเงิน ตามเลขที่บัญชีในนาม "ชื่อลูกค้า" ที่ระบุในใบจองเท่านั้น  2. เมื่อถอนจองแล้ว บริษัทจะยกเลิกการจองและเงื่อนไขทั้งหมดทันที · ข้าพเจ้าได้รับทราบเงื่อนไขของบริษัทฯ และยืนยันที่จะถอนจอง' },
     { sec: 3, h: 'ผู้จัดการสาขาอนุมัติยกเลิก', by: 'อนุมัติในระบบ' },
-    { kv: [['ผล', res, 'ผู้อนุมัติ', `${mgrName} · ${cxWhen(c.at)}`], ['หมายเหตุผู้จัดการ', c.note || '–']] }
+    { kv: [['ผล', res, 'ผู้อนุมัติ', `${mgrName} · ${cxWhen(c.at)}`], ['หมายเหตุผู้จัดการ', (req ? c.note : '') || '–']] }
   ];
   let n = 4;
   if (refund) {
     blocks.push({ sec: n++, h: 'ขอคืนเงินจองเข้าบัญชีลูกค้า', by: rf.at ? `กรอกในระบบ ${cxWho(rf)} ${cxWhen(rf.at)}` : 'ยังไม่ได้กรอกบัญชี' },
       { kv: [['ยอดเงินคืน', `${money(c.amount)} บาท (${bahtText(c.amount)})`, 'ธนาคาร', rf.bank === 'อื่น ๆ' ? rf.bank_other || '' : rf.bank || ''],
         ['เลขที่บัญชี', rf.account_no || '', 'ชื่อบัญชี', `${rf.account_name || ''}${rf.account_name && nameOk(rf.account_name, fresh.cust) ? ' ✓ ตรงชื่อผู้จอง' : ''}`]] },
-      ...(rf.img ? [{ label: 'สำเนาหน้าสมุดบัญชี', img: docImg(rf.img), maxH: 120 }] : []),
       { sec: n++, h: 'CR โทรตรวจสอบกับลูกค้า' }, { cr: true });
   }
   blocks.push({ sec: n++, h: 'ลายเซ็น' },
@@ -59,6 +63,7 @@ async function printCancelDoc(a) {
     { sec: n++, h: refund ? 'ผู้บริหารอนุมัติจ่าย' : 'ผู้บริหารอนุมัติ' },
     { exec: refund ? { ok: 'อนุมัติจ่ายคืนเงินจอง ตามยอดและบัญชีในข้อ 4', foot: 'ส่งฝ่ายบัญชีทำจ่ายเมื่อมีลายเซ็นผู้บริหาร (ไม่ต้องมีลายเซ็นฝ่ายบัญชี)', label: 'ผู้บริหาร (ผู้อนุมัติจ่าย)' }
       : { ok: c.refund === 'transfer' ? 'อนุมัติยกเลิกการจอง (โอนมัดจำไปใบจองใหม่)' : 'อนุมัติยกเลิกการจอง (ไม่คืนมัดจำ)', foot: 'ส่งฝ่ายบัญชีบันทึกยอดมัดจำตามผลอนุมัติ', label: 'ผู้บริหาร (ผู้อนุมัติ)' } },
+    ...(refund ? [{ sec: n++, h: 'สำหรับเจ้าหน้าที่ฝ่ายบัญชี (ต้องมีใบลดหนี้แนบเท่านั้น)' }, { acct: true }] : []),
     { small: `เลขที่เอกสารระบบออกให้อัตโนมัติ ใช้อ้างอิงกับบัญชี · เมื่อเอกสารครบ ผู้บริหารกด "${refund ? 'อนุมัติจ่าย' : 'อนุมัติ'}" ในระบบเพื่อแจ้งเซลล์` });
   const title = refund ? 'ใบอนุมัติยกเลิกการจอง และขอคืนเงินจอง' : 'ใบอนุมัติยกเลิกการจอง';
   const spec = { title, compact: true, sub: cxCompany(fresh.br), meta: [`เลขที่เอกสาร ${no}`, `พิมพ์จากระบบ ${fmtDT(new Date().toISOString())}`], blocks };

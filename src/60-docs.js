@@ -72,6 +72,14 @@ async function docCanvas(spec) {
         text('ลงชื่อ CR', DOC_M + W - 330, y); dots(DOC_M + W - 270, DOC_M + W - 130, y + 16); text('วันที่', DOC_M + W - 120, y); dots(DOC_M + W - 85, DOC_M + W - 10, y + 16); y += 30;
         if (draw) ctx.strokeRect(DOC_M, top, W, y - top); y += 10;
       }
+      // accounting: credit note, transfer date and amount, filled in by hand
+      if (b.acct) {
+        const top = y; y += 10; font(13);
+        text('เลขที่ใบลดหนี้', DOC_M + 10, y); dots(DOC_M + 100, DOC_M + 300, y + 16); text('กำหนดการโอนเงินเข้าบัญชีตามเอกสารแนบ', DOC_M + 310, y); y += 28;
+        text('จำนวน', DOC_M + 10, y); dots(DOC_M + 60, DOC_M + 250, y + 16); text('บาท', DOC_M + 255, y); text('วันที่โอน', DOC_M + 310, y); dots(DOC_M + 370, DOC_M + W - 10, y + 16); y += 34;
+        text('ลงชื่อเจ้าหน้าที่ฝ่ายบัญชี', DOC_M + W - 380, y); dots(DOC_M + W - 220, DOC_M + W - 10, y + 16); y += 30;
+        if (draw) ctx.strokeRect(DOC_M, top, W, y - top); y += 10;
+      }
       // signatures with the names printed under the line
       if (b.sign3) {
         y += spec.compact ? 38 : 50; const n = b.sign3.length, gap = 24, w = (W - gap * (n - 1)) / n;
