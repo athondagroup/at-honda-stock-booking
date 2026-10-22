@@ -82,7 +82,56 @@ async function gsDupApply(x, D) {
   if (prevDrive) { const st = await gsMarkDupRow(prevDrive); if (st === 'notfound' || st === 'error') toast(`ไม่ได้เขียน "คีย์ซ้ำ" ในแถวเดิมของชีต (${x.doc.customer})`, 'bad'); }
   return 'replaced';
 }
+// ---------- two bookings already in the system for one customer (keyed twice): merge, never cancel
+// The extra booking is taken out (not counted as a cancellation, its open locks closed, its sheet row = คีย์ซ้ำ);
+// the kept booking's history says what the extra one held. Managers merge straight away; others ask the manager.
+function mergeChangeBox(a, ch) {
+  const D = derive(), into = D.at.find(x => x.id === ch.into), dec = canDecideBooking(a);
+  return `<div class="p-3 rounded-lg text-sm" style="background:var(--warn-soft);border-left:3px solid var(--warn)"><b>ขอรวมใบจอง (ลงซ้ำ) รอผู้จัดการอนุมัติ</b>
+    <div>ใบนี้จะถูกเอาออก (ไม่นับเป็นยกเลิก) ใช้ใบจอง: ${into ? bkDupLine(into) : esc(ch.into_label || ch.into)}</div>
+    <div class="text-xs mt-1">ขอโดย ${who(ch)} ${fmtDT(ch.at)}</div>
+    ${dec ? `<div class="flex flex-wrap gap-2 mt-2"><button class="btn btn-red btn-sm" data-act="merge-approve" data-id="${esc(a.id)}">อนุมัติรวมใบ</button><button class="btn btn-ghost btn-sm" data-act="chg-reject" data-id="${esc(a.id)}">ไม่อนุมัติ</button></div>` : `<div class="text-xs mt-1">รอ${MGR_NAME[a.br] || 'ผู้จัดการ'}อนุมัติ</div>`}
+    ${isRequester(ch) && perms().write ? `<div class="mt-2"><button class="btn btn-ghost btn-sm" data-act="chg-withdraw" data-id="${esc(a.id)}">ถอนคำขอ</button></div>` : ''}</div>`;
+}
+async function bkMerge(a, into, how) {
+  const fields = ['customer', 'model', 'grade', 'color', 'sales', 'booking_date', 'booking_no', 'receipt_no', 'deposit', 'discount', 'foc_total', 'purchase', 'note'];
+  const ri = into.rec, ra = a.rec;
+  const diff = fields.filter(k => String(ra[k] ?? '').trim() && String(ra[k] ?? '').trim() !== String(ri[k] ?? '').trim()).map(k => `${CHANGE_KEYS[k] || INSTANT_KEYS[k] || k} ใบที่ซ้ำ: ${fieldVal(k, ra[k])}`).join(' · ');
+  const r = await saveBk(a.id, 'รวมกับใบจองเดิม (ลงซ้ำ)', `ใช้ใบจอง ${into.cust} จอง ${fmtD(into.date)} · ${how}`, x => {
+    x.hidden = { ...actor(), why: `ลงซ้ำ รวมกับใบจอง ${into.id}` }; x.merged_into = into.id;
+    if (x.change && x.change.type === 'merge' && x.change.status === 'pending') finishChange(x, 'approved', how);
+  });
+  if (!r) return false;
+  await saveBk(into.id, 'รวมใบจองที่ลงซ้ำเข้ามา', `${a.cust} จอง ${fmtD(a.date)} (${a.sales || ''})${diff ? ' · ' + diff : ' · ข้อมูลตรงกัน'}`, x => {
+    x.form_ids = [...new Set([...(x.form_ids || []), a.id])];
+  });
+  if (typeof releaseFor === 'function') await releaseFor(a, 'รวมใบจอง (ลงซ้ำ)');
+  const drive = ra.sheet_drive_id || (a.id.startsWith('F_') ? a.id.slice(2) : null);
+  if (drive) { const st = await gsMarkDupRow(drive); if (st === 'notfound' || st === 'error') toast(`ไม่ได้เขียน "คีย์ซ้ำ" ในชีต (${a.cust})`, 'bad'); }
+  return true;
+}
 Object.assign(ACTIONS, {
+  async 'merge-open'(el) {
+    const D = derive(), a = D.at.find(x => x.id === el.dataset.id), into = D.at.find(x => x.id === el.dataset.into);
+    if (!a || !into) { toast('ไม่พบใบจอง', 'bad'); return; }
+    const txt = `ใบนี้: ${a.cust} · ${a.model} · จอง ${fmtD(a.date)} · ${a.sales}\nใช้ใบเดิม: ${into.cust} · ${into.model} · จอง ${fmtD(into.date)} · ${into.sales}`;
+    if (canDecideBooking(a)) {
+      if (!confirm(`รวมใบจองที่ลงซ้ำ (ไม่นับเป็นยกเลิก)?\n\n${txt}\n\nใบนี้จะถูกเอาออก ล็อกที่เปิดอยู่ของใบนี้ถูกปิด`)) return;
+      if (await bkMerge(a, into, 'ผู้จัดการรวมเอง')) { S.modal = null; toast('รวมใบจองแล้ว ไม่นับเป็นการยกเลิก'); render(); }
+      return;
+    }
+    if (!confirm(`ขอผู้จัดการรวมใบจองที่ลงซ้ำ?\n\n${txt}`)) return;
+    const r = await saveBk(a.id, 'ขอรวมใบจอง (ลงซ้ำ)', `กับใบจอง ${into.cust} จอง ${fmtD(into.date)}`, x => {
+      x.change = { id: rid(), type: 'merge', into: into.id, into_label: `${into.cust} ${into.model} จอง ${fmtD(into.date)} (${into.sales || ''})`, reason: 'ลงซ้ำ', status: 'pending', ...actor() };
+    }, x => x.status !== 'cancelled' && pendingFree(x));
+    if (r) { toast('ส่งคำขอรวมใบให้ผู้จัดการอนุมัติแล้ว'); render(); }
+  },
+  async 'merge-approve'(el) {
+    const D = derive(), a = D.at.find(x => x.id === el.dataset.id); if (!a || !a.change || a.change.type !== 'merge' || !canDecideBooking(a)) return;
+    const into = D.at.find(x => x.id === a.change.into); if (!into) { toast('ไม่พบใบจองที่จะรวมด้วย', 'bad'); return; }
+    if (!confirm('อนุมัติรวมใบจอง (ใบนี้ถูกเอาออก ไม่นับเป็นยกเลิก)?')) return;
+    if (await bkMerge(a, into, 'ผู้จัดการอนุมัติ')) { S.modal = null; toast('รวมใบจองแล้ว'); render(); }
+  },
   'bkdup-old'(el) {
     if (!confirm('ไม่บันทึกใบจองใหม่นี้ และเปิดใบจองเดิมให้แก้แทน?')) return;
     S.modal = null; S.view = 'book'; S.sub.book = 'list';

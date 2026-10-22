@@ -24,7 +24,7 @@ const REFUND = { refund: 'คืนเงินมัดจำ', forfeit: 'ไ�
 const MULTI_REASONS = ['ซื้อเพิ่มอีกคัน (จอง 2 คัน)', 'เปลี่ยนรุ่น (ขอยกเลิกใบเดิม)', 'คนละคน ชื่อซ้ำ', 'อื่น ๆ'];
 const THAI_BANKS = ['กสิกรไทย (KBANK)', 'ไทยพาณิชย์ (SCB)', 'กรุงเทพ (BBL)', 'กรุงไทย (KTB)', 'กรุงศรีอยุธยา (BAY)', 'ทหารไทยธนชาต (ttb)', 'ออมสิน (GSB)', 'ธ.ก.ส. (BAAC)', 'ยูโอบี (UOB)', 'ซีไอเอ็มบี ไทย (CIMBT)', 'เกียรตินาคินภัทร (KKP)', 'แลนด์ แอนด์ เฮ้าส์ (LH Bank)', 'ทิสโก้ (TISCO)', 'อาคารสงเคราะห์ (GHB)', 'อื่น ๆ'];
 const fieldVal = (k, v) => v === null || v === undefined || v === '' ? '–' : (k === 'discount' || k === 'foc_total' || k === 'deposit') ? money(v) : (k === 'delivery_plan' || k === 'booking_date') ? fmtD(v) : String(v);
-const changeText = ch => Object.keys(ch.fields || {}).map(k => `${CHANGE_KEYS[k] || INSTANT_KEYS[k] || k}: ${fieldVal(k, (ch.old || {})[k])} → ${fieldVal(k, ch.fields[k])}`).join(' · ');
+const changeText = ch => ch && ch.type === 'merge' ? `ลงซ้ำ ขอรวมกับใบจอง ${ch.into_label || ''}` : Object.keys(ch.fields || {}).map(k => `${CHANGE_KEYS[k] || INSTANT_KEYS[k] || k}: ${fieldVal(k, (ch.old || {})[k])} → ${fieldVal(k, ch.fields[k])}`).join(' · ');
 // the role that asked (one sales, or the branch admin desk) can withdraw its own request
 const isRequester = ch => !!ch && ch.role === roleLabel();
 const canOwnerConfirm = a => perms().write && (isMine(a.sales) || (S.role.role === 'admin' && a.br === S.role.branch) || canApproveBr(a.br));
@@ -55,7 +55,7 @@ function nearBox(a) {
     ${a.near.map(h => `<div class="mt-2 pt-2 border-t border-line"><div>${{ dl: 'DL', booking: 'Booking', stock: 'Stock' }[h.kind]} ${esc(h.br)} ${h.inv ? `ใบกำกับ ${esc(h.inv)}` : h.no ? `ใบจอง ${esc(h.no)}` : ''} ${fmtD(h.ddate || h.date)} · ${esc(h.name)} · ${esc(h.model || '')} ${esc(gradeShort(h.model, h.grade) || '')}</div>
       ${h.other ? `<div class="text-xs"><b>ใช้กับใบจอง AT ของ ${esc(h.other.sales || '')} (${esc(h.other.model)} จอง ${fmtD(h.other.date)}) แล้ว</b></div>` : ''}
       ${can ? `<div class="flex flex-wrap gap-2 mt-1">${h.other
-        ? `<button class="btn btn-ghost btn-sm" data-act="cancel-open" data-id="${esc(a.id)}" data-reason="ลงฟอร์มซ้ำ">ลงซ้ำ → ขอยกเลิกใบนี้</button>
+        ? `<button class="btn btn-ghost btn-sm" data-act="merge-open" data-id="${esc(a.id)}" data-into="${esc(h.other.id)}">ลงซ้ำ → รวมกับใบจองนั้น (ไม่นับยกเลิก)</button>
            <button class="btn btn-ghost btn-sm" data-act="match-second" data-id="${esc(a.id)}" data-key="${esc(h.key)}" data-other="${esc(h.other.id)}">ไม่ซ้ำ เป็นคันที่ 2 (ยังไม่ลง IDS)</button>`
         : `<button class="btn btn-dark btn-sm" data-act="match-yes" data-id="${esc(a.id)}" data-key="${esc(h.key)}">ใช่ ใบนี้</button>
            <button class="btn btn-ghost btn-sm" data-act="match-no" data-id="${esc(a.id)}" data-key="${esc(h.key)}">ไม่ใช่</button>`}</div>` : ''}</div>`).join('')}`);
@@ -81,6 +81,7 @@ function ownerBox(m, a) {
 function changeBox(m, a) {
   const ch = a.change;
   if (!ch) return '';
+  if (ch.type === 'merge') return mergeChangeBox(a, ch);
   const dec = canDecideBooking(a), mine = isRequester(ch);
   const diff = ch.type === 'edit' ? `<table class="tbl text-sm mt-2"><thead><tr><th>ช่อง</th><th>เดิม</th><th>ขอเปลี่ยนเป็น</th></tr></thead><tbody>${Object.keys(ch.fields).map(k => `<tr><td class="nowrap">${CHANGE_KEYS[k] || k}</td><td>${esc(fieldVal(k, ch.old[k]))}</td><td style="font-weight:600">${esc(fieldVal(k, ch.fields[k]))}</td></tr>`).join('')}</tbody></table>
     ${SPEC_KEYS.some(k => k in ch.fields) ? '<div class="text-xs mt-1" style="color:var(--bad)">เปลี่ยนรุ่น เกรด หรือสี: ผู้จัดการเลือกต่อคิวใหม่หรือใช้คิวเดิม (ต้องมีเหตุผล) และระบบปล่อยล็อก/การจัดสรรรถเดิม</div>' : ''}` : '';

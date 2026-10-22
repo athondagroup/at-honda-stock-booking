@@ -229,6 +229,7 @@ function viewStock(D) {
     ${isSales() ? '' : `<div class="field"><label for="f-status">สถานะ</label><select id="f-status" data-filter="status"><option value="">ทุกสถานะ</option>
       ${mode === 'spec' ? `<option value="low" ${f.status === 'low' ? 'selected' : ''}>สเปกที่ไม่พอ (แดง)</option>` : ''}
       ${Object.entries(CAR_STATUS).map(([k, v]) => `<option value="${k}" ${f.status === k ? 'selected' : ''}>${v[0]} (${counts[k] || 0})</option>`).join('')}</select></div>`}
+    ${mode === 'spec' ? `<div class="field"><label for="f-spsort">เรียง</label><select id="f-spsort" data-filter="specSort">${[['', 'ขาดมากสุด (รอรถ − ว่าง − Quota)'], ['model', 'รุ่น (A→Z)'], ['free', 'รถว่างมากสุด'], ['waiting', 'รอรถมากสุด'], ['quota', 'Quota ว่างมากสุด'], ['held', 'ติดจองมากสุด'], ['age', 'รถค้างนานสุด']].map(([k, t]) => `<option value="${k}" ${(f.specSort || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
     ${mode === 'list' ? `<div class="field"><label for="f-ssort">เรียง</label><select id="f-ssort" data-filter="sSort">${[['', 'สาขา → สเปก → อายุ'], ['old', 'เก่าสุดทุกสาขา'], ['free', 'รถว่างพร้อมจัดสรร']].map(([k, t]) => `<option value="${k}" ${(f.sSort || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
     <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-q">ค้นหา VIN / Ref${isSales() ? '' : ' / เลขใบจอง / ชื่อลูกค้า'} · ${S.br ? 'ในสาขา ' + S.br : 'ทุกสาขา'}</label><input id="f-q" type="search" data-filter="q" value="${esc(f.q)}" placeholder="เช่น MRHGN36"></div>
   </div>`;
@@ -254,6 +255,7 @@ function viewStock(D) {
       <span class="text-xs text-muted">${fmtDT(c.removed.at)} ${who(c.removed)}</span>
       ${p.remove && p.write ? `<button class="btn btn-ghost btn-sm ml-auto" data-act="restore" data-vin="${esc(c.vin)}">คืนเข้าสต็อก</button>` : ''}</div>`).join('')}</div></section>` : ''}`;
 }
+const SPEC_CAT = { free: 'ว่าง', held: 'ติดจอง (IDS จัดสรร / แจ้งขาย / ออกใบกำกับ)', lock: 'ล็อก (ในเว็บ / ชื่อในชีต)', company: 'รถบริษัท' };
 function specTable(cars, D) {
   const f = S.filters, p = perms();
   const brs = S.br ? [S.br] : BRS;
@@ -261,27 +263,31 @@ function specTable(cars, D) {
   let specs = [...new Set(pool.map(c => c.spec))].map(k => D.specs[k]);
   if (f.status === 'low') specs = specs.filter(s => s.low);
   else if (f.status) { const ks = new Set(cars.filter(c => c.status === f.status).map(c => c.spec)); specs = specs.filter(s => ks.has(s.key)); }
-  specs.sort((a, b) => (b.low - a.low) || a.key.localeCompare(b.key));
+  const gap = s => s.waiting - s.free - s.incoming, C = s => s.cat || { free: 0, held: 0, lock: 0, company: 0 };
+  const by = { model: (a, b) => a.key.localeCompare(b.key), free: (a, b) => b.free - a.free, waiting: (a, b) => b.waiting - a.waiting, quota: (a, b) => b.incoming - a.incoming,
+    held: (a, b) => C(b).held - C(a).held, age: (a, b) => (b.maxAge ?? -1) - (a.maxAge ?? -1) }[f.specSort] || ((a, b) => gap(b) - gap(a));
+  specs.sort((a, b) => by(a, b) || a.key.localeCompare(b.key));
   const rows = specs.map(s => {
-    const open = f.specOpen === s.key || !!f.q;
-    const list = cars.filter(c => c.spec === s.key && (!f.status || f.status === 'low' || c.status === f.status)).sort((a, b) => (b.age ?? -1) - (a.age ?? -1));
+    const open = f.specOpen === s.key || !!f.q, cat = open && f.specOpen === s.key ? f.specCat : '';
+    const list = cars.filter(c => c.spec === s.key && (!f.status || f.status === 'low' || c.status === f.status) && (!cat || specCat(c.status) === cat)).sort((a, b) => (b.age ?? -1) - (a.age ?? -1));
+    const k = C(s), cell = (n, c2, title) => n ? `<button class="underline decoration-dotted" data-act="speccat" data-key="${esc(s.key)}" data-cat="${c2}" title="${title}">${n}</button>` : '–';
     return `<tr class="${s.low ? 'low' : ''}">
       <td><button class="text-left font-medium" data-act="spec" data-key="${esc(s.key)}" aria-expanded="${open}">${open ? '▾' : '▸'} ${specLabel(s.key)}</button>
         ${s.low ? `<div class="text-xs mt-0.5" style="color:var(--bad)">ใบจองรอรถเกินรถที่มี ${s.waiting - s.free - s.incoming} ใบ</div>` : ''}</td>
       ${brs.map(b => `<td class="num text-right ${S.br ? '' : 'hidden md:table-cell'}">${s.freeBy[b] || '<span class="text-muted">–</span>'}${isSales() ? '' : `<span class="text-muted text-xs">/${s.totalBy[b] || 0}</span>`}</td>`).join('')}
-      <td class="num text-right font-semibold" ${s.free === 0 ? 'style="color:var(--bad)"' : ''}>${s.free}</td>
-      <td class="num text-right">${s.held || '–'}</td>
-      <td class="num text-right">${s.locked + s.pending || '–'}</td>
+      <td class="num text-right font-semibold" ${s.free === 0 ? 'style="color:var(--bad)"' : ''}>${s.free ? cell(s.free, 'free', 'ดูรถว่าง') : '0'}</td>
+      <td class="num text-right">${cell(k.held, 'held', 'ดูรถที่ IDS จัดสรร / ขายแล้ว')}</td>
+      <td class="num text-right">${cell(k.lock, 'lock', 'ดูรถที่ล็อกในเว็บ / มีชื่อในชีต')}</td>
       <td class="num text-right">${s.waiting ? `<button class="underline decoration-dotted font-medium" data-act="specq-open" data-key="${esc(s.key)}" title="ดูว่าใบจองไหนรอรถสเปกนี้">${s.waiting}</button>` : '–'}</td>
-      <td class="num text-right hidden sm:table-cell">${s.incoming || '–'}</td>
+      <td class="num text-right">${s.incoming ? `<button class="underline decoration-dotted" data-act="specquota" data-key="${esc(s.key)}" title="ดู Quota ว่าง และขอล็อกคิว">${s.incoming}</button>` : '–'}</td>
     </tr>
-    ${open ? `<tr><td colspan="${brs.length + 6}" style="padding:0;background:var(--surface)"><div class="divide-y divide-line">${list.map(c => carRow(c, D)).join('') || '<div class="p-3 text-muted">ไม่มีรถตามตัวกรองนี้</div>'}</div></td></tr>` : ''}`;
+    ${open ? `<tr><td colspan="${brs.length + 6}" style="padding:0;background:var(--surface)">${cat ? `<div class="px-4 py-2 text-sm flex flex-wrap gap-2 items-center" style="background:var(--surface-2)">แสดงเฉพาะ <b>${SPEC_CAT[cat]}</b> ${list.length} คัน <button class="underline text-xs" data-act="speccat" data-key="${esc(s.key)}" data-cat="">แสดงทุกคัน</button></div>` : ''}<div class="divide-y divide-line">${list.map(c => carRow(c, D)).join('') || '<div class="p-3 text-muted">ไม่มีรถตามตัวกรองนี้</div>'}</div></td></tr>` : ''}`;
   }).join('');
   return `<div class="bg-surface border border-line rounded-lg scroll-x">
     <table><thead><tr><th>รุ่น / เกรด / สี</th>${brs.map(b => `<th class="text-right ${S.br ? '' : 'hidden md:table-cell'}">${b} ${isSales() ? 'ว่าง' : 'ว่าง/มี'}</th>`).join('')}
-      <th class="text-right">ว่าง</th><th class="text-right">ติดจอง</th><th class="text-right">ล็อก</th><th class="text-right">รอรถ</th><th class="text-right hidden sm:table-cell">Quota</th></tr></thead>
+      <th class="text-right">ว่าง</th><th class="text-right">ติดจอง</th><th class="text-right">ล็อก</th><th class="text-right">รอรถ</th><th class="text-right">Quota ว่าง</th></tr></thead>
     <tbody>${rows || `<tr><td colspan="${brs.length + 6}">${emptyBox('ไม่พบรถตามตัวกรองนี้', 'ลองล้างตัวกรองหรือค้นหาด้วยเลขอื่น')}</td></tr>`}</tbody></table></div>
-    <p class="text-xs text-muted mt-2">ติดจอง = รถที่มีลูกค้าแล้ว (จอง ล็อก หรือขายแล้ว) ${isSales() ? 'แสดงเป็นจำนวน ไม่แสดงชื่อ' : 'ไม่นับรถบริษัท'} · แถวสีแดง = ใบจองรอรถมากกว่ารถว่างรวม Quota ที่ยังว่าง</p>`;
+    <p class="text-xs text-muted mt-2">แต่ละคันอยู่ช่องเดียว: <b>ว่าง</b> = ขายได้ (รวมล็อกชั่วคราว) · <b>ติดจอง</b> = IDS จัดสรรให้ใบจองแล้ว หรือแจ้งขาย/ออกใบกำกับแล้ว · <b>ล็อก</b> = ล็อกในเว็บนี้ (อนุมัติแล้ว/รออนุมัติ) หรือมีชื่อพิมพ์ในชีตรอสร้างคำขอ · รถบริษัทไม่อยู่ในช่องไหน · <b>Quota ว่าง</b> = รถที่จะเข้า ยังไม่มีใบจองหรือล็อก · กดตัวเลขเพื่อดูรายคัน${isSales() ? ' (ไม่แสดงชื่อลูกค้า)' : ''}<br>แถวสีแดง = <b>รอรถ มากกว่า ว่าง + Quota ว่าง</b> ("ใบจองรอรถเกินรถที่มี N ใบ" = ลูกค้าท้ายคิว N คนยังไม่มีรถให้)</p>`;
 }
 function tempChip(c) { return c.temps && c.temps.length ? chip(`ล็อกชั่วคราว ${c.temps.length} คน`, 'warn') : ''; }
 function carRow(c, D) {
@@ -293,7 +299,7 @@ function carRow(c, D) {
     <div class="w-12"><b>${esc(c.br)}</b></div>
     <div class="w-32">${carStatusCell(c, D)}</div>
     <div class="w-28 text-sm">${ageCell(c)}</div>
-    <div class="text-sm min-w-0 flex-1">${l ? lockText(l) : isSales() ? '' : `${c.bk ? `<span class="text-muted">ใบจอง</span> ${esc(c.bk)} · ` : ''}${custCell(c.cust || (c.bknote ? c.bknote : null), c.sales, { company: c.company || c.status === 'company', seed: c.seed && ['booked', 'noted', 'sold', 'invoiced'].includes(c.status) })}`}</div>
+    <div class="text-sm min-w-0 flex-1"><button class="text-left w-full" data-act="carwhy" data-vin="${esc(c.vin)}" title="กดดูว่ารถคันนี้ติดอะไร">${l ? lockText(l) : isSales() ? `<span class="text-xs underline decoration-dotted text-muted">${esc((CAR_STATUS[c.status] || [c.status])[0])} · ดูเงื่อนไข</span>` : `${c.bk ? `<span class="text-muted">ใบจอง</span> ${esc(c.bk)} · ` : ''}${custCell(c.cust || (c.bknote ? c.bknote : null), c.sales, { company: c.company || c.status === 'company', seed: c.seed && ['booked', 'noted', 'sold', 'invoiced'].includes(c.status) })}`}<span class="block text-xs underline decoration-dotted text-muted">ดูเงื่อนไข</span></button></div>
     <div class="flex gap-2">${carActions(c, p, D)}</div></div>`;
 }
 const lockLabel = l => `${l.type === 'dealer' ? 'ดีลเลอร์ ' + esc(l.dealer_name || '') : l.type === 'temp' ? 'ล็อกชั่วคราว ' + esc(l.owner || l.sales_nick || '') : 'ใบจองของ ' + esc(l.owner || '')}${l.status === 'approved' ? (l.hold ? ` · ถือไว้จนส่งมอบ ${fmtD(l.holdUntil)}` : ` · หมด ${fmtD(l.end)}`) : l.status === 'pending' ? ' · รออนุมัติ' : ''}`;

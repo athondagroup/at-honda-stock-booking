@@ -12,6 +12,7 @@ function atBranchOf(name) {
   const w = [['ภาษีเจริญ', 'PSC'], ['เอกชัย', 'ATE'], ['บางบอน', 'ATE'], ['สามพราน', 'SPH'], ['กำแพงแสน', 'KPA']].find(([k]) => t.includes(k));
   return w ? w[1] : null;
 }
+function specCat(st) { return st === 'free' || st === 'temp' ? 'free' : st === 'company' ? 'company' : ['locked', 'pending', 'allocated', 'noted'].includes(st) ? 'lock' : 'held'; }
 function carStatus(c, inv, bkByVin) {
   if (inv && !inv.company) return inv.ddate ? 'delivered' : 'invoiced';
   if (c.company) return 'company';
@@ -345,6 +346,9 @@ function deriveNow() {
     if (car.status === 'pending') s.pending++;
     // taken for a customer (booked, typed name, locked, sold) but not company cars
     if (car.status !== 'free' && car.status !== 'temp' && car.status !== 'company') s.held++;
+    // the spec table's columns, each car in one only (ตกลง 22/10): ว่าง · ติดจอง (IDS / sold) · ล็อก (this web, sheet name) · รถบริษัท
+    const cat = specCat(car.status); s.cat = s.cat || { free: 0, held: 0, lock: 0, company: 0 }; s.cat[cat]++;
+    if ((car.age ?? -1) > (s.maxAge ?? -1)) s.maxAge = car.age;
   }
   bookings.filter(b => b.state === 'waiting').forEach(b => sp(b.spec).waiting++);
   quota.forEach(q => { if (q.open) sp(q.spec).incoming += q.qty || 1; });
