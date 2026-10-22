@@ -230,24 +230,21 @@ function viewReceive(D) {
   const shown = by(sub === 'done' ? 'confirmed' : sub === 'rejected' ? 'rejected' : 'pending');
   const running = ai && ai.state === 'running';
   return `
-  ${pageHead('รับรถเข้า', 'ถ่ายรูปใบ NEW CARS DELIVERY NOTE ส่งเข้าระบบ AI จะอ่านเลขตัวถัง รุ่น สี และเลขที่เอกสาร จากนั้นแอดมินสาขาตรวจกับรูปแล้วกดยืนยัน รถจะขึ้นเป็นรถว่างในสต็อกทันที')}
+  ${pageHead('รับรถเข้า', 'คีย์ข้อมูลรถจากใบ NEW CARS DELIVERY NOTE ทีละคัน (1 ใบ = 1 คัน) จากนั้นแอดมินสาขาตรวจแล้วกดยืนยัน รถจะขึ้นเป็นรถว่างในสต็อกทันที')}
   <section class="bg-surface border border-line rounded-lg p-4 md:p-5 mb-5">
     <div class="drop" style="cursor:default">
       <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="color:var(--red)">${ICON.receive}</svg>
-      <span class="font-medium">ส่งรูปใบ New Cars Delivery Note</span>
-      <span class="text-xs text-muted">${aiReady() ? 'ถ่ายให้เห็นทั้งใบ AI จะอ่านข้อมูลให้แอดมินตรวจ' : S.mode === 'local' ? 'AI อ่านรูปใช้ได้เมื่อเปิดหน้านี้บน claude.ai ตอนนี้ส่งรูปแล้วให้แอดมินกรอกเองได้' : 'มุมมองนี้ใช้ AI อ่านรูปไม่ได้ แอดมินจะกรอกข้อมูลจากรูปเอง'}</span>
+      <span class="font-medium">คีย์ข้อมูลรถจากใบ New Cars Delivery Note</span>
+      <span class="text-xs text-muted">1 ใบ = 1 คัน · ใส่เลขตัวถัง รุ่น เกรด สี และวันผลิตจากป้ายที่รถ</span>
       <div class="flex flex-wrap justify-center gap-2 mt-2">
-        <label class="btn btn-red relative ${p.write && !running ? '' : 'opacity-50'}"><input type="file" accept="image/*" capture="environment" data-file="recv" class="absolute w-px h-px opacity-0" ${p.write && !running ? '' : 'disabled'}>ถ่ายรูป</label>
-        <label class="btn btn-ghost relative ${p.write && !running ? '' : 'opacity-50'}"><input type="file" accept="image/*" multiple data-file="recv" class="absolute w-px h-px opacity-0" ${p.write && !running ? '' : 'disabled'}>อัปโหลดรูปจากเครื่อง (เลือกได้หลายใบ)</label>
-        ${p.write && p.confirmReceive ? `<button class="btn btn-ghost" data-act="recv-manual" ${running ? 'disabled' : ''}>คีย์ข้อมูลเอง (ไม่มีรูป)</button>` : ''}
+        ${p.write && p.confirmReceive ? `<button class="btn btn-red" data-act="recv-manual" ${running ? 'disabled' : ''}>+ คีย์รับรถเข้า</button>` : '<span class="text-sm text-muted">รับรถเข้าได้เฉพาะแอดมินสาขา ผู้จัดการ และผู้บริหาร</span>'}
       </div>
-      ${ANDROID_NOTE}
     </div>
     ${ai ? `<div class="mt-3 text-sm flex items-center gap-3" role="status">${ai.state === 'running' ? `<span class="spin"></span> ${esc(ai.msg)} <button class="btn btn-ghost btn-sm" data-act="ai-stop" data-kind="receive">หยุด</button>` : ai.state === 'done' ? `<span style="color:var(--good)">${esc(ai.msg)}</span>` : `<span style="color:var(--bad)">${esc(ai.msg)}</span>`}</div>` : ''}
   </section>
   ${brSeg()}
   ${tabs('receive', [['pending', 'รอแอดมินยืนยัน', by('pending').length], ['done', 'ยืนยันแล้ว', String(by('confirmed').length)], ['rejected', 'ไม่ผ่าน']])}
-  <div class="bg-surface border border-line rounded-lg divide-y divide-line">${shown.map(r => receiptRow(r, D)).join('') || emptyBox(sub === 'pending' ? 'ไม่มีรถที่รอยืนยัน' : 'ยังไม่มีรายการ', 'ส่งรูปใบ New Cars Delivery Note ด้านบน')}</div>
+  <div class="bg-surface border border-line rounded-lg divide-y divide-line">${shown.map(r => receiptRow(r, D)).join('') || emptyBox(sub === 'pending' ? 'ไม่มีรถที่รอยืนยัน' : 'ยังไม่มีรายการ', 'กด "+ คีย์รับรถเข้า" ด้านบน')}</div>
   ${p.confirmReceive ? '' : `<p class="text-sm text-muted mt-3">บทบาท ${esc(roleLabel())} ส่งรูปได้ แต่ต้องให้แอดมินสาขาหรือผู้จัดการเป็นคนยืนยัน</p>`}`;
 }
 function receiveModal(m, D) {
@@ -306,7 +303,6 @@ function receiveModal(m, D) {
         <div class="field"><label for="rv-ref">REF NO.</label><input id="rv-ref" class="code" data-modal="r.ref_no" value="${esc(r.ref_no || '')}" ${dis}></div>
       </div>
       ${(r.cars || []).map(carBlock).join('')}
-      ${canConfirm ? `<button class="btn btn-ghost btn-sm self-start" data-act="recv-car-add">+ เพิ่มรถอีกคันในใบนี้</button>` : ''}
       ${canConfirm ? `<div class="field"><label for="rv-note">หมายเหตุ (ถ้าตีกลับต้องใส่)</label><input id="rv-note" data-modal="note" value="${esc(m.note || '')}"></div>
       ${(() => { const d = recvDupsOf({ ...r, id: m.id }, D); return d.length ? `<div class="p-3 rounded-lg text-sm" style="background:var(--bad-soft);color:var(--bad)"><b>ใบนี้น่าจะซ้ำ</b> ${d.map(esc).join(' · ')} · ถ้าซ้ำจริง กด "ซ้ำ ไม่ต้องรับเข้า"</div>` : ''; })()}
       <div class="flex flex-wrap justify-end gap-2"><button class="btn btn-ghost" data-act="recv-dup" data-id="${esc(m.id)}">ซ้ำ ไม่ต้องรับเข้า</button><button class="btn btn-ghost" data-act="recv-reject">ไม่ผ่าน ตีกลับ</button><button class="btn btn-red" data-act="recv-confirm">ยืนยันรับรถเข้าสต็อก</button></div>`
