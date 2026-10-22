@@ -30,6 +30,7 @@ function renderModal(D) {
   else if (m.kind === 'stassign') { body = stAssignModal(m, D); wide = true; }
   else if (m.kind === 'dio') { body = dioModal(m); wide = true; }
   else if (m.kind === 'drill') { body = drillModal(m, D); wide = true; }
+  else if (m.kind === 'specquota') { body = specQuotaModal(m, D); wide = true; }
   else if (m.kind === 'idsview') { body = idsViewModal(m); wide = true; }
   else if (m.kind === 'adsales') body = adminSalesModal(m);
   else if (m.kind === 'adbk') { body = adminBkModal(m); wide = true; }
@@ -526,7 +527,7 @@ const ACTIONS = {
   'book-filter'(el) { S.filters.aState = el.dataset.st; S.view = 'book'; S.sub.book = 'list'; if (el.dataset.br !== undefined) setBr(el.dataset.br); S.modal = null; setHash(); render(); window.scrollTo(0, 0); },
   br(el) { setBr(el.dataset.br); render(); },
   menu() { S.modal = { kind: 'menu' }; render(); },
-  spec(el) { S.filters.specOpen = S.filters.specOpen === el.dataset.key ? null : el.dataset.key; render(); },
+  spec(el) { S.filters.specOpen = S.filters.specOpen === el.dataset.key ? null : el.dataset.key; S.filters.specCat = ''; render(); },
   close() { S.modal = null; render(); },
   'render-reset'() { const keep = { specOpen: null }; Object.keys(S.filters).forEach(k => { S.filters[k] = typeof S.filters[k] === 'boolean' ? false : ''; }); Object.assign(S.filters, keep); S.modal = null; render(); },
   backdrop(el, ev) { if (ev.target === el) { S.modal = null; render(); } },
