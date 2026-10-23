@@ -51,19 +51,20 @@ function dealBox(a, m, D) {
   }
   // the sales cannot type over the price list; the branch admin and up can (a special price, a price not in the list yet)
   const lockPrice = !!web && !dealAdmin(a);
-  const v = m.deal, F = k => `<div class="field"><label for="dl-${k}" ${k === 'price' ? 'class="req"' : ''}>${dealLabel(k)}</label><input id="dl-${k}" type="number" min="0" ${k === 'rate' ? 'step="0.01" max="30"' : k === 'term' ? 'step="1" max="120"' : 'step="100"'} inputmode="decimal" data-modal="deal.${k}" value="${esc(k === 'price' && lockPrice ? web.price : v[k] ?? '')}" ${k === 'price' && lockPrice ? 'readonly style="background:var(--surface-2)"' : ''}>${k === 'price' ? `<span class="text-xs text-muted">${web ? `ดึงจากราคาในเว็บ (${esc(web.src)}) ตามรุ่น เกรด สี${web.paint ? ` · รวมค่าสี ${money(web.paint)}` : ''}${lockPrice ? '' : num(v.price) && num(v.price) !== web.price ? ` · <b style="color:var(--warn)">ไม่ตรงราคาในเว็บ ${money(web.price)}</b>` : ''}` : 'ยังไม่มีราคารุ่น/เกรด/สีนี้ในเว็บ ใส่เอง'}</span>` : ''}</div>`;
-  const net = num(lockPrice ? web.price : v.price) - num(v.disc) - num(v.down);
-  const hint = !cash && num(v.price) && num(v.down) && num(v.fin_amount) && Math.abs(net - num(v.fin_amount)) >= 1 ? `<div class="text-xs mt-1" style="color:var(--warn)">ราคาหลังส่วนลด − ดาวน์ = ${money(net)} บาท ไม่เท่ากับยอดจัดที่ใส่ ตรวจอีกครั้ง (ถ้ามีรวมประกันหรือค่าอื่นในยอดจัด ใช้ได้)</div>` : '';
+  // the amount financed is worked out: price after the car discount − down payment (23/10)
+  const v = { ...m.deal, ...(lockPrice ? { price: web.price } : {}) };
+  v.fin_amount = commFinAmount({ price: v.price, discount: v.disc, down: v.down });
+  const F = k => k === 'fin_amount' ? `<div class="field"><label>ยอดจัด</label><div class="num p-2 rounded-lg border border-line">${v.fin_amount ? money(v.fin_amount) : '–'}</div><span class="text-xs text-muted">ราคารถ − ส่วนลด − ดาวน์ (คิดให้เอง)</span></div>` : `<div class="field"><label for="dl-${k}" ${k === 'price' ? 'class="req"' : ''}>${dealLabel(k)}</label><input id="dl-${k}" type="number" min="0" ${k === 'rate' ? 'step="0.01" max="30"' : k === 'term' ? 'step="1" max="120"' : 'step="100"'} inputmode="decimal" data-modal="deal.${k}" value="${esc(k === 'price' && lockPrice ? web.price : v[k] ?? '')}" ${k === 'price' && lockPrice ? 'readonly style="background:var(--surface-2)"' : ''}>${k === 'price' ? `<span class="text-xs text-muted">${web ? `ดึงจากราคาในเว็บ (${esc(web.src)}) ตามรุ่น เกรด สี${web.paint ? ` · รวมค่าสี ${money(web.paint)}` : ''}${lockPrice ? '' : num(v.price) && num(v.price) !== web.price ? ` · <b style="color:var(--warn)">ไม่ตรงราคาในเว็บ ${money(web.price)}</b>` : ''}` : 'ยังไม่มีราคารุ่น/เกรด/สีนี้ในเว็บ ใส่เอง'}</span>` : ''}</div>`;
   return `<div class="mt-2 p-3 rounded-lg border border-line" style="background:var(--surface-2)">${title}
     <div class="grid sm:grid-cols-3 gap-3 mt-2">${keys.map(F).join('')}</div>
-    <table class="tbl text-sm mt-2"><tbody>${dealCalc(lockPrice ? { ...v, price: web.price } : v, cash, web ? web.paint : 0).map(([k, x]) => `<tr><td class="text-muted nowrap">${k}</td><td class="num">${esc(x)}</td></tr>`).join('')}</tbody></table>${hint}
+    <table class="tbl text-sm mt-2"><tbody>${dealCalc(v, cash, web ? web.paint : 0).map(([k, x]) => `<tr><td class="text-muted nowrap">${k}</td><td class="num">${esc(x)}</td></tr>`).join('')}</tbody></table>
     <div class="text-xs text-muted mt-1">${first ? 'บันทึกครั้งแรกแล้ว เซลล์แก้เองไม่ได้ ถ้าต้องแก้ แอดมินสาขาหรือผู้จัดการเป็นคนแก้' : 'แก้ไขโดยแอดมินขึ้นไป ระบบเก็บตัวเลขเดิมไว้ในประวัติ'}</div>
     <div class="flex gap-2 mt-2"><button class="btn btn-dark btn-sm" data-act="deal-save" data-id="${esc(a.id)}">บันทึก</button><button class="btn btn-ghost btn-sm" data-act="deal-close">ยกเลิก</button></div></div>`;
 }
 // the commission form starts from the deal numbers (comm values the sales typed win)
 function commDeal(a) {
   const dl = a.rec.deal || {}; if (!dl.at) return {};
-  const o = { price: dl.price, discount: (num(dl.disc) + num(dl.down_disc)) || null, down: dl.down, fin_amount: dl.fin_amount, rate: dl.rate, term: dl.term };
+  const o = { price: dl.price, discount: dl.disc, down: dl.down, down_disc: dl.down_disc, rate: dl.rate, term: dl.term };
   return Object.fromEntries(Object.entries(o).filter(([, x]) => x !== null && x !== undefined));
 }
 function dealCheck(v, keys) {
@@ -94,6 +95,7 @@ Object.assign(ACTIONS, {
     if (first ? !(perms().write && canEditBooking(a)) : !dealAdmin(a)) { toast('แก้ราคาและเงื่อนไขได้เฉพาะแอดมินสาขาหรือผู้จัดการ', 'bad'); return; }
     const web = dealWeb(a, derive());
     if (web && !dealAdmin(a)) v.price = web.price;
+    v.fin_amount = isCash(a.rec) ? '' : (commFinAmount({ price: v.price, discount: v.disc, down: v.down }) ?? '');
     const keys = dealKeys(a.rec), ck = dealCheck(v, keys);
     if (ck.err) { toast(ck.err, 'bad'); if (ck.id) $('#' + ck.id)?.focus(); return; }
     const vals = Object.fromEntries(keys.map(k => [k, v[k] === '' || v[k] === undefined ? null : (k === 'rate' ? Number(v[k]) : k === 'term' ? parseInt(v[k], 10) : num(v[k]))]));

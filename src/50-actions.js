@@ -824,8 +824,7 @@ const ACTIONS = {
   },
   async 'comm-save'(el) {
     const a = atById(el.dataset.id); if (!a || !canEditBooking(a) || a.flow.done.confirmed) return;
-    const c = { ...commDeal(a), ...(a.rec.comm || {}), ...(S.modal.comm || {}) };
-    ['price', 'discount', 'down', 'fin_amount', 'rate', 'term', 'margin'].forEach(k => { if (k in c) c[k] = num(c[k]); });
+    const c = commRecord(a, derive());
     if (await saveFlow(a, { comm: { ...c, ...actor() } }, 'บันทึกข้อมูลค่าคอมแล้ว')) { S.modal.comm = null; render(); }
   },
   async 'flow-confirm'(el) {
@@ -1036,7 +1035,7 @@ document.addEventListener('change', async ev => {
   if (t.dataset.filter && RERENDER_ON_CHANGE.has(t.dataset.filter)) { S.filters[t.dataset.filter] = t.value; softRender(); return; }
   // let focus move to the next field first, then redraw and keep it there
   if (['booking.booking_no', 'booking.deposit', 'booking.booking_date', 'booking.customer', 'booking.multi_note'].includes(t.dataset.draft)) { softRender(); return; }
-  if (t.dataset.modal && S.modal && (t.dataset.modal.endsWith('.vin') || t.dataset.modal.startsWith('po.') || t.dataset.modal.startsWith('deal.') || t.dataset.modal === 'refund.account_name' || t.dataset.modal.startsWith('edit.'))) { softRender(); return; }
+  if (t.dataset.modal && S.modal && (t.dataset.modal.endsWith('.vin') || t.dataset.modal.startsWith('po.') || t.dataset.modal.startsWith('deal.') || (t.dataset.modal.startsWith('comm.') && t.tagName === 'INPUT') || t.dataset.modal === 'refund.account_name' || t.dataset.modal.startsWith('edit.'))) { softRender(); return; }
 });
 document.addEventListener('submit', ev => {
   if (ev.target.id !== 'booking-form') return;
