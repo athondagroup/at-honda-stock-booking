@@ -115,8 +115,8 @@ function flowPanel(m, a, D) {
   };
   const finBody = () => {
     const fin = f.fin || {};
-    if (isCash(r)) return '<div class="text-sm text-muted">ซื้อสด ไม่ต้องผ่านไฟแนนซ์</div>' + dealBox(a, m);
-    if (fl.done.fin) return `<div class="text-sm text-muted">${esc(fin.company || r.finance || '')}${r.dsp ? ' · DSP (Double Smile Plus)' : ''} อนุมัติ ${fmtD(fin.date)} ${fin.docs?.length ? `· แนบ ${fin.docs.length} รูป` : ''} · ${who(fin)}</div>${finDocsN(r) ? '' : finDocsLater(a)}${dealBox(a, m)}`;
+    if (isCash(r)) return '<div class="text-sm text-muted">ซื้อสด ไม่ต้องผ่านไฟแนนซ์</div>' + dealBox(a, m, D);
+    if (fl.done.fin) return `<div class="text-sm text-muted">${esc(fin.company || r.finance || '')}${r.dsp ? ' · DSP (Double Smile Plus)' : ''} อนุมัติ ${fmtD(fin.date)} ${fin.docs?.length ? `· แนบ ${fin.docs.length} รูป` : ''} · ${who(fin)}</div>${finDocsN(r) ? '' : finDocsLater(a)}${dealBox(a, m, D)}`;
     const status = m.fin_status ?? r.fin_status ?? 'รอผล';
     const company = m.fin_company ?? fin.company ?? r.finance ?? '';
     return `<div class="text-sm text-muted mb-2">ยื่น ${esc(r.finance || '–')} สถานะตอนนี้ <b>${esc(r.fin_status || 'รอผล')}</b> · เมื่อผ่าน ให้ยืนยันบริษัทไฟแนนซ์และแนบใบอนุมัติ</div>
@@ -127,7 +127,7 @@ function flowPanel(m, a, D) {
         <div class="flex flex-col gap-1"><label class="btn btn-ghost btn-sm relative">${S.files.fin.length ? `แนบแล้ว ${S.files.fin.length} รูป` : 'แนบใบอนุมัติ'}<input type="file" accept="image/*" multiple data-file="fin" class="absolute w-px h-px opacity-0"></label></div>
       </div>
       <div class="mt-2 flex gap-2"><button class="btn btn-dark btn-sm" data-act="flow-fin" data-id="${esc(a.id)}">บันทึก</button>
-      <span class="text-xs text-muted self-center">เลือก "ผ่าน" แล้วไปขั้นถัดไปได้ · ใบอนุมัติแนบภายหลังได้ แต่ต้องแนบก่อนส่งมอบ</span></div>` : ''}${dealBox(a, m)}`;
+      <span class="text-xs text-muted self-center">เลือก "ผ่าน" แล้วไปขั้นถัดไปได้ · ใบอนุมัติแนบภายหลังได้ แต่ต้องแนบก่อนส่งมอบ</span></div>` : ''}${dealBox(a, m, D)}`;
   };
   const downBody = () => {
     const d = f.down || {};

@@ -10,18 +10,30 @@ function dealMonthly(v) {
   if (!amt || !term || !(rate >= 0)) return null;
   return Math.round(amt * (1 + rate / 100 * term / 12) / term);
 }
-function dealCalc(v, cash) {
+// the car price comes from the web price list (model + grade + colour, as the booking price);
+// the colour surcharge is split out because the margin is worked out on the price without it (23/10)
+function dealWeb(a, D) {
+  const p = bookPrice(a, D); if (!p || !p.price) return null;
+  const v = atVin(a), car = v && D ? carAny(v, D) : null;
+  const q = priceOf(a.model, a.grade, a.color, (car && car.year) || a.rec.list_price_year || null, carOldPrice(car) || !!a.rec.price_old);
+  const paint = q && q.exact && q.extra > 0 && q.extra < p.price ? q.extra : 0;
+  return { price: Number(p.price), src: p.src, paint, base: Number(p.price) - paint };
+}
+function dealPaint(v, web) { return v.paint !== undefined && v.paint !== null ? num(v.paint) : (web ? web.paint : 0); }
+function dealCalc(v, cash, paint) {
   const net = num(v.price) - num(v.disc);
   const downNet = num(v.down) - num(v.down_disc);
-  const out = [['ราคาหลังหักส่วนลด', money(net)]];
+  const out = [];
+  if (num(v.price)) { if (paint) out.push(['ค่าสี', money(paint)]); out.push(['ราคารถไม่รวมค่าสี (ฐานคิด Margin)', money(num(v.price) - num(paint))]); }
+  if (num(v.price)) out.push(['ราคาหลังหักส่วนลด', money(net)]);
   if (!cash) {
     if (num(v.down)) out.push(['ดาวน์หลังหักส่วนลด', money(downNet)]);
     const mo = dealMonthly(v); if (mo) out.push(['ค่างวดโดยประมาณ (ดอกเบี้ยคงที่)', `${money(mo)} บาท / เดือน`]);
   }
   return out;
 }
-function dealBox(a, m) {
-  const r = a.rec, d = r.deal, cash = isCash(r), keys = dealKeys(r);
+function dealBox(a, m, D) {
+  const r = a.rec, d = r.deal, cash = isCash(r), keys = dealKeys(r), web = dealWeb(a, D);
   const first = !(d && d.at), mayFirst = first && perms().write && canEditBooking(a) && !a.cancelled;
   const mayEdit = !first && dealAdmin(a) && !a.cancelled && !(a.flow && a.flow.done.confirmed);
   const editing = m.deal && (mayFirst || (mayEdit && m.dealEdit));
@@ -32,17 +44,19 @@ function dealBox(a, m) {
     const rows = keys.filter(k => d[k] !== null && d[k] !== undefined && d[k] !== '').map(k => [dealLabel(k), k === 'rate' ? `${d[k]} %` : k === 'term' ? `${d[k]} งวด` : money(d[k])]);
     const hist = d.hist || [];
     return `<div class="mt-2 p-3 rounded-lg border border-line">${title}
-      <table class="tbl text-sm mt-1"><tbody>${[...rows, ...dealCalc(d, cash)].map(([k, v]) => `<tr><td class="text-muted nowrap">${k}</td><td class="num">${esc(v)}</td></tr>`).join('')}</tbody></table>
+      <table class="tbl text-sm mt-1"><tbody>${[...rows, ...dealCalc(d, cash, dealPaint(d, web))].map(([k, v]) => `<tr><td class="text-muted nowrap">${k}</td><td class="num">${esc(v)}</td></tr>`).join('')}</tbody></table>
       <div class="text-xs text-muted mt-1">กรอกโดย ${who(d.first || d)} ${fmtDT((d.first || d).at)}${hist.length ? ` · แก้ไขล่าสุด ${who(d)} ${fmtDT(d.at)} (แก้ไข ${hist.length} ครั้ง)` : ''}</div>
       ${mayEdit ? `<button class="btn btn-ghost btn-sm mt-2" data-act="deal-open" data-id="${esc(a.id)}">แก้ไขราคา / เงื่อนไข</button>` : (!first && canEditBooking(a) && !dealAdmin(a) ? '<div class="text-xs text-muted mt-1">ต้องการแก้ตัวเลข แจ้งแอดมินสาขาหรือผู้จัดการ</div>' : '')}
       ${hist.length ? `<details class="mt-1"><summary class="text-xs cursor-pointer">ประวัติการแก้ไข</summary>${hist.slice().reverse().map(h => `<div class="text-xs text-muted">· ${fmtDT(h.at)} ${who(h)}: ${keys.filter(k => h[k] !== undefined && h[k] !== null && h[k] !== '').map(k => `${dealLabel(k).replace(/ \(.*\)/, '')} ${k === 'rate' || k === 'term' ? h[k] : money(h[k])}`).join(' · ')}</div>`).join('')}</details>` : ''}</div>`;
   }
-  const v = m.deal, F = k => `<div class="field"><label for="dl-${k}" ${k === 'price' ? 'class="req"' : ''}>${dealLabel(k)}</label><input id="dl-${k}" type="number" min="0" ${k === 'rate' ? 'step="0.01" max="30"' : k === 'term' ? 'step="1" max="120"' : 'step="100"'} inputmode="decimal" data-modal="deal.${k}" value="${esc(v[k] ?? '')}"></div>`;
-  const net = num(v.price) - num(v.disc) - num(v.down);
+  // the sales cannot type over the price list; the branch admin and up can (a special price, a price not in the list yet)
+  const lockPrice = !!web && !dealAdmin(a);
+  const v = m.deal, F = k => `<div class="field"><label for="dl-${k}" ${k === 'price' ? 'class="req"' : ''}>${dealLabel(k)}</label><input id="dl-${k}" type="number" min="0" ${k === 'rate' ? 'step="0.01" max="30"' : k === 'term' ? 'step="1" max="120"' : 'step="100"'} inputmode="decimal" data-modal="deal.${k}" value="${esc(k === 'price' && lockPrice ? web.price : v[k] ?? '')}" ${k === 'price' && lockPrice ? 'readonly style="background:var(--surface-2)"' : ''}>${k === 'price' ? `<span class="text-xs text-muted">${web ? `ดึงจากราคาในเว็บ (${esc(web.src)}) ตามรุ่น เกรด สี${web.paint ? ` · รวมค่าสี ${money(web.paint)}` : ''}${lockPrice ? '' : num(v.price) && num(v.price) !== web.price ? ` · <b style="color:var(--warn)">ไม่ตรงราคาในเว็บ ${money(web.price)}</b>` : ''}` : 'ยังไม่มีราคารุ่น/เกรด/สีนี้ในเว็บ ใส่เอง'}</span>` : ''}</div>`;
+  const net = num(lockPrice ? web.price : v.price) - num(v.disc) - num(v.down);
   const hint = !cash && num(v.price) && num(v.down) && num(v.fin_amount) && Math.abs(net - num(v.fin_amount)) >= 1 ? `<div class="text-xs mt-1" style="color:var(--warn)">ราคาหลังส่วนลด − ดาวน์ = ${money(net)} บาท ไม่เท่ากับยอดจัดที่ใส่ ตรวจอีกครั้ง (ถ้ามีรวมประกันหรือค่าอื่นในยอดจัด ใช้ได้)</div>` : '';
   return `<div class="mt-2 p-3 rounded-lg border border-line" style="background:var(--surface-2)">${title}
     <div class="grid sm:grid-cols-3 gap-3 mt-2">${keys.map(F).join('')}</div>
-    <table class="tbl text-sm mt-2"><tbody>${dealCalc(v, cash).map(([k, x]) => `<tr><td class="text-muted nowrap">${k}</td><td class="num">${esc(x)}</td></tr>`).join('')}</tbody></table>${hint}
+    <table class="tbl text-sm mt-2"><tbody>${dealCalc(lockPrice ? { ...v, price: web.price } : v, cash, web ? web.paint : 0).map(([k, x]) => `<tr><td class="text-muted nowrap">${k}</td><td class="num">${esc(x)}</td></tr>`).join('')}</tbody></table>${hint}
     <div class="text-xs text-muted mt-1">${first ? 'บันทึกครั้งแรกแล้ว เซลล์แก้เองไม่ได้ ถ้าต้องแก้ แอดมินสาขาหรือผู้จัดการเป็นคนแก้' : 'แก้ไขโดยแอดมินขึ้นไป ระบบเก็บตัวเลขเดิมไว้ในประวัติ'}</div>
     <div class="flex gap-2 mt-2"><button class="btn btn-dark btn-sm" data-act="deal-save" data-id="${esc(a.id)}">บันทึก</button><button class="btn btn-ghost btn-sm" data-act="deal-close">ยกเลิก</button></div></div>`;
 }
@@ -68,9 +82,9 @@ function dealCheck(v, keys) {
 Object.assign(ACTIONS, {
   'deal-open'(el) {
     const a = atById(el.dataset.id); if (!a) return;
-    const d = a.rec.deal || {}, cm = a.rec.comm || {}, r = a.rec;
+    const d = a.rec.deal || {}, cm = a.rec.comm || {}, r = a.rec, web = dealWeb(a, derive());
     // a first entry starts from what the booking or the commission data already has
-    S.modal.deal = d.at ? Object.fromEntries(dealKeys(r).map(k => [k, d[k] ?? ''])) : { price: num(cm.price) || num(r.price) || '', disc: num(r.discount) || '', down: num(cm.down) || '', down_disc: '', fin_amount: num(cm.fin_amount) || '', rate: cm.rate ?? '', term: cm.term ?? '' };
+    S.modal.deal = d.at ? Object.fromEntries(dealKeys(r).map(k => [k, d[k] ?? ''])) : { price: (web && web.price) || num(cm.price) || num(r.price) || '', disc: num(r.discount) || '', down: num(cm.down) || '', down_disc: '', fin_amount: num(cm.fin_amount) || '', rate: cm.rate ?? '', term: cm.term ?? '' };
     S.modal.dealEdit = true; render();
   },
   'deal-close'() { S.modal.deal = null; S.modal.dealEdit = false; render(); },
@@ -78,12 +92,16 @@ Object.assign(ACTIONS, {
     const a = atById(el.dataset.id), v = S.modal.deal; if (!a || !v) return;
     const prev = a.rec.deal, first = !(prev && prev.at);
     if (first ? !(perms().write && canEditBooking(a)) : !dealAdmin(a)) { toast('แก้ราคาและเงื่อนไขได้เฉพาะแอดมินสาขาหรือผู้จัดการ', 'bad'); return; }
+    const web = dealWeb(a, derive());
+    if (web && !dealAdmin(a)) v.price = web.price;
     const keys = dealKeys(a.rec), ck = dealCheck(v, keys);
     if (ck.err) { toast(ck.err, 'bad'); if (ck.id) $('#' + ck.id)?.focus(); return; }
     const vals = Object.fromEntries(keys.map(k => [k, v[k] === '' || v[k] === undefined ? null : (k === 'rate' ? Number(v[k]) : k === 'term' ? parseInt(v[k], 10) : num(v[k]))]));
     if (!first && keys.every(k => (prev[k] ?? null) === vals[k])) { S.modal.deal = null; S.modal.dealEdit = false; render(); return; }
     const old = first ? null : Object.fromEntries([...keys, 'at', 'by', 'role'].map(k => [k, prev[k] ?? null]));
-    const rec = { ...vals, ...actor(), cash: isCash(a.rec), first: first ? actor() : prev.first || { at: prev.at, by: prev.by, role: prev.role }, hist: first ? [] : [...(prev.hist || []), old] };
+    // the colour surcharge only counts when the price is the price-list price
+    const paint = web && vals.price === web.price ? web.paint : 0;
+    const rec = { ...vals, paint, price_src: web && vals.price === web.price ? web.src : 'ใส่เอง', ...actor(), cash: isCash(a.rec), first: first ? actor() : prev.first || { at: prev.at, by: prev.by, role: prev.role }, hist: first ? [] : [...(prev.hist || []), old] };
     if (await saveFlow(a, { deal: rec }, first ? 'บันทึกราคารถแล้ว' : 'แก้ไขราคา / เงื่อนไขแล้ว')) { S.modal.deal = null; S.modal.dealEdit = false; render(); }
   },
   async 'po-skip'(el) {
