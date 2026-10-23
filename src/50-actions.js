@@ -790,11 +790,14 @@ const ACTIONS = {
   async 'po-save'(el) {
     const a = atById(el.dataset.id), po = S.modal.po;
     if (!a || !po) return;
-    if (!stepAllowed(a, 'po') || a.flow.done.delivered || !(a.flow.next === 'po' || a.flow.done.po || S.modal.ret)) { toast('ทำ PO ได้หลังจัดสรรรถ และก่อนส่งมอบ', 'bad'); return; }
+    if (!stepAllowed(a, 'po') || poLocked(a) || !(a.flow.next === 'po' || a.flow.done.po || a.flow.poSkip || S.modal.ret)) { toast('ทำ PO ได้หลังจัดสรรรถ และก่อนส่งมอบ', 'bad'); return; }
     const items = po.items.map(x => ({ ...x, name: String(x.name || '').trim(), qty: Math.max(1, parseInt(x.qty, 10) || 1) })).filter(x => x.name);
     if (!items.length) { toast('ใส่รายการแต่งอย่างน้อย 1 รายการ (ถ้าไม่มีแต่ง ใส่ "ไม่มีรายการแต่ง")', 'bad'); return; }
-    const rec = { ...actor(), items, date: po.date || todayISO(), ddate: po.ddate || null, dtime: po.dtime || null, by_name: po.by || a.sales, note: (po.note || '').trim() || null };
-    if (await saveFlow(a, { flow: { po: rec } }, 'บันทึก PO แล้ว')) { if (S.modal.ret) S.modal = S.modal.ret; else S.modal.po = null; render(); }
+    const prev = a.rec.flow && a.rec.flow.po;
+    // an edit keeps the earlier version's summary (who, when, items) as history
+    const hist = prev && prev.at ? [...(prev.hist || []), { at: prev.at, by: prev.by, role: prev.role, items: (prev.items || []).map(x => `${x.name} ×${x.qty}`) }] : undefined;
+    const rec = { ...actor(), items, date: po.date || todayISO(), ddate: po.ddate || null, dtime: po.dtime || null, by_name: po.by || a.sales, note: (po.note || '').trim() || null, ...(hist ? { hist } : {}) };
+    if (await saveFlow(a, { flow: { po: rec } }, prev && prev.at ? 'แก้ใบแต่งรถแล้ว' : 'บันทึก PO แล้ว')) { if (S.modal.ret) S.modal = S.modal.ret; else S.modal.po = null; render(); }
   },
   'po-print'(el) { const a = atById(el.dataset.id); if (a) printPO(a); },
   async 'flow-deliver'(el) {
@@ -821,14 +824,14 @@ const ACTIONS = {
   },
   async 'comm-save'(el) {
     const a = atById(el.dataset.id); if (!a || !canEditBooking(a) || a.flow.done.confirmed) return;
-    const c = { ...(a.rec.comm || {}), ...(S.modal.comm || {}) };
+    const c = { ...commDeal(a), ...(a.rec.comm || {}), ...(S.modal.comm || {}) };
     ['price', 'discount', 'down', 'fin_amount', 'rate', 'term', 'margin'].forEach(k => { if (k in c) c[k] = num(c[k]); });
     if (await saveFlow(a, { comm: { ...c, ...actor() } }, 'บันทึกข้อมูลค่าคอมแล้ว')) { S.modal.comm = null; render(); }
   },
   async 'flow-confirm'(el) {
     const a = atById(el.dataset.id);
     if (!a || a.flow.next !== 'confirmed' || !canApproveBr(a.br)) { toast('ยืนยันได้เฉพาะผู้จัดการสาขานี้ หลังเซลล์บันทึกส่งมอบ', 'bad'); return; }
-    const c = { ...(a.rec.comm || {}), ...(S.modal.comm || {}) };
+    const c = { ...commDeal(a), ...(a.rec.comm || {}), ...(S.modal.comm || {}) };
     if (!['price', 'down', 'fin_amount', 'margin', 'campaign'].some(k => c[k] !== undefined && c[k] !== null && c[k] !== '')) { toast('ให้เซลล์กรอกข้อมูลสำหรับค่าคอมก่อน', 'bad'); return; }
     await saveFlow(a, { flow: { confirm: { ...actor() } } }, 'ยืนยันแล้ว ใบจองนี้พร้อมเข้าขั้นตอนจ่ายค่าคอม');
   },
@@ -1033,7 +1036,7 @@ document.addEventListener('change', async ev => {
   if (t.dataset.filter && RERENDER_ON_CHANGE.has(t.dataset.filter)) { S.filters[t.dataset.filter] = t.value; softRender(); return; }
   // let focus move to the next field first, then redraw and keep it there
   if (['booking.booking_no', 'booking.deposit', 'booking.booking_date', 'booking.customer', 'booking.multi_note'].includes(t.dataset.draft)) { softRender(); return; }
-  if (t.dataset.modal && S.modal && (t.dataset.modal.endsWith('.vin') || t.dataset.modal.startsWith('po.') || t.dataset.modal === 'refund.account_name' || t.dataset.modal.startsWith('edit.'))) { softRender(); return; }
+  if (t.dataset.modal && S.modal && (t.dataset.modal.endsWith('.vin') || t.dataset.modal.startsWith('po.') || t.dataset.modal.startsWith('deal.') || t.dataset.modal === 'refund.account_name' || t.dataset.modal.startsWith('edit.'))) { softRender(); return; }
 });
 document.addEventListener('submit', ev => {
   if (ev.target.id !== 'booking-form') return;
