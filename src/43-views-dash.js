@@ -155,17 +155,24 @@ function execData(D, rng) {
   // sales by invoice date: every invoice in the DL file (a car invoiced but not handed over yet counts here first)
   const invoiced = [];
   const det = i => ({ grade: i.grade, color: i.color, vin: i.vin, cust: i.cust, sales: i.sales, inv: i.inv, idate: i.idate, ddate: i.ddate });
-  D.X.inv.forEach(i => { if (!i.company && i.idate && inBr(i) && inR(i.idate)) invoiced.push({ date: i.idate, br: i.br, model: i.model, fin: i.fin || null, ...det(i) }); });
+  // advance invoices (no real customer, 23/10): counted on their own branch and month from what the branch set in the
+  // Advance box; a later invoice for that car is a re-issue, not counted again as an invoice (its delivery counts below)
+  const advs = new Map(); for (const [vin] of S.vehicles) { const a = advRec(vin); if (a) advs.set(vin, a); }
+  D.X.inv.forEach(i => { if (!i.company && i.idate && inBr(i) && inR(i.idate) && !(i.vin && advs.has(i.vin))) invoiced.push({ date: i.idate, br: i.br, model: i.model, fin: i.fin || null, ...det(i) }); });
+  for (const [vin, a] of advs) {
+    const br = advBr(vin, a, D), c = carAny(vin, D) || {};
+    if (br && inBr({ br }) && inR(a.idate)) invoiced.push({ date: a.idate, br, model: c.model, grade: c.grade, color: c.color, vin, cust: a.cust, sales: null, inv: a.inv, idate: a.idate, ddate: null, fin: null, adv: true, src: 'ใบ Advance', extra: 'ADV' });
+  }
   D.X.inv.forEach(i => {
     if (i.company || !i.ddate || !inBr(i)) return;
     dlKeys.add('inv:' + i.br + ':' + i.inv);
-    if (inR(i.ddate)) sales.push({ date: i.ddate, br: i.br, model: i.model, fin: i.fin || null, src: 'DL', ...det(i) });
+    if (inR(i.ddate)) { const a = i.vin && advs.get(i.vin); sales.push({ date: i.ddate, br: i.br, model: i.model, fin: i.fin || null, src: 'DL', ...det(i), ...(a ? { advFrom: advBr(i.vin, a, D), extra: 'จากรถ ADV' } : {}) }); }
   });
   D.at.forEach(a => {
     if (a.cancelled || a.demo || !inBr(a)) return;
     const dv = a.rec.flow && a.rec.flow.delivered;
     if (!dv || !dv.date || (a.match && a.match.recs.some(r => r.kind === 'dl'))) return;
-    if (inR(dv.date)) sales.push({ date: dv.date, br: a.delivBr || a.br, model: a.model, fin: isCash(a.rec) ? null : ((a.rec.flow.fin && a.rec.flow.fin.company) || a.rec.finance || 'ไฟแนนซ์'), src: 'บันทึกในระบบ', grade: a.grade, color: a.color, vin: atVin(a), cust: a.cust, sales: a.sales, id: a.id, ddate: dv.date });
+    if (inR(dv.date)) sales.push({ ...(advs.has(atVin(a)) ? { advFrom: advBr(atVin(a), advs.get(atVin(a)), D), extra: 'จากรถ ADV' } : {}), date: dv.date, br: a.delivBr || a.br, model: a.model, fin: isCash(a.rec) ? null : ((a.rec.flow.fin && a.rec.flow.fin.company) || a.rec.finance || 'ไฟแนนซ์'), src: 'บันทึกในระบบ', grade: a.grade, color: a.color, vin: atVin(a), cust: a.cust, sales: a.sales, id: a.id, ddate: dv.date });
   });
   // trade-ins recorded at the down payment step, counted in the month the car was delivered (or paid, if not delivered yet)
   const trades = [];
@@ -240,6 +247,9 @@ function barList(rows, color, unit = 'คัน') {
 function dashExec(D) {
   const E = execData(D), f = S.filters;
   const salesN = E.sales.length, cashN = E.sales.filter(s => !s.fin).length, finN = salesN - cashN;
+  const advInv = E.invoiced.filter(s => s.adv), advSoldN = E.sales.filter(s => s.advFrom).length;
+  const advLeft = advInv.filter(s => { const x = advList(D).find(y => y.vin === s.vin); return x && !x.sold; }).length;
+  const waitN = invWaitingList(D).length;
   const bookN = E.booked.length, cancelN = E.cancelled.length;
   const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
   const series2 = [{ name: 'ไฟแนนซ์', color: '--viz-1', drill: { m: 'sales', fin: 'fin' }, values: E.buckets.map(b => E.count(E.sales, b, s => !!s.fin)) }, { name: 'ซื้อสด', color: '--viz-2', drill: { m: 'sales', fin: 'cash' }, values: E.buckets.map(b => E.count(E.sales, b, s => !s.fin)) }];
@@ -255,13 +265,14 @@ function dashExec(D) {
   </div>
   ${brSeg()}
   ${tiles([
-    tile('ยอดขาย (ส่งมอบ)', fmtN(salesN), { drill: { m: 'sales', from: E.from, to: E.to }, hero: true, sub2: `ไฟแนนซ์ ${fmtN(finN)} · สด ${fmtN(cashN)}` }),
-    tile('ยอดขาย (ใบกำกับภาษี)', fmtN(E.invoiced.length), { drill: { m: 'invoiced', from: E.from, to: E.to }, sub2: (() => { const t = monthsIn(E.from, E.to).reduce((n, m) => n + tgtOf(m), 0); const it = E.invoiced.filter(s => tgtOf(s.date.slice(0, 7)) > 0).length; return t ? `เป้า ${fmtN(t)} · ทำได้ ${pctOf(it, t)}% (เดือนที่มีเป้า)` : 'ยังไม่ได้ใส่เป้า'; })() }),
+    tile('ยอดขาย (ส่งมอบ)', fmtN(salesN), { drill: { m: 'sales', from: E.from, to: E.to }, hero: true, sub2: `ไฟแนนซ์ ${fmtN(finN)} · สด ${fmtN(cashN)}${advSoldN ? `<span class="block" style="color:var(--warn)">รวมรถ Advance ที่ขายออก ${fmtN(advSoldN)}</span>` : ''}` }),
+    tile('ยอดขาย (ใบกำกับภาษี)', fmtN(E.invoiced.length), { drill: { m: 'invoiced', from: E.from, to: E.to }, sub2: (() => { const t = monthsIn(E.from, E.to).reduce((n, m) => n + tgtOf(m), 0); const it = E.invoiced.filter(s => tgtOf(s.date.slice(0, 7)) > 0).length; return t ? `เป้า ${fmtN(t)} · ทำได้ ${pctOf(it, t)}% (เดือนที่มีเป้า)` : 'ยังไม่ได้ใส่เป้า'; })() + (advInv.length ? `<span class="block" style="color:var(--warn)">รวมใบ Advance ${fmtN(advInv.length)} (ยังไม่มีลูกค้า ${fmtN(advLeft)})</span>` : '') }),
     tile('ยอดจอง', fmtN(bookN), { drill: { m: 'bk', from: E.from, to: E.to }, sub2: `ยกเลิก ${fmtN(cancelN)} ใบ (${pct(cancelN, bookN + cancelN)}%)` }),
     tile('สัดส่วนไฟแนนซ์', `${pct(finN, salesN)}%`, { drill: { m: 'sales', fin: 'fin', from: E.from, to: E.to }, sub2: `${finRows[0] ? `มากสุด ${esc(finRows[0].k)} ${finRows[0].pct}%` : '–'}` }),
     tile('ใบจองรอรถตอนนี้', fmtN(D.bookings.filter(b => b.state === 'waiting' && inBr(b)).length), { drill: { m: 'wait' } }),
     tile('รถว่างขายได้ตอนนี้', fmtN([...D.cars.values()].filter(c => inBr(c) && (c.status === 'free' || c.status === 'temp')).length), { drill: { m: 'free' }, tone: 'good' })
   ], 'lg:grid-cols-6')}
+  ${waitN || advInv.length ? `<div class="-mt-2 mb-5 text-sm"><button class="underline decoration-dotted" data-act="adv-sum">ดูรถออกใบกำกับแล้ว ยังไม่ส่งมอบ ${fmtN(waitN)} คัน และสรุปรถ Advance ›</button></div>` : ''}
   <div class="grid lg:grid-cols-2 gap-5 mb-5">
     ${card('เป้า เทียบ ยอดขาย (ใบกำกับภาษี)', tgtChart(E, 'c1t'), 'ใบกำกับภาษี = ยอดที่แจ้งขายกับฮอนด้า นับตามวันที่ออกใบกำกับใน DL (ไม่รวมรถบริษัท) · เป้าใส่ที่แท็บ ยอดขายและเป้า')}
     ${card('ยอดจอง เทียบ ยอดขาย (ส่งมอบ)', bookDelivChart(E, 'c1'), `ส่งมอบ = รถที่ปล่อยให้ลูกค้าจริง นับตามวันที่ส่งมอบ${E.dlAsof ? ` · ข้อมูล DL ถึง ${fmtD(E.dlAsof)} หลังจากนั้นนับจากที่เซลล์บันทึกในระบบนี้` : ''}`)}

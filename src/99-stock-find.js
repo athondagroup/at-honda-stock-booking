@@ -20,6 +20,6 @@ function stockOutBox(D) {
   return `<div class="bg-surface border border-line rounded-lg mb-3"><div class="p-3 px-4 border-b border-line"><b>พบนอกสต็อก ${L.length} คัน</b> <span class="text-sm text-muted">ออกใบกำกับ / ส่งมอบ / นำออกไปแล้ว · กดเลขตัวถังเพื่อดูประวัติรถ</span></div>
     <div class="divide-y divide-line">${L.map(({ c, i, why }) => `<div class="p-2 px-4 text-sm flex flex-wrap gap-x-3 gap-y-1 items-center">${vinLink(c)}
       <span>${esc(c.model || (i && i.model) || '')} ${esc(gradeShort(c.model || (i && i.model), c.grade || (i && i.grade)) || '')} ${esc(c.color || (i && i.color) || '')}</span>
-      <span class="text-muted">${esc(c.br || (i && i.br) || '')}${i ? ` · ใบกำกับ ${esc(i.inv || '')} ${fmtD(i.idate)}${i.ddate ? ` · ส่งมอบ ${fmtD(i.ddate)}` : ''} · ${esc(i.cust || '')}` : ''}${c.handed && c.handed.date ? ` · ส่งมอบในเว็บ ${fmtD(c.handed.date)}` : ''}</span>
-      ${chip(why, why.startsWith('ส่งมอบ') ? 'good' : 'neutral')}</div>`).join('')}</div></div>`;
+      <span class="text-muted">${esc((i && i.br) || c.br || '')}${i ? ` · ใบกำกับ ${esc(i.inv || '')} ${fmtD(i.idate)}${i.ddate ? ` · ส่งมอบ ${fmtD(i.ddate)}` : ''} · ${esc(i.cust || '')}` : ''}${c.handed && c.handed.date ? ` · ส่งมอบในเว็บ ${fmtD(c.handed.date)}` : ''}</span>
+      ${advRec(c.vin) ? (x => x ? advPath(x) : '')(advList(D).find(y => y.vin === c.vin)) : chip(why, why.startsWith('ส่งมอบ') ? 'good' : 'neutral')}</div>`).join('')}</div></div>`;
 }

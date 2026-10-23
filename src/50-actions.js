@@ -19,6 +19,7 @@ function renderModal(D) {
   else if (m.kind === 'idsfix') { body = idsFixModal(m, D); wide = true; }
   else if (m.kind === 'carhist') { body = carHistModal(m, D); wide = true; }
   else if (m.kind === 'gsearch') { body = gsearchModal(m, D); wide = true; }
+  else if (m.kind === 'advsum') { body = advSumModal(m, D); wide = true; }
   else if (m.kind === 'tr') { body = trModal(m, D); wide = true; }
   else if (m.kind === 'car') { body = carModal(m, D); wide = true; }
   else if (m.kind === 'tgt') { body = tgtModal(m); wide = true; }
