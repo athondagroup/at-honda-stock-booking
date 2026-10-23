@@ -411,7 +411,6 @@ async function saveBooking() {
   if (!d.model || !d.grade || !d.color) missing.push('รุ่นรถ / เกรด / สี');
   if (!d.purchase) missing.push('เงื่อนไข');
   if (!d.insurance) missing.push('ประกันภัย');
-  if (d.discount === '' || d.discount === null || d.discount === undefined) missing.push('ส่วนลด (ไม่มีใส่ 0)');
   if (d.foc_total === '' || d.foc_total === null || d.foc_total === undefined) missing.push('FOC (ไม่มีใส่ 0)');
   if (d.booking_no && !/^\d{8,12}$/.test(d.booking_no.trim())) missing.push('เลขที่ใบจองต้องเป็นตัวเลข 8–12 หลัก');
   { const tm = bookTermsMissing(d); if (tm) missing.push('เงื่อนไขการขาย: ' + tm); }

@@ -116,7 +116,6 @@ function bookingForm(D) {
         ${bookFormPrice(d)}
         ${F('purchase', 'เงื่อนไข', sel('purchase', ['ไฟแนนซ์', 'ซื้อสด']), true)}
         ${F('insurance', 'ประกันภัย', sel('insurance', d.insurance && !['Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม'].includes(d.insurance) ? [d.insurance, 'Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม'] : ['Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม']), true)}
-        ${F('discount', 'ส่วนลด ระบุจำนวน ไม่มี ใส่ 0 บาท', inp('discount', 'number', 'min="0" step="100" inputmode="numeric" placeholder="0"'), true)}
         ${F('foc_total', 'FOC ที่ใช้ทั้งหมด', inp('foc_total', 'number', 'min="0" step="100" inputmode="numeric" placeholder="0"'), true)}
         ${bookTradeFields(d)}
         <div class="field"><label for="b-note">หมายเหตุ</label>${inp('note', 'text', 'placeholder="เช่น Trade in"')}</div>

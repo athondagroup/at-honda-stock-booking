@@ -151,8 +151,11 @@ function bookTermsBox(d) {
   const x = bookTermsCtx(d), p = bookTermsPrice(d);
   const v = { ...d.deal, price: p ? p.price : d.deal.price, disc: d.discount };
   return `<fieldset class="p-4 rounded-lg border border-line"><legend class="font-head font-semibold px-1">เงื่อนไขการขาย (${x.cash ? 'ซื้อสด' : 'ไฟแนนซ์'})</legend>
-    <p class="text-sm text-muted mb-2">ราคารถ ${p ? `<b class="num">${money(p.price)}</b> บาท ตามใบราคาในเว็บ${p.paint ? ` (รวมค่าสี ${money(p.paint)})` : ''}` : '<b style="color:var(--warn)">ยังไม่มีราคาสีนี้ในเว็บ ใส่ราคาเองด้านล่าง</b>'} · ส่วนลด ${termEmpty(d.discount) ? 'ใส่ที่ช่องส่วนลดด้านบน' : `<b class="num">${money(d.discount)}</b> บาท`} · หลังบันทึก เซลล์ขอแก้ได้อีก 1 ครั้งตอนไฟแนนซ์ผ่าน (แอดมินอนุมัติ)</p>
-    ${p ? '' : `<div class="grid sm:grid-cols-3 gap-3 mb-3"><div class="field"><label for="bt-price" class="req">ราคารถ (ราคาเต็ม)</label><input id="bt-price" type="number" min="0" step="100" inputmode="decimal" data-draft="booking.deal.price" value="${esc(d.deal.price ?? '')}"></div></div>`}
+    <p class="text-sm text-muted mb-2">ส่วนลดไม่มีเว้นว่างได้ · หลังบันทึก เซลล์ขอแก้ได้อีก 1 ครั้งตอนไฟแนนซ์ผ่าน (แอดมินอนุมัติ)</p>
+    <div class="grid sm:grid-cols-3 gap-3 mb-3">
+      ${p ? `<div class="field"><label>ราคารถ (ราคาเต็ม)</label><div class="num p-2 rounded-lg border border-line" style="background:var(--surface-2)">${money(p.price)}</div><span class="text-xs text-muted">ตามใบราคาในเว็บ${p.paint ? ` · รวมค่าสี ${money(p.paint)}` : ''}</span></div>`
+        : `<div class="field"><label for="bt-price" class="req">ราคารถ (ราคาเต็ม)</label><input id="bt-price" type="number" min="0" step="100" inputmode="decimal" data-draft="booking.deal.price" value="${esc(d.deal.price ?? '')}"><span class="text-xs" style="color:var(--warn)">ยังไม่มีราคาสีนี้ในเว็บ ใส่เอง</span></div>`}
+      <div class="field"><label for="b-discount">ส่วนลดราคารถ (บาท)</label><input id="b-discount" type="number" min="0" step="100" inputmode="numeric" data-draft="booking.discount" value="${esc(d.discount ?? '')}" placeholder="ไม่มีเว้นว่าง"></div></div>
     ${termsFields(x, v, { attr: 'data-draft', pre: 'booking.deal', idp: 'bt', paint: p ? p.paint : 0, priceDisc: false })}</fieldset>`;
 }
 function bookTermsMissing(d) {
