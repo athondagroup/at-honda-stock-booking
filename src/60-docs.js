@@ -24,6 +24,7 @@ async function docCanvas(spec) {
   const FF = spec.font ? `${spec.font}, ${DOC_FONT}` : DOC_FONT;   // an official form can ask for Sarabun (23/10)
   try { await document.fonts.load(`16px ${FF}`); await document.fonts.load(`600 16px ${FF}`); await document.fonts.load(`700 16px ${FF}`); } catch (e) { /* use what is there */ }
   const imgs = await Promise.all(spec.blocks.map(b => b.img && !spec.noImg ? docLoadImg(b.img) : null));
+  const logo = spec.letter && spec.letter.logo ? await docLoadImg(spec.letter.logo) : null;
   // two passes: measure, then draw on a canvas of the right height
   const run = (ctx, draw) => {
     const W = DOC_W - DOC_M * 2, LH = spec.compact ? 18 : 20, PAD = spec.compact ? 4 : 6;
@@ -48,7 +49,9 @@ async function docCanvas(spec) {
     if (spec.compact) y -= 16;
     // letterhead: the branch company, address, tax id, phones (left) and an optional right block
     if (spec.letter) {
-      const L = spec.letter, top = y;
+      const L = spec.letter;
+      if (logo) { const h = L.logoH || 24, w = logo.naturalWidth * h / logo.naturalHeight; if (draw) ctx.drawImage(logo, DOC_M, y, w, h); y += h + 12; }
+      const top = y;
       L.lines.forEach((t, i) => { font(i ? 12 : 15, i ? 400 : 700); text(t, DOC_M, y); y += i ? 18 : 22; });
       if (L.right) { let ry = top; L.right.forEach((t, i) => { font(i ? 12 : 14, i ? 400 : 700); text(t, DOC_W - DOC_M, ry, { align: 'right' }); ry += i ? 18 : 22; }); }
       y += 6; if (draw) { ctx.save(); ctx.lineWidth = 1.5; line(DOC_M, y, DOC_W - DOC_M, y); ctx.restore(); } y += 18;
@@ -85,7 +88,7 @@ async function docCanvas(spec) {
       // a form line: label, then the value written on a dotted line ([{ t, v, w, box }]), like a paper form (23/10)
       if (b.lines) {
         b.lines.forEach(rw => {
-          let x = DOC_M + (rw.indent || 0); const fs = 14;
+          let x = DOC_M + (rw.indent || 0); const fs = spec.fs || 14;
           rw.forEach(seg => {
             if (seg.box !== undefined) { box(x, y); if (seg.box) { font(14, 700); text('✓', x + 1, y - 1); } x += 20; }
             if (seg.t) { font(fs); text(seg.t, x, y); x += ctx.measureText(seg.t).width + 6; }
@@ -94,11 +97,12 @@ async function docCanvas(spec) {
               font(fs, 700); const v = String(seg.v ?? ''); text(v, seg.left ? x + 6 : x + w / 2, y, { align: seg.left ? 'left' : 'center' }); x += w + 8;
             }
           });
-          y += rw.gap || (spec.font ? 40 : 32);
+          y += rw.gap || spec.rowGap || (spec.font ? 40 : 32);
         });
         y += 4;
       }
-      if (b.para) { font(14); docWrap(ctx, b.para, W - (b.indent || 0)).forEach(ln => { text(ln, DOC_M + (b.indent || 0), y); y += 24; }); y += 6; }
+      if (b.para) { font(spec.fs || 14); docWrap(ctx, b.para, W - (b.indent || 0)).forEach(ln => { text(ln, DOC_M + (b.indent || 0), y); y += (spec.fs || 14) + 12; }); y += b.after ?? 6; }
+      if (b.space) y += b.space;
       // accounting: credit note, transfer date and amount, filled in by hand
       if (b.acct) {
         const top = y; y += 10; font(13);
