@@ -181,15 +181,7 @@ function flowPanel(m, a, D) {
       ${tradeDelivFields('deliv', (m.deliv = m.deliv || tradePre(r)), 'fl', tradeCur(r), true)}
       <button class="btn btn-dark btn-sm mt-2" data-act="flow-deliver" data-id="${esc(a.id)}">บันทึกส่งมอบ</button>`;
   };
-  const commBody = () => {
-    // the commission data starts from the price and finance terms keyed in the finance step
-    const c = Object.assign({}, commDeal(a), a.rec.comm || {}, m.comm || {});
-    const ro = fl.done.confirmed || !canEditBooking(a);
-    const F2 = (k, label, type = 'number') => `<div class="field"><label for="cm-${k}">${label}</label><input id="cm-${k}" type="${type}" data-modal="comm.${k}" value="${esc(c[k] ?? '')}" ${ro ? 'disabled' : ''}></div>`;
-    return `<details class="mt-2" ${fl.done.confirmed ? '' : 'open'}><summary class="text-sm font-medium cursor-pointer">ข้อมูลสำหรับค่าคอม (กรอกหลังส่งมอบ)</summary>
-      <div class="grid sm:grid-cols-3 gap-3 mt-2">${F2('price', 'ราคารถ')}${F2('discount', 'ส่วนลด')}${F2('down', 'เงินดาวน์')}${a.rec.purchase === 'ไฟแนนซ์' ? F2('fin_amount', 'ยอดจัด') + F2('rate', 'ดอกเบี้ย %') + F2('term', 'จำนวนงวด') : ''}${F2('campaign', 'แคมเปญ', 'text')}${F2('margin', 'Margin', 'number')}</div>
-      ${ro ? '' : `<button class="btn btn-ghost btn-sm mt-2" data-act="comm-save" data-id="${esc(a.id)}">บันทึกข้อมูลค่าคอม</button>`}</details>`;
-  };
+  const commBody = () => commForm(a, m, D, fl.done.confirmed || !canEditBooking(a), !fl.done.confirmed);
   const confBody = () => {
     if (fl.done.confirmed) return `<div class="text-sm text-muted">ยืนยัน ${fmtDT(f.confirm.at)} · ${who(f.confirm)} พร้อมเข้าขั้นตอนจ่ายค่าคอม</div>`;
     return can('confirmed') ? `<div class="mt-1"><button class="btn btn-red btn-sm" data-act="flow-confirm" data-id="${esc(a.id)}">ยืนยันเพื่อทำค่าคอม</button></div>` : (fl.next === 'confirmed' ? '<div class="text-sm text-muted">รอผู้จัดการยืนยัน (พี่อั้มหรือนุช)</div>' : '');

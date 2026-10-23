@@ -407,6 +407,7 @@ function buildAlerts(D) {
     const ro = a.rec.reassigned_out;
     if (ro && !a.cancelled && ro.at && daysBetween(ro.at.slice(0, 10), today) <= 7) add('reas:' + a.id + ':' + ro.vin, { sales: a.sales, br: a.br, roles: ['sales', 'admin', 'manager'] }, 'warn', 'รถที่จัดสรรให้ใบจองนี้ ถูกเปลี่ยนไปให้ใบจองอื่น',
       `${car} · รถ ${ro.vin} ไปให้ ${ro.to || 'ใบจองอื่น'} (${ro.role || ''} ${fmtD(ro.at.slice(0, 10))}) · ใบจองนี้กลับไปรอรถ`, go);
+    if (a.rec.deal && a.rec.deal.req && a.rec.deal.req.at && !a.cancelled) add('dealreq:' + a.id, { br: a.br, roles: ['admin', 'manager'] }, 'warn', 'เซลล์ขอแก้เงื่อนไขการขาย รออนุมัติ', `${car} · ${a.sales || ''}${a.rec.deal.req.why ? ' · ' + a.rec.deal.req.why : ''}`, go);
     if (a.matchAsk) add('matchq:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin'] }, 'warn', a.match.status === 'possible' ? 'ชื่อลูกค้าตรงกับ IDS แต่รุ่นไม่ตรง ยืนยันการจับคู่' : 'เกรดหรือสีในฟอร์มไม่ตรงกับ IDS ยืนยันการจับคู่',
       `${car} · ใน IDS เป็น ${a.match.idsModel} ${gradeShort(a.match.idsModel, a.match.idsGrade)} ${a.match.idsColor || ''} ใช่ใบเดียวกันหรือเป็นการจองเพิ่มอีกคัน`, go);
     if (a.ownerCheck === 'pending') add('owner:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin'] }, 'warn', 'ยืนยันเจ้าของเคส (ชื่อเซลล์ใน IDS ไม่ตรง)',

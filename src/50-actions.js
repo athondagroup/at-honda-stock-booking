@@ -411,9 +411,9 @@ async function saveBooking() {
   if (!d.model || !d.grade || !d.color) missing.push('รุ่นรถ / เกรด / สี');
   if (!d.purchase) missing.push('เงื่อนไข');
   if (!d.insurance) missing.push('ประกันภัย');
-  if (d.discount === '' || d.discount === null || d.discount === undefined) missing.push('ส่วนลด (ไม่มีใส่ 0)');
   if (d.foc_total === '' || d.foc_total === null || d.foc_total === undefined) missing.push('FOC (ไม่มีใส่ 0)');
   if (d.booking_no && !/^\d{8,12}$/.test(d.booking_no.trim())) missing.push('เลขที่ใบจองต้องเป็นตัวเลข 8–12 หลัก');
+  { const tm = bookTermsMissing(d); if (tm) missing.push('เงื่อนไขการขาย: ' + tm); }
   const checks = bookingChecks(d, D);
   const block = checks.find(c => c.block);
   if (missing.length || block) { if (msg) msg.innerHTML = `<span style="color:var(--bad)">${missing.length ? 'ยังขาด: ' + missing.map(esc).join(', ') : esc(block.t)}</span>`; return; }
@@ -428,7 +428,7 @@ async function saveBooking() {
     booking_no: d.booking_no.trim() || null, booking_date: d.booking_date, br: myBranch() || d.br || salesBranch(d.sales), sales: d.sales, customer: d.customer.trim(), source: d.source === 'อื่น ๆ' ? `อื่น ๆ: ${String(d.source_other || '').trim()}` : d.source,
     model: d.model, grade: d.grade, color: d.color, model_text: d.model_text || null, purchase: d.purchase, finance: fin ? d.finance : null,
     fin_status: fin ? 'รอผล' : null, dsp: fin && /HLTC/i.test(d.finance || '') ? !!d.dsp : false, deposit: num(d.deposit) || 0, receipt_no: (d.receipt_no || '').trim() || null, paper_no: (d.paper_no || '').trim() || null, discount: num(d.discount), foc_total: num(d.foc_total), insurance: d.insurance,
-    ...bookPriceSnap(d),
+    ...bookPriceSnap(d), deal: bookTermsRec(d),
     trade: bookTradeRec(d),
     delivery_plan: validDate(d.delivery_plan), lead_id: d.lead_id || null, note: d.note || null, ids_claim: d.ids_claim || null,
     doc_imgs, slip_imgs, img_missing: imgMissing, slip: S.files.slip.length > 0, flow: {},
@@ -824,15 +824,15 @@ const ACTIONS = {
   },
   async 'comm-save'(el) {
     const a = atById(el.dataset.id); if (!a || !canEditBooking(a) || a.flow.done.confirmed) return;
-    const c = { ...commDeal(a), ...(a.rec.comm || {}), ...(S.modal.comm || {}) };
-    ['price', 'discount', 'down', 'fin_amount', 'rate', 'term', 'margin'].forEach(k => { if (k in c) c[k] = num(c[k]); });
+    const c = { ...(a.rec.comm || {}), ...(S.modal.comm || {}) };
     if (await saveFlow(a, { comm: { ...c, ...actor() } }, 'บันทึกข้อมูลค่าคอมแล้ว')) { S.modal.comm = null; render(); }
   },
   async 'flow-confirm'(el) {
     const a = atById(el.dataset.id);
     if (!a || a.flow.next !== 'confirmed' || !canApproveBr(a.br)) { toast('ยืนยันได้เฉพาะผู้จัดการสาขานี้ หลังเซลล์บันทึกส่งมอบ', 'bad'); return; }
     const c = { ...commDeal(a), ...(a.rec.comm || {}), ...(S.modal.comm || {}) };
-    if (!['price', 'down', 'fin_amount', 'margin', 'campaign'].some(k => c[k] !== undefined && c[k] !== null && c[k] !== '')) { toast('ให้เซลล์กรอกข้อมูลสำหรับค่าคอมก่อน', 'bad'); return; }
+    if (!(a.rec.deal && a.rec.deal.at) && !['price', 'down', 'fin_amount', 'margin', 'campaign'].some(k => c[k] !== undefined && c[k] !== null && c[k] !== '')) { toast('ให้เซลล์ใส่เงื่อนไขการขาย (ราคา แคมเปญ Margin) ก่อน', 'bad'); return; }
+    if (a.rec.deal && a.rec.deal.req && a.rec.deal.req.at) { toast('มีคำขอแก้เงื่อนไขรออนุมัติ อนุมัติหรือไม่อนุมัติก่อน', 'bad'); return; }
     await saveFlow(a, { flow: { confirm: { ...actor() } } }, 'ยืนยันแล้ว ใบจองนี้พร้อมเข้าขั้นตอนจ่ายค่าคอม');
   },
 
@@ -1036,7 +1036,7 @@ document.addEventListener('change', async ev => {
   if (t.dataset.filter && RERENDER_ON_CHANGE.has(t.dataset.filter)) { S.filters[t.dataset.filter] = t.value; softRender(); return; }
   // let focus move to the next field first, then redraw and keep it there
   if (['booking.booking_no', 'booking.deposit', 'booking.booking_date', 'booking.customer', 'booking.multi_note'].includes(t.dataset.draft)) { softRender(); return; }
-  if (t.dataset.modal && S.modal && (t.dataset.modal.endsWith('.vin') || t.dataset.modal.startsWith('po.') || t.dataset.modal.startsWith('deal.') || t.dataset.modal === 'refund.account_name' || t.dataset.modal.startsWith('edit.'))) { softRender(); return; }
+  if (t.dataset.modal && S.modal && (t.dataset.modal.endsWith('.vin') || t.dataset.modal.startsWith('po.') || t.dataset.modal.startsWith('deal.') || (t.dataset.modal.startsWith('comm.') && t.tagName === 'INPUT') || t.dataset.modal === 'refund.account_name' || t.dataset.modal.startsWith('edit.'))) { softRender(); return; }
 });
 document.addEventListener('submit', ev => {
   if (ev.target.id !== 'booking-form') return;
