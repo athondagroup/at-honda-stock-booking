@@ -45,7 +45,7 @@ function renderModal(D) {
   const ae = document.activeElement, keepFocus = ae && root.contains(ae) ? ae.id : null;
   let caret = null; try { caret = keepFocus && typeof ae.selectionStart === 'number' ? ae.selectionStart : null; } catch (e) { caret = null; }
   const scroll = root.querySelector('.modal')?.scrollTop || 0;
-  root.innerHTML = `<div class="modal-back" data-act="backdrop"><div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true">${body}</div></div>`;
+  root.innerHTML = `<div class="modal-back ${m.kind === 'gsearch' ? 'top' : ''}" data-act="backdrop"><div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true">${body}</div></div>`;
   if (scroll) root.querySelector('.modal').scrollTop = scroll;
   const fe = keepFocus && document.getElementById(keepFocus);
   if (fe) { fe.focus(); if (caret !== null) { try { fe.setSelectionRange(caret, caret); } catch (e) { /* not a text input */ } } }
@@ -953,6 +953,8 @@ document.addEventListener('input', ev => {
     if (S.modal.kind === 'idsfix' && path === 'e.grade') S.modal.e.color = '';
     if (path.endsWith('.model') && path.startsWith('r.cars')) { const c = S.modal.r.cars[Number(path.split('.')[2])]; c.grade = ''; c.color = ''; }
     if (path.endsWith('.grade') && path.startsWith('r.cars')) { const c = S.modal.r.cars[Number(path.split('.')[2])]; c.color = ''; }
+    // the search window: only the results are redrawn, the box being typed in stays as it is (no jump, keyboard stays)
+    if (path === 'q' && S.modal.kind === 'gsearch') { clearTimeout(poqTimer); poqTimer = setTimeout(() => { const r = document.getElementById('gs-res'); if (r && S.modal && S.modal.kind === 'gsearch') r.innerHTML = gsearchResults(S.modal, derive()); else render(); }, 200); return; }
     if (path === 'poq' || (path === 'q' && (S.modal.kind === 'idspair' || S.modal.kind === 'lockbk' || S.modal.kind === 'gsearch' || S.modal.kind === 'stassign' || S.modal.kind === 'idsview' || S.modal.kind === 'drill'))) { clearTimeout(poqTimer); poqTimer = setTimeout(render, 250); return; }
     if (t.tagName === 'SELECT' || t.type === 'radio' || (path.endsWith('.vin') && val.length === 17)) render();
   } else if (t.dataset.filter) {

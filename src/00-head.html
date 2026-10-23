@@ -102,6 +102,10 @@ tr.low td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 @media (min-width: 768px) { .toast { bottom: 24px; } }
 .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
 @media (min-width: 768px) { .modal-back { align-items: center; } }
+/* search window: pinned to the top, full height, so it does not jump while typing (23/10) */
+.modal-back.top { align-items: flex-start; }
+.modal-back.top .modal { height: 100dvh; max-height: 100dvh; border-radius: 0; padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
+@media (min-width: 768px) { .modal-back.top { padding-top: 6vh; } .modal-back.top .modal { height: 80vh; max-height: 80vh; border-radius: 12px; } }
 .modal { background: var(--surface); color: var(--fg); width: 100%; max-width: 720px; max-height: 92vh; overflow: auto; border-radius: 12px 12px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); }
 @media (min-width: 768px) { .modal { border-radius: 12px; padding: 22px 24px; } }
 .pick { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }

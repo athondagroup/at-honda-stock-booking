@@ -147,26 +147,38 @@ function nextStepBox(a, D, mine) {
 Object.assign(ACTIONS, { 'scroll-flow'(el) { const t = document.querySelector('#modal-root [data-flow-steps]') || document.querySelector('#modal-root h3'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
 // ---- one search for everything: customers, booking numbers, VIN (the last 6 digits are enough), quota Ref
 function gsearchModal(m, D) {
+  const scope = m.all === false ? 'br' : 'all';
+  return `<div class="flex items-start justify-between gap-3 mb-2"><h2 class="font-head text-xl font-semibold">ค้นหาทุกอย่าง</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
+  <div class="field mb-2"><label for="gs-q">ชื่อลูกค้า เลขใบจอง เซลล์ VIN (4 ตัวท้ายขึ้นไป) เลขใบกำกับ หรือ Ref</label><input id="gs-q" type="search" inputmode="search" autocomplete="off" autocorrect="off" spellcheck="false" data-modal="q" value="${esc(String(m.q || ''))}" autofocus></div>
+  <div class="flex gap-2 mb-3 text-sm"><button class="btn btn-sm ${scope === 'all' ? 'btn-dark' : 'btn-ghost'}" data-act="gsearch-scope" data-v="all">ทุกสาขา</button><button class="btn btn-sm ${scope === 'br' ? 'btn-dark' : 'btn-ghost'}" data-act="gsearch-scope" data-v="br" ${S.br ? '' : 'disabled'}>เฉพาะ ${S.br || 'สาขาที่เลือก'}</button></div>
+  <div id="gs-res">${gsearchResults(m, D)}</div>`;
+}
+function gsearchResults(m, D) {
   const q = String(m.q || '').trim(), k = searchKey(q), up = q.toUpperCase().replace(/\s+/g, '');
   const scope = m.all === false ? 'br' : 'all', inScope = x => scope === 'all' || inBr(x);
   let cars = [], bks = [], qs = [];
   if (q.length >= 2) {
-    const vinHit = v => v && (String(v).toUpperCase().endsWith(up) || (up.length >= 6 && String(v).toUpperCase().includes(up)));
-    cars = [...D.cars.values(), ...D.deliveredOut].filter(c => inScope(c) && (vinHit(c.vin) || (c.ref && String(c.ref).toUpperCase().includes(up)))).slice(0, 10);
+    // a VIN: its ending (any length), or any part of it from 4 characters (23/10)
+    const vinHit = v => v && (String(v).toUpperCase().endsWith(up) || (up.length >= 4 && String(v).toUpperCase().includes(up)));
+    const seen = new Set(), pool = [];
+    [...D.cars.values(), ...D.deliveredOut, ...D.removed].forEach(c => { if (!seen.has(c.vin)) { seen.add(c.vin); pool.push(c); } });
+    // cars only in the DL (invoiced, delivered, no longer in the Stock file)
+    if (!isSales()) for (const [vin, i] of D.invByVin) if (vin && !seen.has(vin)) { seen.add(vin); pool.push({ vin, br: i.br, model: i.model, grade: i.grade, color: i.color, spec: specKey(i.model, i.grade, i.color), status: i.company ? 'company' : i.ddate ? 'delivered' : 'invoiced', inv: i, dlOnly: true }); }
+    const invTxt = c => { const i = c.inv || D.invByVin.get(c.vin); return i ? [i.inv, i.cust] : []; };
+    cars = pool.filter(c => inScope(c) && (vinHit(c.vin) || (c.ref && String(c.ref).toUpperCase().includes(up)) || (!isSales() && k.length >= 2 && invTxt(c).some(x => x && searchKey(x).includes(k))))).slice(0, 15);
     bks = bookRows(D).filter(r => rowVisible(r) && inScope(r) && ([r.no, r.owner, r.idsSales].some(x => x && searchKey(x).includes(k)) || vinHit(r.vin) || ((!isSales() || isMine(r.owner)) && [r.cust, r.b && r.b.cust, r.a && r.a.rec.customer].some(x => x && searchKey(x).includes(k))))).slice(0, 12);
     qs = D.quota.filter(x => inScope(x) && ((x.ref && String(x.ref).toUpperCase().includes(up)) || vinHit(x.vin))).slice(0, 8);
   }
-  const vinShow = v => { const s = String(v || ''); return up && s.toUpperCase().endsWith(up) ? `${esc(s.slice(0, s.length - up.length))}<b style="background:var(--warn-soft)">${esc(s.slice(-up.length))}</b>` : esc(s); };
+  const vinShow = v => { const s = String(v || ''), i = up ? s.toUpperCase().lastIndexOf(up) : -1; return i >= 0 ? `${esc(s.slice(0, i))}<b style="background:var(--warn-soft)">${esc(s.slice(i, i + up.length))}</b>${esc(s.slice(i + up.length))}` : esc(s); };
   const sec = (t, n, body) => n ? `<section class="mb-3"><h3 class="font-semibold text-sm mb-1">${t} ${n}</h3><div class="flex flex-col gap-1">${body}</div></section>` : '';
   const btn = (attrs, html) => `<button class="text-left p-2 rounded-lg border border-line bg-surface text-sm" ${attrs}>${html}</button>`;
-  return `<div class="flex items-start justify-between gap-3 mb-2"><h2 class="font-head text-xl font-semibold">ค้นหาทุกอย่าง</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
-  <div class="field mb-2"><label for="gs-q">ชื่อลูกค้า เลขใบจอง เซลล์ VIN (ท้าย 6 หลักพอ) หรือ Ref</label><input id="gs-q" type="search" data-modal="q" value="${esc(q)}" autofocus></div>
-  <div class="flex gap-2 mb-3 text-sm"><button class="btn btn-sm ${scope === 'all' ? 'btn-dark' : 'btn-ghost'}" data-act="gsearch-scope" data-v="all">ทุกสาขา</button><button class="btn btn-sm ${scope === 'br' ? 'btn-dark' : 'btn-ghost'}" data-act="gsearch-scope" data-v="br" ${S.br ? '' : 'disabled'}>เฉพาะ ${S.br || 'สาขาที่เลือก'}</button></div>
-  ${q.length < 2 ? '<p class="text-sm text-muted">พิมพ์อย่างน้อย 2 ตัว</p>' : !(cars.length + bks.length + qs.length) ? `<p class="text-sm text-muted">ไม่พบ "${esc(q)}" ใน${scope === 'all' ? 'ทุกสาขา' : ' ' + S.br}</p>`
+  const carSub = c => { const i = c.inv || (c.handed ? null : D.invByVin.get(c.vin)); const st = c.handed ? 'ส่งมอบแล้ว' : c.removed ? 'นำออกแล้ว' : esc((CAR_STATUS[c.status] || [c.status])[0] || '');
+    return `${specLabelText(c.spec || specKey(c.model, c.grade, c.color))} · ${esc(c.br || '')} · ${st}${!isSales() && i && (c.dlOnly || c.status === 'delivered' || c.status === 'invoiced') ? ` · ใบกำกับ ${esc(i.inv || '')} ${fmtD(i.idate)}${i.ddate ? ` ส่งมอบ ${fmtD(i.ddate)}` : ''}${i.cust ? ' · ' + esc(i.cust) : ''}` : ''}`; };
+  return q.length < 2 ? '<p class="text-sm text-muted">พิมพ์อย่างน้อย 2 ตัว</p>' : !(cars.length + bks.length + qs.length) ? `<p class="text-sm text-muted">ไม่พบ "${esc(q)}" ใน${scope === 'all' ? 'ทุกสาขา' : ' ' + S.br}</p>`
     : `<p class="text-xs text-muted mb-2">ค้นใน${scope === 'all' ? 'ทุกสาขา' : ' ' + S.br} ตามสิทธิ์ที่เห็นได้${isSales() ? ' (เซลล์เห็นชื่อลูกค้าเฉพาะของตัวเอง)' : ''}</p>
-    ${sec('รถ', cars.length, cars.map(c => btn(`data-act="car-open" data-vin="${esc(c.vin)}"`, `<span class="code">${vinShow(c.vin)}</span><span class="block text-xs text-muted">${specLabelText(c.spec || specKey(c.model, c.grade, c.color))} · ${esc(c.br || '')} · ${c.handed ? 'ส่งมอบแล้ว' : esc((CAR_STATUS[c.status] || [c.status])[0] || '')}</span>`)).join(''))}
+    ${sec('รถ', cars.length, cars.map(c => btn(`data-act="car-open" data-vin="${esc(c.vin)}"`, `<span class="code">${vinShow(c.vin)}</span><span class="block text-xs text-muted">${carSub(c)}</span>`)).join(''))}
     ${sec('ใบจอง', bks.length, bks.map(r => btn(r.a ? `data-act="at-open" data-id="${esc(r.a.id)}"` : `data-act="go" data-view="book" data-q="${esc(r.no || '')}"`, `<b>${(!isSales() || isMine(r.owner)) ? esc(r.cust || '') : 'ลูกค้าของเซลล์อื่น'}</b><span class="block text-xs text-muted">${esc(r.no || 'ยังไม่อยู่ใน IDS')} · ${esc(r.br || '')} · ${esc(r.owner || '')} · ${specLabelText(r.spec)}${r.vin ? ` · VIN …${esc(String(r.vin).slice(-6))}` : ''}</span>`)).join(''))}
-    ${sec('Quota', qs.length, qs.map(x => btn(`data-act="go" data-view="quota"`, `<b>Ref ${esc(x.ref || '')}</b><span class="block text-xs text-muted">${specLabelText(x.spec)} · ${esc(x.br || '')}${x.vin ? ` · VIN …${esc(String(x.vin).slice(-6))}` : ''}</span>`)).join(''))}`}`;
+    ${sec('Quota', qs.length, qs.map(x => btn(`data-act="go" data-view="quota"`, `<b>Ref ${esc(x.ref || '')}</b><span class="block text-xs text-muted">${specLabelText(x.spec)} · ${esc(x.br || '')}${x.vin ? ` · VIN …${esc(String(x.vin).slice(-6))}` : ''}</span>`)).join(''))}`;
 }
 Object.assign(ACTIONS, {
   'gsearch-open'() { S.modal = { kind: 'gsearch', q: '', all: true }; render(); setTimeout(() => { const i = document.getElementById('gs-q'); if (i) i.focus(); }, 30); },
