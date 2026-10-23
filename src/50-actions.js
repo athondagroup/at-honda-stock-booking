@@ -832,6 +832,8 @@ const ACTIONS = {
     if (!a || a.flow.next !== 'confirmed' || !canApproveBr(a.br)) { toast('ยืนยันได้เฉพาะผู้จัดการสาขานี้ หลังเซลล์บันทึกส่งมอบ', 'bad'); return; }
     const c = { ...commDeal(a), ...(a.rec.comm || {}), ...(S.modal.comm || {}) };
     if (!(a.rec.deal && a.rec.deal.at) && !['price', 'down', 'fin_amount', 'margin', 'campaign'].some(k => c[k] !== undefined && c[k] !== null && c[k] !== '')) { toast('ให้เซลล์ใส่เงื่อนไขการขาย (ราคา แคมเปญ Margin) ก่อน', 'bad'); return; }
+    // terms keyed before the campaign / margin fields existed: they have to be completed first
+    if (a.rec.deal && a.rec.deal.at && !a.rec.deal.campaign_id) { toast('เงื่อนไขการขายยังไม่ได้เลือกแคมเปญและ Margin กด "แก้ไขเงื่อนไข" ที่ขั้นไฟแนนซ์ก่อน', 'bad'); return; }
     if (a.rec.deal && a.rec.deal.req && a.rec.deal.req.at) { toast('มีคำขอแก้เงื่อนไขรออนุมัติ อนุมัติหรือไม่อนุมัติก่อน', 'bad'); return; }
     await saveFlow(a, { flow: { confirm: { ...actor() } } }, 'ยืนยันแล้ว ใบจองนี้พร้อมเข้าขั้นตอนจ่ายค่าคอม');
   },

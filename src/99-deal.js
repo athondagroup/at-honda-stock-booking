@@ -22,11 +22,12 @@ function dealWeb(a, D) {
 }
 // who may do what with the terms of this booking
 function dealState(a) {
-  const d = a.rec.deal || {}, fl = a.flow || {}, open = !a.cancelled && !(fl.done && fl.done.confirmed) && perms().write;
-  const first = !d.at, admin = open && dealAdmin(a), own = open && canEditBooking(a);
+  // after the manager confirmed for commission the sales cannot change anything; the admin and up still can (23/10)
+  const d = a.rec.deal || {}, fl = a.flow || {}, conf = !!(fl.done && fl.done.confirmed), live = !a.cancelled && perms().write, open = live && !conf;
+  const first = !d.at, admin = live && dealAdmin(a), own = open && canEditBooking(a);
   const reqOpen = !!(d.req && d.req.at);
   const salesWindow = isCash(a.rec) || !!(fl.done && fl.done.fin);
-  return { d, first, admin, mayFirst: first && own, mayAdmin: !first && admin, mayReq: !first && own && !admin && !reqOpen && !d.sales_edit && salesWindow && !poLocked(a),
+  return { d, first, admin, mayFirst: first && (own || admin), mayAdmin: !first && admin, mayReq: !first && own && !admin && !reqOpen && !d.sales_edit && salesWindow && !poLocked(a),
     usedReq: !!d.sales_edit, reqOpen, salesWindow };
 }
 function dealRows(d, cash) {
@@ -66,6 +67,7 @@ function dealBox(a, m, D) {
   return `<div class="mt-2 p-3 rounded-lg border border-line">${title}
     <table class="tbl text-sm mt-1"><tbody>${dealRows(d, cash).map(([k, v]) => `<tr><td class="text-muted nowrap">${k}</td><td class="${k === 'แคมเปญ Honda' ? '' : 'num'}">${esc(v)}</td></tr>`).join('')}</tbody></table>
     <div class="text-xs text-muted mt-1">ใส่โดย ${who(d.first || d)} ${fmtDT((d.first || d).at)}${d.src ? ` (${esc(d.src)})` : ''}${hist.length ? ` · แก้ไขล่าสุด ${who(d)} ${fmtDT(d.at)} (แก้ไข ${hist.length} ครั้ง)` : ''}${st.usedReq ? ' · เซลล์ใช้สิทธิ์ขอแก้ไขแล้ว' : ''}</div>
+    ${!d.campaign_id ? `<div class="mt-2 p-2 rounded-lg text-sm" style="background:var(--warn-soft)">ยังไม่ได้เลือกแคมเปญและ Margin (ใส่ไว้ก่อนมีช่องนี้)${st.admin ? ' · กด "แก้ไขเงื่อนไข" เพื่อใส่ให้ครบ' : ' · แจ้งแอดมินสาขาหรือผู้จัดการให้ใส่ หรือกดขอแก้ไข'}</div>` : ''}
     ${req && req.at ? `<div class="mt-2 p-2 rounded-lg text-sm" style="background:var(--warn-soft)"><b>เซลล์ขอแก้ไข รออนุมัติ</b> · ${who(req)} ${fmtDT(req.at)}${req.why ? ` · เหตุผล: ${esc(req.why)}` : ''}
       <div class="mt-1">${dealDiff(d, req.vals).join(' · ') || 'ไม่มีตัวเลขเปลี่ยน'}</div>
       ${st.admin ? `<div class="flex gap-2 mt-2"><button class="btn btn-red btn-sm" data-act="deal-approve" data-id="${esc(a.id)}">อนุมัติ</button><button class="btn btn-ghost btn-sm" data-act="deal-reject" data-id="${esc(a.id)}">ไม่อนุมัติ</button></div>` : '<div class="text-xs mt-1">รอแอดมินสาขาหรือผู้จัดการอนุมัติ</div>'}</div>` : ''}
