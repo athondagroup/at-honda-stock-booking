@@ -282,6 +282,7 @@ function viewStock(D) {
   </div>
   ${isSales() ? '' : delivWaitBox(D)}
   ${filters}${line}
+  ${f.q ? stockOutBox(D) : ''}
   ${mode === 'list' ? carTable(all, D) : specTable(all, D)}
   <p class="text-xs text-muted mt-2">อายุรถนับจากวันผลิต (ใช้ค่าจาก IDS ถ้าไม่มีใช้ค่าที่คีย์จากป้ายที่รถ) · * ยังไม่มีวันผลิต อายุนับจากวันที่รถฝากศูนย์ไปก่อน</p>
   ${!isSales() && D.removed.filter(inBr).length ? `<section class="mt-6"><h2 class="font-head text-lg font-semibold mb-2">รถที่นำออกในระบบนี้</h2>
