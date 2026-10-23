@@ -102,7 +102,8 @@ function flowPanel(m, a, D) {
   const step = (k, body) => {
     const done = fl.done[k] || (k !== 'confirmed' && fl.lateUpdate && FLOW.indexOf(k) <= FLOW.indexOf('delivered'));
     const cur = fl.next === k;
-    const icon = done ? `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:var(--good);color:#fff">✓</span>` : `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:${cur ? 'var(--warn)' : 'var(--surface-2)'};color:${cur ? '#fff' : 'var(--muted)'}">${FLOW.indexOf(k) + 1}</span>`;
+    const skip = k === 'po' && fl.poSkip && !done;
+    const icon = skip ? `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:var(--warn-soft, #fde9c8);color:var(--warn)" title="ข้ามไว้ก่อน">–</span>` : done ? `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:var(--good);color:#fff">✓</span>` : `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:${cur ? 'var(--warn)' : 'var(--surface-2)'};color:${cur ? '#fff' : 'var(--muted)'}">${FLOW.indexOf(k) + 1}</span>`;
     return `<div class="flex gap-3"><div class="pt-0.5">${icon}</div><div class="flex-1 min-w-0 pb-3 border-b border-line"><div class="font-medium ${cur ? '' : done ? '' : 'text-muted'}">${FLOW_LABEL[k]}</div>${body || ''}</div></div>`;
   };
   const can = k => stepAllowed(a, k) && fl.next === k;
@@ -114,8 +115,8 @@ function flowPanel(m, a, D) {
   };
   const finBody = () => {
     const fin = f.fin || {};
-    if (isCash(r)) return '<div class="text-sm text-muted">ซื้อสด ไม่ต้องผ่านไฟแนนซ์</div>';
-    if (fl.done.fin) return `<div class="text-sm text-muted">${esc(fin.company || r.finance || '')}${r.dsp ? ' · DSP (Double Smile Plus)' : ''} อนุมัติ ${fmtD(fin.date)} ${fin.docs?.length ? `· แนบ ${fin.docs.length} รูป` : ''} · ${who(fin)}</div>${finDocsN(r) ? '' : finDocsLater(a)}`;
+    if (isCash(r)) return '<div class="text-sm text-muted">ซื้อสด ไม่ต้องผ่านไฟแนนซ์</div>' + dealBox(a, m);
+    if (fl.done.fin) return `<div class="text-sm text-muted">${esc(fin.company || r.finance || '')}${r.dsp ? ' · DSP (Double Smile Plus)' : ''} อนุมัติ ${fmtD(fin.date)} ${fin.docs?.length ? `· แนบ ${fin.docs.length} รูป` : ''} · ${who(fin)}</div>${finDocsN(r) ? '' : finDocsLater(a)}${dealBox(a, m)}`;
     const status = m.fin_status ?? r.fin_status ?? 'รอผล';
     const company = m.fin_company ?? fin.company ?? r.finance ?? '';
     return `<div class="text-sm text-muted mb-2">ยื่น ${esc(r.finance || '–')} สถานะตอนนี้ <b>${esc(r.fin_status || 'รอผล')}</b> · เมื่อผ่าน ให้ยืนยันบริษัทไฟแนนซ์และแนบใบอนุมัติ</div>
@@ -126,7 +127,7 @@ function flowPanel(m, a, D) {
         <div class="flex flex-col gap-1"><label class="btn btn-ghost btn-sm relative">${S.files.fin.length ? `แนบแล้ว ${S.files.fin.length} รูป` : 'แนบใบอนุมัติ'}<input type="file" accept="image/*" multiple data-file="fin" class="absolute w-px h-px opacity-0"></label></div>
       </div>
       <div class="mt-2 flex gap-2"><button class="btn btn-dark btn-sm" data-act="flow-fin" data-id="${esc(a.id)}">บันทึก</button>
-      <span class="text-xs text-muted self-center">เลือก "ผ่าน" แล้วไปขั้นถัดไปได้ · ใบอนุมัติแนบภายหลังได้ แต่ต้องแนบก่อนส่งมอบ</span></div>` : ''}`;
+      <span class="text-xs text-muted self-center">เลือก "ผ่าน" แล้วไปขั้นถัดไปได้ · ใบอนุมัติแนบภายหลังได้ แต่ต้องแนบก่อนส่งมอบ</span></div>` : ''}${dealBox(a, m)}`;
   };
   const downBody = () => {
     const d = f.down || {};
@@ -154,9 +155,13 @@ function flowPanel(m, a, D) {
       ${bkLocks(a, D)}<div class="text-xs text-muted mt-1">${lockCar ? `รถที่ล็อกไว้ให้ใบจองนี้: ${lockCar.vin} · ${prodPlain(lockCar)}` : matchVin ? `IDS จัดสรรไว้แล้ว: ${matchVin}` : `รถว่างสเปกนี้ ${cands.length} คัน`}</div>${swapHist(a)}`;
   };
   const poBody = () => {
-    if (fl.done.po) return `<div class="text-sm text-muted">สั่งแต่ง ${(f.po.items || []).length} รายการ ${fmtD(f.po.date)} · ${who(f.po)}</div>
-      <div class="flex gap-2 mt-1"><button class="btn btn-ghost btn-sm" data-act="po-open" data-id="${esc(a.id)}">${fl.done.delivered ? 'ดูใบแต่งรถ' : 'แก้ใบแต่งรถ'}</button><button class="btn btn-ghost btn-sm" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button>${discBtn(a, 'po')}</div>${discBox(a, m, D, 'po')}`;
-    return can('po') ? `<div class="mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่ง (PO)</button></div>` : '';
+    const locked = poLocked(a);
+    if (fl.done.po) return `<div class="text-sm text-muted">สั่งแต่ง ${(f.po.items || []).length} รายการ ${fmtD(f.po.date)} · ${who(f.po)}${(f.po.hist || []).length ? ` · แก้ไขแล้ว ${f.po.hist.length} ครั้ง` : ''}</div>
+      <div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-ghost btn-sm" data-act="po-open" data-id="${esc(a.id)}">${locked || !stepAllowed(a, 'po') ? 'ดูใบแต่งรถ' : 'แก้ใบแต่งรถ'}</button><button class="btn btn-ghost btn-sm" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button>${discBtn(a, 'po')}</div>${locked ? '<div class="text-xs text-muted mt-1">ส่งมอบแล้ว แก้ใบแต่งรถไม่ได้</div>' : ''}${discBox(a, m, D, 'po')}`;
+    if (fl.poSkip) return `<div class="text-sm" style="color:var(--warn)">ข้าม PO ไว้ก่อน · ${who(f.po_skip)} ${fmtDT(f.po_skip.at)} · ยังไม่ได้ทำ PO</div>
+      ${stepAllowed(a, 'po') && !locked ? `<div class="mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่ง (PO)</button></div>` : ''}`;
+    return can('po') ? `<div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่ง (PO)</button><button class="btn btn-ghost btn-sm" data-act="po-skip" data-id="${esc(a.id)}">ข้าม PO ไปก่อน</button></div>
+      <div class="text-xs text-muted mt-1">ยังไม่รู้รายการแต่ง กด "ข้าม PO ไปก่อน" แล้วทำขั้นถัดไปได้ · ทำ PO ภายหลังได้จนถึงก่อนส่งมอบ</div>` : '';
   };
   const delivBody = () => {
     const dv = f.delivered || {};
@@ -177,7 +182,8 @@ function flowPanel(m, a, D) {
       <button class="btn btn-dark btn-sm mt-2" data-act="flow-deliver" data-id="${esc(a.id)}">บันทึกส่งมอบ</button>`;
   };
   const commBody = () => {
-    const c = Object.assign({}, a.rec.comm || {}, m.comm || {});
+    // the commission data starts from the price and finance terms keyed in the finance step
+    const c = Object.assign({}, commDeal(a), a.rec.comm || {}, m.comm || {});
     const ro = fl.done.confirmed || !canEditBooking(a);
     const F2 = (k, label, type = 'number') => `<div class="field"><label for="cm-${k}">${label}</label><input id="cm-${k}" type="${type}" data-modal="comm.${k}" value="${esc(c[k] ?? '')}" ${ro ? 'disabled' : ''}></div>`;
     return `<details class="mt-2" ${fl.done.confirmed ? '' : 'open'}><summary class="text-sm font-medium cursor-pointer">ข้อมูลสำหรับค่าคอม (กรอกหลังส่งมอบ)</summary>
@@ -207,8 +213,10 @@ function poEditor(m, a, D) {
   const cost = po.items.reduce((n, x) => n + (Number(x.cost) || 0) * (Number(x.qty) || 1), 0);
   const sale = po.items.reduce((n, x) => n + (Number(x.sale) || 0) * (Number(x.qty) || 1), 0);
   const focBudget = Number(a.rec.foc_total) || 0;
-  const ro = a.flow.done.delivered || !stepAllowed(a, 'po');
-  return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">ใบสั่งแต่ง (PO)</h2><p class="text-sm text-muted">${esc(a.cust)} · ${esc(a.model)} ${esc(a.grade)} ${esc(a.color)} · รหัสรุ่นในรายการ FOC: ${codes.slice(0, -2).join(', ') || '–'}</p></div>
+  const ro = poLocked(a) || !stepAllowed(a, 'po');
+  const vin = atVin(a), car = vin ? (carAny(vin, D) || {}) : {};
+  return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">ใบสั่งแต่ง (PO)</h2><p class="text-sm text-muted">${esc(a.cust)} · ${esc(a.model)} ${esc(a.grade)} ${esc(a.color)} · รหัสรุ่นในรายการ FOC: ${codes.slice(0, -2).join(', ') || '–'}</p>
+      <p class="text-sm mt-1">หมายเลขตัวถัง <span class="code">${esc(vin || 'ยังไม่จัดสรรรถ')}</span> · หมายเลขเครื่องยนต์ <span class="code">${esc(car.engine || '–')}</span></p>${ro && poLocked(a) ? '<p class="text-xs mt-1" style="color:var(--warn)">ส่งมอบแล้ว แก้ใบแต่งรถไม่ได้ ดูและพิมพ์ได้อย่างเดียว</p>' : ''}</div>
     <button class="btn btn-ghost btn-sm" data-act="po-back">กลับ</button></div>
   <div class="grid md:grid-cols-[1.1fr_1fr] gap-5">
     <div class="flex flex-col gap-3">
@@ -239,8 +247,7 @@ function poEditor(m, a, D) {
 // the accessories order for the parts team, saved as a PDF or a picture
 function printPO(a) {
   const po = (S.modal && S.modal.po) || poDraft(a);
-  const vin = a.rec.flow?.assign?.vin, D0 = derive();
-  const car = vin ? (D0.cars.get(vin) || D0.deliveredOut.find(c => c.vin === vin) || {}) : {};
+  const vin = atVin(a), car = vin ? (carAny(vin, derive()) || {}) : {};
   const rows = [...po.items.map((x, i) => [String(i + 1), x.name, x.part || x.vendor || '', String(x.qty), x.note || '']),
     ...Array.from({ length: Math.max(0, 15 - po.items.length) }, (_, i) => [String(po.items.length + i + 1), '', '', '', ''])];
   const spec = { title: 'ใบสั่งแต่งรถ', sub: `บริษัท เอที ฮอนด้า ออโตโมบิล จำกัด สาขา${BR[a.br]?.name || ''}`, blocks: [

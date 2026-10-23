@@ -26,14 +26,18 @@ function finFull(f) {
 }
 // what goes on the form: saved values first, then the booking / delivery / commission data
 function discPre(a, D) {
-  const r = a.rec, f = r.flow || {}, cm = r.comm || {}, s = r.disc_doc || {}, vin = atVin(a) || '';
+  const r = a.rec, f = r.flow || {}, cm = r.comm || {}, vin = atVin(a) || '';
+  // the numbers come from the finance step (deal); a receipt printed before the deal was last changed does not override it
+  const dl = r.deal || {}, s0 = r.disc_doc || {}, fresh = dl.at && (!s0.at || dl.at > s0.at);
+  const s = fresh ? Object.fromEntries(Object.entries(s0).filter(([k]) => !['price', 'body', 'downDisc', 'cashDisc', 'down'].includes(k))) : s0;
+  const has = k => dl[k] !== null && dl[k] !== undefined && dl[k] !== '';
   const c = vin ? (D.cars.get(vin) || carAny(vin, D) || {}) : {};
   const cash = isCash(r), fin = (f.fin && f.fin.company) || r.finance || '';
   const total = num(cm.discount) || num(r.discount) || 0;
   return {
     date: s.date || (f.delivered && f.delivered.date) || todayISO(), cust: s.cust || a.cust || '', model: s.model || a.model || '', grade: s.grade || gradeShort(a.model, a.grade) || a.grade || '', color: s.color || a.color || '',
-    vin: s.vin || vin, engine: s.engine || c.engine || '', cash: s.cash ?? cash, fin: s.fin ?? finFull(fin), down: s.down ?? (num(cm.down) || num(r.down) || ''), price: s.price ?? (num(cm.price) || num(r.price) || ''),
-    body: s.body ?? (cash ? '' : total || ''), downDisc: s.downDisc ?? '', cashDisc: s.cashDisc ?? (cash ? total || '' : ''), tel: s.tel || '', mobile: s.mobile || r.phone || ''
+    vin: s.vin || vin, engine: s.engine || c.engine || '', cash: s.cash ?? cash, fin: s.fin ?? finFull(fin), down: s.down ?? (has('down') ? dl.down : (num(cm.down) || num(r.down) || '')), price: s.price ?? (has('price') ? dl.price : (num(cm.price) || num(r.price) || '')),
+    body: s.body ?? (cash ? '' : has('disc') ? dl.disc : total || ''), downDisc: s.downDisc ?? (has('down_disc') ? dl.down_disc : ''), cashDisc: s.cashDisc ?? (cash ? (has('disc') ? dl.disc : total || '') : ''), tel: s.tel || '', mobile: s.mobile || r.phone || ''
   };
 }
 function discTotal(v) { return v.cash ? num(v.cashDisc) : num(v.body) + num(v.downDisc); }

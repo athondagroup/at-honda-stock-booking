@@ -48,8 +48,10 @@ function flowOf(a, today) {
   // IDS shows delivered this month but the sales has not updated AT yet: only the delivery step is left
   const lateUpdate = idsDelivered && !done.delivered && !history;
   // delivered in the IDS file this month: the delivery counts; the red plate and insurer can be added later
-  const next = history ? null : lateUpdate ? (done.confirmed ? null : 'confirmed') : (FLOW.find(k => !done[k]) || null);
-  return { done, stage, next, idsDelivered, history, lateUpdate, deliveredDate: (f.delivered && f.delivered.date) || idsDate || null };
+  // the sales may skip the PO for now (24/10): the flow moves on, the PO stays missing until made (before delivery)
+  const poSkip = !done.po && !!(f.po_skip && f.po_skip.at);
+  const next = history ? null : lateUpdate ? (done.confirmed ? null : 'confirmed') : (FLOW.find(k => !done[k] && !(k === 'po' && poSkip)) || null);
+  return { done, stage, next, poSkip, idsDelivered, history, lateUpdate, deliveredDate: (f.delivered && f.delivered.date) || idsDate || null };
 }
 const r0 = a => a.rec || {};
 const sameName = (x, y) => norm(x) === norm(y);
