@@ -136,13 +136,13 @@ function nextStepBox(a, D, mine) {
   if (n === 'fin' && a.date) { due = addDays(a.date, 15); dates.push(['ครบกำหนดไฟแนนซ์อนุมัติผ่าน (15 วันจากวันจอง)', fmtD(due)]); }
   if (r.delivery_plan) dates.push(['นัดรับรถ', fmtD(r.delivery_plan)]);
   const late = due && due < D.today ? daysBetween(due, D.today) : 0;
-  const body = a.cancelled ? '<div class="font-semibold">ยกเลิกแล้ว</div>' : a.done ? '<div class="font-semibold" style="color:var(--good)">ส่งมอบแล้ว</div>'
+  const body = a.cancelled ? '<div class="font-semibold">ยกเลิกแล้ว</div>' : a.done ? `<div class="font-semibold" style="color:var(--good)">ส่งมอบแล้ว${saleDates(a, D).ddate ? ` ${fmtD(saleDates(a, D).ddate)}` : ''}</div>`
     : n ? `<div class="text-xs text-muted">ขั้นต่อไป</div><div class="text-lg font-semibold">${esc(FLOW_LABEL[n] || n)}</div><div class="text-sm">${esc(nextStepWho(n))}${late ? ` · <b style="color:var(--bad)">เลยกำหนด ${late} วัน</b>` : ''}</div>
       <button class="btn btn-red btn-sm mt-2 self-start" data-act="scroll-flow">ไปที่ขั้นนี้</button>` : '<div class="text-sm">ไม่มีขั้นที่ต้องทำ</div>';
   const ro = !a.cancelled && !a.done && !(perms().write && canEditBooking(a)) ? `<div class="text-xs p-2 rounded" style="background:var(--surface-2)">ดูได้อย่างเดียว: ใบจองสาขา ${esc(a.br)} แก้ได้โดยเซลล์เจ้าของ (${esc(a.sales || '–')}) แอดมินสาขา ${esc(a.br)} และผู้จัดการสาขา ${esc(a.br)}${mgrNameOf(a.br) ? ` (${esc(mgrNameOf(a.br))})` : ''} · บทบาทตอนนี้: ${esc(roleLabel())}</div>` : '';
   const holdTxt = n && n !== 'fin' && n !== 'booked' && a.rec.delivery_plan ? '<div class="text-xs" style="color:var(--good)">ไฟแนนซ์ผ่านและยืนยันวันออกรถแล้ว: ล็อกคิวไว้จนส่งมอบ ไม่ปลดล็อก ไม่ถามซ้ำ</div>' : '';
   return `<div class="p-3 rounded-lg border-2 mb-4 flex flex-col gap-2" style="border-color:${a.cancelled || a.done ? 'var(--line)' : 'var(--red)'}">${head}<div class="flex flex-col">${body}</div>${holdTxt}${ro}
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">${dates.map(([k, v]) => `<div><div class="text-muted">${k}</div><div class="num">${v}</div></div>`).join('')}</div></div>`;
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">${dates.map(([k, v]) => `<div><div class="text-muted">${k}</div><div class="num">${v}</div></div>`).join('')}</div>${saleSumBox(a, D)}</div>`;
 }
 Object.assign(ACTIONS, { 'scroll-flow'(el) { const t = document.querySelector('#modal-root [data-flow-steps]') || document.querySelector('#modal-root h3'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
 // ---- one search for everything: customers, booking numbers, VIN (the last 6 digits are enough), quota Ref

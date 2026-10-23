@@ -102,7 +102,6 @@ function privText(o) {
   if (o.priv_gtg) t.push(`Gen to Gen (${o.priv_gtg === '2' ? '2 คันขึ้นไป' : '1 คัน'})`);
   if (o.priv_ln) t.push(`Local Native (${o.priv_ln === 'care' ? 'Ultimate Care' : 'รับเงิน'})`);
   if (num(o.priv_hk)) t.push(`ฮอนด้าเคียงข้างคุณ ${money(o.priv_hk)}`);
-  if (o.priv_rate) t.push({ loyalty: 'Honda Loyalty ลดดอกเบี้ย 0.15%', fj: 'First Jobber ลดดอกเบี้ย 0.10%', yto: "You're the One ลดดอกเบี้ย 0.15%" }[o.priv_rate] || o.priv_rate);
   return t.join(' · ');
 }
 function commFinAmount(c) { const n = num(c.price) - num(c.discount) - num(c.down); return num(c.price) && n > 0 ? n : null; }
@@ -127,11 +126,10 @@ function termsFields(x, v, f) {
   const N = (k, label, extra = '') => `<div class="field"><label for="${f.idp}-${k}">${label}</label><input id="${f.idp}-${k}" type="number" min="0" inputmode="decimal" ${f.attr}="${f.pre}.${k}" value="${esc(o[k] ?? '')}" ${dis} ${extra}></div>`;
   const RO = (label, val, note) => `<div class="field"><label>${label}</label><div class="num p-2 rounded-lg border border-line">${val ? money(val) : '–'}</div>${note ? `<span class="text-xs text-muted">${note}</span>` : ''}</div>`;
   const g = pv.pr.gtg, ln = pv.pr.ln;
-  const privBox = `<div class="mt-3 pt-3 border-t border-line"><div class="font-medium text-sm mb-2">สิทธิพิเศษ Honda</div><div class="grid sm:grid-cols-3 gap-3">
+  const privBox = `<div class="mt-3 pt-3 border-t border-line"><div class="font-medium text-sm mb-2">สิทธิพิเศษ Honda</div><div class="grid sm:grid-cols-2 gap-3">
     ${S2('priv_gtg', 'Gen to Gen', [['', 'ไม่ใช้'], ...(g && !pv.bl.gtg ? [['1', `รถฮอนด้าเดิม 1 คัน · ${money(g.a1)}`], ['2', `2 คันขึ้นไป · ${money(g.a2)}`]] : [['x', pv.bl.gtg ? 'แคมเปญที่เลือกไม่ร่วม Gen to Gen' : 'รุ่นนี้ไม่ร่วม Gen to Gen', true]])])}
     ${S2('priv_ln', 'Local Native', [['', 'ไม่ใช้'], ...(ln && !pv.bl.ln ? [['cash', `รับเงิน · ${money(ln.a1)}`], ['care', 'รับ Ultimate Care (ไม่เข้า Margin)']] : [['x', pv.bl.ln ? 'แคมเปญที่เลือกไม่ร่วม Local Native' : 'รุ่นนี้ไม่ร่วม Local Native', true]])])}
     ${N('priv_hk', 'ฮอนด้าเคียงข้างคุณ (บาท)', 'step="1000" placeholder="25,000–70,000"')}
-    ${S2('priv_rate', 'สิทธิ์ลดดอกเบี้ย (บันทึกไว้ ไม่เข้า Margin)', [['', 'ไม่มี'], ['loyalty', 'Honda Loyalty −0.15%'], ['fj', 'First Jobber −0.10% (City)'], ['yto', "You're the One −0.15% (City)"]])}
     ${N('margin_priv', '4. สิทธิพิเศษ Honda (บาท)')}</div>
     <div class="text-xs text-muted mt-1">ยอดตามแท็บสิทธิพิเศษ Honda เดือน ${fmtM(pv.pr.month)} · ฮอนด้าเคียงข้างคุณใช้ร่วมกับ Gen to Gen / Local Native ไม่ได้</div></div>`;
   const price = f.priceDisc ? `<div class="field"><label for="${f.idp}-price" class="req">ราคารถ (ราคาเต็ม)</label><input id="${f.idp}-price" type="number" min="0" step="100" inputmode="decimal" ${f.attr}="${f.pre}.price" value="${esc(o.price ?? '')}" ${f.lockPrice || f.ro ? 'readonly style="background:var(--surface-2)"' : ''}>${f.priceNote ? `<span class="text-xs text-muted">${f.priceNote}</span>` : ''}</div>` + N('disc', 'ส่วนลดราคารถ', 'step="100"') : '';
@@ -160,7 +158,7 @@ function termsRecord(x, v, paint) {
     rate: x.cash || termEmpty(o.rate) ? null : Number(o.rate), term: x.cash || termEmpty(o.term) ? null : parseInt(o.term, 10),
     campaign_id: o.campaign_id || null, campaign: camp ? (camp.value === 'other' ? String(o.campaign_text || '').trim() || 'อื่น ๆ' : (camp.group ? camp.group + ' · ' : '') + camp.name) : null, campaign_text: o.campaign_id === 'other' ? String(o.campaign_text || '').trim() : null,
     camp_month: camp && camp.month ? camp.month : null, at_step: x.cash ? null : (o.at_step || null), margin_car: num(o.margin_car), margin_at: num(o.margin_at), margin_honda: num(o.margin_honda), margin: o.margin, paint: num(paint),
-    priv_gtg: pv.bl.gtg ? null : (o.priv_gtg || null), priv_ln: pv.bl.ln ? null : (o.priv_ln || null), priv_hk: n('priv_hk'), priv_rate: o.priv_rate || null, margin_priv: num(o.margin_priv), privileges: privText(o) || null };
+    priv_gtg: pv.bl.gtg ? null : (o.priv_gtg || null), priv_ln: pv.bl.ln ? null : (o.priv_ln || null), priv_hk: n('priv_hk'), margin_priv: num(o.margin_priv), privileges: privText(o) || null };
 }
 function termsCheck(x, v) {
   if (termEmpty(v.price) || !num(v.price)) return { err: 'ใส่ราคารถ', id: 'price' };

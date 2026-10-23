@@ -282,6 +282,7 @@ function viewStock(D) {
   </div>
   ${isSales() ? '' : delivWaitBox(D)}
   ${filters}${line}
+  ${!isSales() && ['sold', 'invoiced', 'delivered'].includes(f.status) ? `<p class="text-sm mb-2 p-2 rounded-lg" style="background:var(--surface-2)">ดูรถออกใบกำกับ / ส่งมอบ แยกตามเดือน พร้อมเงื่อนไขการขายและ Margin ที่ ${go('book', 'sold', undefined, '<b style="text-decoration:underline">ใบจอง › ส่งมอบ / แจ้งขาย</b>')}</p>` : ''}
   ${f.q ? stockOutBox(D) : ''}
   ${mode === 'list' ? carTable(all, D) : specTable(all, D)}
   <p class="text-xs text-muted mt-2">อายุรถนับจากวันผลิต (ใช้ค่าจาก IDS ถ้าไม่มีใช้ค่าที่คีย์จากป้ายที่รถ) · * ยังไม่มีวันผลิต อายุนับจากวันที่รถฝากศูนย์ไปก่อน</p>
