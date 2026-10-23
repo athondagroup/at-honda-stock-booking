@@ -1,10 +1,11 @@
-// ---------- the deal in the finance step (24/10): price, discounts, down payment, amount financed, rate, term
-// the sales keys it once; after that only the branch admin, the manager or the executive can change it (history kept)
-// the PO cannot change once the car is delivered (in this web or in the IDS DL file)
+// ---------- the sale terms in the finance step (24/10): price, discounts, down, instalments, campaign, margin
+// Keyed on the booking (Google Form bookings: here, the first time, by the sales). After that the sales may change
+// them once more, when the finance is approved (cash: before delivery), and the branch admin or a manager approves;
+// the branch admin, the managers and the executive change them directly. Every change keeps the old values.
+// The PO cannot change once the car is delivered (in this web or in the IDS DL file).
+// Only function declarations here: the first render runs before this part of the file.
 function poLocked(a) { const fl = a.flow || {}; return !!(fl.done && fl.done.delivered) || !!fl.lateUpdate || !!fl.history || !!a.done; }
 function dealAdmin(a) { return perms().write && ((S.role.role === 'admin' && a.br === S.role.branch) || canApproveBr(a.br)); }
-function dealLabel(k) { return ({ price: 'ราคารถ (ราคาเต็ม)', disc: 'ส่วนลดราคารถ', down: 'เงินดาวน์', down_disc: 'ส่วนลดดาวน์', fin_amount: 'ยอดจัด', rate: 'ดอกเบี้ย (% ต่อปี)', term: 'จำนวนงวด (เดือน)' })[k]; }
-function dealKeys(r) { return isCash(r) ? ['price', 'disc'] : ['price', 'disc', 'down', 'down_disc', 'fin_amount', 'rate', 'term']; }
 function dealMonthly(v) {
   const amt = num(v.fin_amount), rate = Number(v.rate), term = parseInt(v.term, 10);
   if (!amt || !term || !(rate >= 0)) return null;
@@ -19,92 +20,107 @@ function dealWeb(a, D) {
   const paint = q && q.exact && q.extra > 0 && q.extra < p.price ? q.extra : 0;
   return { price: Number(p.price), src: p.src, paint, base: Number(p.price) - paint };
 }
-function dealPaint(v, web) { return v.paint !== undefined && v.paint !== null ? num(v.paint) : (web ? web.paint : 0); }
-function dealCalc(v, cash, paint) {
-  const net = num(v.price) - num(v.disc);
-  const downNet = num(v.down) - num(v.down_disc);
-  const out = [];
-  if (num(v.price)) { if (paint) out.push(['ค่าสี', money(paint)]); out.push(['ราคารถไม่รวมค่าสี (ฐานคิด Margin)', money(num(v.price) - num(paint))]); }
-  if (num(v.price)) out.push(['ราคาหลังหักส่วนลด', money(net)]);
-  if (!cash) {
-    if (num(v.down)) out.push(['ดาวน์หลังหักส่วนลด', money(downNet)]);
-    const mo = dealMonthly(v); if (mo) out.push(['ค่างวดโดยประมาณ (ดอกเบี้ยคงที่)', `${money(mo)} บาท / เดือน`]);
-  }
-  return out;
+// who may do what with the terms of this booking
+function dealState(a) {
+  const d = a.rec.deal || {}, fl = a.flow || {}, open = !a.cancelled && !(fl.done && fl.done.confirmed) && perms().write;
+  const first = !d.at, admin = open && dealAdmin(a), own = open && canEditBooking(a);
+  const reqOpen = !!(d.req && d.req.at);
+  const salesWindow = isCash(a.rec) || !!(fl.done && fl.done.fin);
+  return { d, first, admin, mayFirst: first && own, mayAdmin: !first && admin, mayReq: !first && own && !admin && !reqOpen && !d.sales_edit && salesWindow && !poLocked(a),
+    usedReq: !!d.sales_edit, reqOpen, salesWindow };
+}
+function dealRows(d, cash) {
+  const r = [['ราคารถ (ราคาเต็ม)', money(d.price)], ['ส่วนลดราคารถ', money(d.disc)]];
+  if (!cash) r.push(['เงินดาวน์', money(d.down)], ['ส่วนลดดาวน์', money(d.down_disc)], ['ยอดจัด', money(d.fin_amount)], ['ดอกเบี้ย', d.rate !== null && d.rate !== undefined ? d.rate + ' %' : '–'], ['จำนวนงวด', d.term ? d.term + ' งวด' : '–']);
+  const mo = cash ? null : dealMonthly(d); if (mo) r.push(['ค่างวดโดยประมาณ', `${money(mo)} บาท / เดือน`]);
+  if (d.paint) r.push(['ค่าสี', money(d.paint)]);
+  r.push(['แคมเปญ Honda', d.campaign || '–'], ['Margin รถ', money(d.margin_car)]);
+  if (!cash) r.push([`AT แคมเปญ${d.at_step ? ` (Step ช่อง ${d.at_step})` : ''}`, money(d.margin_at)]);
+  r.push(['Honda แคมเปญ', money(d.margin_honda)], ['รวม Margin', money(d.margin)]);
+  return r;
+}
+function dealDiff(old, nw) {
+  const L = { price: 'ราคารถ', disc: 'ส่วนลด', down: 'ดาวน์', down_disc: 'ส่วนลดดาวน์', fin_amount: 'ยอดจัด', rate: 'ดอกเบี้ย', term: 'งวด', campaign: 'แคมเปญ', margin_car: 'Margin รถ', margin_at: 'AT แคมเปญ', margin_honda: 'Honda แคมเปญ', margin: 'รวม Margin' };
+  return Object.keys(L).filter(k => (old[k] ?? null) !== (nw[k] ?? null)).map(k => `${L[k]} ${k === 'campaign' || k === 'rate' || k === 'term' ? esc(old[k] ?? '–') : money(old[k])} → <b>${k === 'campaign' || k === 'rate' || k === 'term' ? esc(nw[k] ?? '–') : money(nw[k])}</b>`);
 }
 function dealBox(a, m, D) {
-  const r = a.rec, d = r.deal, cash = isCash(r), keys = dealKeys(r), web = dealWeb(a, D);
-  const first = !(d && d.at), mayFirst = first && perms().write && canEditBooking(a) && !a.cancelled;
-  const mayEdit = !first && dealAdmin(a) && !a.cancelled && !(a.flow && a.flow.done.confirmed);
-  const editing = m.deal && (mayFirst || (mayEdit && m.dealEdit));
-  const title = `<div class="font-medium text-sm">${cash ? 'ราคารถ (ซื้อสด)' : 'ราคารถและเงื่อนไขไฟแนนซ์'}</div>`;
-  if (!editing) {
-    if (first) return mayFirst ? `<div class="mt-2 p-3 rounded-lg border border-line">${title}<div class="text-sm text-muted mt-1">ยังไม่ได้กรอก ${cash ? 'ราคารถและส่วนลด' : 'ราคารถ ส่วนลด ดาวน์ ยอดจัด ดอกเบี้ย และจำนวนงวด'} · ใบสำคัญรับส่วนลดจะดึงตัวเลขจากตรงนี้</div>
-      <button class="btn btn-dark btn-sm mt-2" data-act="deal-open" data-id="${esc(a.id)}">กรอกราคารถ</button></div>` : '';
-    const rows = keys.filter(k => d[k] !== null && d[k] !== undefined && d[k] !== '').map(k => [dealLabel(k), k === 'rate' ? `${d[k]} %` : k === 'term' ? `${d[k]} งวด` : money(d[k])]);
-    const hist = d.hist || [];
-    return `<div class="mt-2 p-3 rounded-lg border border-line">${title}
-      <table class="tbl text-sm mt-1"><tbody>${[...rows, ...dealCalc(d, cash, dealPaint(d, web))].map(([k, v]) => `<tr><td class="text-muted nowrap">${k}</td><td class="num">${esc(v)}</td></tr>`).join('')}</tbody></table>
-      <div class="text-xs text-muted mt-1">กรอกโดย ${who(d.first || d)} ${fmtDT((d.first || d).at)}${hist.length ? ` · แก้ไขล่าสุด ${who(d)} ${fmtDT(d.at)} (แก้ไข ${hist.length} ครั้ง)` : ''}</div>
-      ${mayEdit ? `<button class="btn btn-ghost btn-sm mt-2" data-act="deal-open" data-id="${esc(a.id)}">แก้ไขราคา / เงื่อนไข</button>` : (!first && canEditBooking(a) && !dealAdmin(a) ? '<div class="text-xs text-muted mt-1">ต้องการแก้ตัวเลข แจ้งแอดมินสาขาหรือผู้จัดการ</div>' : '')}
-      ${hist.length ? `<details class="mt-1"><summary class="text-xs cursor-pointer">ประวัติการแก้ไข</summary>${hist.slice().reverse().map(h => `<div class="text-xs text-muted">· ${fmtDT(h.at)} ${who(h)}: ${keys.filter(k => h[k] !== undefined && h[k] !== null && h[k] !== '').map(k => `${dealLabel(k).replace(/ \(.*\)/, '')} ${k === 'rate' || k === 'term' ? h[k] : money(h[k])}`).join(' · ')}</div>`).join('')}</details>` : ''}</div>`;
+  const cash = isCash(a.rec), st = dealState(a), d = st.d, x = termsCtxAt(a, D), web = dealWeb(a, D);
+  const title = `<div class="font-medium text-sm">เงื่อนไขการขาย (${cash ? 'ซื้อสด' : 'ไฟแนนซ์'})</div>`;
+  const editing = m.deal && m.dealMode && ((m.dealMode === 'first' && st.mayFirst) || (m.dealMode === 'admin' && st.mayAdmin) || (m.dealMode === 'req' && st.mayReq));
+  if (editing) {
+    const lockPrice = !!web && !st.admin;
+    const v = { ...m.deal, ...(lockPrice ? { price: web.price } : {}) };
+    const paint = web && num(v.price) === web.price ? web.paint : 0;
+    const priceNote = web ? `ดึงจากราคาในเว็บ (${esc(web.src)})${web.paint ? ` · รวมค่าสี ${money(web.paint)}` : ''}${!lockPrice && num(v.price) && num(v.price) !== web.price ? ` · <b style="color:var(--warn)">ไม่ตรงราคาในเว็บ ${money(web.price)}</b>` : ''}` : 'ยังไม่มีราคารุ่น/เกรด/สีนี้ในเว็บ ใส่เอง';
+    const note = m.dealMode === 'first' ? 'บันทึกแล้ว เซลล์ขอแก้ได้อีก 1 ครั้งตอนไฟแนนซ์ผ่าน (แอดมินสาขาหรือผู้จัดการอนุมัติ)'
+      : m.dealMode === 'req' ? 'ขอแก้ได้ครั้งเดียว · ส่งแล้วรอแอดมินสาขาหรือผู้จัดการอนุมัติ ตัวเลขเดิมยังใช้อยู่จนกว่าจะอนุมัติ' : 'แอดมินขึ้นไปแก้ได้เลย ระบบเก็บตัวเลขเดิมไว้ในประวัติ';
+    return `<div class="mt-2 p-3 rounded-lg border border-line" style="background:var(--surface-2)">${title}<div class="mt-2">
+      ${termsFields(x, v, { attr: 'data-modal', pre: 'deal', idp: 'dl', paint, priceDisc: true, lockPrice, priceNote })}</div>
+      ${m.dealMode === 'req' ? `<div class="field mt-2"><label for="dl-why" class="req">เหตุผลที่ขอแก้</label><input id="dl-why" data-modal="dealWhy" value="${esc(m.dealWhy || '')}" autocomplete="off" placeholder="เช่น ไฟแนนซ์อนุมัติดาวน์ 25%"></div>` : ''}
+      <div class="text-xs text-muted mt-2">${note}</div>
+      <div class="flex gap-2 mt-2"><button class="btn btn-dark btn-sm" data-act="deal-save" data-id="${esc(a.id)}">${m.dealMode === 'req' ? 'ส่งขอแก้ไข' : 'บันทึก'}</button><button class="btn btn-ghost btn-sm" data-act="deal-close">ยกเลิก</button></div></div>`;
   }
-  // the sales cannot type over the price list; the branch admin and up can (a special price, a price not in the list yet)
-  const lockPrice = !!web && !dealAdmin(a);
-  // the amount financed is worked out: price after the car discount − down payment (23/10)
-  const v = { ...m.deal, ...(lockPrice ? { price: web.price } : {}) };
-  v.fin_amount = commFinAmount({ price: v.price, discount: v.disc, down: v.down });
-  const F = k => k === 'fin_amount' ? `<div class="field"><label>ยอดจัด</label><div class="num p-2 rounded-lg border border-line">${v.fin_amount ? money(v.fin_amount) : '–'}</div><span class="text-xs text-muted">ราคารถ − ส่วนลด − ดาวน์ (คิดให้เอง)</span></div>` : `<div class="field"><label for="dl-${k}" ${k === 'price' ? 'class="req"' : ''}>${dealLabel(k)}</label><input id="dl-${k}" type="number" min="0" ${k === 'rate' ? 'step="0.01" max="30"' : k === 'term' ? 'step="1" max="120"' : 'step="100"'} inputmode="decimal" data-modal="deal.${k}" value="${esc(k === 'price' && lockPrice ? web.price : v[k] ?? '')}" ${k === 'price' && lockPrice ? 'readonly style="background:var(--surface-2)"' : ''}>${k === 'price' ? `<span class="text-xs text-muted">${web ? `ดึงจากราคาในเว็บ (${esc(web.src)}) ตามรุ่น เกรด สี${web.paint ? ` · รวมค่าสี ${money(web.paint)}` : ''}${lockPrice ? '' : num(v.price) && num(v.price) !== web.price ? ` · <b style="color:var(--warn)">ไม่ตรงราคาในเว็บ ${money(web.price)}</b>` : ''}` : 'ยังไม่มีราคารุ่น/เกรด/สีนี้ในเว็บ ใส่เอง'}</span>` : ''}</div>`;
-  return `<div class="mt-2 p-3 rounded-lg border border-line" style="background:var(--surface-2)">${title}
-    <div class="grid sm:grid-cols-3 gap-3 mt-2">${keys.map(F).join('')}</div>
-    <table class="tbl text-sm mt-2"><tbody>${dealCalc(v, cash, web ? web.paint : 0).map(([k, x]) => `<tr><td class="text-muted nowrap">${k}</td><td class="num">${esc(x)}</td></tr>`).join('')}</tbody></table>
-    <div class="text-xs text-muted mt-1">${first ? 'บันทึกครั้งแรกแล้ว เซลล์แก้เองไม่ได้ ถ้าต้องแก้ แอดมินสาขาหรือผู้จัดการเป็นคนแก้' : 'แก้ไขโดยแอดมินขึ้นไป ระบบเก็บตัวเลขเดิมไว้ในประวัติ'}</div>
-    <div class="flex gap-2 mt-2"><button class="btn btn-dark btn-sm" data-act="deal-save" data-id="${esc(a.id)}">บันทึก</button><button class="btn btn-ghost btn-sm" data-act="deal-close">ยกเลิก</button></div></div>`;
+  if (st.first) return st.mayFirst ? `<div class="mt-2 p-3 rounded-lg border border-line">${title}<div class="text-sm text-muted mt-1">ยังไม่ได้ใส่ราคา ส่วนลด ${cash ? '' : 'ดาวน์ ผ่อน '}แคมเปญ และ Margin (ใบจองจาก Google Form ใส่ที่นี่) · ใบสำคัญรับส่วนลดและค่าคอมใช้ตัวเลขชุดนี้</div>
+      <button class="btn btn-dark btn-sm mt-2" data-act="deal-open" data-mode="first" data-id="${esc(a.id)}">ใส่เงื่อนไขการขาย</button></div>` : '';
+  const hist = d.hist || [], req = d.req;
+  return `<div class="mt-2 p-3 rounded-lg border border-line">${title}
+    <table class="tbl text-sm mt-1"><tbody>${dealRows(d, cash).map(([k, v]) => `<tr><td class="text-muted nowrap">${k}</td><td class="${k === 'แคมเปญ Honda' ? '' : 'num'}">${esc(v)}</td></tr>`).join('')}</tbody></table>
+    <div class="text-xs text-muted mt-1">ใส่โดย ${who(d.first || d)} ${fmtDT((d.first || d).at)}${d.src ? ` (${esc(d.src)})` : ''}${hist.length ? ` · แก้ไขล่าสุด ${who(d)} ${fmtDT(d.at)} (แก้ไข ${hist.length} ครั้ง)` : ''}${st.usedReq ? ' · เซลล์ใช้สิทธิ์ขอแก้ไขแล้ว' : ''}</div>
+    ${req && req.at ? `<div class="mt-2 p-2 rounded-lg text-sm" style="background:var(--warn-soft)"><b>เซลล์ขอแก้ไข รออนุมัติ</b> · ${who(req)} ${fmtDT(req.at)}${req.why ? ` · เหตุผล: ${esc(req.why)}` : ''}
+      <div class="mt-1">${dealDiff(d, req.vals).join(' · ') || 'ไม่มีตัวเลขเปลี่ยน'}</div>
+      ${st.admin ? `<div class="flex gap-2 mt-2"><button class="btn btn-red btn-sm" data-act="deal-approve" data-id="${esc(a.id)}">อนุมัติ</button><button class="btn btn-ghost btn-sm" data-act="deal-reject" data-id="${esc(a.id)}">ไม่อนุมัติ</button></div>` : '<div class="text-xs mt-1">รอแอดมินสาขาหรือผู้จัดการอนุมัติ</div>'}</div>` : ''}
+    <div class="flex flex-wrap gap-2 mt-2">${st.mayAdmin ? `<button class="btn btn-ghost btn-sm" data-act="deal-open" data-mode="admin" data-id="${esc(a.id)}">แก้ไขเงื่อนไข</button>` : ''}
+      ${st.mayReq ? `<button class="btn btn-ghost btn-sm" data-act="deal-open" data-mode="req" data-id="${esc(a.id)}">ขอแก้ไขเงื่อนไข (เหลือ 1 ครั้ง · แอดมินอนุมัติ)</button>` : ''}</div>
+    ${!st.admin && canEditBooking(a) && !st.reqOpen && !st.mayReq && !poLocked(a) ? `<div class="text-xs text-muted mt-1">${st.usedReq ? 'ใช้สิทธิ์ขอแก้ไขครบแล้ว ต้องแก้อีก แจ้งแอดมินสาขาหรือผู้จัดการ' : !st.salesWindow ? 'ขอแก้ไขได้ 1 ครั้งเมื่อไฟแนนซ์ผ่าน' : ''}</div>` : ''}
+    ${hist.length ? `<details class="mt-1"><summary class="text-xs cursor-pointer">ประวัติการแก้ไข</summary>${hist.slice().reverse().map(h => `<div class="text-xs text-muted">· ${fmtDT(h.at)} ${who(h)}${h.how ? ` (${esc(h.how)})` : ''}: ราคา ${money(h.price)} · ส่วนลด ${money(h.disc)}${h.down !== null && h.down !== undefined ? ` · ดาวน์ ${money(h.down)} · ${h.rate ?? '–'}% ${h.term ?? '–'} งวด` : ''} · ${esc(h.campaign || '–')} · Margin ${money(h.margin)}</div>`).join('')}</details>` : ''}</div>`;
 }
-// the commission form starts from the deal numbers (comm values the sales typed win)
+// the commission and the discount receipt read these
 function commDeal(a) {
   const dl = a.rec.deal || {}; if (!dl.at) return {};
-  const o = { price: dl.price, discount: dl.disc, down: dl.down, down_disc: dl.down_disc, rate: dl.rate, term: dl.term };
+  const o = { price: dl.price, discount: dl.disc, down: dl.down, down_disc: dl.down_disc, fin_amount: dl.fin_amount, rate: dl.rate, term: dl.term, campaign: dl.campaign, margin: dl.margin, margin_car: dl.margin_car, margin_at: dl.margin_at, margin_honda: dl.margin_honda };
   return Object.fromEntries(Object.entries(o).filter(([, x]) => x !== null && x !== undefined));
 }
-function dealCheck(v, keys) {
-  for (const k of keys) {
-    const x = v[k];
-    if (x === '' || x === null || x === undefined) { if (k === 'price') return { err: 'ใส่ราคารถ', id: 'dl-price' }; continue; }
-    const n = Number(x);
-    if (!isFinite(n) || n < 0) return { err: `${dealLabel(k)} ต้องเป็นตัวเลข`, id: 'dl-' + k };
-    if (k === 'rate' && n > 30) return { err: 'ดอกเบี้ยเกิน 30% ตรวจอีกครั้ง', id: 'dl-rate' };
-    if (k === 'term' && (n < 1 || n > 120 || n !== Math.round(n))) return { err: 'จำนวนงวดต้องเป็นจำนวนเต็ม 1–120', id: 'dl-term' };
-  }
-  if (num(v.disc) > num(v.price)) return { err: 'ส่วนลดมากกว่าราคารถ', id: 'dl-disc' };
-  if (num(v.down_disc) > num(v.down) && num(v.down)) return { err: 'ส่วนลดดาวน์มากกว่าเงินดาวน์', id: 'dl-down_disc' };
-  return {};
-}
+function dealOld(d) { return Object.fromEntries(['price', 'disc', 'down', 'down_disc', 'fin_amount', 'rate', 'term', 'campaign_id', 'campaign', 'campaign_text', 'camp_month', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'margin', 'paint', 'at', 'by', 'role', 'how'].map(k => [k, d[k] ?? null])); }
 Object.assign(ACTIONS, {
   'deal-open'(el) {
     const a = atById(el.dataset.id); if (!a) return;
     const d = a.rec.deal || {}, cm = a.rec.comm || {}, r = a.rec, web = dealWeb(a, derive());
-    // a first entry starts from what the booking or the commission data already has
-    S.modal.deal = d.at ? Object.fromEntries(dealKeys(r).map(k => [k, d[k] ?? ''])) : { price: (web && web.price) || num(cm.price) || num(r.price) || '', disc: num(r.discount) || '', down: num(cm.down) || '', down_disc: '', fin_amount: num(cm.fin_amount) || '', rate: cm.rate ?? '', term: cm.term ?? '' };
-    S.modal.dealEdit = true; render();
+    const keep = ['price', 'disc', 'down', 'down_disc', 'rate', 'term', 'campaign_id', 'campaign_text', 'at_step', 'margin_car', 'margin_at', 'margin_honda'];
+    // a first entry starts from what the booking or the old commission data already has
+    S.modal.deal = d.at ? Object.fromEntries(keep.map(k => [k, d[k] ?? ''])) : { price: (web && web.price) || num(cm.price) || num(r.price) || '', disc: num(r.discount) || num(cm.discount) || '', down: num(cm.down) || '', down_disc: num(cm.down_disc) || '', rate: cm.rate ?? '', term: cm.term ?? '', campaign_id: '', at_step: '' };
+    S.modal.dealMode = el.dataset.mode || 'first'; S.modal.dealWhy = ''; render();
   },
-  'deal-close'() { S.modal.deal = null; S.modal.dealEdit = false; render(); },
+  'deal-close'() { S.modal.deal = null; S.modal.dealMode = null; render(); },
   async 'deal-save'(el) {
-    const a = atById(el.dataset.id), v = S.modal.deal; if (!a || !v) return;
-    const prev = a.rec.deal, first = !(prev && prev.at);
-    if (first ? !(perms().write && canEditBooking(a)) : !dealAdmin(a)) { toast('แก้ราคาและเงื่อนไขได้เฉพาะแอดมินสาขาหรือผู้จัดการ', 'bad'); return; }
-    const web = dealWeb(a, derive());
-    if (web && !dealAdmin(a)) v.price = web.price;
-    v.fin_amount = isCash(a.rec) ? '' : (commFinAmount({ price: v.price, discount: v.disc, down: v.down }) ?? '');
-    const keys = dealKeys(a.rec), ck = dealCheck(v, keys);
-    if (ck.err) { toast(ck.err, 'bad'); if (ck.id) $('#' + ck.id)?.focus(); return; }
-    const vals = Object.fromEntries(keys.map(k => [k, v[k] === '' || v[k] === undefined ? null : (k === 'rate' ? Number(v[k]) : k === 'term' ? parseInt(v[k], 10) : num(v[k]))]));
-    if (!first && keys.every(k => (prev[k] ?? null) === vals[k])) { S.modal.deal = null; S.modal.dealEdit = false; render(); return; }
-    const old = first ? null : Object.fromEntries([...keys, 'at', 'by', 'role'].map(k => [k, prev[k] ?? null]));
-    // the colour surcharge only counts when the price is the price-list price
-    const paint = web && vals.price === web.price ? web.paint : 0;
-    const rec = { ...vals, paint, price_src: web && vals.price === web.price ? web.src : 'ใส่เอง', ...actor(), cash: isCash(a.rec), first: first ? actor() : prev.first || { at: prev.at, by: prev.by, role: prev.role }, hist: first ? [] : [...(prev.hist || []), old] };
-    if (await saveFlow(a, { deal: rec }, first ? 'บันทึกราคารถแล้ว' : 'แก้ไขราคา / เงื่อนไขแล้ว')) { S.modal.deal = null; S.modal.dealEdit = false; render(); }
+    const a = atById(el.dataset.id), v = S.modal.deal, mode = S.modal.dealMode; if (!a || !v) return;
+    const D = derive(), st = dealState(a), prev = st.d;
+    if (!((mode === 'first' && st.mayFirst) || (mode === 'admin' && st.mayAdmin) || (mode === 'req' && st.mayReq))) { toast('แก้เงื่อนไขไม่ได้ในขั้นนี้', 'bad'); return; }
+    const x = termsCtxAt(a, D), web = dealWeb(a, D);
+    if (web && !st.admin) v.price = web.price;
+    const ck = termsCheck(x, v); if (ck.err) { toast(ck.err, 'bad'); $('#dl-' + ck.id)?.focus(); return; }
+    const paint = web && num(v.price) === web.price ? web.paint : 0;
+    const vals = { ...termsRecord(x, v, paint), price_src: web && num(v.price) === web.price ? web.src : 'ใส่เอง', cash: isCash(a.rec) };
+    if (mode === 'req') {
+      const why = String(S.modal.dealWhy || '').trim(); if (!why) { toast('ใส่เหตุผลที่ขอแก้', 'bad'); $('#dl-why')?.focus(); return; }
+      if (await saveFlow(a, { deal: { ...prev, req: { vals, why, ...actor() } } }, 'ส่งขอแก้ไขแล้ว รอแอดมินสาขาหรือผู้จัดการอนุมัติ')) { S.modal.deal = null; S.modal.dealMode = null; render(); }
+      return;
+    }
+    const first = mode === 'first';
+    const rec = { ...(first ? {} : prev), ...vals, ...actor(), how: first ? null : 'แอดมินแก้', first: first ? actor() : prev.first || { at: prev.at, by: prev.by, role: prev.role }, hist: first ? [] : [...(prev.hist || []), dealOld(prev)], src: first ? 'ขั้นไฟแนนซ์' : prev.src };
+    if (await saveFlow(a, { deal: rec }, first ? 'บันทึกเงื่อนไขการขายแล้ว' : 'แก้ไขเงื่อนไขแล้ว')) { S.modal.deal = null; S.modal.dealMode = null; render(); }
+  },
+  async 'deal-approve'(el) {
+    const a = atById(el.dataset.id); if (!a) return;
+    const d = a.rec.deal || {}; if (!dealAdmin(a) || !(d.req && d.req.at)) return;
+    const q = d.req;
+    const rec = { ...d, ...q.vals, at: new Date().toISOString(), by: q.by, role: q.role, how: `เซลล์ขอแก้ · อนุมัติโดย ${roleLabel()}`, hist: [...(d.hist || []), dealOld(d)], req: null, sales_edit: { ...actor(), asked: q.at, why: q.why } };
+    await saveFlow(a, { deal: rec }, 'อนุมัติแล้ว ใช้เงื่อนไขใหม่');
+  },
+  async 'deal-reject'(el) {
+    const a = atById(el.dataset.id); if (!a) return;
+    const d = a.rec.deal || {}; if (!dealAdmin(a) || !(d.req && d.req.at)) return;
+    // a refused request does not use up the sales' one change
+    await saveFlow(a, { deal: { ...d, req: null, rejected: [...(d.rejected || []), { ...d.req, rejected: actor() }] } }, 'ไม่อนุมัติ ใช้เงื่อนไขเดิม');
   },
   async 'po-skip'(el) {
     const a = atById(el.dataset.id); if (!a) return;

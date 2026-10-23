@@ -126,6 +126,7 @@ function bookingForm(D) {
         ${d.source === 'อื่น ๆ' ? F('source_other', 'แหล่งที่มาอื่น (พิมพ์)', inp('source_other', 'text', 'placeholder="เช่น TikTok, งานบูธ, ป้ายหน้าโชว์รูม" maxlength="60"'), true) : ''}
         ${F('lead_id', 'Lead ID จาก BOT (ถ้ามี)', inp('lead_id', 'text', 'placeholder="ถ้ามี"'))}
       </fieldset>
+      ${bookTermsBox(d)}
       <fieldset class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-lg" style="background:var(--surface-2)"><legend class="font-head font-semibold px-1">ข้อมูลเพิ่ม (ไม่อยู่ใน Google Form · ไม่บังคับ ใส่ทีหลังได้)</legend>
         ${F('booking_no', 'เลขที่ใบจอง IDS', inp('booking_no', 'text', 'inputmode="numeric" maxlength="12" placeholder="10 หลักจาก IDS"'), false, 'ยังไม่ได้ลง IDS เว้นไว้ก่อนได้ ระบบจะเตือนจนกว่าจะใส่')}
         ${d.purchase === 'ไฟแนนซ์' ? F('finance', 'บริษัทไฟแนนซ์ที่ยื่น', sel('finance', FINANCE)) : ''}
@@ -137,7 +138,7 @@ function bookingForm(D) {
       </fieldset>
       ${multiBlock(d, D)}
       ${checks.length ? `<div class="p-3 rounded-lg text-sm flex flex-col gap-1" style="background:var(--surface-2)"><b>ผลตรวจ</b>${checks.map(c => `<div style="color:var(--${c.bad ? 'warn' : 'good'})">${c.bad ? '⚠' : '✓'} ${esc(c.t)}</div>`).join('')}</div>` : ''}
-      <p class="text-xs text-muted">ราคา ดาวน์ ยอดจัด ดอกเบี้ย และของแถมรายชิ้นสำหรับคิดค่าคอม กรอกทีหลังตอนส่งมอบ</p>
+      <p class="text-xs text-muted">ของแถมรายชิ้นใส่ทีหลังในใบสั่งแต่ง (PO)</p>
       <div class="flex flex-wrap gap-3 items-center">
         <button type="submit" class="btn btn-red" ${p.write && !running && !S.saving ? '' : 'disabled'}>${S.saving ? '<span class="spin"></span> กำลังบันทึก…' : 'บันทึกใบจองเข้าคิว'}</button>
         <button type="button" class="btn btn-ghost" data-act="booking-reset">ล้างฟอร์ม</button>
