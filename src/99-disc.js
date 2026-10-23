@@ -37,9 +37,12 @@ function discPre(a, D) {
   };
 }
 function discTotal(v) { return v.cash ? num(v.cashDisc) : num(v.body) + num(v.downDisc); }
-function discBox(a, m, D) {
+// the button: next to "พิมพ์ใบแต่งรถ" (po) or in the delivery step (deliv); the form opens where it was pressed
+function discBtn(a, at) { return perms().write && canEditBooking(a) && !a.cancelled ? `<button class="btn btn-ghost btn-sm" data-act="disc-open" data-at="${at}" data-id="${esc(a.id)}">พิมพ์ใบสำคัญรับส่วนลด</button>` : ''; }
+function discBox(a, m, D, at = 'deliv') {
   if (!perms().write || !canEditBooking(a) || a.cancelled) return '';
-  if (!m.disc) return `<div class="mt-2"><button class="btn btn-ghost btn-sm" data-act="disc-open" data-id="${esc(a.id)}">ใบสำคัญรับส่วนลด (พิมพ์ให้ลูกค้าเซ็น)</button>${a.rec.disc_doc && a.rec.disc_doc.at ? ` <span class="text-xs text-muted">พิมพ์ล่าสุด ${fmtDT(a.rec.disc_doc.at)}</span>` : ''}</div>`;
+  const here = m.disc && (m.discAt || 'deliv') === at;
+  if (!here) return at === 'po' ? '' : (m.disc ? '' : `<div class="mt-2">${discBtn(a, 'deliv')}${a.rec.disc_doc && a.rec.disc_doc.at ? ` <span class="text-xs text-muted">พิมพ์ล่าสุด ${fmtDT(a.rec.disc_doc.at)}</span>` : ''}</div>`);
   const v = m.disc, F = (k, label, type = 'text', extra = '') => `<div class="field"><label for="ds-${k}">${label}</label><input id="ds-${k}" type="${type}" ${type === 'number' ? 'min="0" step="100"' : 'autocomplete="off"'} data-modal="disc.${k}" value="${esc(v[k] ?? '')}" ${extra}></div>`;
   return `<div class="mt-2 p-3 rounded-lg border border-line" style="background:var(--surface-2)"><div class="font-medium mb-2">ใบสำคัญรับส่วนลด · ตรวจข้อมูลก่อนพิมพ์</div>
     <div class="grid sm:grid-cols-3 gap-3">${F('date', 'วันที่', 'date')}${F('cust', 'ชื่อลูกค้า')}${F('mobile', 'มือถือ')}
@@ -80,7 +83,7 @@ function printDisc(a, v) {
   openDoc(spec, docName('ใบสำคัญรับส่วนลด', a.cust, v.date || todayISO()), { kind: 'at', id: a.id });
 }
 Object.assign(ACTIONS, {
-  'disc-open'(el) { const a = atById(el.dataset.id); if (!a) return; if (!S.modal || S.modal.id !== a.id) S.modal = { kind: 'at', id: a.id }; S.modal.disc = discPre(a, derive()); render(); },
+  'disc-open'(el) { const a = atById(el.dataset.id); if (!a) return; if (!S.modal || S.modal.id !== a.id) S.modal = { kind: 'at', id: a.id }; S.modal.disc = discPre(a, derive()); S.modal.discAt = el.dataset.at || 'deliv'; render(); },
   'disc-close'() { if (S.modal) { S.modal.disc = null; render(); } },
   async 'disc-print'(el) {
     const a = atById(el.dataset.id), v = S.modal && S.modal.disc; if (!a || !v || !canEditBooking(a)) return;
