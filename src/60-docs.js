@@ -21,13 +21,14 @@ const docImg = id => (S.assetUrls[id] && /^(blob:|data:)/.test(S.assetUrls[id]))
 const docLoadImg = src => new Promise(ok => { if (!src) { ok(null); return; } const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; setTimeout(() => ok(im.complete && im.naturalWidth ? im : null), 6000); });
 // spec: { title, sub, blocks: [{ kv: [[th, td, th, td] | [th, td]] }, { h }, { items: { cols, widths, rows } }, { img, label }, { note }, { sign: [..] }] }
 async function docCanvas(spec) {
-  try { await document.fonts.load(`16px ${DOC_FONT}`); await document.fonts.load(`600 16px ${DOC_FONT}`); } catch (e) { /* use what is there */ }
+  const FF = spec.font ? `${spec.font}, ${DOC_FONT}` : DOC_FONT;   // an official form can ask for Sarabun (23/10)
+  try { await document.fonts.load(`16px ${FF}`); await document.fonts.load(`600 16px ${FF}`); await document.fonts.load(`700 16px ${FF}`); } catch (e) { /* use what is there */ }
   const imgs = await Promise.all(spec.blocks.map(b => b.img && !spec.noImg ? docLoadImg(b.img) : null));
   // two passes: measure, then draw on a canvas of the right height
   const run = (ctx, draw) => {
     const W = DOC_W - DOC_M * 2, LH = spec.compact ? 18 : 20, PAD = spec.compact ? 4 : 6;
     let y = DOC_M;
-    const font = (sz, wt = 400) => { ctx.font = `${wt} ${sz}px ${DOC_FONT}`; };
+    const font = (sz, wt = 400) => { ctx.font = `${wt} ${sz + (spec.font ? 2 : 0)}px ${FF}`; };
     const text = (t, x, yy, opts = {}) => { if (draw) { ctx.fillStyle = '#000'; ctx.textAlign = opts.align || 'left'; ctx.textBaseline = 'top'; ctx.fillText(t, x, yy); } };
     const line = (x1, y1, x2, y2) => { if (draw) { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); } };
     // a table row: cells [{ t, w, bold }]; returns the row height
@@ -45,6 +46,13 @@ async function docCanvas(spec) {
       y += h; return h;
     };
     if (spec.compact) y -= 16;
+    // letterhead: the branch company, address, tax id, phones (left) and an optional right block
+    if (spec.letter) {
+      const L = spec.letter, top = y;
+      L.lines.forEach((t, i) => { font(i ? 12 : 15, i ? 400 : 700); text(t, DOC_M, y); y += i ? 18 : 22; });
+      if (L.right) { let ry = top; L.right.forEach((t, i) => { font(i ? 12 : 14, i ? 400 : 700); text(t, DOC_W - DOC_M, ry, { align: 'right' }); ry += i ? 18 : 22; }); }
+      y += 6; if (draw) { ctx.save(); ctx.lineWidth = 1.5; line(DOC_M, y, DOC_W - DOC_M, y); ctx.restore(); } y += 18;
+    }
     font(22, 600); text(spec.title, DOC_W / 2, y, { align: 'center' }); y += 34;
     if (spec.sub) { font(13); docWrap(ctx, spec.sub, W).forEach(ln => { text(ln, DOC_W / 2, y, { align: 'center' }); y += LH; }); y += 10; }
     if (spec.meta) { font(12); if (draw) ctx.fillStyle = '#000'; text(spec.meta[0] || '', DOC_M, y); text(spec.meta[1] || '', DOC_W - DOC_M, y, { align: 'right' }); y += LH + 4; }
@@ -74,6 +82,23 @@ async function docCanvas(spec) {
         text('ลงชื่อ CR', DOC_M + W - 330, y); dots(DOC_M + W - 270, DOC_M + W - 130, y + 16); text('วันที่', DOC_M + W - 120, y); dots(DOC_M + W - 85, DOC_M + W - 10, y + 16); y += 30;
         if (draw) ctx.strokeRect(DOC_M, top, W, y - top); y += 10;
       }
+      // a form line: label, then the value written on a dotted line ([{ t, v, w, box }]), like a paper form (23/10)
+      if (b.lines) {
+        b.lines.forEach(rw => {
+          let x = DOC_M + (rw.indent || 0); const fs = 14;
+          rw.forEach(seg => {
+            if (seg.box !== undefined) { box(x, y); if (seg.box) { font(14, 700); text('✓', x + 1, y - 1); } x += 20; }
+            if (seg.t) { font(fs); text(seg.t, x, y); x += ctx.measureText(seg.t).width + 6; }
+            if (seg.v !== undefined) {
+              const w = seg.w ? W * seg.w : DOC_M + W - x; dots(x, x + w, y + 19);
+              font(fs, 700); const v = String(seg.v ?? ''); text(v, seg.left ? x + 6 : x + w / 2, y, { align: seg.left ? 'left' : 'center' }); x += w + 8;
+            }
+          });
+          y += rw.gap || (spec.font ? 40 : 32);
+        });
+        y += 4;
+      }
+      if (b.para) { font(14); docWrap(ctx, b.para, W - (b.indent || 0)).forEach(ln => { text(ln, DOC_M + (b.indent || 0), y); y += 24; }); y += 6; }
       // accounting: credit note, transfer date and amount, filled in by hand
       if (b.acct) {
         const top = y; y += 10; font(13);
