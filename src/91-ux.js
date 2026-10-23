@@ -65,7 +65,7 @@ function datafixItems(D) {
       ['ยกเลิกในเว็บแล้ว แต่ IDS ยังมีใบจอง (ให้ยกเลิกใน IDS)', at.filter(a => a.cancelled && a.idsLeft).length, 'warn', { act: 'book-filter', st: 'cxids' }],
       ['ใบจองยังไม่มีเลขที่ใบเสร็จมัดจำ', at.filter(a => a.active && !a.rec.receipt_no && !a.rec.imported).length, 'neutral', { act: 'go', view: 'flow', sub: 'booked' }]]],
     ['รถและล็อก', [
-      ['รถออกจากสต็อก ไม่รู้ว่าไปไหน', outStock, 'bad', { act: 'go', view: 'upload' }],
+      ['รถออกจากสต็อก ไม่รู้ว่าไปไหน', outStock, 'bad', { act: 'out-go' }],
       ['IDS จัดสรรรถที่มีล็อก ชื่อไม่ตรง', D.locks.filter(l => l.idsAsk && ['pending', 'approved', 'allocated'].includes(l.status) && inBr({ br: l.car_br })).length, 'warn', { act: 'go', view: 'lock', sub: 'active' }],
       ['รับรถเข้ารอยืนยัน', D.receipts.filter(r => r.status === 'pending' && inBr(r)).length, 'neutral', { act: 'go', view: 'receive' }]]]
   ];

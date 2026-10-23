@@ -9,7 +9,9 @@ function outFixReasons() { return [['other_br', 'ขายให้สาขา�
 function outFixWhy(r) { const t = (outFixReasons().find(x => x[0] === r.reason) || [, r.reason])[1]; return t + (r.text ? ' · ' + r.text : ''); }
 // a car flagged by an older upload that a later Stock file of the same branch lists again never left (the older file
 // was incomplete): it is no longer a question
-function outBack(u, o) { const c = derive().cars.get(o.vin); return !!(c && c.src === 'IDS' && c.br === u.br && !c.fromBr); }
+// a car now in another branch's Stock IDS file moved there (23/10): not lost either
+function outBack(u, o) { const c = derive().cars.get(o.vin); return !!(c && c.src === 'IDS' && (c.br !== u.br || !c.fromBr)); }
+function outBackBr(u, o) { const c = derive().cars.get(o.vin); return c && c.br !== u.br ? c.br : null; }
 function outOpen(u, o) { return !!(o && o.flag && !o.res && !outBack(u, o)); }
 function outOpenLocks(vin) { return [...S.locks.entries()].filter(([, l]) => l.vin === vin && !l.hidden && ['pending', 'approved', 'allocated'].includes(l.status)); }
 function outFixList(u) {
@@ -19,7 +21,7 @@ function outFixList(u) {
     const back = o.flag && !o.res && outBack(u, o), lk = outOpen(u, o) ? outOpenLocks(o.vin).length : 0;
     return `<div class="flex flex-wrap gap-x-4 items-center">${can && outOpen(u, o) ? `<input type="checkbox" class="w-4 h-4" data-outfix="${esc(u.id)}" data-vin="${esc(o.vin)}" ${F && F.sel[o.vin] ? 'checked' : ''} aria-label="เลือก ${esc(o.vin)}">` : ''}<span class="code">${esc(o.vin)}</span><span class="text-muted">${specLabel(o.spec)}</span>
       ${o.res ? `<span style="color:var(--good)">ระบุแล้ว: ${esc(outFixWhy(o.res))}</span><span class="text-xs text-muted">${fmtDT(o.res.at)} ${esc(o.res.role || '')}</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>`
-        : back ? `<span style="color:var(--good)">กลับมาอยู่ในไฟล์ Stock ล่าสุดแล้ว (ไม่ได้ออกจริง ไฟล์รอบนั้นไม่ครบ)</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>`
+        : back ? `<span style="color:var(--good)">${outBackBr(u, o) ? `อยู่ในไฟล์ Stock สาขา ${esc(outBackBr(u, o))} แล้ว (ย้ายสาขา)` : 'กลับมาอยู่ในไฟล์ Stock ล่าสุดแล้ว (ไม่ได้ออกจริง ไฟล์รอบนั้นไม่ครบ)'}</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>`
         : `<span style="color:var(--${o.flag ? 'bad' : 'muted'})">${esc(o.why)}</span>${lk ? `<span class="text-xs" style="color:var(--warn)">ล็อกเปิดอยู่ ${lk}</span>` : ''}`}</div>`;
   };
   const bar = can && todo.length ? `<div class="p-3 rounded-lg mb-2" style="background:var(--warn-soft)">
@@ -74,6 +76,12 @@ async function outFixSave(id) {
   toast(`บันทึกแล้ว ${vins.length} คัน${closed ? ` · ยกเลิกล็อก ${closed} รายการ` : ''}`); render();
 }
 Object.assign(ACTIONS, {
+  // from the notice: open the upload page with the newest Stock upload that still has cars to explain
+  'out-go'() {
+    const u = [...S.uploads.entries()].map(([id, x]) => ({ id, ...x })).filter(x => x.src === 'stock' && inBr(x) && (x.out || []).some(o => outOpen(x, o))).sort((a, b) => (b.at || '').localeCompare(a.at || ''))[0];
+    navPush(); S.view = 'upload'; S.modal = null; if (u) S.filters.uplOpen = u.id; setHash(); render();
+    if (u) setTimeout(() => { const b = document.querySelector(`[data-act="upl-open"][data-id="${u.id}"]`); if (b) b.scrollIntoView({ block: 'center' }); }, 50);
+  },
   'outfix-all'(el) { const F = outFixState(el.dataset.id), u = S.uploads.get(el.dataset.id); F.sel = {}; if (el.dataset.v && u) (u.out || []).filter(o => outOpen(u, o)).forEach(o => { F.sel[o.vin] = true; }); render(); },
   async 'outfix-save'(el) { await outFixSave(el.dataset.id); }
 });
