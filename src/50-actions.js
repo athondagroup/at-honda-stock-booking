@@ -8,6 +8,7 @@ function renderModal(D) {
   else if (m.kind === 'special') body = spModal(m, D);
   else if (m.kind === 'quota') body = quotaModal(m, D);
   else if (m.kind === 'rptedit') body = rptEditModal(m, D);
+  else if (m.kind === 'cdbedit') body = cdbEditModal(m, D);
   else if (m.kind === 'tgtadj') body = tgtAdjModal(m);
   else if (m.kind === 'note') body = noteModal(m);
   else if (m.kind === 'at') { body = atModal(m, D); wide = true; }

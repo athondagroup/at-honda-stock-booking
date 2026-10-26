@@ -1,6 +1,8 @@
 // Reads Google Sheets for the AT Honda website: the Google Form response sheet ("ดึงใบจองจาก Google Form")
 // and the IDS stock sheet (backup for "อัปเดตข้อมูล IDS"). { spreadsheetId, range } → values;
 // { spreadsheetId, fields } → the sheet's tab names (spreadsheets.get).
+// Writes (26/10, only the campaign table sheet): { tool: 'update_values' | 'append_values', spreadsheetId, range, values } for admin / manager / executive members;
+// the sheet has to be shared with the service account as Editor. Reads keep the read-only scope.
 // Set secret GOOGLE_SERVICE_ACCOUNT (the JSON key of a Google service account) and share the sheet
 // with that account's e-mail as Viewer. Returns { range, values } like the Sheets API.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -14,10 +16,12 @@ const b64url = (b: ArrayBuffer | Uint8Array | string) => {
   let s = ""; bytes.forEach((x) => s += String.fromCharCode(x));
   return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
-async function token(sa: any) {
+const WRITE_SHEETS = ["17pqWhpWAcj_rqg5jkzqCIVCGj3Awno__aqpIUZ_sSI8"];
+const WRITE_ROLES = ["exec", "aum", "nuch", "admin"];
+async function token(sa: any, write = false) {
   const now = Math.floor(Date.now() / 1000);
   const head = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const claim = b64url(JSON.stringify({ iss: sa.client_email, scope: "https://www.googleapis.com/auth/spreadsheets.readonly", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }));
+  const claim = b64url(JSON.stringify({ iss: sa.client_email, scope: write ? "https://www.googleapis.com/auth/spreadsheets" : "https://www.googleapis.com/auth/spreadsheets.readonly", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }));
   const pem = sa.private_key.replace(/-----[^-]+-----/g, "").replace(/\s/g, "");
   const der = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
   const key = await crypto.subtle.importKey("pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
@@ -31,11 +35,21 @@ Deno.serve(async (req) => {
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: req.headers.get("Authorization") || "" } } });
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return out({ code: "not_granted" }, 401);
-  const { data: m } = await sb.from("members").select("active").eq("email", (user.email || "").toLowerCase()).maybeSingle();
+  const { data: m } = await sb.from("members").select("active, role").eq("email", (user.email || "").toLowerCase()).maybeSingle();
   if (!m || !m.active) return out({ code: "not_granted" }, 403);
   if (body.ping) return out({ ready: !!SA });
   if (!SA) return out({ code: "unavailable" }, 503);
   try {
+    if (body.tool === "update_values" || body.tool === "append_values") {
+      if (!WRITE_ROLES.includes(String(m.role || "")) || !WRITE_SHEETS.includes(body.spreadsheetId) || !Array.isArray(body.values) || !body.range) return out({ code: "not_granted" }, 403);
+      const tw = await token(JSON.parse(SA), true);
+      const b = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(body.spreadsheetId)}/values/${encodeURIComponent(body.range)}`;
+      const rw = body.tool === "update_values"
+        ? await fetch(`${b}?valueInputOption=USER_ENTERED`, { method: "PUT", headers: { Authorization: `Bearer ${tw}`, "Content-Type": "application/json" }, body: JSON.stringify({ range: body.range, majorDimension: "ROWS", values: body.values }) })
+        : await fetch(`${b}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, { method: "POST", headers: { Authorization: `Bearer ${tw}`, "Content-Type": "application/json" }, body: JSON.stringify({ majorDimension: "ROWS", values: body.values }) });
+      if (!rw.ok) { const g = await rw.json().catch(() => ({})); console.error("sheets write", rw.status, g && g.error && g.error.message); return out({ code: "tool_error", status: rw.status, message: (g && g.error && g.error.message) || "" }, 502); }
+      return out(await rw.json());
+    }
     const t = await token(JSON.parse(SA));
     const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(body.spreadsheetId)}`;
     const url = body.range ? `${base}/values/${encodeURIComponent(body.range)}` : `${base}?fields=${encodeURIComponent((body.fields && body.fields.length ? body.fields : ["sheets.properties.title"]).join(","))}`;
