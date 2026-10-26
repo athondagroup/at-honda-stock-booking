@@ -105,7 +105,7 @@ function campUpVinRows(D) {
   const ord = { diff: 0, new: 1, ok: 2 };
   return out.sort((p, q) => ord[p.state] - ord[q.state]);
 }
-function campUpVinRow(r) {
+function campUpVinRow(r, D) {
   const { a, d, it, opts, found, state, done, chg, old } = r, U = S.campUp, pick = (U.pick || {})[it.vin] || '';
   const can = campUpCan(), canEdit = a && d && dealAdmin(a);
   const tone = state === 'ok' ? 'good' : state === 'diff' ? 'warn' : 'muted';
@@ -121,7 +121,7 @@ function campUpVinRow(r) {
     <div class="flex flex-wrap items-center gap-2">${tick}${vinLink({ vin: it.vin })}<span class="text-xs text-muted">${esc(it.name)}${a ? ' · ' + esc(a.cust) + ' · ' + esc(a.br) : ' · ไม่พบใบจองที่ผูกกับ VIN นี้'}</span>${a ? `<button type="button" class="text-xs underline" data-act="at-open" data-id="${esc(a.id)}">เปิดใบจอง</button>` : ''}<span class="ml-auto flex gap-1">${done ? chip('บันทึกแล้ว', 'good') : ''}${chip(label, tone)}</span></div>
     <div class="text-sm p-2 rounded-lg" style="background:var(--surface-2)">ในไฟล์ Honda: <b>${esc(it.opt || '–')}</b><div class="text-xs text-muted">${esc(it.camp)}${it.date ? ' · ส่งมอบ ' + esc(it.date) : ''}${it.st ? ' · ' + esc(it.st) : ''}</div></div>
     ${d ? `<div class="text-sm">เงื่อนไขขายในเว็บ: <b>${esc(d.campaign || '–')}</b></div>` : ''}
-    ${chgBox}${fix}${sv}</div>`;
+    ${chgBox}${fix}${sv}${state === 'new' && a ? (() => { const pb = rptPickBox(it.vin, a, D, it.opt, it.camp, (rptPayAll()[it.vin] || {}).amt || 0, false); return `<div class="text-sm p-2 rounded-lg border border-line"><div class="text-xs text-muted mb-1">เลือกแคมเปญที่ตรงกับไฟล์ (เก็บในรายงาน ยังไม่แก้ใบจอง)</div>${pb.html}<div class="mt-1"><button type="button" class="btn btn-ghost btn-sm" data-act="rpt-terms" data-id="${esc(a.id)}">ใส่เงื่อนไขการขายในใบจอง</button></div></div>`; })() : ''}</div>`;
 }
 function campUpRptBox(vr) {
   const U = S.campUp, by = {}, st = {};
@@ -156,7 +156,7 @@ function campUpExtra(rows) {
 }
 function campUpItems(D) {
   const vr = campUpVinRows(D);
-  return `${campUpRptBox(vr)}<h3 class="font-head font-semibold mb-2">รายคันในไฟล์ (${vr.length})</h3><div class="flex flex-col gap-2">${vr.map(campUpVinRow).join('')}</div>`;
+  return `${campUpRptBox(vr)}<h3 class="font-head font-semibold mb-2">รายคันในไฟล์ (${vr.length})</h3><div class="flex flex-col gap-2">${vr.map(r => campUpVinRow(r, D)).join('')}</div>`;
 }
 function viewCampUp(D) {
   const U = S.campUp || (S.campUp = { text: '', file: '', busy: false, msg: '', pick: {} }), can = campUpCan();
@@ -245,6 +245,22 @@ Object.assign(ACTIONS, {
   }
 });
 
+// in the sale-terms form (admin): the campaign Honda's file reports for this VIN, one tap to use it (26/10)
+function campFileBox(opts, v) {
+  const m = S.modal, id = m && (m.id || (m.at && m.at.id)), a = id && atById(id), vin = a && atVin(a);
+  if (!vin || !campUpCan()) return '';
+  const r = rptAll()[String(vin).toUpperCase()]; if (!r || !r.opt) return '';
+  const h = rptOptHead(r.opt), hit = rptSuggest(opts, r.opt, r.camp)[0] || null, on = hit && v.campaign_id === hit.value;
+  const head = `<div>Honda แจ้งขายคันนี้${r.rep ? ' ' + esc(r.rep) : ''}: <b>${esc(h.no || '–')}</b> <span class="text-xs text-muted">${esc(h.txt)}</span></div>`;
+  const body = !hit ? '<div class="text-xs text-muted mt-1">ไม่พบแคมเปญที่ตรงกับไฟล์ในตารางของเดือนนี้ เลือกเองจากรายการด้านล่าง</div>'
+    : on ? `<div class="mt-1">${chip('ใช้แคมเปญจากไฟล์แล้ว', 'good')} <span class="text-xs">${esc(campFull(hit))}</span> <button type="button" class="btn btn-ghost btn-sm" data-act="camp-reselect">เลือกใหม่</button></div>`
+    : `<div class="mt-1 flex flex-wrap items-center gap-2"><span class="text-xs flex-1 min-w-[180px]">ตรงกับ: ${esc(campFull(hit))}</span><button type="button" class="btn btn-dark btn-sm" data-act="camp-usefile" data-cid="${esc(hit.value)}" data-file="${esc(r.file || '')}">ใช้แคมเปญจากไฟล์</button><button type="button" class="btn btn-ghost btn-sm" data-act="camp-reselect">เลือกใหม่</button></div>`;
+  return `<div class="p-2 rounded-lg border border-line text-sm mb-2" style="background:var(--surface-2)">${head}${body}</div>`;
+}
+Object.assign(ACTIONS, {
+  'camp-usefile'(el) { const d = S.modal && S.modal.deal; if (!d) return; d.campaign_id = el.dataset.cid; d.margin_honda = ''; d.margin_priv = ''; d.adm_mode = 'own'; d.adm_file = el.dataset.file || 'ไฟล์ Honda'; render(); },
+  'camp-reselect'() { const d = S.modal && S.modal.deal; if (!d) return; d.adm_mode = 'own'; render(); setTimeout(() => { const s = document.querySelector('select[data-modal="deal.campaign_id"]'); if (s) { s.scrollIntoView({ block: 'center' }); s.focus(); } }, 60); }
+});
 // on the car: what Honda reported for this VIN (from the Dealer Incentive Report), admin and up only
 function rptBox(c) {
   if (!campUpCan()) return '';

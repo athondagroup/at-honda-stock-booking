@@ -255,6 +255,7 @@ function campAdminBox(f, o, v, sel, opts) {
     </div>`;
   return `<div class="sm:col-span-3 p-3 rounded-lg border border-line" style="background:var(--surface)">
     <div class="font-medium text-sm mb-1">แคมเปญ Honda</div>
+    ${typeof campFileBox === 'function' ? campFileBox(opts, v) : ''}
     <div class="text-sm mb-2">เซลล์เลือก: ${scName ? `<b>${esc(scName)}</b>` : '<span class="text-muted">เซลล์ยังไม่ได้เลือก</span>'}</div>
     <div class="flex flex-wrap gap-2" role="group" aria-label="แอดมินเลือกแคมเปญ">${seg('same', 'เลือกเหมือนเซลล์ (copy)')}${seg('own', 'เลือกเอง')}</div>
     ${mode === 'same' ? `<div class="mt-2 text-sm">${scName ? `ใช้แคมเปญเดียวกับเซลล์: <b>${esc(campFull(cur) || scName)}</b>` : 'เซลล์ยังไม่ได้เลือกแคมเปญ ให้เลือกเองหรืออัปโหลด'}</div>` : `<div class="mt-2">${sel}</div>${mode === 'upload' ? '' : '<div class="text-xs text-muted mt-1">อัปโหลดไฟล์แคมเปญเพื่อเทียบ ทำที่หน้า เพิ่มเติม › อัปเดตแคมเปญ</div>'}`}

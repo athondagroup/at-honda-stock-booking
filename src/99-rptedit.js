@@ -35,12 +35,18 @@ document.addEventListener('scroll', optPopHide, true);
 function rptMoneyCheck(r, a, D, pr) {
   const T = (t, s) => pr ? s : chip(s, t);
   const d = a && a.rec && a.rec.deal;
-  if (!a || !d || !d.at) return { html: T('muted', 'ไม่มีเงื่อนไขขายในเว็บ'), tone: 'muted' };
+  if (!a) return { html: T('muted', 'ไม่พบใบจองที่ผูกกับ VIN นี้'), tone: 'muted' };
+  // the web has no sale terms yet: pick the campaign here and the option's money shows (kept in the report only, 26/10)
+  if (!d || !d.at) return rptPickBox(r.vin, a, D, r.opt, r.camp, r.hasPay ? r.pay : 0, pr);
   const x = termsCtxAt(a, D), opts = campOptions(x).opts, out = [];
   let tone = 'good';
   if (!d.campaign_id || d.campaign_id === 'pending') {
     const m = campMatchText(opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)), (r.camp || '') + ' ' + (r.opt || '') + ' ' + (r.name || '')).filter(h => h.pct >= 60)[0];
     out.push(T('warn', d.campaign_id === 'pending' ? 'แอดมินยังไม่เลือก (รอเลือกแคมเปญ)' : 'แอดมินยังไม่ระบุแคมเปญ'));
+    if (!pr && rptEditCan(a.br) && dealAdmin(a)) {
+      const dr = (S.filters.rptDraft || {})[r.vin] || '', dy = dr && opts.find(y => y.value === dr);
+      out.push(`<div class="flex flex-wrap items-center gap-1 mt-1"><select class="text-xs min-w-0" data-rpt-draft="${esc(r.vin)}" aria-label="เลือกแคมเปญ"><option value="">เลือกแคมเปญเอง…</option>${rptOptHtml(opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)), dr)}</select><button type="button" class="btn btn-dark btn-sm" data-act="rpt-confirm" data-id="${esc(a.id)}" data-cid="${esc(dr)}" ${dr ? '' : 'disabled'}>ใช้ตัวที่เลือก</button></div>${dy ? `<div class="text-xs mt-1">เงินทางเลือกตามตารางแคมเปญ <b>${money(Number(dy.sup) || 0)}</b>${hasPayNow(r) ? (Math.abs(r.pay - (Number(dy.sup) || 0)) < 1 ? ' ' + chip('ตรงไฟล์เงิน', 'good') : ' ' + chip('ไฟล์เงิน ' + money(r.pay), 'warn')) : ''}</div>` : ''}`);
+    }
     if (m) out.push(pr ? 'แนะนำ: ' + campFull(m.opt) : `<div class="text-xs mt-1">แนะนำ: ${esc(campFull(m.opt))}${rptEditCan(a.br) && dealAdmin(a) ? ` <button type="button" class="btn btn-dark btn-sm" data-act="rpt-confirm" data-id="${esc(a.id)}" data-cid="${esc(m.opt.value)}">ยืนยัน</button>` : ''}</div>`);
     return { html: out.join(' '), tone: 'warn' };
   }
@@ -53,8 +59,37 @@ function rptMoneyCheck(r, a, D, pr) {
   } else out.push(T('muted', 'ยังไม่มีไฟล์เงิน'));
   return { html: out.join(' '), tone };
 }
+const hasPayNow = r => !!(r && r.hasPay && r.pay);
+// "แก้ไข" opens the booking at its sale-terms box (campaign, margin); "เงิน Honda" opens the window for Honda's money and special campaigns
 function rptEditBtn(r, a) {
-  return rptEditCan(r.br || (a && a.br)) ? `<button type="button" class="btn btn-ghost btn-sm" data-act="rpt-edit" data-vin="${esc(r.vin)}">แก้ไข</button>` : '';
+  if (!rptEditCan(r.br || (a && a.br))) return '';
+  const money_ = `<button type="button" class="btn btn-ghost btn-sm" data-act="rpt-edit" data-vin="${esc(r.vin)}">${a ? 'เงิน Honda' : 'แก้ไข'}</button>`;
+  return a ? `<div class="flex flex-col gap-1"><button type="button" class="btn btn-dark btn-sm" data-act="rpt-terms" data-id="${esc(a.id)}" title="เปิดใบจองที่ช่องเงื่อนไขการขาย">แก้ไข</button>${money_}</div>` : money_;
+}
+// ---- pick a campaign for a car whose sale terms the web does not have yet
+function rptOptHtml(list, sel) {
+  const groups = [...new Set(list.map(y => y.group))];
+  return groups.map(g => { const os = list.filter(y => y.group === g).map(y => `<option value="${esc(y.value)}" ${sel === y.value ? 'selected' : ''}>${esc(y.name)}</option>`).join(''); return g ? `<optgroup label="${esc(g)}">${os}</optgroup>` : os; }).join('');
+}
+// the campaign options that fit the option written in Honda's file, best first (same interest / free items / baht; same option number; same campaign document)
+function rptSuggest(opts, optText, camp) {
+  const ff = campFeats(optText), no = campNo(optText); if (!ff) return [];
+  const code = (String(camp || '').match(/SP\d+\/\d+/i) || [''])[0].toUpperCase();
+  const score = y => (campNo(y.name) === no && no ? 2 : 0) + (code && campFull(y).toUpperCase().includes(code) ? 1 : 0);
+  return opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value) && campFeats(y.name) === ff && (!no || campNo(y.name) === no)).sort((p, q) => score(q) - score(p));
+}
+function rptPickBox(vin, a, D, optText, camp, pay, pr) {
+  const opts = campOptions(termsCtxAt(a, D)).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value));
+  const pk = (((S.ref.get('honda_pay') || {}).picks || {})[vin]) || null, cur = pk && opts.find(y => y.value === pk.cid), sug = rptSuggest(opts, optText, camp)[0] || null;
+  const can = rptEditCan(a.br) && dealAdmin(a), sup = cur ? Number(cur.sup) || 0 : 0;
+  const ok = cur && pay ? Math.abs(pay - sup) < 1 : null;
+  const tone = !cur ? 'warn' : ok === false ? 'warn' : 'good';
+  if (pr) return { tone, html: cur ? `ยังไม่ลงเงื่อนไขขายในเว็บ · เลือก ${campFull(cur)} · เงินตามตาราง ${money(sup)}${pay ? (ok ? ' · ตรงไฟล์เงิน' : ' · ไฟล์เงิน ' + money(pay)) : ''}` : 'ยังไม่ลงเงื่อนไขขายในเว็บ' };
+  const chips = chip('ยังไม่ลงเงื่อนไขขายในเว็บ', 'muted');
+  const sel = can ? `<select class="text-xs min-w-0" data-rpt-pick="${esc(vin)}" aria-label="เลือกแคมเปญ"><option value="">เลือกแคมเปญ…</option>${rptOptHtml(opts, cur ? cur.value : '')}</select>` : '';
+  const hint = !cur && sug ? `<div class="text-xs mt-1">แนะนำ (ตรงกับไฟล์ Honda): ${esc(campFull(sug))}${can ? ` <button type="button" class="btn btn-dark btn-sm" data-act="rpt-pick-use" data-vin="${esc(vin)}" data-cid="${esc(sug.value)}">ใช้ที่แนะนำ</button>` : ''}</div>` : !cur && !sug ? '<div class="text-xs text-muted mt-1">ไม่พบแคมเปญที่ตรงกับไฟล์ในตาราง เลือกเองได้</div>' : '';
+  const money_ = cur ? `<div class="text-xs mt-1">เงินทางเลือกตามตารางแคมเปญ <b class="num">${money(sup)}</b> ${pay ? (ok ? chip('ตรงไฟล์เงิน', 'good') : chip('ไฟล์เงิน ' + money(pay), 'warn')) : chip('ยังไม่มีไฟล์เงิน', 'muted')}</div>` : '';
+  return { tone, html: `${chips}<div class="mt-1">${sel}</div>${hint}${money_}` };
 }
 
 // ---- the edit window

@@ -197,6 +197,8 @@ function viewCampSum(D) {
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t || !t.dataset) return;
   if (t.dataset.rptRep !== undefined) { S.filters.rptRep = t.value; render(); }
+  else if (t.dataset.rptPick !== undefined) rptPickSave(t.dataset.rptPick, t.value);
+  else if (t.dataset.rptDraft !== undefined) { S.filters.rptDraft = { ...(S.filters.rptDraft || {}), [t.dataset.rptDraft]: t.value }; render(); }
   else if (t.dataset.rptLetter !== undefined) {
     const br = rptBr(), months = rptMonths(), rep = S.filters.rptRep && months.includes(S.filters.rptRep) ? S.filters.rptRep : months[0]; if (!br || !rep || !campUpCan()) return;
     const cur = S.ref.get('honda_pay') || { v: {} }, letter = { ...(cur.letter || {}) }, k = rptLetterKey(br, rep);
@@ -204,7 +206,24 @@ document.addEventListener('change', ev => {
     write('ref', 'honda_pay', { ...cur, letter }).then(() => render());
   }
 });
+// a campaign picked in the report for a car with no sale terms in the web yet: kept in the report (ref/honda_pay.picks), the booking is not changed
+async function rptPickSave(vin, cid) {
+  const D = derive(), a = rptByVin(D).get(vin);
+  if (!a || !dealAdmin(a) || !rptEditCan(a.br)) { toast('แก้ไม่ได้', 'bad'); return; }
+  const y = cid ? campOptions(termsCtxAt(a, D)).opts.find(o => o.value === cid) : null;
+  const cur = S.ref.get('honda_pay') || { v: {} }, picks = { ...(cur.picks || {}) };
+  if (y && y.ok) picks[vin] = { cid, name: campFull(y), sup: Number(y.sup) || 0, ...actor() }; else delete picks[vin];
+  if (await write('ref', 'honda_pay', { ...cur, picks })) { toast(y ? 'เลือกแคมเปญในรายงานแล้ว (ยังไม่ได้ใส่เงื่อนไขการขายในใบจอง)' : 'ล้างตัวเลือกแล้ว'); render(); }
+}
 Object.assign(ACTIONS, {
+  'rpt-pick-use'(el) { rptPickSave(String(el.dataset.vin || '').toUpperCase(), el.dataset.cid); },
+  // open the booking and go straight into its sale-terms form (first entry, or the admin's edit), where the campaign and margin are keyed
+  'rpt-terms'(el) {
+    ACTIONS['so-open'](el);
+    const a = atById(el.dataset.id); if (!a || !S.modal) return;
+    const st = dealState(a), mode = st.mayFirst ? 'first' : st.mayAdmin ? 'admin' : '';
+    if (mode) { ACTIONS['deal-open']({ dataset: { id: a.id, mode } }); setTimeout(() => { const b = document.querySelector('[data-deal-box]'); if (b) b.scrollIntoView({ block: 'start' }); }, 80); }
+  },
   'rpt-br'(el) { S.filters.rptBr = el.dataset.br || ''; S.filters.rptRep = ''; S.filters.rptOpen = {}; render(); },
   'rpt-model'(el) { const o = { ...(S.filters.rptOpen || {}) }; o[el.dataset.m] = !o[el.dataset.m]; S.filters.rptOpen = o; render(); },
   'rpt-print'() {
