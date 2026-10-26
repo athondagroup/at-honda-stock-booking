@@ -6,18 +6,19 @@ const CDB_SHEET = '17pqWhpWAcj_rqg5jkzqCIVCGj3Awno__aqpIUZ_sSI8';
 const CDB_TAB = { camp: 'แคมเปญ Honda', margin: 'Margin มาตรฐาน' };
 const CDB_LAST = { camp: 'P', margin: 'H' };
 const CDB_MKEY = { accord: 'Accord e:HEV', crv: 'CR-V e:HEV', city: 'City e:HEV', cityHb: 'City HB e:HEV', civic: 'Civic e:HEV', hrv: 'HR-V e:HEV', en2: 'e:N2', step: 'STEP WGN e:HEV' };
-const cdbDocId = k => k === 'camp' ? 'campaigns' : 'margins';
+const cdbDocId = k => k === 'camp' ? 'campaigns' : k === 'priv' ? 'privileges' : 'margins';
 const cdbDoc = k => S.ref.get(cdbDocId(k)) || {};
 const cdbCan = () => campUpCan();
 const cdbSheetId = () => (S.ref.get('campaigns') || {}).sheet_id || CDB_SHEET;
-const cdbTab = () => S.filters.cdbTab === 'margin' ? 'margin' : 'camp';
+const cdbTab = () => S.filters.cdbTab === 'margin' ? 'margin' : S.filters.cdbTab === 'priv' ? 'priv' : 'camp';
 function cdbRows(k) {
   const d = cdbDoc(k);
   if (Array.isArray(d.rows) && d.rows.length) return d.rows;
+  if (k === 'priv') return privRowsBuiltIn().map(r => ({ ...r, active: true }));
   return k === 'camp' ? campRowsBuiltIn().map(r => ({ ...r, no: Number(String(r.id).split('-').pop()) || null, active: true }))
     : marginRowsBuiltIn().map(r => ({ ...r, model: CDB_MKEY[r.mkey] || r.mkey, active: true }));
 }
-const cdbRowKey = (k, r) => k === 'camp' ? r.month + '|' + r.id : r.month + '|' + (r.model || r.mkey);
+const cdbRowKey = (k, r) => k === 'priv' ? r.month + '|' + r.priv + '|' + r.mkey : k === 'camp' ? r.month + '|' + r.id : r.month + '|' + (r.model || r.mkey);
 function cdbMkey(model) {
   const m = String(model || '').toUpperCase();
   return /^CITY ?(HB|HATCH)/.test(m) ? 'cityHb' : m.startsWith('CITY') ? 'city' : m.startsWith('CIVIC') ? 'civic' : m.startsWith('HR-V') ? 'hrv' : m.startsWith('ACCORD') ? 'accord' : m.startsWith('CR-V') ? 'crv' : m.startsWith('E:N2') ? 'en2' : m.startsWith('STEP') ? 'step' : '';
@@ -34,7 +35,8 @@ function cdbToSheet(k, x) {
   if (k === 'camp') return [x.month, x.book_from || '', x.book_to || '', x.deliver_by || '', x.id, x.key, x.group || '', x.grade || '', x.no ?? '', x.name || '', x.rate || '', x.sup || 0, x.ins ?? '', x.excl || '', x.ref || '', x.active === false ? 'N' : 'Y'];
   return [x.month, x.model || CDB_MKEY[x.mkey] || x.mkey, cdbPctTxt(x.cash), cdbPctTxt(x.fin), x.step1 || 0, x.step2 || 0, x.note || '', x.active === false ? 'N' : 'Y'];
 }
-const CDB_F = { camp: [['month', 'เดือนแคมเปญ'], ['book_from', 'จองตั้งแต่'], ['book_to', 'จองถึง'], ['deliver_by', 'ออกใบกำกับภายใน'], ['key', 'กลุ่มรุ่น (รหัส)'], ['group', 'ชื่อกลุ่มรุ่น'], ['grade', 'เกรด'], ['no', 'ทางเลือกที่'], ['name', 'ชื่อทางเลือก'], ['rate', 'ดอกเบี้ย'], ['sup', 'Honda เข้า Margin (บาท)'], ['ins', 'ฟรีประกัน (ปี)'], ['excl', 'ห้ามใช้ร่วมกับ'], ['ref', 'อ้างอิง'], ['active', 'ใช้งาน']],
+const CDB_F = { priv: [['month', 'เดือนแคมเปญ'], ['priv', 'สิทธิ์'], ['mkey', 'รุ่น'], ['a1', 'ยอด 1 คัน / รับเงิน (บาท)'], ['a2', 'ยอด 2 คันขึ้นไป (บาท)']],
+   camp: [['month', 'เดือนแคมเปญ'], ['book_from', 'จองตั้งแต่'], ['book_to', 'จองถึง'], ['deliver_by', 'ออกใบกำกับภายใน'], ['key', 'กลุ่มรุ่น (รหัส)'], ['group', 'ชื่อกลุ่มรุ่น'], ['grade', 'เกรด'], ['no', 'ทางเลือกที่'], ['name', 'ชื่อทางเลือก'], ['rate', 'ดอกเบี้ย'], ['sup', 'Honda เข้า Margin (บาท)'], ['ins', 'ฟรีประกัน (ปี)'], ['excl', 'ห้ามใช้ร่วมกับ'], ['ref', 'อ้างอิง'], ['active', 'ใช้งาน']],
   margin: [['month', 'เดือนแคมเปญ'], ['model', 'รุ่น'], ['cash', 'Margin สด %'], ['fin', 'Margin ไฟแนนซ์ %'], ['step1', 'Step ช่อง 1 (บาท)'], ['step2', 'Step ช่อง 2 (บาท)'], ['note', 'หมายเหตุ'], ['active', 'ใช้งาน']] };
 async function cdbCall(tool, args) {
   const mcp = await gsUse(); if (!mcp) throw { code: 'nomcp' };
@@ -52,6 +54,7 @@ const cdbDiff = (k, o, n) => CDB_F[k].filter(([f]) => String(o ? o[f] ?? '' : ''
 // ---- page
 function cdbMonths(k) { return [...new Set(cdbRows(k).map(r => r.month))].sort().reverse(); }
 function viewCampDb(D) {
+  if (cdbTab() === 'priv') return cdbPrivView(D);
   const k = cdbTab(), can = cdbCan(), rows = cdbRows(k), ms = cdbMonths(k), M = ms.includes(S.filters.cdbMonth) ? S.filters.cdbMonth : ms[0] || '', B = S.cdb || {};
   const list = rows.filter(r => r.month === M), dirty = cdbDirty('camp') + cdbDirty('margin'), d = cdbDoc(k);
   const tabBtn = (id, t) => `<button type="button" class="tab" aria-selected="${k === id}" data-act="cdb-tab" data-t="${id}">${t}</button>`;
@@ -62,7 +65,7 @@ function viewCampDb(D) {
     <td class="nowrap">${r.active === false ? chip('ปิด', 'neutral') : chip('ใช้', 'good')}${r.dirty ? ' ' + chip('ยังไม่ส่งขึ้นชีต', 'warn') : ''}</td>
     <td>${can ? `<button type="button" class="btn btn-ghost btn-sm" data-act="cdb-edit" data-k="${k}" data-key="${esc(cdbRowKey(k, r))}">แก้ไข</button>` : ''}</td></tr>`).join('');
   return `${pageHead('ตารางแคมเปญรายเดือน', 'ทางเลือกและเงินช่วย Honda ของแต่ละรุ่น + Margin มาตรฐาน · ข้อมูลในเว็บเป็นหลัก ทุกหน้าที่เทียบเงินอ่านจากตารางนี้')}
-  <div class="flex gap-1 border-b border-line mb-3" role="tablist">${tabBtn('camp', 'แคมเปญ Honda')}${tabBtn('margin', 'Margin มาตรฐาน')}</div>
+  <div class="flex gap-1 border-b border-line mb-3" role="tablist">${tabBtn('camp', 'แคมเปญ Honda')}${tabBtn('margin', 'Margin มาตรฐาน')}${tabBtn('priv', 'สิทธิพิเศษ Honda')}</div>
   <section class="bg-surface border border-line rounded-lg p-3 md:p-4 mb-4"><div class="flex flex-wrap items-end gap-2">
     <div class="field"><label for="cdb-m">เดือนแคมเปญ</label><select id="cdb-m" data-cdb-month>${ms.map(m => `<option value="${esc(m)}" ${m === M ? 'selected' : ''}>${esc(fmtM(m))}</option>`).join('') || '<option value="">–</option>'}</select></div>
     ${can ? `<button class="btn btn-dark btn-sm" data-act="cdb-add" data-k="${k}" data-m="${esc(M)}">+ เพิ่ม${k === 'camp' ? 'ทางเลือก' : 'รุ่น'}</button>
@@ -80,15 +83,44 @@ function cdbLogBox(k) {
   const log = (cdbDoc(k).log || []).slice().reverse().slice(0, 30); if (!log.length) return '';
   return `<details class="mt-4"><summary class="text-sm cursor-pointer">ประวัติแก้ไขตารางนี้ (${log.length} ล่าสุด)</summary><div class="mt-2 bg-surface border border-line rounded-lg divide-y divide-line">${log.map(h => `<div class="p-2 md:px-4 text-xs"><span class="num text-muted">${fmtDT(h.at)}</span> · ${who(h)} · <b>${esc(h.act)}</b>${(h.changes || []).length ? '<br>' + h.changes.slice(0, 8).map(c => `${esc(c.f)}: ${esc(c.old)} → <b>${esc(c.new)}</b>`).join(' · ') : ''}</div>`).join('')}</div></details>`;
 }
+// ---- special privileges (Gen to Gen / Local Native): kept in the web only (ref/privileges), not in the Google Sheet
+const CDB_PRIV = { gtg: 'Gen to Gen', ln: 'Local Native' };
+function cdbPrivView(D) {
+  const k = 'priv', can = cdbCan(), rows = cdbRows(k), ms = cdbMonths(k), M = ms.includes(S.filters.cdbMonth) ? S.filters.cdbMonth : ms[0] || '', list = rows.filter(r => r.month === M), d = cdbDoc(k);
+  const tabBtn = (id, t) => `<button type="button" class="tab" aria-selected="${k === id}" data-act="cdb-tab" data-t="${id}">${t}</button>`;
+  const body = list.map(r => `<tr class="${r.active === false ? 'opacity-50' : ''}"><td>${esc(CDB_PRIV[r.priv] || r.priv)}</td><td>${esc(CDB_MKEY[r.mkey] || r.mkey)}</td><td class="text-right num">${money(r.a1 || 0)}</td><td class="text-right num">${r.priv === 'gtg' ? money(r.a2 || 0) : '–'}</td>
+    <td>${r.active === false ? chip('ปิด', 'neutral') : chip('ใช้', 'good')}</td><td>${can ? `<button type="button" class="btn btn-ghost btn-sm" data-act="cdb-edit" data-k="${k}" data-key="${esc(cdbRowKey(k, r))}">แก้ไข</button>` : ''}</td></tr>`).join('');
+  return `${pageHead('ตารางแคมเปญรายเดือน', 'สิทธิพิเศษ Honda ที่จ่ายเป็นเงิน (Gen to Gen, Local Native) ต่อรุ่น · เป็นข้อมูลในเว็บอย่างเดียว ไม่ต้องส่งขึ้นชีต')}
+  <div class="flex gap-1 border-b border-line mb-3" role="tablist">${tabBtn('camp', 'แคมเปญ Honda')}${tabBtn('margin', 'Margin มาตรฐาน')}${tabBtn('priv', 'สิทธิพิเศษ Honda')}</div>
+  <section class="bg-surface border border-line rounded-lg p-3 md:p-4 mb-4"><div class="flex flex-wrap items-end gap-2">
+    <div class="field"><label for="cdb-m">เดือนแคมเปญ</label><select id="cdb-m" data-cdb-month>${ms.map(m => `<option value="${esc(m)}" ${m === M ? 'selected' : ''}>${esc(fmtM(m))}</option>`).join('') || '<option value="">–</option>'}</select></div>
+    ${can ? `<button class="btn btn-dark btn-sm" data-act="cdb-add" data-k="${k}" data-m="${esc(M)}">+ เพิ่มสิทธิ์</button><button class="btn btn-ghost btn-sm" data-act="cdb-copy" ${M ? '' : 'disabled'}>คัดลอกเดือนนี้ไปเดือนใหม่</button>` : ''}</div>
+    <p class="text-xs text-muted mt-2">${d.rows ? '' : 'ยังใช้ตารางที่ฝังในระบบ (เดือน ต.ค.) · พอบันทึกครั้งแรก ระบบจะเก็บทั้งตารางไว้ในเว็บ · '}ฮอนด้าเคียงข้างคุณ (น้ำท่วม) เป็นยอดที่เซลล์พิมพ์เองต่อคัน ไม่อยู่ในตารางนี้ · Loyalty (ลดดอกเบี้ย 0.15%) เป็นหมายเหตุ ไม่คิดเงิน</p></section>
+  <div class="bg-surface border border-line rounded-lg overflow-x-auto"><table class="tbl"><thead><tr><th>สิทธิ์</th><th>รุ่น</th><th class="text-right">1 คัน / รับเงิน</th><th class="text-right">2 คันขึ้นไป</th><th>สถานะ</th><th></th></tr></thead><tbody>${body || '<tr><td colspan="6" class="text-muted p-4">ยังไม่มีข้อมูลเดือนนี้ กด "คัดลอกเดือนนี้ไปเดือนใหม่" หรือ "+ เพิ่มสิทธิ์"</td></tr>'}</tbody></table></div>
+  ${cdbLogBox(k)}`;
+}
+function cdbPrivModal(m) {
+  const e = m.e, opt = (v, t, cur) => `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(t)}</option>`;
+  return `<div class="flex items-start justify-between gap-3 mb-2"><h2 class="font-head text-xl font-semibold">${m.key ? 'แก้ไข' : 'เพิ่ม'}สิทธิพิเศษ Honda</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
+  <div class="flex flex-col gap-3"><div class="grid sm:grid-cols-2 gap-3">
+    <div class="field"><label for="cp-month">เดือนแคมเปญ (ปี-เดือน)</label><input id="cp-month" data-modal="e.month" value="${esc(e.month || '')}" placeholder="2026-11"></div>
+    <div class="field"><label for="cp-priv">สิทธิ์</label><select id="cp-priv" data-modal="e.priv">${opt('gtg', 'Gen to Gen', e.priv)}${opt('ln', 'Local Native', e.priv)}</select></div>
+    <div class="field"><label for="cp-mkey">รุ่น</label><select id="cp-mkey" data-modal="e.mkey">${Object.entries(CDB_MKEY).map(([kk, t]) => opt(kk, t, e.mkey)).join('')}</select></div><div></div>
+    <div class="field"><label for="cp-a1">${e.priv === 'gtg' ? 'ยอดรถฮอนด้าเดิม 1 คัน (บาท)' : 'รับเงิน (บาท)'}</label><input id="cp-a1" type="number" inputmode="decimal" data-modal="e.a1" value="${esc(e.a1 ?? 0)}"></div>
+    ${e.priv === 'gtg' ? `<div class="field"><label for="cp-a2">ยอดรถ 2 คันขึ้นไป (บาท)</label><input id="cp-a2" type="number" inputmode="decimal" data-modal="e.a2" value="${esc(e.a2 ?? 0)}"></div>` : ''}</div>
+  <label class="flex items-center gap-2 text-sm"><input type="checkbox" data-modal="e.active" ${e.active === false ? '' : 'checked'}> ใช้งาน</label>
+  <div class="flex gap-2 justify-end"><button class="btn btn-ghost" data-act="close">ยกเลิก</button><button class="btn btn-dark" data-act="cdb-save">บันทึก</button></div></div>`;
+}
 // ---- edit / add window
 function cdbEditOpen(k, key, month) {
   const rows = cdbRows(k), r = key ? rows.find(x => cdbRowKey(k, x) === key) : null;
-  const base = r ? { ...r } : k === 'camp' ? { month, active: true, no: '', sup: 0 } : { month, active: true, cash: 0.03, fin: 0.03, step1: 0, step2: 0 };
+  const base = r ? { ...r } : k === 'priv' ? { month, priv: 'gtg', mkey: 'city', a1: 0, a2: 0, active: true } : k === 'camp' ? { month, active: true, no: '', sup: 0 } : { month, active: true, cash: 0.03, fin: 0.03, step1: 0, step2: 0 };
   if (k === 'margin') { base.cashP = cdbPctTxt(base.cash).replace('%', ''); base.finP = cdbPctTxt(base.fin).replace('%', ''); }
   S.modal = { kind: 'cdbedit', k, key: key || null, e: base };
   render();
 }
 function cdbEditModal(m, D) {
+  if (m.k === 'priv') return cdbPrivModal(m);
   const k = m.k, e = m.e, fld = (f, t, type = 'text', extra = '') => `<div class="field"><label for="cd-${f}">${t}</label><input id="cd-${f}" type="${type}" ${type === 'number' ? 'step="any" inputmode="decimal"' : ''} data-modal="e.${f}" value="${esc(e[f] ?? '')}" autocomplete="off" ${extra}></div>`;
   const groups = [...new Map(cdbRows('camp').map(r => [r.key, r.group])).entries()];
   const fields = k === 'camp' ? `<div class="grid sm:grid-cols-2 gap-3">${fld('month', 'เดือนแคมเปญ (ปี-เดือน)', 'text', 'placeholder="2026-11"')}${fld('no', 'ทางเลือกที่', 'number')}${fld('book_from', 'จองตั้งแต่', 'date')}${fld('book_to', 'จองถึง', 'date')}${fld('deliver_by', 'ออกใบกำกับ / รับรถภายใน', 'date')}${fld('sup', 'Honda เข้า Margin (บาท)', 'number')}
@@ -137,6 +169,7 @@ async function cdbReadFile(file) {
 }
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t || !t.dataset) return;
+  if (t.dataset.modal === 'e.priv' && S.modal && S.modal.kind === 'cdbedit') { render(); return; }
   if (t.dataset.cdbMonth !== undefined) { S.filters.cdbMonth = t.value; render(); }
   else if (t.dataset.cdbFile !== undefined) { const f = t.files && t.files[0]; t.value = ''; if (f) cdbReadFile(f); }
   else if (t.dataset.cdbDr !== undefined && S.cdb && S.cdb.draft) { S.cdb.draft[t.dataset.cdbDr] = t.value; if (t.tagName === 'SELECT') render(); }
@@ -152,7 +185,10 @@ Object.assign(ACTIONS, {
     const m = S.modal; if (!m || m.kind !== 'cdbedit' || !cdbCan()) return; const k = m.k, e = { ...m.e }, rows = cdbRows(k).map(r => ({ ...r }));
     if (!/^\d{4}-\d{2}$/.test(String(e.month || '').trim())) { toast('ใส่เดือนแคมเปญเป็น ปี-เดือน เช่น 2026-11', 'bad'); return; }
     e.month = e.month.trim();
-    if (k === 'camp') {
+    if (k === 'priv') {
+      if (!['gtg', 'ln'].includes(e.priv) || !CDB_MKEY[e.mkey]) { toast('เลือกสิทธิ์และรุ่น', 'bad'); return; }
+      e.a1 = Number(e.a1) || 0; e.a2 = e.priv === 'gtg' ? Number(e.a2) || 0 : 0;
+    } else if (k === 'camp') {
       if (!e.key || !e.name || !Number(e.no)) { toast('เลือกกลุ่มรุ่น ใส่ทางเลือกที่ และชื่อทางเลือก', 'bad'); return; }
       e.no = Number(e.no); e.sup = Number(e.sup) || 0; e.id = m.key ? e.id : e.key + '-' + e.no; e.group = e.group || (cdbRows('camp').find(r => r.key === e.key) || {}).group || e.key;
       if (!String(e.name).startsWith('ทางเลือก')) e.name = 'ทางเลือก ' + e.no + ': ' + e.name;
@@ -162,8 +198,8 @@ Object.assign(ACTIONS, {
     if (!m.key && at >= 0) { toast('มีทางเลือกนี้ในเดือนนี้แล้ว ให้แก้แถวเดิม', 'bad'); return; }
     if (m.key && nk !== m.key && rows.some(r => cdbRowKey(k, r) === nk)) { toast('ชื่อซ้ำกับแถวอื่น', 'bad'); return; }
     const ch = cdbDiff(k, old, e); if (old && !ch.length) { toast('ไม่มีอะไรเปลี่ยน', 'bad'); return; }
-    const row = { ...(old || {}), ...e, dirty: true }; if (at >= 0) rows[at] = row; else rows.push(row);
-    if (await cdbSave(k, rows, old ? 'แก้' : 'เพิ่ม', ch.length ? ch : [{ f: 'แถวใหม่', old: '–', new: nk }])) { S.filters.cdbMonth = e.month; S.modal = null; toast('บันทึกในเว็บแล้ว · อย่าลืมส่งขึ้นชีต'); render(); }
+    const row = { ...(old || {}), ...e, dirty: k !== 'priv' }; if (at >= 0) rows[at] = row; else rows.push(row);
+    if (await cdbSave(k, rows, old ? 'แก้' : 'เพิ่ม', ch.length ? ch : [{ f: 'แถวใหม่', old: '–', new: nk }])) { S.filters.cdbMonth = e.month; S.modal = null; toast(k === 'priv' ? 'บันทึกในเว็บแล้ว' : 'บันทึกในเว็บแล้ว · อย่าลืมส่งขึ้นชีต'); render(); }
   },
   async 'cdb-draft-add'() {
     const dr = S.cdb && S.cdb.draft; if (!dr || !cdbCan()) return;
@@ -182,7 +218,7 @@ Object.assign(ACTIONS, {
     const [y, mo] = M.split('-').map(Number), nm = new Date(y, mo, 1), N = nm.getFullYear() + '-' + String(nm.getMonth() + 1).padStart(2, '0');
     const rows = cdbRows(k).map(r => ({ ...r })); if (rows.some(r => r.month === N)) { toast(`มีข้อมูลเดือน ${fmtM(N)} แล้ว`, 'bad'); return; }
     const last = new Date(nm.getFullYear(), nm.getMonth() + 1, 0).getDate();
-    rows.filter(r => r.month === M).forEach(r => { const c = { ...r, month: N, dirty: true }; delete c.srow; if (k === 'camp') { c.book_from = N + '-01'; c.book_to = N + '-' + String(last).padStart(2, '0'); c.deliver_by = ''; c.ref = ''; } rows.push(c); });
+    rows.filter(r => r.month === M).forEach(r => { const c = { ...r, month: N, dirty: k !== 'priv' }; delete c.srow; if (k === 'camp') { c.book_from = N + '-01'; c.book_to = N + '-' + String(last).padStart(2, '0'); c.deliver_by = ''; c.ref = ''; } rows.push(c); });
     if (await cdbSave(k, rows, `คัดลอกเดือน ${fmtM(M)} → ${fmtM(N)}`, [])) { S.filters.cdbMonth = N; toast(`คัดลอกไปเดือน ${fmtM(N)} แล้ว แก้ตัวเลขและวันที่ให้ตรงเอกสารใหม่`); render(); }
   },
   async 'cdb-pull'() {
