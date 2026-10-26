@@ -168,7 +168,7 @@ function rptLetterBox(rows, rep) {
 }
 function rptKpi(rows, cmp, nNone) {
   const nAdv = rows.filter(r => rptKinds(r) === 'adv').length;
-  return [['จำนวนรถ', rows.length, `ส่งมอบ ${rows.length - nAdv} · Advance ${nAdv}`], ['เงินรางวัลรวม (บาท)', money(sumBy(rows, r => r.tot)), `ทางเลือก ${money(sumBy(rows, r => r.pay + r.est))}${sumBy(rows, r => r.est) ? ` (ตามตารางประมาณ ${money(sumBy(rows, r => r.est))})` : ''} · พิเศษ ${money(sumBy(rows, r => r.actAmt))}`], ['ALLOCATED = Advance', nAdv, `${cmp.adv.filter(r => r.kind === 'wait').length} รอส่งมอบ · ${cmp.adv.filter(r => r.kind === 'next').length} ส่งมอบเดือนถัดไป`], ['ยังไม่เลือกแคมเปญ', nNone, 'ในเว็บ']];
+  return [['จำนวนรถ', rows.length, `ส่งมอบ ${rows.length - nAdv} · Advance ${nAdv}`, 'rpt-s1'], ['เงินรางวัลรวม (บาท)', money(sumBy(rows, r => r.tot)), `ทางเลือก ${money(sumBy(rows, r => r.pay + r.est))}${sumBy(rows, r => r.est) ? ` (ตามตารางประมาณ ${money(sumBy(rows, r => r.est))})` : ''} · พิเศษ ${money(sumBy(rows, r => r.actAmt))}`, 'rpt-s5'], ['ALLOCATED = Advance', nAdv, `${cmp.adv.filter(r => r.kind === 'wait').length} รอส่งมอบ · ${cmp.adv.filter(r => r.kind === 'next').length} ส่งมอบเดือนถัดไป`, 'rpt-s3'], ['ยังไม่เลือกแคมเปญ', nNone, 'ในเว็บ', 'rpt-s4']];
 }
 function rptSheet(D, rep, rows, cmp) {
   const k = rptKpi(rows, cmp, rptNoneCount(D, rep));
@@ -189,9 +189,9 @@ function viewCampSum(D) {
     ${rep ? `<span class="ml-auto flex gap-2"><button class="btn btn-ghost btn-sm" data-act="rpt-export">ส่งออก Excel</button><button class="btn btn-red btn-sm" data-act="rpt-print">พิมพ์รายงาน</button></span>` : ''}</div>`;
   if (!rep) return `${pageHead('รายงานสรุปแคมเปญ', 'ยอดแจ้งขายและเงินรางวัลตามไฟล์ของ Honda เทียบกับข้อมูลในเว็บ')}${ctl}${emptyBox(rptBr() ? `ยังไม่มีข้อมูลของสาขา ${rptBr()}` : 'ยังไม่มียอดแจ้งขายที่บันทึกไว้', 'อัปโหลดไฟล์ที่หน้า เพิ่มเติม › อัปเดตแคมเปญ แล้วกดบันทึก หรือเลือกสาขาอื่น')}<button class="btn btn-red mt-3" data-act="go" data-view="campup">ไปหน้าอัปเดตแคมเปญ</button>`;
   const rows = rptRows(rep), cmp = rptCompare(D, rep, rows.filter(r => r.hasDir)), k = rptKpi(rows, cmp, rptNoneCount(D, rep));
-  const sec = (t, sub, body) => `<section class="mb-6"><h3 class="font-head font-semibold">${t}</h3>${sub ? `<p class="text-xs text-muted mb-2">${sub}</p>` : '<div class="mb-2"></div>'}${body}</section>`;
+  let secN = 0; const sec = (t, sub, body) => `<section class="mb-6" id="rpt-s${++secN}" style="scroll-margin-top:72px"><h3 class="font-head font-semibold">${t}</h3>${sub ? `<p class="text-xs text-muted mb-2">${sub}</p>` : '<div class="mb-2"></div>'}${body}</section>`;
   return `${pageHead('รายงานสรุปแคมเปญ', 'ยอดแจ้งขายและเงินรางวัลตามไฟล์ของ Honda เทียบกับข้อมูลในเว็บ')}${ctl}
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">${k.map(([t, n, sub]) => `<div class="p-3 rounded-lg border border-line bg-surface"><div class="text-xs text-muted">${esc(t)}</div><div class="num text-2xl font-semibold">${n}</div>${sub ? `<div class="text-xs text-muted">${esc(sub)}</div>` : ''}</div>`).join('')}</div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">${k.map(([t, n, sub, go]) => `<button type="button" class="p-3 rounded-lg border border-line bg-surface text-left hover:bg-surface2" data-act="rpt-go" data-t="${go}" title="กดเพื่อไปที่รายละเอียด"><div class="text-xs text-muted">${esc(t)}</div><div class="num text-2xl font-semibold">${n}</div>${sub ? `<div class="text-xs text-muted">${esc(sub)}</div>` : ''}<div class="text-xs underline mt-1">ดูรายละเอียด ↓</div></button>`).join('')}</div>
   <section class="mb-6">${rptCharts(rows)}</section>
   ${sec('1. สรุปรายรุ่น', 'กดที่รุ่นเพื่อดูว่าแต่ละคันเลือกแคมเปญอะไรและได้เงินเท่าไร', rptModelTable(rows, D, false))}
   ${sec('2. สรุปตามแคมเปญและทางเลือก', 'จำนวนคันแยกตามรุ่น ส่งมอบ และ Advance (ALLOCATED)', rptPivotTable(rows, false))}
@@ -221,6 +221,7 @@ async function rptPickSave(vin, cid) {
   if (await write('ref', 'honda_pay', { ...cur, picks })) { toast(y ? 'เลือกแคมเปญในรายงานแล้ว (ยังไม่ได้ใส่เงื่อนไขการขายในใบจอง)' : 'ล้างตัวเลือกแล้ว'); render(); }
 }
 Object.assign(ACTIONS, {
+  'rpt-go'(el) { const e = document.getElementById(el.dataset.t); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
   'rpt-pick-use'(el) { rptPickSave(String(el.dataset.vin || '').toUpperCase(), el.dataset.cid); },
   // open the booking and go straight into its sale-terms form (first entry, or the admin's edit), where the campaign and margin are keyed
   'rpt-terms'(el) {
