@@ -19,11 +19,11 @@ function campParseDIR(X, wb) {
     const hi = rows.findIndex(r => r.some(c => String(c).includes('หมายเลขตัวถัง')));
     if (hi < 0) continue;
     const h = rows[hi].map(c => String(c).trim()), ix = k => h.findIndex(c => c.includes(k));
-    const iV = ix('หมายเลขตัวถัง'), iC = ix('เคมเปญ') >= 0 ? ix('เคมเปญ') : ix('แคมเปญ'), iO = ix('ทางเลือก'), iD = ix('วันที่ส่งมอบ'), iN = ix('ชื่อ MTOC'), iS = ix('สถานะ');
+    const iV = ix('หมายเลขตัวถัง'), iC = ix('เคมเปญ') >= 0 ? ix('เคมเปญ') : ix('แคมเปญ'), iO = ix('ทางเลือก'), iD = ix('วันที่ส่งมอบ'), iN = ix('ชื่อ MTOC'), iS = ix('สถานะ'), iM = ix('รหัส MTOC'), iT = ix('ประเภทการขาย');
     const items = new Map();
     for (const r of rows.slice(hi + 1)) {
       const vin = String(r[iV] || '').trim().toUpperCase(); if (!/^[A-Z0-9]{17}$/.test(vin)) continue;
-      items.set(vin, { vin, camp: String(r[iC] || '').trim(), opt: String(r[iO] || '').replace(/\s+/g, ' ').trim(), date: String(r[iD] || '').trim(), name: String(r[iN] || '').trim(), st: String(r[iS] || '').trim() });
+      items.set(vin, { vin, camp: String(r[iC] || '').trim(), opt: String(r[iO] || '').replace(/\s+/g, ' ').trim(), date: String(r[iD] || '').trim(), name: String(r[iN] || '').trim(), st: String(r[iS] || '').trim(), mtoc: String(r[iM] || '').trim(), typ: String(r[iT] || '').trim() });
     }
     if (items.size) { const rep = rows.slice(0, hi).map(r => r.join(' ')).join(' ').match(/(\d{2}\/\d{4})/); return { items, report: rep ? rep[1] : '' }; }
   }
@@ -58,13 +58,14 @@ function campUpVinRows(D) {
       state = ff && ff === campFeats(d.campaign) ? 'ok' : 'diff';
       if (state === 'diff') found = opts.filter(y => ff && campFeats(y.name) === ff && (!campNo(it.opt) || campNo(y.name) === campNo(it.opt))).map(y => ({ opt: y, pct: 100 }));
     }
-    out.push({ a, d, it, opts, found, state, done: !!(sv && sv.opt === it.opt && sv.rep === U.report) });
+    const done = !!(sv && sv.opt === it.opt && sv.rep === U.report);
+    out.push({ a, d, it, opts, found, state, done, chg: !!(sv && sv.rep === U.report && sv.opt !== it.opt), old: sv });
   }
   const ord = { diff: 0, new: 1, ok: 2 };
   return out.sort((p, q) => ord[p.state] - ord[q.state]);
 }
 function campUpVinRow(r) {
-  const { a, d, it, opts, found, state, done } = r, U = S.campUp, pick = (U.pick || {})[it.vin] || '';
+  const { a, d, it, opts, found, state, done, chg, old } = r, U = S.campUp, pick = (U.pick || {})[it.vin] || '';
   const can = campUpCan(), canEdit = a && d && dealAdmin(a) && !poLocked(a);
   const tone = state === 'ok' ? 'good' : state === 'diff' ? 'warn' : 'muted';
   const label = state === 'ok' ? 'ตรง' : state === 'diff' ? 'ไม่ตรง' : 'ยังไม่มีข้อมูลในเว็บ';
@@ -72,21 +73,23 @@ function campUpVinRow(r) {
       ${found.map(h => `<div class="flex flex-wrap items-center gap-2"><span class="text-sm flex-1 min-w-[180px]">เปลี่ยนในเว็บเป็น: ${esc(campFull(h.opt))}</span><button type="button" class="btn btn-dark btn-sm" data-act="campup-use" data-id="${esc(a.id)}" data-cid="${esc(h.opt.value)}">ใช้ตามไฟล์</button></div>`).join('')}
       <div class="flex flex-wrap items-center gap-2"><select class="min-w-0 flex-1" data-campup-pick="${esc(it.vin)}"><option value="">เลือกแคมเปญเอง…</option>${opts.map(y => `<option value="${esc(y.value)}" ${pick === y.value ? 'selected' : ''}>${esc(campFull(y))}</option>`).join('')}</select>
         <button type="button" class="btn btn-ghost btn-sm" data-act="campup-use" data-id="${esc(a.id)}" data-cid="${esc(pick)}" ${pick ? '' : 'disabled'}>ใช้ตัวที่เลือก</button></div></div>`;
-  const sv = state === 'new' && can && !done ? `<button type="button" class="btn btn-dark btn-sm self-start" data-act="campup-save" data-vin="${esc(it.vin)}">บันทึกเข้า VIN นี้</button>` : '';
+  const tick = can && !done ? `<input type="checkbox" class="mr-1" data-campup-sel="${esc(it.vin)}" ${U.sel && U.sel.has(it.vin) ? 'checked' : ''} aria-label="เลือก ${esc(it.vin)}">` : '';
+  const sv = '';
+  const chgBox = chg ? `<div class="p-2 rounded-lg text-sm" style="background:var(--warn-soft);color:var(--warn)"><b>ทางเลือกเปลี่ยน</b> จากที่บันทึกไว้: ${esc(old.opt || '–')} → ${esc(it.opt || '–')}<div class="text-xs">ติ๊กเลือกเพื่อบันทึกตามไฟล์ใหม่ ค่าเก่าเก็บไว้ในประวัติ</div></div>` : '';
   return `<div class="p-3 rounded-lg border border-line bg-surface flex flex-col gap-2">
-    <div class="flex flex-wrap items-center gap-2"><span class="code font-medium">${esc(it.vin)}</span><span class="text-xs text-muted">${esc(it.name)}${a ? ' · ' + esc(a.cust) + ' · ' + esc(a.br) : ' · ไม่พบใบจองที่ผูกกับ VIN นี้'}</span><span class="ml-auto flex gap-1">${done ? chip('บันทึกแล้ว', 'good') : ''}${chip(label, tone)}</span></div>
+    <div class="flex flex-wrap items-center gap-2">${tick}<span class="code font-medium">${esc(it.vin)}</span><span class="text-xs text-muted">${esc(it.name)}${a ? ' · ' + esc(a.cust) + ' · ' + esc(a.br) : ' · ไม่พบใบจองที่ผูกกับ VIN นี้'}</span><span class="ml-auto flex gap-1">${done ? chip('บันทึกแล้ว', 'good') : ''}${chip(label, tone)}</span></div>
     <div class="text-sm p-2 rounded-lg" style="background:var(--surface-2)">ในไฟล์ Honda: <b>${esc(it.opt || '–')}</b><div class="text-xs text-muted">${esc(it.camp)}${it.date ? ' · ส่งมอบ ' + esc(it.date) : ''}${it.st ? ' · ' + esc(it.st) : ''}</div></div>
     ${d ? `<div class="text-sm">เงื่อนไขขายในเว็บ: <b>${esc(d.campaign || '–')}</b></div>` : ''}
-    ${fix}${sv}</div>`;
+    ${chgBox}${fix}${sv}</div>`;
 }
 function campUpRptBox(vr) {
   const U = S.campUp, by = {}, st = {};
   vr.forEach(r => { const m = r.it.name.split(' ')[0] || '–'; by[m] = (by[m] || 0) + 1; st[r.it.st || '–'] = (st[r.it.st || '–'] || 0) + 1; });
-  const todo = vr.filter(r => !r.done).length;
+  const todo = vr.filter(r => !r.done).length, nSel = vr.filter(r => !r.done && U.sel && U.sel.has(r.it.vin)).length, nChg = vr.filter(r => r.chg).length;
   return `<section class="bg-surface border border-line rounded-lg p-4 mb-4"><div class="flex flex-wrap items-center gap-2"><h3 class="font-head font-semibold">ยอดแจ้งขาย Honda${U.report ? ' ' + esc(U.report) : ''}: ${vr.length} คัน</h3>
     <span class="text-sm text-muted">${Object.entries(st).map(([k, v]) => esc(k) + ' ' + v).join(' · ')}</span>
-    ${campUpCan() ? `<button class="btn btn-red btn-sm ml-auto" data-act="campup-save" data-vin="*" ${todo ? '' : 'disabled'}>${todo ? `บันทึกยอดแจ้งขายทั้งไฟล์ (${todo} คัน)` : 'บันทึกครบแล้ว'}</button>` : ''}</div>
-    <div class="text-xs text-muted mt-1">รุ่น: ${Object.entries(by).map(([k, v]) => esc(k) + ' ' + v).join(' · ')} · บันทึกแล้วเก็บไว้ที่ VIN แต่ละคัน (เห็นเฉพาะแอดมินขึ้นไป) ไม่เปลี่ยนเงื่อนไขขายในใบจอง</div></section>`;
+    ${campUpCan() ? `<span class="ml-auto flex flex-wrap gap-2"><button class="btn btn-ghost btn-sm" data-act="campup-selall" ${todo ? '' : 'disabled'}>เลือกทั้งหมด (${todo})</button><button class="btn btn-ghost btn-sm" data-act="campup-selnone">ไม่เลือก</button><button class="btn btn-red btn-sm" data-act="campup-save" ${nSel ? '' : 'disabled'}>${todo ? `บันทึกที่เลือก (${nSel} คัน)` : 'บันทึกครบแล้ว'}</button></span>` : ''}</div>
+    ${nChg ? `<div class="text-sm mt-2" style="color:var(--warn)">มี ${nChg} คันที่ทางเลือกเปลี่ยนจากที่บันทึกไว้ ตรวจแล้วติ๊กเลือกเองก่อนบันทึก</div>` : ''}<div class="text-xs text-muted mt-1">รุ่น: ${Object.entries(by).map(([k, v]) => esc(k) + ' ' + v).join(' · ')} · บันทึกแล้วเก็บไว้ที่ VIN แต่ละคัน (เห็นเฉพาะแอดมินขึ้นไป) ไม่เปลี่ยนเงื่อนไขขายในใบจอง · ดูสรุปและเทียบกับยอดจริงที่ เพิ่มเติม › รายงานสรุปแคมเปญ</div></section>`;
 }
 function campUpRow(r) {
   const { a, d, opts, found, state, it, why } = r, U = S.campUp, pick = (U.pick || {})[a.id] || '';
@@ -141,7 +144,7 @@ async function campUpRead(file) {
     } else {
       const X = await loadXLSX(), wb = /\.(csv|txt)$/i.test(file.name) ? X.read(await file.text(), { type: 'string' }) : X.read(await file.arrayBuffer(), { type: 'array' });
       const dir = campParseDIR(X, wb);
-      if (dir) { Object.assign(U, { items: dir.items, report: dir.report, text: '', file: file.name, pick: {} }); U.busy = false; render(); return; }
+      if (dir) { Object.assign(U, { items: dir.items, report: dir.report, text: '', file: file.name, pick: {} }); U.sel = new Set(campUpVinRows(derive()).filter(r => !r.done && !r.chg).map(r => r.it.vin)); U.busy = false; render(); return; }
       text = wb.SheetNames.map(n => X.utils.sheet_to_csv(wb.Sheets[n])).join(' ');
     }
     if (!text.trim()) U.msg = 'อ่านข้อความจากไฟล์ไม่ได้ ลองไฟล์อื่น';
@@ -152,19 +155,23 @@ async function campUpRead(file) {
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t || !t.dataset) return;
   if (t.dataset.campupFile !== undefined) { const f = t.files && t.files[0]; t.value = ''; if (f) campUpRead(f); }
+  else if (t.dataset.campupSel !== undefined) { const U = S.campUp; U.sel = U.sel || new Set(); t.checked ? U.sel.add(t.dataset.campupSel) : U.sel.delete(t.dataset.campupSel); render(); }
   else if (t.dataset.campupPick !== undefined) { const U = S.campUp; U.pick[t.dataset.campupPick] = t.value; render(); }
 });
 Object.assign(ACTIONS, {
-  async 'campup-save'(el) {
+  'campup-selall'() { const U = S.campUp; U.sel = new Set(campUpVinRows(derive()).filter(r => !r.done).map(r => r.it.vin)); render(); },
+  'campup-selnone'() { S.campUp.sel = new Set(); render(); },
+  async 'campup-save'() {
     const U = S.campUp; if (!U || !U.items || !campUpCan()) return;
-    const all = el.dataset.vin === '*', cur = S.ref.get('honda_rpt') || { v: {} }, v = { ...(cur.v || {}) }, now = new Date().toISOString(); let n = 0;
+    const cur = S.ref.get('honda_rpt') || { v: {} }, v = { ...(cur.v || {}) }, now = new Date().toISOString(); let n = 0, ch = 0;
     for (const it of U.items.values()) {
-      if (!all && it.vin !== el.dataset.vin) continue;
+      if (!U.sel || !U.sel.has(it.vin)) continue;
       const sv = v[it.vin]; if (sv && sv.opt === it.opt && sv.rep === U.report) continue;
-      v[it.vin] = { camp: it.camp, opt: it.opt, date: it.date, st: it.st, name: it.name, rep: U.report, file: U.file, ...actor(), at: now, prev: sv ? (sv.prev || []).concat([{ opt: sv.opt, rep: sv.rep, at: sv.at }]).slice(-5) : undefined }; n++;
+      const prev = sv ? [...(sv.prev || []), { opt: sv.opt, camp: sv.camp, date: sv.date, st: sv.st, rep: sv.rep, file: sv.file, at: sv.at, role: sv.role }].slice(-5) : [];
+      v[it.vin] = { camp: it.camp, opt: it.opt, date: it.date, st: it.st, name: it.name, mtoc: it.mtoc, typ: it.typ, rep: U.report, file: U.file, ...actor(), at: now, prev }; n++; if (sv) ch++;
     }
-    if (!n) { toast('บันทึกครบแล้ว'); return; }
-    if (await write('ref', 'honda_rpt', { ...cur, v })) { toast(`บันทึกยอดแจ้งขาย ${n} คันเข้า VIN แล้ว`); render(); }
+    if (!n) { toast('ยังไม่ได้เลือกคัน', 'bad'); return; }
+    if (await write('ref', 'honda_rpt', { ...cur, v })) { U.sel = new Set(); toast(`บันทึกยอดแจ้งขาย ${n} คันเข้า VIN แล้ว${ch ? ` (ทางเลือกเปลี่ยน ${ch} คัน เก็บค่าเก่าในประวัติ)` : ''}`); render(); }
   },
   'campup-clear'() { S.campUp = { items: null, text: '', file: '', busy: false, msg: '', pick: {} }; render(); },
   async 'campup-use'(el) {
@@ -183,5 +190,5 @@ Object.assign(ACTIONS, {
 function rptBox(c) {
   if (!campUpCan()) return '';
   const r = rptAll()[String(c.vin || '').toUpperCase()]; if (!r) return '';
-  return `<div class="p-3 rounded-lg border border-line text-sm" style="background:var(--surface-2)"><b>แจ้งขาย Honda${r.rep ? ' ' + esc(r.rep) : ''}</b>: ${esc(r.opt || '–')}<div class="text-xs text-muted">${esc(r.camp)}${r.date ? ' · ส่งมอบ ' + esc(r.date) : ''}${r.st ? ' · ' + esc(r.st) : ''} · บันทึก ${fmtD((r.at || '').slice(0, 10))} โดย ${esc(r.role || '')}</div></div>`;
+  return `<div class="p-3 rounded-lg border border-line text-sm" style="background:var(--surface-2)"><b>แจ้งขาย Honda${r.rep ? ' ' + esc(r.rep) : ''}</b>: ${esc(r.opt || '–')}<div class="text-xs text-muted">${esc(r.camp)}${r.date ? ' · ส่งมอบ ' + esc(r.date) : ''}${r.st ? ' · ' + esc(r.st) : ''} · บันทึก ${fmtD((r.at || '').slice(0, 10))} โดย ${esc(r.role || '')}</div>${(r.prev || []).length ? `<details class="mt-1"><summary class="text-xs cursor-pointer">ประวัติก่อนหน้า (${r.prev.length})</summary>${r.prev.slice().reverse().map(p => `<div class="text-xs text-muted">${esc(p.rep || '')} · ${esc(p.opt || '–')} · ${fmtD((p.at || '').slice(0, 10))}</div>`).join('')}</details>` : ''}</div>`;
 }

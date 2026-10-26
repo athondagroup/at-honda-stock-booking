@@ -236,6 +236,7 @@ function menuItems() {
   const items = [['datafix', 'ข้อมูลผิด / ขาด / ต้องจับคู่', 'รวมเรื่องที่ต้องแก้ไว้ที่เดียว กดแล้วพาไปหน้าที่แก้'],
     ['upload', 'อัปโหลดข้อมูล IDS', 'ไฟล์ Stock, Booking, Quota, Invoice/DL จาก IDS'],
     ['campup', 'อัปเดตข้อมูลแคมเปญ', 'ไฟล์แคมเปญ Honda เทียบกับแคมเปญที่เลือกไว้ในใบจอง'],
+    ['campsum', 'รายงานสรุปแคมเปญ', 'สรุปแคมเปญที่ Honda แจ้งขาย เทียบกับยอดจริง พิมพ์รายเดือน'],
     ['admin', 'หลังบ้าน', S.role.role === 'exec' ? 'ผู้ใช้งาน รายชื่อเซลล์ รุ่น เกรด สี แก้ข้อมูลโดยตรง' : 'ดูได้อย่างเดียว การแก้ทำโดยผู้บริหาร']].filter(x => can.has(x[0]));
   if (!items.length) return '';
   const bc = badgeCounts(derive()), nOf = v => v === 'datafix' ? datafixCount(derive()) : bc[v] || 0;
