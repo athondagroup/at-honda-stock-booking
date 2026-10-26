@@ -85,9 +85,10 @@ function privRowsBuiltIn() {
 }
 function privRows() { const d = S.ref.get('privileges'); return d && Array.isArray(d.rows) && d.rows.length ? d.rows.filter(r => r.active !== false) : privRowsBuiltIn(); }
 function privFor(x, month) {
-  const mk = termsModelKey(x.model), rows = privRows().filter(r => r.mkey === mk), use = termsMonthUse(rows, month || (termsMonths(x)[0]) || todayISO().slice(0, 7));
-  const get = k => rows.find(r => r.month === use && r.priv === k) || null;
-  return { gtg: get('gtg'), ln: get('ln'), month: use };
+  const mk = termsModelKey(x.model), rows = privRows().filter(r => r.mkey === mk), req = month || (termsMonths(x)[0]) || todayISO().slice(0, 7), use = termsMonthUse(rows, req);
+  // an older month than the first keyed one (the Jul-Sep campaign): the table has no amounts for it, so none are filled in (typed by hand)
+  const miss = !!(use && use > req), get = k => miss ? null : rows.find(r => r.month === use && r.priv === k) || null;
+  return { gtg: get('gtg'), ln: get('ln'), month: use, miss, req };
 }
 // what the picked campaign rules out (its name says "ไม่ร่วม Gen to Gen / Local Native")
 function privBlocked(camp) { const n = String(camp && camp.name || ''); const m = n.match(/ไม่ร่วม([^)]*)/); const t = m ? m[1] : ''; return { gtg: /Gen to Gen/i.test(t), ln: /Local Native/i.test(t) }; }
@@ -127,11 +128,11 @@ function termsFields(x, v, f) {
   const RO = (label, val, note) => `<div class="field"><label>${label}</label><div class="num p-2 rounded-lg border border-line">${val ? money(val) : '–'}</div>${note ? `<span class="text-xs text-muted">${note}</span>` : ''}</div>`;
   const g = pv.pr.gtg, ln = pv.pr.ln;
   const privBox = `<div class="mt-3 pt-3 border-t border-line"><div class="font-medium text-sm mb-2">สิทธิพิเศษ Honda</div><div class="grid sm:grid-cols-2 gap-3">
-    ${S2('priv_gtg', 'Gen to Gen', [['', 'ไม่ใช้'], ...(g && !pv.bl.gtg ? [['1', `รถฮอนด้าเดิม 1 คัน · ${money(g.a1)}`], ['2', `2 คันขึ้นไป · ${money(g.a2)}`]] : [['x', pv.bl.gtg ? 'แคมเปญที่เลือกไม่ร่วม Gen to Gen' : 'รุ่นนี้ไม่ร่วม Gen to Gen', true]])])}
-    ${S2('priv_ln', 'Local Native', [['', 'ไม่ใช้'], ...(ln && !pv.bl.ln ? [['cash', `รับเงิน · ${money(ln.a1)}`], ['care', 'รับ Ultimate Care (ไม่เข้า Margin)']] : [['x', pv.bl.ln ? 'แคมเปญที่เลือกไม่ร่วม Local Native' : 'รุ่นนี้ไม่ร่วม Local Native', true]])])}
+    ${S2('priv_gtg', 'Gen to Gen', [['', 'ไม่ใช้'], ...(g && !pv.bl.gtg ? [['1', `รถฮอนด้าเดิม 1 คัน · ${money(g.a1)}`], ['2', `2 คันขึ้นไป · ${money(g.a2)}`]] : [['x', pv.bl.gtg ? 'แคมเปญที่เลือกไม่ร่วม Gen to Gen' : pv.pr.miss ? `ไม่มีตารางสิทธิ์เดือน ${fmtM(pv.pr.req)} · ใส่ยอดเองในช่อง 4` : 'รุ่นนี้ไม่ร่วม Gen to Gen', true]])])}
+    ${S2('priv_ln', 'Local Native', [['', 'ไม่ใช้'], ...(ln && !pv.bl.ln ? [['cash', `รับเงิน · ${money(ln.a1)}`], ['care', 'รับ Ultimate Care (ไม่เข้า Margin)']] : [['x', pv.bl.ln ? 'แคมเปญที่เลือกไม่ร่วม Local Native' : pv.pr.miss ? `ไม่มีตารางสิทธิ์เดือน ${fmtM(pv.pr.req)} · ใส่ยอดเองในช่อง 4` : 'รุ่นนี้ไม่ร่วม Local Native', true]])])}
     ${N('priv_hk', 'ฮอนด้าเคียงข้างคุณ (บาท)', 'step="1000" placeholder="25,000–70,000"')}
     ${N('margin_priv', '4. สิทธิพิเศษ Honda (บาท)')}</div>
-    <div class="text-xs text-muted mt-1">ยอดตามแท็บสิทธิพิเศษ Honda เดือน ${fmtM(pv.pr.month)} · ฮอนด้าเคียงข้างคุณใช้ร่วมกับ Gen to Gen / Local Native ไม่ได้</div></div>`;
+    <div class="text-xs text-muted mt-1">${pv.pr.miss ? `เดือน ${fmtM(pv.pr.req)} ไม่มียอดในตาราง (Gen to Gen ของแคมเปญเดือนนี้ขึ้นกับปีที่ครอบครองรถเดิม) ใส่ยอดเองในช่อง 4 และดูเงื่อนไขในเอกสารแคมเปญ` : `ยอดตามแท็บสิทธิพิเศษ Honda เดือน ${fmtM(pv.pr.month)}`} · ฮอนด้าเคียงข้างคุณใช้ร่วมกับ Gen to Gen / Local Native ไม่ได้</div></div>`;
   const price = f.priceDisc ? `<div class="field"><label for="${f.idp}-price" class="req">ราคารถ (ราคาเต็ม)</label><input id="${f.idp}-price" type="number" min="0" step="100" inputmode="decimal" ${f.attr}="${f.pre}.price" value="${esc(o.price ?? '')}" ${f.lockPrice || f.ro ? 'readonly style="background:var(--surface-2)"' : ''}>${f.priceNote ? `<span class="text-xs text-muted">${f.priceNote}</span>` : ''}</div>` + N('disc', 'ส่วนลดราคารถ', 'step="100"') : '';
   const fin = x.cash ? '' : N('down', 'เงินดาวน์', 'step="100"') + N('down_disc', 'ส่วนลดดาวน์', 'step="100"') + RO('ยอดจัด', o.fin_amount, 'ราคารถ − ส่วนลด − ดาวน์ (คิดให้เอง)') + N('rate', 'ดอกเบี้ย (% ต่อปี)', 'step="0.01" max="30"') + N('term', 'จำนวนงวด (เดือน)', 'step="1" max="120"');
   const groups = [...new Set(opts.map(y => y.group))];
