@@ -61,6 +61,7 @@ function dealBoxIn(a, m, D) {
       : m.dealMode === 'req' ? 'ขอแก้ได้ครั้งเดียว · ส่งแล้วรอแอดมินสาขาหรือผู้จัดการอนุมัติ ตัวเลขเดิมยังใช้อยู่จนกว่าจะอนุมัติ' : 'แอดมินขึ้นไปแก้ได้เลย ระบบเก็บตัวเลขเดิมไว้ในประวัติ';
     return `<div class="mt-2 p-3 rounded-lg border border-line" style="background:var(--surface-2)">${title}<div class="mt-2">
       ${termsFields(x, v, { attr: 'data-modal', pre: 'deal', idp: 'dl', paint, priceDisc: true, lockPrice, priceNote, adm: st.admin && m.dealMode !== 'req' })}</div>
+      ${m.dealMode === 'admin' && poLocked(a) ? `<div class="field mt-2"><label for="dl-why" class="req">เหตุผลที่แก้หลังส่งมอบ (บังคับ · เก็บในประวัติ)</label><input id="dl-why" data-modal="dealWhy" value="${esc(m.dealWhy || '')}" autocomplete="off" placeholder="เช่น Honda แจ้งเปลี่ยนทางเลือก / บัญชีตรวจพบ"></div>` : ''}
       ${m.dealMode === 'req' ? `<div class="field mt-2"><label for="dl-why" class="req">เหตุผลที่ขอแก้</label><input id="dl-why" data-modal="dealWhy" value="${esc(m.dealWhy || '')}" autocomplete="off" placeholder="เช่น ไฟแนนซ์อนุมัติดาวน์ 25%"></div>` : ''}
       <div class="text-xs text-muted mt-2">${note}</div>
       <div class="flex gap-2 mt-2"><button class="btn btn-dark btn-sm" data-act="deal-save" data-id="${esc(a.id)}">${m.dealMode === 'req' ? 'ส่งขอแก้ไข' : 'บันทึก'}</button><button class="btn btn-ghost btn-sm" data-act="deal-close">ยกเลิก</button></div></div>`;
@@ -86,7 +87,7 @@ function commDeal(a) {
   const o = { price: dl.price, discount: dl.disc, down: dl.down, down_disc: dl.down_disc, fin_amount: dl.fin_amount, rate: dl.rate, term: dl.term, campaign: dl.campaign, margin: dl.margin, margin_car: dl.margin_car, margin_at: dl.margin_at, margin_honda: dl.margin_honda, margin_priv: dl.margin_priv, privileges: dl.privileges };
   return Object.fromEntries(Object.entries(o).filter(([, x]) => x !== null && x !== undefined));
 }
-function dealOld(d) { return Object.fromEntries(['price', 'disc', 'down', 'down_disc', 'fin_amount', 'rate', 'term', 'campaign_id', 'campaign', 'campaign_text', 'camp_month', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'priv_gtg', 'priv_ln', 'priv_hk', 'privileges', 'margin_priv', 'margin', 'paint', 'at', 'by', 'role', 'how'].map(k => [k, d[k] ?? null])); }
+function dealOld(d) { return Object.fromEntries(['price', 'disc', 'down', 'down_disc', 'fin_amount', 'rate', 'term', 'campaign_id', 'campaign', 'campaign_text', 'camp_month', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'priv_gtg', 'priv_ln', 'priv_hk', 'privileges', 'margin_priv', 'margin', 'paint', 'at', 'by', 'role', 'how', 'why'].map(k => [k, d[k] ?? null])); }
 Object.assign(ACTIONS, {
   'deal-open'(el) {
     const a = atById(el.dataset.id); if (!a) return;
@@ -120,7 +121,9 @@ Object.assign(ACTIONS, {
       return;
     }
     const first = mode === 'first';
-    const rec = { ...(first ? {} : prev), ...vals, ...actor(), how: first ? null : 'แอดมินแก้', first: first ? actor() : prev.first || { at: prev.at, by: prev.by, role: prev.role }, hist: first ? [] : [...(prev.hist || []), dealOld(prev)], src: first ? 'ขั้นไฟแนนซ์' : prev.src };
+    const lockWhy = !first && poLocked(a) ? String(S.modal.dealWhy || '').trim() : '';
+    if (!first && poLocked(a) && !lockWhy) { toast('ส่งมอบแล้ว ต้องใส่เหตุผลที่แก้', 'bad'); $('#dl-why')?.focus(); return; }
+    const rec = { ...(first ? {} : prev), ...vals, ...actor(), how: first ? null : (lockWhy ? 'แอดมินแก้หลังส่งมอบ' : 'แอดมินแก้'), why: lockWhy || null, first: first ? actor() : prev.first || { at: prev.at, by: prev.by, role: prev.role }, hist: first ? [] : [...(prev.hist || []), dealOld(prev)], src: first ? 'ขั้นไฟแนนซ์' : prev.src };
     if (await saveFlow(a, { deal: rec }, first ? 'บันทึกเงื่อนไขการขายแล้ว' : 'แก้ไขเงื่อนไขแล้ว')) { S.modal.deal = null; S.modal.dealMode = null; render(); }
   },
   async 'deal-approve'(el) {

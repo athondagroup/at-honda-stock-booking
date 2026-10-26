@@ -8,11 +8,11 @@
 function adminCan() { return S.role.role === 'exec' || !!MGR_OF[S.role.role]; }
 // หลังบ้าน: executive edits, managers only look, branch admins have no access
 function adminWrite(br) { if (S.view === 'admin' && S.role.role !== 'exec') return false; return perms().write && perms().approve && (!br || canApproveBr(br)); }
-function adminTabs() { return [...(window.__WEB && window.__WEB.role === 'exec' ? [['users', 'ผู้ใช้งานเว็บ']] : []), ['sales', 'รายชื่อเซลล์'], ['cat', 'รุ่น เกรด สี'], ['book', 'ใบจอง'], ['lock', 'ล็อกรถ'], ['file', 'แก้ผ่าน Excel / Google Sheet'], ['log', 'ประวัติหลังบ้าน']]; }
+function adminTabs() { return [...(window.__WEB && window.__WEB.role === 'exec' ? [['users', 'ผู้ใช้งานเว็บ']] : []), ...(window.__WEB && window.__WEB.role === 'exec' ? [['money', 'ประวัติแก้ไข เงิน/แคมเปญ']] : []), ['sales', 'รายชื่อเซลล์'], ['cat', 'รุ่น เกรด สี'], ['book', 'ใบจอง'], ['lock', 'ล็อกรถ'], ['file', 'แก้ผ่าน Excel / Google Sheet'], ['log', 'ประวัติหลังบ้าน']]; }
 function viewAdmin(D) {
   if (!adminCan()) return `${pageHead('หลังบ้าน', '')}<div class="bg-surface border border-line rounded-lg">${emptyBox('บทบาทนี้เข้าหลังบ้านไม่ได้', 'สำหรับผู้บริหาร (แก้ได้) และผู้จัดการ (ดูได้)')}</div>`;
   const sub = adminTabs().some(t => t[0] === S.sub.admin) ? S.sub.admin : 'sales';
-  const body = sub === 'users' ? adminUsers() : sub === 'book' ? adminBook(D) : sub === 'lock' ? adminLock(D) : sub === 'file' ? adminFile(D) : sub === 'log' ? adminLog(D) : sub === 'cat' ? adminCatalog(D) : adminSales(D);
+  const body = sub === 'users' ? adminUsers() : sub === 'book' ? adminBook(D) : sub === 'lock' ? adminLock(D) : sub === 'file' ? adminFile(D) : sub === 'log' ? adminLog(D) : sub === 'money' ? adminMoney(D) : sub === 'cat' ? adminCatalog(D) : adminSales(D);
   return `${pageHead('หลังบ้าน', 'ตรวจและแก้ข้อมูลโดยตรง ทุกการแก้เก็บประวัติว่าใครแก้ เมื่อไหร่ จากอะไรเป็นอะไร')}
   ${tabs('admin', adminTabs())}${!adminWrite() ? '<p class="text-sm text-muted mb-3">ผู้จัดการดูและดาวน์โหลดได้ การแก้ในหลังบ้านทำโดยผู้บริหาร</p>' : ''}${body}`;
 }

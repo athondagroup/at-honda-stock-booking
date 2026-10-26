@@ -107,7 +107,7 @@ function campUpVinRows(D) {
 }
 function campUpVinRow(r) {
   const { a, d, it, opts, found, state, done, chg, old } = r, U = S.campUp, pick = (U.pick || {})[it.vin] || '';
-  const can = campUpCan(), canEdit = a && d && dealAdmin(a) && !poLocked(a);
+  const can = campUpCan(), canEdit = a && d && dealAdmin(a);
   const tone = state === 'ok' ? 'good' : state === 'diff' ? 'warn' : 'muted';
   const label = state === 'ok' ? 'ตรง' : state === 'diff' ? 'ไม่ตรง' : 'ยังไม่มีข้อมูลในเว็บ';
   const fix = state !== 'diff' ? '' : !canEdit ? `<span class="text-xs text-muted">${a && poLocked(a) ? 'ส่งมอบแล้ว แก้เงื่อนไขในเว็บไม่ได้' : 'แก้ได้เฉพาะแอดมิน/ผู้จัดการสาขา ' + esc(a ? a.br : '')}</span>` : `<div class="flex flex-col gap-2">
@@ -134,11 +134,11 @@ function campUpRptBox(vr) {
 }
 function campUpRow(r) {
   const { a, d, opts, found, state, it, why } = r, U = S.campUp, pick = (U.pick || {})[a.id] || '';
-  const can = dealAdmin(a) && !poLocked(a);
+  const can = dealAdmin(a);
   const tone = state === 'ok' ? 'good' : state === 'diff' ? 'warn' : state === 'miss' ? 'bad' : 'muted';
   const label = state === 'ok' ? 'ตรง' : state === 'diff' ? 'ไม่ตรง' : state === 'miss' ? 'ไม่พบในไฟล์' : 'ยังไม่เทียบ';
   const sugg = found.filter(h => h.opt.value !== d.campaign_id);
-  const act = !can ? `<span class="text-xs text-muted">${poLocked(a) ? 'ส่งมอบแล้ว แก้ไม่ได้' : 'แก้ได้เฉพาะแอดมิน/ผู้จัดการสาขา ' + esc(a.br)}</span>` : state === 'ok' ? '' : `<div class="flex flex-col gap-2">
+  const act = !can ? `<span class="text-xs text-muted">${'แก้ได้เฉพาะแอดมิน/ผู้จัดการสาขา ' + esc(a.br)}</span>` : state === 'ok' ? '' : `<div class="flex flex-col gap-2">
       ${sugg.map(h => `<div class="flex flex-wrap items-center gap-2"><span class="text-sm flex-1 min-w-[180px]">${esc(campFull(h.opt))} ${chip(h.pct + '% ตรง', h.pct >= 80 ? 'good' : 'warn')}</span><button type="button" class="btn btn-dark btn-sm" data-act="campup-use" data-id="${esc(a.id)}" data-cid="${esc(h.opt.value)}">ใช้ตัวนี้</button></div>`).join('')}
       <div class="flex flex-wrap items-center gap-2"><select class="min-w-0 flex-1" data-campup-pick="${esc(a.id)}"><option value="">เลือกแคมเปญเอง…</option>${opts.map(y => `<option value="${esc(y.value)}" ${pick === y.value ? 'selected' : ''}>${esc(campFull(y))}</option>`).join('')}</select>
         <button type="button" class="btn btn-ghost btn-sm" data-act="campup-use" data-id="${esc(a.id)}" data-cid="${esc(pick)}" ${pick ? '' : 'disabled'}>ใช้ตัวที่เลือก</button></div></div>`;
@@ -235,7 +235,8 @@ Object.assign(ACTIONS, {
   async 'campup-use'(el) {
     const a = atById(el.dataset.id), cid = el.dataset.cid, U = S.campUp; if (!a || !cid) return;
     const D = derive(), d = a.rec.deal;
-    if (!d || !dealAdmin(a) || poLocked(a)) { toast('แก้ไม่ได้', 'bad'); return; }
+    if (!d || !dealAdmin(a)) { toast('แก้ไม่ได้', 'bad'); return; }
+    if (poLocked(a)) { rptEditOpen(String(atVin(a) || '').toUpperCase(), cid); return; }  // delivered: the edit window asks for the reason
     const x = termsCtxAt(a, D), c = campOptions(x).opts.find(y => y.value === cid);
     if (!c || !c.ok) { toast('แคมเปญนี้ใช้ไม่ได้กับใบจองนี้', 'bad'); return; }
     const vals = termsRecord(x, { ...d, campaign_id: cid, margin_honda: '', margin_priv: '' }, d.paint || 0);

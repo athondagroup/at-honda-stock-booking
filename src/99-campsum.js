@@ -21,6 +21,7 @@ function rptRows(rep) {
   Object.entries(pay).forEach(([vin, p]) => {
     if (fmtM(p.per) !== rep || (rptBr() && p.br !== rptBr())) return;
     const r = by.get(vin) || { vin, br: p.br, name: p.model || '', camp: p.camp || '', opt: fixTh(p.opt || ''), st: '', date: '', hasDir: false };
+    if (p.opt_adj) { r.opt = fixTh(p.opt_adj); r.optAdj = true; }
     r.hasPay = true; r.pay = Number(p.amt) || 0; r.acts = p.acts || []; r.actAmt = r.acts.reduce((t, x) => t + (Number(x.amt) || 0), 0);
     if (!r.name) r.name = p.model || ''; if (!r.opt) { r.opt = fixTh(p.opt || ''); r.camp = r.camp || p.camp || ''; }
     by.set(vin, r);
@@ -74,7 +75,7 @@ function rptPivotTable(rows, pr) {
   let body = '';
   camps.forEach(g => {
     body += `<tr class="rpt-grp"><td colspan="${cols.length + 4}"><b>${esc(g.camp || '–')}</b></td></tr>`;
-    g.opts.forEach(o => { const h = rptOptHead(o.opt); h.txt = h.txt.replace(/\s*ดาวน์ ?\d+%.*$/, ''); body += `<tr><td><b>${esc(h.no)}</b> ${esc(h.txt)}</td>${cols.map(m => `<td class="text-right num">${c(o.by[m] || 0)}</td>`).join('')}<td class="text-right num">${c(o.del)}</td><td class="text-right num">${c(o.adv)}</td><td class="text-right num"><b>${o.n}</b></td></tr>`; });
+    g.opts.forEach(o => { const h = rptOptHead(o.opt); h.txt = h.txt.replace(/\s*ดาวน์ ?\d+%.*$/, ''); body += `<tr><td>${pr ? '<b>' + esc(h.no) + '</b> ' + esc(h.txt) : optTip(o.opt)}</td>${cols.map(m => `<td class="text-right num">${c(o.by[m] || 0)}</td>`).join('')}<td class="text-right num">${c(o.del)}</td><td class="text-right num">${c(o.adv)}</td><td class="text-right num"><b>${o.n}</b></td></tr>`; });
     if (g.opts.length > 1) body += `<tr class="rpt-sub"><td>รวม ${esc((g.camp || '').split(' ')[0])}</td>${cols.map(m => `<td class="text-right num">${c(sumBy(g.opts, o => o.by[m] || 0))}</td>`).join('')}<td class="text-right num">${c(sumBy(g.opts, o => o.del))}</td><td class="text-right num">${c(sumBy(g.opts, o => o.adv))}</td><td class="text-right num"><b>${sumBy(g.opts, o => o.n)}</b></td></tr>`;
   });
   const all = camps.flatMap(g => g.opts);
@@ -136,10 +137,11 @@ function rptCharts(rows) {
 function rptCarTable(list, pr, D, byVin) {
   const tr = list.map((r, i) => { const a = byVin.get(r.vin), d = a && a.rec && a.rec.deal, h = rptOptHead(r.opt), adv = rptKind(r.st) === 'adv';
     const chk = !r.hasDir ? '–' : !d || !d.campaign_id ? '–' : d.campaign_id === 'pending' ? 'รอเลือก' : campFeats(d.campaign) === campFeats(r.opt) ? 'ตรง' : 'ต่าง';
+    const mc = rptMoneyCheck(r, a, D, pr); mc.txt = String(mc.html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     const stt = !r.hasDir ? '–' : adv ? 'ALLOCATED (Advance)' : (r.st || '–');
-    return `<tr><td class="num">${i + 1}</td><td>${esc(r.br || '')}</td><td>${esc(r.name)}</td><td>${pr ? esc(r.vin) : vinLink({ vin: r.vin })}</td><td>${a ? esc(a.cust) : '<span class="text-muted">–</span>'}</td><td><b>${esc(h.no)}</b> <span class="text-xs">${esc(h.txt)}</span></td><td class="text-right num">${r.pay ? money(r.pay) : '–'}</td><td class="text-xs">${r.acts.length ? r.acts.map(x => esc(String(x.name).replace(/^SP\d+\/\d+ ?: ?/, '').slice(0, 60)) + ' ' + money(x.amt)).join('<br>') : '–'}</td><td class="text-right num"><b>${r.tot ? money(r.tot) : '–'}</b></td><td class="nowrap">${pr ? esc(stt) : !r.hasDir ? '–' : adv ? chip('Advance', 'warn') : chip(r.st || '–', 'good')}</td><td class="nowrap">${pr ? esc(chk) : chk === 'ตรง' ? chip(chk, 'good') : chk === 'ต่าง' ? chip(chk, 'warn') : chk}</td></tr>`; }).join('');
-  const tot = `<tr class="rpt-tot"><td colspan="6"><b>รวม ${list.length} คัน</b></td><td class="text-right num"><b>${money(sumBy(list, r => r.pay))}</b></td><td></td><td class="text-right num"><b>${money(sumBy(list, r => r.tot))}</b></td><td colspan="2"></td></tr>`;
-  return `<div class="${pr ? '' : 'bg-surface border border-line rounded-lg overflow-x-auto'}"><table class="${pr ? '' : 'tbl'}"><thead><tr><th>#</th><th>สาขา</th><th>รุ่น</th><th>เลขตัวถัง</th><th>ลูกค้า</th><th>ทางเลือก</th><th class="text-right">เงินทางเลือก</th><th>แคมเปญพิเศษ</th><th class="text-right">รวมเงิน</th><th>สถานะ</th><th>เทียบเว็บ</th></tr></thead><tbody>${tr}${tot}</tbody></table></div>`;
+    return `<tr><td class="num">${i + 1}</td><td>${esc(r.br || '')}</td><td>${esc(r.name)}</td><td>${pr ? esc(r.vin) : vinLink({ vin: r.vin })}</td><td>${a ? esc(a.cust) : '<span class="text-muted">–</span>'}</td><td>${optTip(r.opt, pr)}${r.optAdj ? ' <span class="text-xs text-muted">(แก้)</span>' : ''}</td><td class="text-right num">${r.pay ? money(r.pay) : '–'}</td><td class="text-xs">${r.acts.length ? r.acts.map(x => esc(String(x.name).replace(/^SP\d+\/\d+ ?: ?/, '').slice(0, 60)) + ' ' + money(x.amt)).join('<br>') : '–'}</td><td class="text-right num"><b>${r.tot ? money(r.tot) : '–'}</b></td><td class="nowrap">${pr ? esc(stt) : !r.hasDir ? '–' : adv ? chip('Advance', 'warn') : chip(r.st || '–', 'good')}</td><td class="nowrap">${pr ? esc(chk) : chk === 'ตรง' ? chip(chk, 'good') : chk === 'ต่าง' ? chip(chk, 'warn') : chk}</td><td>${pr ? esc(mc.txt) : mc.html}</td>${pr ? '' : `<td>${rptEditBtn(r, a)}</td>`}</tr>`; }).join('');
+  const tot = `<tr class="rpt-tot"><td colspan="6"><b>รวม ${list.length} คัน</b></td><td class="text-right num"><b>${money(sumBy(list, r => r.pay))}</b></td><td></td><td class="text-right num"><b>${money(sumBy(list, r => r.tot))}</b></td><td colspan="${pr ? 3 : 4}"></td></tr>`;
+  return `<div class="${pr ? '' : 'bg-surface border border-line rounded-lg overflow-x-auto'}"><table class="${pr ? '' : 'tbl'}"><thead><tr><th>#</th><th>สาขา</th><th>รุ่น</th><th>เลขตัวถัง</th><th>ลูกค้า</th><th>ทางเลือก</th><th class="text-right">เงินทางเลือก</th><th>แคมเปญพิเศษ</th><th class="text-right">รวมเงิน</th><th>สถานะ</th><th>เทียบเว็บ</th><th>เทียบเงิน</th>${pr ? '' : '<th></th>'}</tr></thead><tbody>${tr}${tot}</tbody></table></div>`;
 }
 function rptByVin(D) { const m = new Map(); for (const a of D.at) { const v = atVin(a); if (v && !a.cancelled) m.set(String(v).toUpperCase(), a); } return m; }
 function rptModelTable(rows, D, pr) {
@@ -171,7 +173,7 @@ function rptSheet(D, rep, rows, cmp) {
   <h2>2. สรุปตามแคมเปญและทางเลือก (แยกรุ่น)</h2>${rptPivotTable(rows, true)}
   <h2>3. เทียบกับข้อมูลในเว็บ</h2>${rptChecksTable(rptChecks(D, rep, rows, cmp), true)}
   <h2>4. คันที่ยังไม่เลือกแคมเปญ</h2>${rptNoneTable(D, rep, true)}
-  <h2>5. รายคัน (ส่งบัญชีตรวจเทียบ)</h2>${rptCarTable(rows, true, D, rptByVin(D))}</div>`;
+  <h2>5. รายคัน (ส่งบัญชีตรวจเทียบ)</h2>${rptCarTable(rows, true, D, rptByVin(D))}<h2>6. คำอธิบายทางเลือก</h2>${optLegend(rows)}</div>`;
 }
 function viewCampSum(D) {
   const months = rptMonths(), rep = S.filters.rptRep && months.includes(S.filters.rptRep) ? S.filters.rptRep : months[0];
