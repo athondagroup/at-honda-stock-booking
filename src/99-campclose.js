@@ -49,10 +49,8 @@ function ccWhyCell(x) {
   const w = x.why || {};
   return `<select data-cc-why="${esc(x.vin)}" aria-label="เหตุผล"><option value="">– เลือกเหตุผล –</option>${Object.entries(CC_WHY).map(([k, v]) => `<option value="${k}" ${w.r === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>${w.r === 'other' ? `<input class="mt-1 w-full" data-cc-whyt="${esc(x.vin)}" value="${esc(w.t || '')}" placeholder="พิมพ์เหตุผล" aria-label="เหตุผลอื่น ๆ">` : ''}`;
 }
-function viewCampClose(D) {
-  if (!campUpCan()) return `${pageHead('ปิดเดือน', '')}<p class="text-sm text-muted">เฉพาะแอดมินขึ้นไป</p>`;
-  const months = ccMonths(D), ym = months.includes(S.filters.ccM) ? S.filters.ccM : months[0];
-  if (!ym) return `${pageHead('ปิดเดือน', 'ใบกำกับทุกคันเทียบไฟล์ Honda ของเดือนนั้น')}<p class="text-sm text-muted">ยังไม่มีข้อมูลใบกำกับหรือไฟล์ Honda</p>`;
+function ccSection(D, rep) {
+  const ym = rptMonth(rep);
   const B = ccBuild(D, ym), F = S.filters.ccF || '', L = B.list;
   const cnt = f => L.filter(f).length, miss = cnt(x => x.st === 'missing'), wait = cnt(x => x.st === 'wait');
   const tiles = [
@@ -73,12 +71,7 @@ function viewCampClose(D) {
       <td class="text-xs">${x.money ? x.money.html : r ? '<span class="text-muted">ไม่พบใบจอง</span>' : ''}${x.st === 'extra' && x.inv ? `<span class="text-muted">ใบกำกับ ${esc(fmtD(String(x.inv.idate).slice(0, 10)))}</span>` : ''}</td>
       <td class="text-xs">${ccWhyCell(x)}</td></tr>`;
   }).join('');
-  return `${pageHead('ปิดเดือน', 'ใบกำกับทุกคันเทียบไฟล์ Honda ของเดือนนั้น · เงินรางวัลจ่ายตามเดือนที่ออกใบกำกับ')}
-  <div class="flex flex-wrap items-center gap-2 mb-4 p-3 rounded-lg border border-line bg-surface">
-    ${myBranch() ? `<span class="text-sm">สาขา ${esc(myBranch())}</span>` : `<div class="flex flex-wrap gap-1" role="group" aria-label="สาขา">${[['', 'ทุกสาขา'], ...BRS.map(b => [b, b])].map(([v, t]) => `<button type="button" class="btn btn-sm ${(S.filters.rptBr || '') === v ? 'btn-dark' : 'btn-ghost'}" data-act="cc-br" data-br="${v}">${esc(t)}</button>`).join('')}</div>`}
-    <label class="text-sm ml-2" for="cc-m">เดือนที่ออกใบกำกับ</label><select id="cc-m" data-cc-m>${months.map(m => `<option value="${m}" ${m === ym ? 'selected' : ''}>${esc(fmtM(m))}</option>`).join('')}</select>
-    ${B.rep ? '' : '<span class="text-xs text-muted">เดือนนี้ยังไม่มีไฟล์ Honda</span>'}</div>
-  <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">${tiles.map(([t, n, sub, go]) => `<button type="button" class="p-3 rounded-lg border border-line bg-surface text-left hover:bg-surface2" data-act="cc-f" data-f="${go}"><div class="text-xs text-muted">${esc(t)}</div><div class="text-2xl font-head font-semibold">${n}</div><div class="text-xs text-muted">${esc(sub)}</div></button>`).join('')}</div>
+  return `  <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">${tiles.map(([t, n, sub, go]) => `<button type="button" class="p-3 rounded-lg border border-line bg-surface text-left hover:bg-surface2" data-act="cc-f" data-f="${go}"><div class="text-xs text-muted">${esc(t)}</div><div class="text-2xl font-head font-semibold">${n}</div><div class="text-xs text-muted">${esc(sub)}</div></button>`).join('')}</div>
   <p class="text-xs text-muted mb-3">สาขาที่แอดมินยังไม่กด "ยืนยันไฟล์ครบ" จะแสดง "รอไฟล์" และไม่เตือนคันที่ไม่อยู่ในไฟล์ · คันที่ออกใบกำกับปลายเดือนแล้วส่งมอบเดือนถัดไป ไฟล์ระบุเป็น Allocated จะไม่เตือน</p>
   ${ccBranchTable(D, ym, B)}
   <div class="flex flex-wrap gap-1 mb-2" role="group" aria-label="กรอง">${chips.map(([v, t]) => `<button type="button" class="btn btn-sm ${F === v ? 'btn-dark' : 'btn-ghost'}" data-act="cc-f" data-f="${v}">${esc(t)}</button>`).join('')}</div>
@@ -86,7 +79,6 @@ function viewCampClose(D) {
 }
 async function ccSave(patch) { const cur = ccRef(); return write('ref', 'honda_pay', { ...cur, ...patch }); }
 Object.assign(ACTIONS, {
-  'cc-br'(el) { S.filters.rptBr = el.dataset.br || ''; render(); },
   'cc-f'(el) { S.filters.ccF = el.dataset.f || ''; render(); },
   async 'cc-done'(el) {
     const br = el.dataset.br, ym = el.dataset.ym; if (!rptEditCan(br)) { toast('แก้ไม่ได้', 'bad'); return; }
@@ -97,8 +89,7 @@ Object.assign(ACTIONS, {
 });
 document.addEventListener('change', async ev => {
   const t = ev.target; if (!t || !t.dataset) return;
-  if (t.dataset.ccM !== undefined) { S.filters.ccM = t.value; render(); }
-  else if (t.dataset.ccWhy !== undefined || t.dataset.ccWhyt !== undefined) {
+  if (t.dataset.ccWhy !== undefined || t.dataset.ccWhyt !== undefined) {
     const vin = String(t.dataset.ccWhy || t.dataset.ccWhyt).toUpperCase(), why = { ...(ccRef().why || {}) }, cur = why[vin] || {};
     if (t.dataset.ccWhy !== undefined) { if (!t.value) delete why[vin]; else why[vin] = { ...actor(), r: t.value, t: t.value === 'other' ? cur.t || '' : '' }; }
     else why[vin] = { ...cur, ...actor(), t: t.value.trim() };

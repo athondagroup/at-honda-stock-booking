@@ -12,6 +12,8 @@ function rptMonths() {
   const set = new Set();
   Object.values(rptAll()).forEach(r => { if (r.rep && (!rptBr() || r.br === rptBr())) set.add(r.rep); });
   Object.values(rptPayAll()).forEach(r => { if (r.per && (!rptBr() || r.br === rptBr())) set.add(fmtM(r.per)); });
+  // months with invoices count too: the reward is paid by invoice month
+  (typeof derive === 'function' ? derive().X.inv || [] : []).forEach(i => { if (i.vin && !i.company && i.idate && (!rptBr() || i.br === rptBr())) set.add(fmtM(String(i.idate).slice(0, 7))); });
   return [...set].sort((a, b) => rptMonth(b).localeCompare(rptMonth(a)));
 }
 // one row per VIN for the month: the Dealer Incentive Report (status, date) merged with the payout files (baht, special campaigns)
@@ -219,6 +221,7 @@ function viewCampSum(D) {
   return `${pageHead('รายงานสรุปแคมเปญ', 'ยอดแจ้งขายและเงินรางวัลตามไฟล์ของ Honda เทียบกับข้อมูลในเว็บ')}${ctl}
   <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">${k.map(([t, n, sub, go]) => `<button type="button" class="p-3 rounded-lg border border-line bg-surface text-left hover:bg-surface2" data-act="rpt-go" data-t="${go}" title="กดเพื่อไปที่รายละเอียด"><div class="text-xs text-muted">${esc(t)}</div><div class="num text-2xl font-semibold">${n}</div>${sub ? `<div class="text-xs text-muted">${esc(sub)}</div>` : ''}<div class="text-xs underline mt-1">ดูรายละเอียด ↓</div></button>`).join('')}</div>
   <section class="mb-6">${rptCharts(rows, D)}${rptStatusNote(rows, D)}</section>
+  <section class="mb-6" id="rpt-inv" style="scroll-margin-top:72px"><h3 class="font-head font-semibold">ตรวจใบกำกับเทียบไฟล์ Honda</h3><p class="text-xs text-muted mb-2">ใบกำกับทุกคันในเดือนนี้เทียบกับไฟล์ · เงินรางวัลจ่ายตามเดือนที่ออกใบกำกับ</p>${ccSection(D, rep)}</section>
   ${sec('1. สรุปรายรุ่น', 'กดที่รุ่นเพื่อดูว่าแต่ละคันเลือกแคมเปญอะไรและได้เงินเท่าไร', rptModelTable(rows, D, false))}
   ${sec('2. เทียบกับข้อมูลในเว็บ', 'เทียบเฉพาะคันที่มีในไฟล์ Dealer Incentive Report · กด "ดูรายคัน" แล้วกด VIN เพื่อเปิดรายละเอียดรถ', rptChecksTable(rptChecks(D, rep, rows, cmp), false))}
   ${secH('3. คันที่ยังไม่เลือกแคมเปญ', 'รอเลือกแคมเปญ · ไม่ระบุแคมเปญ · ส่งมอบเดือนนี้แต่ยังไม่ลงเงื่อนไขขาย · เลือกแคมเปญจากตารางได้เลย', rptNoneTable(D, rep, false, rows), 'rptHide3')}
