@@ -36,7 +36,7 @@ function carModal(m, D) {
       <div class="mt-1 flex flex-wrap gap-2">${c.status === 'temp' ? chip('ว่าง', 'good') : statusChip(CAR_STATUS, c.status)} ${c.fromInv ? '' : tempChip(c)} ${chip(`${c.br} ${BR[c.br]?.name || ''}`, 'neutral')}</div>${c.fromInv ? '<p class="text-xs text-muted mt-1">รถคันนี้ไม่อยู่ในไฟล์ Stock IDS แล้ว (ออกใบกำกับแล้ว) แสดงข้อมูลจากไฟล์ DL</p>' : ''}</div>
     ${m.back ? '<button class="btn btn-dark btn-sm" data-act="car-back">← กลับ</button>' : '<button class="btn btn-ghost btn-sm" data-act="close">ปิด</button>'}</div>
   ${carWhyBox(c, D, inv, bk, hideCust)}
-  ${spBox(c, D)}
+  ${spBox(c, D)}${rptBox(c)}
   <div class="grid md:grid-cols-2 gap-5">
     <div><table class="tbl text-sm"><tbody>
       ${row('รุ่น เกรด สี', specLabel(c.spec))}

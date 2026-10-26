@@ -35,14 +35,7 @@ function campUpRows(D) {
     const d = a.rec && a.rec.deal; if (!d || !d.at || a.cancelled) continue;
     const x = termsCtxAt(a, D), opts = campOptions(x).opts.filter(y => y.ok && y.value !== 'other');
     if (S.br && a.br !== S.br) continue;
-    if (U.items) {
-      const vin = atVin(a), it = vin ? U.items.get(String(vin).toUpperCase()) : null;
-      if (!it) { out.push({ a, d, opts, found: [], state: 'miss', why: vin ? 'ไม่มี VIN นี้ในไฟล์' : 'ใบจองยังไม่มี VIN' }); continue; }
-      const ff = campFeats(it.opt), same = ff && ff === campFeats(d.campaign);
-      const found = same ? [] : opts.filter(y => ff && campFeats(y.name) === ff && (!campNo(it.opt) || campNo(y.name) === campNo(it.opt))).map(y => ({ opt: y, pct: 100, why: 'ตรงกับไฟล์' }));
-      out.push({ a, d, opts, found, state: same ? 'ok' : 'diff', it });
-      continue;
-    }
+    if (U.items) continue;
     const found = U.text ? campMatchText(opts, U.text) : [], top = found[0];
     const mine = found.find(h => h.opt.value === d.campaign_id);
     const state = !U.text ? 'none' : !top ? 'miss' : (top.opt.value === d.campaign_id || (mine && mine.pct >= top.pct)) ? 'ok' : 'diff';
@@ -50,6 +43,50 @@ function campUpRows(D) {
   }
   const ord = { diff: 0, miss: 1, ok: 2, none: 3 };
   return out.sort((p, q) => ord[p.state] - ord[q.state] || (p.a.br || '').localeCompare(q.a.br || ''));
+}
+// ---- the Honda report, one row per VIN in the file (whether or not the web has sale terms for it)
+const rptAll = () => (S.ref.get('honda_rpt') || {}).v || {};
+function campUpVinRows(D) {
+  const U = S.campUp, byVin = new Map(), saved = rptAll(), out = [];
+  for (const a of D.at) { const v = atVin(a); if (v && !a.cancelled) byVin.set(String(v).toUpperCase(), a); }
+  for (const it of U.items.values()) {
+    const a = byVin.get(it.vin), d = a && a.rec && a.rec.deal && a.rec.deal.at ? a.rec.deal : null, sv = saved[it.vin];
+    const opts = a ? campOptions(termsCtxAt(a, D)).opts.filter(y => y.ok && y.value !== 'other') : [];
+    const ff = campFeats(it.opt);
+    let state = 'new', found = [];
+    if (d) {
+      state = ff && ff === campFeats(d.campaign) ? 'ok' : 'diff';
+      if (state === 'diff') found = opts.filter(y => ff && campFeats(y.name) === ff && (!campNo(it.opt) || campNo(y.name) === campNo(it.opt))).map(y => ({ opt: y, pct: 100 }));
+    }
+    out.push({ a, d, it, opts, found, state, done: !!(sv && sv.opt === it.opt && sv.rep === U.report) });
+  }
+  const ord = { diff: 0, new: 1, ok: 2 };
+  return out.sort((p, q) => ord[p.state] - ord[q.state]);
+}
+function campUpVinRow(r) {
+  const { a, d, it, opts, found, state, done } = r, U = S.campUp, pick = (U.pick || {})[it.vin] || '';
+  const can = campUpCan(), canEdit = a && d && dealAdmin(a) && !poLocked(a);
+  const tone = state === 'ok' ? 'good' : state === 'diff' ? 'warn' : 'muted';
+  const label = state === 'ok' ? 'ตรง' : state === 'diff' ? 'ไม่ตรง' : 'ยังไม่มีข้อมูลในเว็บ';
+  const fix = state !== 'diff' ? '' : !canEdit ? `<span class="text-xs text-muted">${a && poLocked(a) ? 'ส่งมอบแล้ว แก้เงื่อนไขในเว็บไม่ได้' : 'แก้ได้เฉพาะแอดมิน/ผู้จัดการสาขา ' + esc(a ? a.br : '')}</span>` : `<div class="flex flex-col gap-2">
+      ${found.map(h => `<div class="flex flex-wrap items-center gap-2"><span class="text-sm flex-1 min-w-[180px]">เปลี่ยนในเว็บเป็น: ${esc(campFull(h.opt))}</span><button type="button" class="btn btn-dark btn-sm" data-act="campup-use" data-id="${esc(a.id)}" data-cid="${esc(h.opt.value)}">ใช้ตามไฟล์</button></div>`).join('')}
+      <div class="flex flex-wrap items-center gap-2"><select class="min-w-0 flex-1" data-campup-pick="${esc(it.vin)}"><option value="">เลือกแคมเปญเอง…</option>${opts.map(y => `<option value="${esc(y.value)}" ${pick === y.value ? 'selected' : ''}>${esc(campFull(y))}</option>`).join('')}</select>
+        <button type="button" class="btn btn-ghost btn-sm" data-act="campup-use" data-id="${esc(a.id)}" data-cid="${esc(pick)}" ${pick ? '' : 'disabled'}>ใช้ตัวที่เลือก</button></div></div>`;
+  const sv = state === 'new' && can && !done ? `<button type="button" class="btn btn-dark btn-sm self-start" data-act="campup-save" data-vin="${esc(it.vin)}">บันทึกเข้า VIN นี้</button>` : '';
+  return `<div class="p-3 rounded-lg border border-line bg-surface flex flex-col gap-2">
+    <div class="flex flex-wrap items-center gap-2"><span class="code font-medium">${esc(it.vin)}</span><span class="text-xs text-muted">${esc(it.name)}${a ? ' · ' + esc(a.cust) + ' · ' + esc(a.br) : ' · ไม่พบใบจองที่ผูกกับ VIN นี้'}</span><span class="ml-auto flex gap-1">${done ? chip('บันทึกแล้ว', 'good') : ''}${chip(label, tone)}</span></div>
+    <div class="text-sm p-2 rounded-lg" style="background:var(--surface-2)">ในไฟล์ Honda: <b>${esc(it.opt || '–')}</b><div class="text-xs text-muted">${esc(it.camp)}${it.date ? ' · ส่งมอบ ' + esc(it.date) : ''}${it.st ? ' · ' + esc(it.st) : ''}</div></div>
+    ${d ? `<div class="text-sm">เงื่อนไขขายในเว็บ: <b>${esc(d.campaign || '–')}</b></div>` : ''}
+    ${fix}${sv}</div>`;
+}
+function campUpRptBox(vr) {
+  const U = S.campUp, by = {}, st = {};
+  vr.forEach(r => { const m = r.it.name.split(' ')[0] || '–'; by[m] = (by[m] || 0) + 1; st[r.it.st || '–'] = (st[r.it.st || '–'] || 0) + 1; });
+  const todo = vr.filter(r => !r.done).length;
+  return `<section class="bg-surface border border-line rounded-lg p-4 mb-4"><div class="flex flex-wrap items-center gap-2"><h3 class="font-head font-semibold">ยอดแจ้งขาย Honda${U.report ? ' ' + esc(U.report) : ''}: ${vr.length} คัน</h3>
+    <span class="text-sm text-muted">${Object.entries(st).map(([k, v]) => esc(k) + ' ' + v).join(' · ')}</span>
+    ${campUpCan() ? `<button class="btn btn-red btn-sm ml-auto" data-act="campup-save" data-vin="*" ${todo ? '' : 'disabled'}>${todo ? `บันทึกยอดแจ้งขายทั้งไฟล์ (${todo} คัน)` : 'บันทึกครบแล้ว'}</button>` : ''}</div>
+    <div class="text-xs text-muted mt-1">รุ่น: ${Object.entries(by).map(([k, v]) => esc(k) + ' ' + v).join(' · ')} · บันทึกแล้วเก็บไว้ที่ VIN แต่ละคัน (เห็นเฉพาะแอดมินขึ้นไป) ไม่เปลี่ยนเงื่อนไขขายในใบจอง</div></section>`;
 }
 function campUpRow(r) {
   const { a, d, opts, found, state, it, why } = r, U = S.campUp, pick = (U.pick || {})[a.id] || '';
@@ -73,9 +110,13 @@ function campUpExtra(rows) {
   if (!left.length) return '';
   return `<details class="mb-4 bg-surface border border-line rounded-lg p-3"><summary class="text-sm cursor-pointer">VIN ในไฟล์ที่ไม่มีเงื่อนไขการขายในเว็บ (${left.length})</summary><div class="mt-2 flex flex-col gap-1 text-sm">${left.map(i => `<div><span class="code">${esc(i.vin)}</span> <span class="text-xs text-muted">${esc(i.name)} · ${esc(i.opt)}</span></div>`).join('')}</div></details>`;
 }
+function campUpItems(D) {
+  const vr = campUpVinRows(D);
+  return `${campUpRptBox(vr)}<h3 class="font-head font-semibold mb-2">รายคันในไฟล์ (${vr.length})</h3><div class="flex flex-col gap-2">${vr.map(campUpVinRow).join('')}</div>`;
+}
 function viewCampUp(D) {
   const U = S.campUp || (S.campUp = { text: '', file: '', busy: false, msg: '', pick: {} }), can = campUpCan();
-  const rows = campUpRows(D), n = s => rows.filter(r => r.state === s).length;
+  const rows = U.items ? campUpVinRows(D) : campUpRows(D), n = s => rows.filter(r => r.state === s).length;
   return `${pageHead('อัปเดตข้อมูลแคมเปญ', 'อัปโหลดรายงาน Dealer Incentive Report ของ Honda (.xlsx) ระบบเทียบรายคันตามเลข VIN กับแคมเปญที่เลือกไว้ในแต่ละใบจอง (รูปหรือไฟล์อื่นเทียบจากข้อความ) ถ้าไม่ตรงหรือไม่พบ กดเลือกเองว่าใบนั้นใช้แคมเปญอะไร')}
   <section class="bg-surface border border-line rounded-lg p-4 md:p-5 mb-5">
     <label class="drop relative ${can && !U.busy ? '' : 'opacity-50'}">
@@ -85,11 +126,10 @@ function viewCampUp(D) {
       <span class="text-xs text-muted">${can ? 'อ่านในเครื่อง ไม่เก็บไฟล์ในระบบ · ระบบเทียบกับแคมเปญของเดือนที่ใบจองนั้นใช้' : 'เฉพาะแอดมินและผู้จัดการ'}</span>
     </label>
     ${U.msg ? `<p class="mt-3 text-sm" style="color:var(--bad)">${esc(U.msg)}</p>` : ''}
-    ${U.text || U.items ? `<div class="mt-3 flex flex-wrap items-center gap-2 text-sm">ไฟล์ <b>${esc(U.file)}</b>${U.report ? ` (รายงาน ${esc(U.report)})` : ''} ${chip('ตรง ' + n('ok'), 'good')}${chip('ไม่ตรง ' + n('diff'), 'warn')}${chip('ไม่พบ/ไม่มี VIN ' + n('miss'), 'bad')}<button class="btn btn-ghost btn-sm ml-auto" data-act="campup-clear">ล้างไฟล์</button></div>` : ''}
+    ${U.text || U.items ? `<div class="mt-3 flex flex-wrap items-center gap-2 text-sm">ไฟล์ <b>${esc(U.file)}</b>${U.report ? ` (รายงาน ${esc(U.report)})` : ''} ${chip('ตรง ' + n('ok'), 'good')}${chip('ไม่ตรง ' + n('diff'), 'warn')}${(U.items ? chip('ยังไม่มีข้อมูล ' + n('new'), 'muted') : chip('ไม่พบ ' + n('miss'), 'bad'))}<button class="btn btn-ghost btn-sm ml-auto" data-act="campup-clear">ล้างไฟล์</button></div>` : ''}
   </section>
-  ${U.items ? campUpExtra(rows) : ''}
-  <h3 class="font-head font-semibold mb-2">ใบจองที่ลงเงื่อนไขการขายแล้ว (${rows.length})</h3>
-  <div class="flex flex-col gap-2">${rows.map(campUpRow).join('') || emptyBox('ยังไม่มีใบจองที่ลงเงื่อนไขการขาย', 'ใบจองที่ผ่านขั้นไฟแนนซ์และลงเงื่อนไขแล้วจะขึ้นที่นี่')}</div>`;
+  ${U.items ? campUpItems(D) : `<h3 class="font-head font-semibold mb-2">ใบจองที่ลงเงื่อนไขการขายแล้ว (${rows.length})</h3>
+  <div class="flex flex-col gap-2">${rows.map(campUpRow).join('') || emptyBox('ยังไม่มีใบจองที่ลงเงื่อนไขการขาย', 'ใบจองที่ผ่านขั้นไฟแนนซ์และลงเงื่อนไขแล้วจะขึ้นที่นี่')}</div>`}`;
 }
 async function campUpRead(file) {
   const U = S.campUp || (S.campUp = { pick: {} }); U.busy = true; U.msg = ''; render();
@@ -115,6 +155,17 @@ document.addEventListener('change', ev => {
   else if (t.dataset.campupPick !== undefined) { const U = S.campUp; U.pick[t.dataset.campupPick] = t.value; render(); }
 });
 Object.assign(ACTIONS, {
+  async 'campup-save'(el) {
+    const U = S.campUp; if (!U || !U.items || !campUpCan()) return;
+    const all = el.dataset.vin === '*', cur = S.ref.get('honda_rpt') || { v: {} }, v = { ...(cur.v || {}) }, now = new Date().toISOString(); let n = 0;
+    for (const it of U.items.values()) {
+      if (!all && it.vin !== el.dataset.vin) continue;
+      const sv = v[it.vin]; if (sv && sv.opt === it.opt && sv.rep === U.report) continue;
+      v[it.vin] = { camp: it.camp, opt: it.opt, date: it.date, st: it.st, name: it.name, rep: U.report, file: U.file, ...actor(), at: now, prev: sv ? (sv.prev || []).concat([{ opt: sv.opt, rep: sv.rep, at: sv.at }]).slice(-5) : undefined }; n++;
+    }
+    if (!n) { toast('บันทึกครบแล้ว'); return; }
+    if (await write('ref', 'honda_rpt', { ...cur, v })) { toast(`บันทึกยอดแจ้งขาย ${n} คันเข้า VIN แล้ว`); render(); }
+  },
   'campup-clear'() { S.campUp = { items: null, text: '', file: '', busy: false, msg: '', pick: {} }; render(); },
   async 'campup-use'(el) {
     const a = atById(el.dataset.id), cid = el.dataset.cid, U = S.campUp; if (!a || !cid) return;
@@ -124,6 +175,13 @@ Object.assign(ACTIONS, {
     if (!c || !c.ok) { toast('แคมเปญนี้ใช้ไม่ได้กับใบจองนี้', 'bad'); return; }
     const vals = termsRecord(x, { ...d, campaign_id: cid, margin_honda: '', margin_priv: '' }, d.paint || 0);
     const rec = { ...d, ...vals, ...actor(), how: 'แอดมินแก้ (อัปเดตข้อมูลแคมเปญ)', sales_camp_id: d.sales_camp_id ?? null, sales_camp: d.sales_camp ?? null, adm_mode: 'upload', adm_file: U.file || null, hist: [...(d.hist || []), dealOld(d)] };
-    if (await saveFlow(a, { deal: rec }, 'เปลี่ยนแคมเปญแล้ว ' + (a.cust || ''))) { delete U.pick[a.id]; render(); }
+    if (await saveFlow(a, { deal: rec }, 'เปลี่ยนแคมเปญแล้ว ' + (a.cust || ''))) { delete U.pick[a.id]; delete U.pick[String(atVin(a) || '').toUpperCase()]; render(); }
   }
 });
+
+// on the car: what Honda reported for this VIN (from the Dealer Incentive Report), admin and up only
+function rptBox(c) {
+  if (!campUpCan()) return '';
+  const r = rptAll()[String(c.vin || '').toUpperCase()]; if (!r) return '';
+  return `<div class="p-3 rounded-lg border border-line text-sm" style="background:var(--surface-2)"><b>แจ้งขาย Honda${r.rep ? ' ' + esc(r.rep) : ''}</b>: ${esc(r.opt || '–')}<div class="text-xs text-muted">${esc(r.camp)}${r.date ? ' · ส่งมอบ ' + esc(r.date) : ''}${r.st ? ' · ' + esc(r.st) : ''} · บันทึก ${fmtD((r.at || '').slice(0, 10))} โดย ${esc(r.role || '')}</div></div>`;
+}
