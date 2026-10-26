@@ -43,10 +43,7 @@ function rptMoneyCheck(r, a, D, pr) {
   if (!d.campaign_id || d.campaign_id === 'pending') {
     const m = campMatchText(opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)), (r.camp || '') + ' ' + (r.opt || '') + ' ' + (r.name || '')).filter(h => h.pct >= 60)[0];
     out.push(T('warn', d.campaign_id === 'pending' ? 'แอดมินยังไม่เลือก (รอเลือกแคมเปญ)' : 'แอดมินยังไม่ระบุแคมเปญ'));
-    if (!pr && rptEditCan(a.br) && dealAdmin(a)) {
-      const dr = (S.filters.rptDraft || {})[r.vin] || '', dy = dr && opts.find(y => y.value === dr);
-      out.push(`<div class="flex flex-wrap items-center gap-1 mt-1"><select class="text-xs min-w-0" data-rpt-draft="${esc(r.vin)}" aria-label="เลือกแคมเปญ"><option value="">เลือกแคมเปญเอง…</option>${rptOptHtml(opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)), dr)}</select><button type="button" class="btn btn-dark btn-sm" data-act="rpt-confirm" data-id="${esc(a.id)}" data-cid="${esc(dr)}" ${dr ? '' : 'disabled'}>ใช้ตัวที่เลือก</button></div>${dy ? `<div class="text-xs mt-1">เงินทางเลือกตามตารางแคมเปญ <b>${money(Number(dy.sup) || 0)}</b>${hasPayNow(r) ? (Math.abs(r.pay - (Number(dy.sup) || 0)) < 1 ? ' ' + chip('ตรงไฟล์เงิน', 'good') : ' ' + chip('ไฟล์เงิน ' + money(r.pay), 'warn')) : ''}</div>` : ''}`);
-    }
+    out.push(rptDraftBox(a, r, opts, pr));
     if (m) out.push(pr ? 'แนะนำ: ' + campFull(m.opt) : `<div class="text-xs mt-1">แนะนำ: ${esc(campFull(m.opt))}${rptEditCan(a.br) && dealAdmin(a) ? ` <button type="button" class="btn btn-dark btn-sm" data-act="rpt-confirm" data-id="${esc(a.id)}" data-cid="${esc(m.opt.value)}">ยืนยัน</button>` : ''}</div>`);
     return { html: out.join(' '), tone: 'warn' };
   }
@@ -57,10 +54,17 @@ function rptMoneyCheck(r, a, D, pr) {
     if (Math.abs(r.pay - web) < 1) out.push(T('good', 'ตรงเว็บ')); else { out.push(T('bad', 'เว็บ ' + money(web))); tone = 'bad'; }
     if (sup !== null && Math.abs(r.pay - sup) >= 1) { out.push(T('warn', 'ตารางแคมเปญ ' + money(sup))); if (tone === 'good') tone = 'warn'; }
   } else out.push(T('muted', 'ยังไม่มีไฟล์เงิน'));
+  if (r.opt && campFeats(d.campaign) !== campFeats(r.opt)) { out.push(T('warn', 'เว็บไม่ตรงไฟล์ เลือกเอง')); out.push(rptDraftBox(a, r, opts, pr)); if (tone === 'good') tone = 'warn'; }
   return { html: out.join(' '), tone };
 }
 const hasPayNow = r => !!(r && r.hasPay && r.pay);
 // "แก้ไข" opens the booking at its sale-terms box (campaign, margin); "เงิน Honda" opens the window for Honda's money and special campaigns
+// the web and Honda's file disagree (or no campaign yet): choose by hand, then "ใช้ตัวที่เลือก" writes it into the booking's sale terms
+function rptDraftBox(a, r, opts, pr) {
+  if (pr || !(rptEditCan(a.br) && dealAdmin(a))) return '';
+  const dr = (S.filters.rptDraft || {})[r.vin] || '', dy = dr && opts.find(y => y.value === dr);
+  return `<div class="flex flex-wrap items-center gap-1 mt-1"><select class="text-xs min-w-0" data-rpt-draft="${esc(r.vin)}" aria-label="เลือกแคมเปญ"><option value="">เลือกแคมเปญเอง…</option>${rptOptHtml(opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)), dr)}</select><button type="button" class="btn btn-dark btn-sm" data-act="rpt-confirm" data-id="${esc(a.id)}" data-cid="${esc(dr)}" ${dr ? '' : 'disabled'}>ใช้ตัวที่เลือก</button></div>${dy ? `<div class="text-xs mt-1">เงินทางเลือกตามตารางแคมเปญ <b>${money(Number(dy.sup) || 0)}</b>${hasPayNow(r) ? (Math.abs(r.pay - (Number(dy.sup) || 0)) < 1 ? ' ' + chip('ตรงไฟล์เงิน', 'good') : ' ' + chip('ไฟล์เงิน ' + money(r.pay), 'warn')) : ''}</div>` : ''}`;
+}
 function rptEditBtn(r, a) {
   if (!rptEditCan(r.br || (a && a.br))) return '';
   const money_ = `<button type="button" class="btn btn-ghost btn-sm" data-act="rpt-edit" data-vin="${esc(r.vin)}">${a ? 'เงิน Honda' : 'แก้ไข'}</button>`;
@@ -72,15 +76,43 @@ function rptOptHtml(list, sel) {
   return groups.map(g => { const os = list.filter(y => y.group === g).map(y => `<option value="${esc(y.value)}" ${sel === y.value ? 'selected' : ''}>${esc(y.name)}</option>`).join(''); return g ? `<optgroup label="${esc(g)}">${os}</optgroup>` : os; }).join('');
 }
 // the campaign options that fit the option written in Honda's file, best first (same interest / free items / baht; same option number; same campaign document)
-function rptSuggest(opts, optText, camp) {
+function rptSugScored(opts, optText, camp) {
   const ff = campFeats(optText), no = campNo(optText); if (!ff) return [];
   const code = (String(camp || '').match(/SP\d+\/\d+/i) || [''])[0].toUpperCase();
   const score = y => (campNo(y.name) === no && no ? 2 : 0) + (code && campFull(y).toUpperCase().includes(code) ? 1 : 0);
-  return opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value) && campFeats(y.name) === ff && (!no || campNo(y.name) === no)).sort((p, q) => score(q) - score(p));
+  return opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value) && campFeats(y.name) === ff && (!no || campNo(y.name) === no)).map(y => [y, score(y)]).sort((p, q) => q[1] - p[1]);
+}
+function rptSuggest(opts, optText, camp) { return rptSugScored(opts, optText, camp).map(x => x[0]); }
+// the one clear match, or null when none or several fit equally (then the admin picks)
+function rptSuggestOne(opts, optText, camp, model) {
+  const l = rptSugScored(opts, optText, camp); if (!l.length) return null;
+  let ties = l.filter(x => x[1] === l[0][1]).map(x => x[0]); if (ties.length === 1) return ties[0];
+  // same text in several groups (booking month / invoice month, City / City Hatchback): keep the car's own model, then accept when the baht is the same
+  const mt = String(model || '').toUpperCase(), hb = /HATCHBACK/.test(mt), w = mt.split(' ')[0];
+  const fit = ties.filter(y => { const g = String(y.group || '').toUpperCase(); return (!w || g.includes(w)) && /HATCHBACK/.test(g) === hb; });
+  if (fit.length) ties = fit;
+  return ties.length === 1 || ties.every(y => (Number(y.sup) || 0) === (Number(ties[0].sup) || 0)) ? ties[0] : null;
+}
+// the file is matched to the campaigns by itself (26/10): no sale terms yet → kept as the car's pick in the report; sale terms with no campaign → written into them.
+// A different campaign already in the web is left alone (shown as "ไม่ตรง", the admin chooses). Delivered cars need a reason, so they are left for the admin too.
+async function rptAutoRun(rep) {
+  if (!campUpCan()) return;
+  const D = derive(), rows = rptRows(rep).filter(r => r.hasDir), byVin = rptByVin(D);
+  const cur = S.ref.get('honda_pay') || { v: {} }, picks = { ...(cur.picks || {}) }, apply = []; let nPick = 0;
+  for (const r of rows) {
+    const a = byVin.get(r.vin); if (!a || !rptEditCan(a.br) || !dealAdmin(a) || !r.opt) continue;
+    const d = a.rec && a.rec.deal, opts = campOptions(termsCtxAt(a, D)).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value));
+    const hit = rptSuggestOne(opts, r.opt, r.camp, a.model); if (!hit) continue;
+    if (!d || !d.at) { if (!picks[r.vin]) { picks[r.vin] = { cid: hit.value, name: campFull(hit), sup: Number(hit.sup) || 0, auto: true, ...actor() }; nPick++; } }
+    else if ((!d.campaign_id || d.campaign_id === 'pending') && !poLocked(a)) apply.push([a, hit.value]);
+  }
+  if (nPick) await write('ref', 'honda_pay', { ...cur, picks });
+  let nApply = 0; for (const [a, cid] of apply) if (await rptApplyCamp(a, cid, 'ปรับตามไฟล์ Honda อัตโนมัติ (รายงานสรุปแคมเปญ)', null, null, 'ไฟล์ Honda')) nApply++;
+  if (nPick + nApply) toast(`ระบบจับคู่แคมเปญตามไฟล์ Honda ให้อัตโนมัติ ${nPick + nApply} คัน`);
 }
 // เงินทางเลือก column when Honda's money file has no baht for the car: the picked campaign's money from the campaign table (goes into Margin when the terms are keyed)
 function rptPickMoney(r, a, D, pr) {
-  const pk = (((S.ref.get('honda_pay') || {}).picks || {})[r.vin]) || null; if (!pk || !a) return '–';
+  const pk = (((S.ref.get('honda_pay') || {}).picks || {})[r.vin]) || null; if (!pk || !pk.cid || !a) return '–';
   const y = campOptions(termsCtxAt(a, D)).opts.find(o => o.value === pk.cid), sup = y ? Number(y.sup) || 0 : Number(pk.sup) || 0;
   return pr ? money(sup) + ' (ตามตารางแคมเปญ)' : `${money(sup)}<div class="text-xs text-muted">ตามตารางแคมเปญ</div>`;
 }
@@ -94,7 +126,7 @@ function rptPickBox(vin, a, D, optText, camp, pay, pr) {
   const chips = chip('ยังไม่ลงเงื่อนไขขายในเว็บ', 'muted');
   const sel = can ? `<select class="text-xs min-w-0" data-rpt-pick="${esc(vin)}" aria-label="เลือกแคมเปญ"><option value="">เลือกแคมเปญ…</option>${rptOptHtml(opts, cur ? cur.value : '')}</select>` : '';
   const hint = !cur && sug ? `<div class="text-xs mt-1">แนะนำ (ตรงกับไฟล์ Honda): ${esc(campFull(sug))}${can ? ` <button type="button" class="btn btn-dark btn-sm" data-act="rpt-pick-use" data-vin="${esc(vin)}" data-cid="${esc(sug.value)}">ใช้ที่แนะนำ</button>` : ''}</div>` : !cur && !sug ? '<div class="text-xs text-muted mt-1">ไม่พบแคมเปญที่ตรงกับไฟล์ในตาราง เลือกเองได้</div>' : '';
-  const money_ = cur ? `<div class="text-xs mt-1">เงินทางเลือกตามตารางแคมเปญ <b class="num">${money(sup)}</b> ${pay ? (ok ? chip('ตรงไฟล์เงิน', 'good') : chip('ไฟล์เงิน ' + money(pay), 'warn')) : chip('ยังไม่มีไฟล์เงิน', 'muted')}</div>` : '';
+  const money_ = cur ? `<div class="text-xs mt-1">${pk.auto ? chip('จับคู่ตามไฟล์อัตโนมัติ', 'good') + ' ' : ''}เงินทางเลือกตามตารางแคมเปญ <b class="num">${money(sup)}</b> ${pay ? (ok ? chip('ตรงไฟล์เงิน', 'good') : chip('ไฟล์เงิน ' + money(pay), 'warn')) : chip('ยังไม่มีไฟล์เงิน', 'muted')}</div>` : '';
   return { tone, html: `${chips}<div class="mt-1">${sel}</div>${hint}${money_}` };
 }
 

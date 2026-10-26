@@ -115,25 +115,33 @@ function campNoneRows(D, rep) {
   return out;
 }
 function rptNoneCount(D, rep) { const g = campNoneRows(D, rep); return g.pend.length + g.none.length + g.nodeal.length; }
-function rptNoneTable(D, rep, pr) {
+// the same chooser as the per-car list: a row from the report when the car is in Honda's file, else a bare row with the VIN
+function rptNoneChoose(r, D, rows, pr) {
+  if (!r.vin) return '<span class="text-muted">ไม่มี VIN</span>';
+  const row = (rows || []).find(x => x.vin === r.vin) || { vin: r.vin, opt: (rptAll()[r.vin] || {}).opt || '', camp: (rptAll()[r.vin] || {}).camp || '', name: r.a.model || '', hasPay: false, pay: 0, st: '' };
+  return rptMoneyCheck(row, r.a, D, pr).html;
+}
+function rptNoneTable(D, rep, pr, rows) {
   const g = campNoneRows(D, rep), list = [['รอเลือกแคมเปญ', g.pend], ['ลงเงื่อนไขแล้ว ไม่ระบุแคมเปญ', g.none], ['ส่งมอบเดือนนี้ ยังไม่ลงเงื่อนไขขาย', g.nodeal]];
   if (!list.some(([, a]) => a.length)) return `<p class="text-sm text-muted">ไม่มีคันที่ยังไม่เลือกแคมเปญ</p>`;
-  const tr = list.flatMap(([t, a]) => a.map(r => `<tr><td class="nowrap">${pr ? esc(t) : chip(t, 'warn')}</td><td>${pr ? esc(r.a.cust) : `<button type="button" class="underline text-left" data-act="at-open" data-id="${esc(r.a.id)}">${esc(r.a.cust)}</button>`}</td><td>${esc(r.a.br)}</td><td>${esc(r.a.model)} ${esc(gradeShort(r.a.model, r.a.grade))} ${esc(r.a.color || '')}</td><td>${r.vin ? (pr ? esc(r.vin) : vinLink({ vin: r.vin })) : '–'}</td></tr>`)).join('');
-  return `<div class="${pr ? '' : 'bg-surface border border-line rounded-lg overflow-x-auto'}"><table class="${pr ? '' : 'tbl'}"><thead><tr><th>สถานะ</th><th>ลูกค้า</th><th>สาขา</th><th>รุ่น</th><th>เลขตัวถัง</th></tr></thead><tbody>${tr}</tbody></table></div>`;
+  const tr = list.flatMap(([t, a]) => a.map(r => `<tr><td class="nowrap">${pr ? esc(t) : chip(t, 'warn')}</td><td>${pr ? esc(r.a.cust) : `<button type="button" class="underline text-left" data-act="at-open" data-id="${esc(r.a.id)}">${esc(r.a.cust)}</button>`}</td><td>${esc(r.a.br)}</td><td>${esc(r.a.model)} ${esc(gradeShort(r.a.model, r.a.grade))} ${esc(r.a.color || '')}</td><td>${r.vin ? (pr ? esc(r.vin) : vinLink({ vin: r.vin })) : '–'}</td><td style="min-width:240px">${rptNoneChoose(r, D, rows, pr)}</td></tr>`)).join('');
+  return `<div class="${pr ? '' : 'bg-surface border border-line rounded-lg overflow-x-auto'}"><table class="${pr ? '' : 'tbl'}"><thead><tr><th>สถานะ</th><th>ลูกค้า</th><th>สาขา</th><th>รุ่น</th><th>เลขตัวถัง</th><th>เลือกแคมเปญ</th></tr></thead><tbody>${tr}</tbody></table></div>`;
 }
 // ---- charts: plain bars (no library), by branch when all branches are shown, by model when one branch is picked
+// items carry n (cars); hovering a bar or a part shows the number of cars
 function rptBars(title, items, segs, fmt) {
   const max = Math.max(1, ...items.map(i => sumBy(segs, s => i[s.k] || 0)));
   return `<div class="p-3 rounded-lg border border-line bg-surface"><div class="text-sm font-medium mb-2">${esc(title)}</div>
-    <div class="flex flex-col gap-2">${items.map(i => { const tot = sumBy(segs, s => i[s.k] || 0); return `<div class="flex items-center gap-2"><div class="w-24 shrink-0 text-xs truncate" title="${esc(i.label)}">${esc(i.label)}</div><div class="flex-1 min-w-0 flex h-5 rounded overflow-hidden" style="background:var(--surface-2)">${segs.map(s => (i[s.k] || 0) ? `<div style="width:${(i[s.k] / max * 100).toFixed(1)}%;background:${s.c}" title="${esc(s.n)} ${fmt(i[s.k])}"></div>` : '').join('')}</div><div class="w-20 shrink-0 text-right text-xs num">${fmt(tot)}</div></div>`; }).join('')}</div>
+    <div class="flex flex-col gap-2">${items.map(i => { const tot = sumBy(segs, s => i[s.k] || 0); const tip = `${i.label} · ${i.n || 0} คัน`; return `<div class="flex items-center gap-2" title="${esc(tip)}"><div class="w-24 shrink-0 text-xs truncate" title="${esc(tip)}">${esc(i.label)}</div><div class="flex-1 min-w-0 flex h-5 rounded overflow-hidden" style="background:var(--surface-2)">${segs.map(s => (i[s.k] || 0) ? `<div style="width:${(i[s.k] / max * 100).toFixed(1)}%;background:${s.c}" title="${esc(i.label + ' · ' + s.n + ' ' + fmt(i[s.k]) + (i['n_' + s.k] !== undefined ? ' · ' + i['n_' + s.k] + ' คัน' : ' · ' + (i.n || 0) + ' คัน'))}"></div>` : '').join('')}</div><div class="w-20 shrink-0 text-right text-xs num" title="${esc(tip)}">${fmt(tot)}</div></div>`; }).join('')}</div>
     <div class="flex flex-wrap gap-3 mt-2 text-xs text-muted">${segs.map(s => `<span class="inline-flex items-center gap-1"><span style="width:10px;height:10px;border-radius:2px;background:${s.c};display:inline-block"></span>${esc(s.n)}</span>`).join('')}</div></div>`;
 }
 function rptCharts(rows) {
   const byBr = !rptBr(), keyOf = r => byBr ? (r.br || '–') : rptModel(r.name), labelOf = k => byBr && BR[k] ? `${k} ${BR[k].name}` : k, g = new Map();
-  rows.forEach(r => { const k = keyOf(r); if (!g.has(k)) g.set(k, { label: labelOf(k), del: 0, adv: 0, pay: 0, act: 0 }); const x = g.get(k); rptKinds(r) === 'adv' ? x.adv++ : x.del++; x.pay += r.pay + r.est; x.act += r.actAmt; });
+  rows.forEach(r => { const k = keyOf(r); if (!g.has(k)) g.set(k, { label: labelOf(k), del: 0, adv: 0, pay: 0, act: 0, n: 0, n_pay: 0, n_act: 0 }); const x = g.get(k); x.n++; if (r.pay + r.est) x.n_pay++; if (r.actAmt) x.n_act++; rptKinds(r) === 'adv' ? x.adv++ : x.del++; x.pay += r.pay + r.est; x.act += r.actAmt; });
+  g.forEach(x => { x.n_del = x.del; x.n_adv = x.adv; });
   const items = [...g.values()].sort((a, b) => (b.del + b.adv) - (a.del + a.adv));
   // reward money by model is always shown (by branch as well when all branches are on)
-  const gm = new Map(); rows.forEach(r => { const k = rptModel(r.name); if (!gm.has(k)) gm.set(k, { label: k, pay: 0, act: 0 }); const x = gm.get(k); x.pay += r.pay + r.est; x.act += r.actAmt; });
+  const gm = new Map(); rows.forEach(r => { const k = rptModel(r.name); if (!gm.has(k)) gm.set(k, { label: k, pay: 0, act: 0, n: 0, n_pay: 0, n_act: 0 }); const x = gm.get(k); x.n++; if (r.pay + r.est) x.n_pay++; if (r.actAmt) x.n_act++; x.pay += r.pay + r.est; x.act += r.actAmt; });
   const byModel = byBr ? `<div class="md:col-span-2">${rptBars('เงินรางวัล (บาท) แยกรุ่น', [...gm.values()].sort((a, b) => (b.pay + b.act) - (a.pay + a.act)), [{ k: 'pay', n: 'ตามทางเลือกแคมเปญ', c: 'var(--red)' }, { k: 'act', n: 'แคมเปญพิเศษ', c: 'var(--warn)' }], v => money(v))}</div>` : '';
   return `<div class="grid md:grid-cols-2 gap-3">${rptBars(byBr ? 'จำนวนคัน แยกสาขา' : 'จำนวนคัน แยกรุ่น', items, [{ k: 'del', n: 'ส่งมอบ', c: 'var(--good)' }, { k: 'adv', n: 'Advance (ALLOCATED)', c: 'var(--warn)' }], v => String(v))}
     ${rptBars(byBr ? 'เงินรางวัล (บาท) แยกสาขา' : 'เงินรางวัล (บาท) แยกรุ่น', items, [{ k: 'pay', n: 'ตามทางเลือกแคมเปญ', c: 'var(--red)' }, { k: 'act', n: 'แคมเปญพิเศษ', c: 'var(--warn)' }], v => money(v))}${byModel}</div>`;
@@ -168,17 +176,16 @@ function rptLetterBox(rows, rep) {
 }
 function rptKpi(rows, cmp, nNone) {
   const nAdv = rows.filter(r => rptKinds(r) === 'adv').length;
-  return [['จำนวนรถ', rows.length, `ส่งมอบ ${rows.length - nAdv} · Advance ${nAdv}`, 'rpt-s1'], ['เงินรางวัลรวม (บาท)', money(sumBy(rows, r => r.tot)), `ทางเลือก ${money(sumBy(rows, r => r.pay + r.est))}${sumBy(rows, r => r.est) ? ` (ตามตารางประมาณ ${money(sumBy(rows, r => r.est))})` : ''} · พิเศษ ${money(sumBy(rows, r => r.actAmt))}`, 'rpt-s5'], ['ALLOCATED = Advance', nAdv, `${cmp.adv.filter(r => r.kind === 'wait').length} รอส่งมอบ · ${cmp.adv.filter(r => r.kind === 'next').length} ส่งมอบเดือนถัดไป`, 'rpt-s3'], ['ยังไม่เลือกแคมเปญ', nNone, 'ในเว็บ', 'rpt-s4']];
+  return [['จำนวนรถ', rows.length, `ส่งมอบ ${rows.length - nAdv} · Advance ${nAdv}`, 'rpt-s1'], ['เงินรางวัลรวม (บาท)', money(sumBy(rows, r => r.tot)), `ทางเลือก ${money(sumBy(rows, r => r.pay + r.est))}${sumBy(rows, r => r.est) ? ` (ตามตารางประมาณ ${money(sumBy(rows, r => r.est))})` : ''} · พิเศษ ${money(sumBy(rows, r => r.actAmt))}`, 'rpt-s4'], ['ALLOCATED = Advance', nAdv, `${cmp.adv.filter(r => r.kind === 'wait').length} รอส่งมอบ · ${cmp.adv.filter(r => r.kind === 'next').length} ส่งมอบเดือนถัดไป`, 'rpt-s2'], ['ยังไม่เลือกแคมเปญ', nNone, 'ในเว็บ', 'rpt-s3']];
 }
 function rptSheet(D, rep, rows, cmp) {
   const k = rptKpi(rows, cmp, rptNoneCount(D, rep));
   return `<div class="sheet"><h1>รายงานสรุปแคมเปญ Honda ${esc(rep)}</h1><p class="sub">AT Honda ${rptBr() ? esc(BR[rptBr()].name) : 'ทุกสาขา'} · พิมพ์ ${esc(fmtD(todayISO()))}</p>
   <table><tbody><tr>${k.map(([t, n]) => `<th>${esc(t)}</th><td>${n}</td>`).join('')}</tr></tbody></table>
   <h2>1. สรุปรายรุ่น</h2>${rptModelTable(rows, D, false).replace(/<tr class="cursor-pointer"[^>]*>/g, '<tr>').replace(/[▸▾] /g, '')}
-  <h2>2. สรุปตามแคมเปญและทางเลือก (แยกรุ่น)</h2>${rptPivotTable(rows, true)}
-  <h2>3. เทียบกับข้อมูลในเว็บ</h2>${rptChecksTable(rptChecks(D, rep, rows, cmp), true)}
-  <h2>4. คันที่ยังไม่เลือกแคมเปญ</h2>${rptNoneTable(D, rep, true)}
-  <h2>5. รายคัน (ส่งบัญชีตรวจเทียบ)</h2>${rptCarTable(rows, true, D, rptByVin(D))}<h2>6. คำอธิบายทางเลือก</h2>${optLegend(rows)}</div>`;
+  <h2>2. เทียบกับข้อมูลในเว็บ</h2>${rptChecksTable(rptChecks(D, rep, rows, cmp), true)}
+  <h2>3. คันที่ยังไม่เลือกแคมเปญ</h2>${rptNoneTable(D, rep, true, rows)}
+  <h2>4. รายคัน (ส่งบัญชีตรวจเทียบ)</h2>${rptCarTable(rows, true, D, rptByVin(D))}<h2>5. คำอธิบายทางเลือก</h2>${optLegend(rows)}</div>`;
 }
 function viewCampSum(D) {
   const months = rptMonths(), rep = S.filters.rptRep && months.includes(S.filters.rptRep) ? S.filters.rptRep : months[0];
@@ -189,15 +196,19 @@ function viewCampSum(D) {
     ${rep ? `<span class="ml-auto flex gap-2"><button class="btn btn-ghost btn-sm" data-act="rpt-export">ส่งออก Excel</button><button class="btn btn-red btn-sm" data-act="rpt-print">พิมพ์รายงาน</button></span>` : ''}</div>`;
   if (!rep) return `${pageHead('รายงานสรุปแคมเปญ', 'ยอดแจ้งขายและเงินรางวัลตามไฟล์ของ Honda เทียบกับข้อมูลในเว็บ')}${ctl}${emptyBox(rptBr() ? `ยังไม่มีข้อมูลของสาขา ${rptBr()}` : 'ยังไม่มียอดแจ้งขายที่บันทึกไว้', 'อัปโหลดไฟล์ที่หน้า เพิ่มเติม › อัปเดตแคมเปญ แล้วกดบันทึก หรือเลือกสาขาอื่น')}<button class="btn btn-red mt-3" data-act="go" data-view="campup">ไปหน้าอัปเดตแคมเปญ</button>`;
   const rows = rptRows(rep), cmp = rptCompare(D, rep, rows.filter(r => r.hasDir)), k = rptKpi(rows, cmp, rptNoneCount(D, rep));
+  // once per month / branch / file content: match the file to the campaigns by itself (never inside the draw)
+  const ak = [rep, rptBr(), rows.length, Object.keys(rptAll()).length].join('|');
+  if (S.rptAutoKey !== ak) { S.rptAutoKey = ak; setTimeout(() => { rptAutoRun(rep).catch(() => { /* the chooser stays for the admin */ }); }, 0); }
   let secN = 0; const sec = (t, sub, body) => `<section class="mb-6" id="rpt-s${++secN}" style="scroll-margin-top:72px"><h3 class="font-head font-semibold">${t}</h3>${sub ? `<p class="text-xs text-muted mb-2">${sub}</p>` : '<div class="mb-2"></div>'}${body}</section>`;
+  // a section that can be hidden (the choice is kept while the page is open)
+  const secH = (t, sub, body, key) => { const hid = !!S.filters[key]; secN++; return `<section class="mb-6" id="rpt-s${secN}" style="scroll-margin-top:72px"><div class="flex items-center gap-2"><h3 class="font-head font-semibold">${t}</h3><button type="button" class="btn btn-ghost btn-sm ml-auto" data-act="rpt-hide" data-k="${key}">${hid ? 'แสดง' : 'ซ่อน'}</button></div>${hid ? '<div class="mb-2"></div>' : `${sub ? `<p class="text-xs text-muted mb-2">${sub}</p>` : ''}${body}`}</section>`; };
   return `${pageHead('รายงานสรุปแคมเปญ', 'ยอดแจ้งขายและเงินรางวัลตามไฟล์ของ Honda เทียบกับข้อมูลในเว็บ')}${ctl}
   <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">${k.map(([t, n, sub, go]) => `<button type="button" class="p-3 rounded-lg border border-line bg-surface text-left hover:bg-surface2" data-act="rpt-go" data-t="${go}" title="กดเพื่อไปที่รายละเอียด"><div class="text-xs text-muted">${esc(t)}</div><div class="num text-2xl font-semibold">${n}</div>${sub ? `<div class="text-xs text-muted">${esc(sub)}</div>` : ''}<div class="text-xs underline mt-1">ดูรายละเอียด ↓</div></button>`).join('')}</div>
   <section class="mb-6">${rptCharts(rows)}</section>
   ${sec('1. สรุปรายรุ่น', 'กดที่รุ่นเพื่อดูว่าแต่ละคันเลือกแคมเปญอะไรและได้เงินเท่าไร', rptModelTable(rows, D, false))}
-  ${sec('2. สรุปตามแคมเปญและทางเลือก', 'จำนวนคันแยกตามรุ่น ส่งมอบ และ Advance (ALLOCATED)', rptPivotTable(rows, false))}
-  ${sec('3. เทียบกับข้อมูลในเว็บ', 'เทียบเฉพาะคันที่มีในไฟล์ Dealer Incentive Report · กด "ดูรายคัน" แล้วกด VIN เพื่อเปิดรายละเอียดรถ', rptChecksTable(rptChecks(D, rep, rows, cmp), false))}
-  ${sec('4. คันที่ยังไม่เลือกแคมเปญ', 'รอเลือกแคมเปญ · ไม่ระบุแคมเปญ · ส่งมอบเดือนนี้แต่ยังไม่ลงเงื่อนไขขาย', rptNoneTable(D, rep, false))}
-  ${sec(`5. รายคัน (${rows.length}) สำหรับส่งบัญชีตรวจเทียบ`, 'เงินตามทางเลือกแคมเปญ + แคมเปญพิเศษ ต่อคัน กด "ส่งออก Excel" หรือ "พิมพ์รายงาน" ส่งบัญชีได้', `${rptCarTable(rows, false, D, rptByVin(D))}<div class="mt-3">${rptLetterBox(rows, rep)}</div>`)}`;
+  ${sec('2. เทียบกับข้อมูลในเว็บ', 'เทียบเฉพาะคันที่มีในไฟล์ Dealer Incentive Report · กด "ดูรายคัน" แล้วกด VIN เพื่อเปิดรายละเอียดรถ', rptChecksTable(rptChecks(D, rep, rows, cmp), false))}
+  ${secH('3. คันที่ยังไม่เลือกแคมเปญ', 'รอเลือกแคมเปญ · ไม่ระบุแคมเปญ · ส่งมอบเดือนนี้แต่ยังไม่ลงเงื่อนไขขาย · เลือกแคมเปญจากตารางได้เลย', rptNoneTable(D, rep, false, rows), 'rptHide3')}
+  ${sec(`4. รายคัน (${rows.length}) สำหรับส่งบัญชีตรวจเทียบ`, 'เงินตามทางเลือกแคมเปญ + แคมเปญพิเศษ ต่อคัน กด "ส่งออก Excel" หรือ "พิมพ์รายงาน" ส่งบัญชีได้', `${rptCarTable(rows, false, D, rptByVin(D))}<div class="mt-3">${rptLetterBox(rows, rep)}</div>`)}`;
 }
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t || !t.dataset) return;
@@ -217,10 +228,11 @@ async function rptPickSave(vin, cid) {
   if (!a || !dealAdmin(a) || !rptEditCan(a.br)) { toast('แก้ไม่ได้', 'bad'); return; }
   const y = cid ? campOptions(termsCtxAt(a, D)).opts.find(o => o.value === cid) : null;
   const cur = S.ref.get('honda_pay') || { v: {} }, picks = { ...(cur.picks || {}) };
-  if (y && y.ok) picks[vin] = { cid, name: campFull(y), sup: Number(y.sup) || 0, ...actor() }; else delete picks[vin];
+  if (y && y.ok) picks[vin] = { cid, name: campFull(y), sup: Number(y.sup) || 0, ...actor() }; else picks[vin] = { manual: true, ...actor() };   // cleared by hand: the automatic match leaves it alone
   if (await write('ref', 'honda_pay', { ...cur, picks })) { toast(y ? 'เลือกแคมเปญในรายงานแล้ว (ยังไม่ได้ใส่เงื่อนไขการขายในใบจอง)' : 'ล้างตัวเลือกแล้ว'); render(); }
 }
 Object.assign(ACTIONS, {
+  'rpt-hide'(el) { S.filters[el.dataset.k] = !S.filters[el.dataset.k]; render(); },
   'rpt-go'(el) { const e = document.getElementById(el.dataset.t); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
   'rpt-pick-use'(el) { rptPickSave(String(el.dataset.vin || '').toUpperCase(), el.dataset.cid); },
   // open the booking and go straight into its sale-terms form (first entry, or the admin's edit), where the campaign and margin are keyed
