@@ -67,7 +67,7 @@ function dealBoxIn(a, m, D) {
       <div class="flex gap-2 mt-2"><button class="btn btn-dark btn-sm" data-act="deal-save" data-id="${esc(a.id)}">${m.dealMode === 'req' ? 'ส่งขอแก้ไข' : 'บันทึก'}</button><button class="btn btn-ghost btn-sm" data-act="deal-close">ยกเลิก</button></div></div>`;
   }
   if (st.first) return st.mayFirst ? `<div class="mt-2 p-3 rounded-lg border border-line">${title}<div class="text-sm text-muted mt-1">ยังไม่ได้ใส่ราคา ส่วนลด ${cash ? '' : 'ดาวน์ ผ่อน '}แคมเปญ และ Margin (ใบจองจาก Google Form ใส่ที่นี่) · ใบสำคัญรับส่วนลดและค่าคอมใช้ตัวเลขชุดนี้</div>
-      <button class="btn btn-dark btn-sm mt-2" data-act="deal-open" data-mode="first" data-id="${esc(a.id)}">ใส่เงื่อนไขการขาย</button></div>` : '';
+      <button class="btn btn-dark btn-sm mt-2" data-act="deal-open" data-mode="first" data-id="${esc(a.id)}">ใส่เงื่อนไขการขาย</button></div>` : `<div class="mt-2 p-3 rounded-lg border border-line">${title}<div class="text-sm text-muted mt-1">ยังไม่มีเงื่อนไขการขายในใบจองนี้ · ${!perms().write ? 'บัญชีนี้ดูอย่างเดียว เพิ่มไม่ได้' : a.cancelled ? 'ใบจองถูกยกเลิกแล้ว' : `เพิ่มได้โดยแอดมินสาขา ${esc(a.br || '')} หรือผู้จัดการ/ผู้บริหาร`}</div></div>`;
   const hist = d.hist || [], req = d.req;
   return `<div class="mt-2 p-3 rounded-lg border border-line">${title}
     <table class="tbl text-sm mt-1"><tbody>${dealRows(d, cash).map(([k, v]) => `<tr><td class="text-muted nowrap">${k}</td><td class="${k === 'แคมเปญ Honda' ? '' : 'num'}">${esc(v)}</td></tr>`).join('')}</tbody></table>

@@ -23,15 +23,17 @@ function planCalc(D) {
     c.cars.sort((x, y) => (y.age ?? -1) - (x.age ?? -1));
     c.match = Math.min(c.wait, c.free); c.short = Math.max(0, c.wait - c.match - c.inc); c.spare = Math.max(0, c.free - c.wait);
     c.model = c.sp.split('|')[0]; c.grade = c.sp.split('|')[1];
-    c.bks.forEach((b, i) => { b.planSt = i < c.match ? 'now' : i < c.match + c.inc ? 'inc' : 'order'; });
+    c.mv = 0;
   }
   // suggestions: move cars between branches, offer another colour, old stock nobody waits for
   const left = new Map(list.map(c => [c, { short: c.short, spare: c.spare }]));
   const transfers = [], alts = [];
   for (const a of list.filter(c => c.short > 0)) for (const b of list.filter(c => c.sp === a.sp && c.br !== a.br && left.get(c).spare > 0)) {
     const n = Math.min(left.get(a).short, left.get(b).spare); if (n <= 0) continue;
-    left.get(a).short -= n; left.get(b).spare -= n; transfers.push({ sp: a.sp, from: b, to: a, n });
+    left.get(a).short -= n; left.get(b).spare -= n; a.mv += n; transfers.push({ sp: a.sp, from: b, to: a, n });
   }
+  // a waiting booking is served by: stock in its own branch, the quota on the way, a car moved from another branch, or else an order
+  for (const c of list) { c.short = Math.max(0, c.short - c.mv); c.bks.forEach((b, i) => { b.planSt = i < c.match ? 'now' : i < c.match + c.inc ? 'inc' : i < c.match + c.inc + c.mv ? 'move' : 'order'; }); }
   for (const a of list.filter(c => left.get(c).short > 0)) for (const b of list.filter(c => c.br === a.br && c.model === a.model && c.grade === a.grade && c.sp !== a.sp && left.get(c).spare > 0)) {
     const n = Math.min(left.get(a).short, left.get(b).spare); if (n <= 0) continue;
     left.get(a).short -= n; left.get(b).spare -= n; alts.push({ want: a, have: b, n });
@@ -43,15 +45,15 @@ function planCalc(D) {
   // rows (per spec or per model)
   const by = planBy(), rows = {};
   for (const c of list) {
-    const k = by === 'model' ? c.model : c.sp, r = (rows[k] ||= { k, label: by === 'model' ? c.model : specLabel(c.sp), cells: [], booked: 0, has: 0, wait: 0, match: 0, free: 0, inc: 0, short: 0, spare: 0, age: 0 });
-    r.cells.push(c); for (const f of ['booked', 'has', 'wait', 'match', 'free', 'inc', 'short', 'spare']) r[f] += c[f]; r.age = Math.max(r.age, c.age);
+    const k = by === 'model' ? c.model : c.sp, r = (rows[k] ||= { k, label: by === 'model' ? c.model : specLabel(c.sp), cells: [], booked: 0, has: 0, wait: 0, match: 0, free: 0, inc: 0, short: 0, spare: 0, mv: 0, age: 0 });
+    r.cells.push(c); for (const f of ['booked', 'has', 'wait', 'match', 'free', 'inc', 'short', 'spare', 'mv']) r[f] += c[f]; r.age = Math.max(r.age, c.age);
   }
   const arr = Object.values(rows).filter(r => r.booked || r.free || r.inc).sort((x, y) => (y.short - x.short) || (y.wait - x.wait) || (y.free - x.free));
-  const tot = arr.reduce((t, r) => { for (const f of ['booked', 'has', 'wait', 'match', 'free', 'inc', 'short', 'spare']) t[f] += r[f]; return t; }, { booked: 0, has: 0, wait: 0, match: 0, free: 0, inc: 0, short: 0, spare: 0 });
+  const tot = arr.reduce((t, r) => { for (const f of ['booked', 'has', 'wait', 'match', 'free', 'inc', 'short', 'spare', 'mv']) t[f] += r[f]; return t; }, { booked: 0, has: 0, wait: 0, match: 0, free: 0, inc: 0, short: 0, spare: 0, mv: 0 });
   return { list, rows: arr, tot, transfers, alts, olds };
 }
-const planSt = r => r.short > 0 ? chip('ต้องสั่ง', 'bad') : r.spare > 2 ? chip('stock เกิน', 'warn') : chip('พอดี', 'good');
-const bkSt = { now: ['จับคู่ stock ได้ทันที', 'good'], inc: ['รอรถที่กำลังมา', 'warn'], order: ['ต้องสั่ง', 'bad'] };
+const planSt = r => r.short > 0 ? chip('ต้องสั่ง', 'bad') : r.mv > 0 ? chip('ย้ายรถจากสาขาอื่น', 'warn') : r.spare > 2 ? chip('stock เกิน', 'warn') : chip('พอดี', 'good');
+const bkSt = { now: ['จับคู่ stock ได้ทันที', 'good'], inc: ['รอรถที่กำลังมา', 'warn'], move: ['ย้ายรถจากสาขาอื่น', 'warn'], order: ['ต้องสั่ง', 'bad'] };
 const planBkTable = (bks, showSpec, tagFn) => bks.length ? `<div class="scroll-x"><table class="tbl"><thead><tr><th>เลขที่ใบจอง</th><th>สาขา</th><th>ลูกค้า</th><th>เซลล์</th>${showSpec ? '<th>สเปก</th>' : ''}<th>วันที่จอง</th><th class="text-right">รอมา</th><th>สถานะ</th><th></th></tr></thead><tbody>
   ${bks.map(b => `<tr><td class="nowrap">${b.no ? esc(b.no) : '<span class="text-muted">ยังไม่มีเลขที่</span>'}</td><td>${b.br}</td><td>${esc(b.cust || '')}</td><td class="nowrap">${esc(b.owner || b.sales || '')}</td>${showSpec ? `<td class="nowrap">${specLabel(b.spec)}</td>` : ''}
   <td class="num nowrap">${fmtD(b.date)}</td><td class="num text-right nowrap">${b.date ? daysBetween(b.date, todayISO()) : '–'} วัน</td><td>${tagFn ? tagFn(b) : chip(...bkSt[b.planSt || 'order'])}</td>
@@ -74,7 +76,7 @@ function planItem(key, head, body) {
 function planView(D) {
   const P = planCalc(D), t = P.tot, pct = t.booked ? Math.round(t.has / t.booked * 100) : 0, by = planBy(), open = PLAN.open;
   const tiles5 = tiles([tile('ใบจองค้างส่งมอบ', fmtN(t.booked)), tile('มีรถแล้ว (match stock)', fmtN(t.has), { tone: 'good', sub2: `${pct}% ของใบจองค้าง` }), tile('ยังรอรถ', fmtN(t.wait), { tone: t.wait ? 'warn' : '', sub2: 'ใบจองรอจริง' }),
-    tile('รถว่างใน stock', fmtN(t.free), { sub2: `จับคู่ใบจองรอได้ทันที ${fmtN(t.match)} คัน` }), tile('รถที่กำลังมา', fmtN(t.inc), { sub2: 'Quota ที่ยังว่าง' }), tile('ควรสั่งเพิ่ม', fmtN(t.short), { tone: t.short ? 'bad' : 'good', sub2: 'หลังหักรถว่างและรถกำลังมา' })], 'lg:grid-cols-6');
+    tile('รถว่างใน stock', fmtN(t.free), { sub2: `จับคู่ใบจองรอได้ทันที ${fmtN(t.match)} คัน` }), tile('รถที่กำลังมา', fmtN(t.inc), { sub2: 'Quota ที่ยังว่าง' }), tile('ควรสั่งเพิ่ม', fmtN(t.short), { tone: t.short ? 'bad' : 'good', sub2: t.mv ? `หลังหักรถว่าง รถกำลังมา และรถที่ย้ายจากสาขาอื่นได้ ${t.mv} คัน` : 'หลังหักรถว่างและรถกำลังมา' })], 'lg:grid-cols-6');
   const row = r => { const p = r.booked ? Math.round(r.has / r.booked * 100) : 0, on = open.has(r.k);
     return `<tr class="cursor-pointer hover:bg-surface2" data-act="plan-row" data-k="${esc(r.k)}" tabindex="0" aria-expanded="${on}"><td class="font-medium" style="min-width:170px">${on ? '▾' : '▸'} ${r.label}</td><td class="num text-right">${r.booked}</td><td class="num text-right">${r.has}</td>
       <td class="text-right nowrap"><span class="inline-block align-middle mr-1" style="width:60px;height:7px;background:var(--line);border-radius:9px;overflow:hidden"><span style="display:block;height:100%;width:${p}%;background:var(--good)"></span></span><span class="num">${p}%</span></td>
@@ -83,7 +85,7 @@ function planView(D) {
   const trf = P.transfers.map((x, i) => planItem('t' + i + x.sp + x.from.br + x.to.br,
     `<b>${specLabel(x.sp)}</b> · <b>${x.from.br}</b> → <b>${x.to.br}</b> · โอน <b>${x.n}</b> คัน <span class="text-muted">(รถ ${x.from.br} อายุ ${x.from.age || '–'} วัน)</span>`,
     `<div><div class="font-medium mb-1">รถที่ ${x.from.br} โอนให้ได้</div>${planCarTable(x.from.cars.slice(x.from.wait, x.from.wait + x.n), false, () => chip('ว่างเกินใบจองรอ', 'warn'))}</div>
-     <div><div class="font-medium mb-1">ใบจองที่ ${x.to.br} ที่จะได้รถ</div>${planBkTable(x.to.bks.filter(b => b.planSt === 'order').slice(0, x.n), false, () => chip('ได้รถจากการโอน', 'good'))}</div>
+     <div><div class="font-medium mb-1">ใบจองที่ ${x.to.br} ที่จะได้รถ</div>${planBkTable(x.to.bks.filter(b => b.planSt === 'move').slice(0, x.n), false, () => chip('ได้รถจากการโอน', 'good'))}</div>
      <p class="text-xs text-muted">โอนแล้วสาขา ${x.to.br} ไม่ต้องสั่งเพิ่มในจำนวนนี้ · ผู้จัดการทั้งสองสาขาต้องยืนยันก่อนโอนรถ</p>`)).join('');
   const alts = P.alts.map((x, i) => planItem('a' + i + x.want.sp + x.have.sp + x.want.br,
     `<b>${specLabel(x.want.sp)}</b> รอ ${x.want.wait} คัน (${x.want.br}) · มีสีอื่นว่าง ${x.n} คัน <span style="color:var(--red)">→</span> เสนอเปลี่ยนเป็น <b>${esc(x.have.sp.split('|')[2] || '')}</b>`,
@@ -96,7 +98,7 @@ function planView(D) {
   return `<div class="flex flex-wrap gap-3 items-end mb-3"><div class="field"><label for="p-by">จัดกลุ่ม</label><select id="p-by" data-filter="pBy"><option value="spec" ${by === 'spec' ? 'selected' : ''}>ตามรุ่น / เกรด / สี</option><option value="model" ${by === 'model' ? 'selected' : ''}>ตามรุ่น</option></select></div>
     <button class="btn btn-ghost" data-act="plan-xlsx">ดาวน์โหลด Excel</button></div>
   ${tiles5}
-  <section class="min-w-0 mb-6"><h2 class="font-head text-lg font-semibold">รถแต่ละ${by === 'model' ? 'รุ่น' : 'สเปก'}</h2><p class="text-sm text-muted mb-2">เรียงจากที่ต้องสั่งเพิ่มมากที่สุด · สั่งเพิ่ม = ใบจองที่รอรถจริง − รถว่างตรงสเปก (สาขาเดียวกัน) − รถที่กำลังมา · กดที่แถวเพื่อดูรายชื่อใบจองและรถ</p>
+  <section class="min-w-0 mb-6"><h2 class="font-head text-lg font-semibold">รถแต่ละ${by === 'model' ? 'รุ่น' : 'สเปก'}</h2><p class="text-sm text-muted mb-2">เรียงจากที่ต้องสั่งเพิ่มมากที่สุด · สั่งเพิ่ม = ใบจองที่รอรถจริง − รถว่างตรงสเปก (สาขาเดียวกัน) − รถที่กำลังมา − รถว่างสเปกเดียวกันของสาขาอื่นที่ย้ายมาได้ (แสดงเป็น "ย้ายรถจากสาขาอื่น" ไม่ต้องสั่ง) · กดที่แถวเพื่อดูรายชื่อใบจองและรถ</p>
   ${P.rows.length ? `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl"><thead><tr><th>${by === 'model' ? 'รุ่น' : 'รุ่น / เกรด / สี'}</th><th class="text-right">ใบจองค้าง</th><th class="text-right">มีรถแล้ว</th><th class="text-right">% มีรถ</th><th class="text-right">รอรถ</th><th class="text-right">จับคู่ได้ทันที</th><th class="text-right">stock ว่าง</th><th class="text-right">กำลังมา</th><th class="text-right">สั่งเพิ่ม</th><th class="text-right">อายุ stock สูงสุด</th><th>สถานะ</th></tr></thead>
   <tbody>${P.rows.map(row).join('')}<tr style="font-weight:600"><td>รวม</td><td class="num text-right">${t.booked}</td><td class="num text-right">${t.has}</td><td class="num text-right">${pct}%</td><td class="num text-right">${t.wait}</td><td class="num text-right">${t.match}</td><td class="num text-right">${t.free}</td><td class="num text-right">${t.inc}</td><td class="num text-right" style="color:var(--bad)">${t.short}</td><td></td><td></td></tr></tbody></table></div>`
     : `<div class="bg-surface border border-line rounded-lg">${emptyBox('ยังไม่มีข้อมูล', 'ลองเปลี่ยนสาขา')}</div>`}</section>
@@ -112,7 +114,7 @@ async function planXlsx() {
   const cells = P.list.filter(c => c.booked || c.free || c.inc).sort((a, b) => a.br.localeCompare(b.br) || a.sp.localeCompare(b.sp));
   const H1 = ['สาขา', 'รุ่น', 'เกรด', 'สี', 'ใบจองค้างส่งมอบ', 'มีรถแล้ว', '% มีรถ', 'รอรถ (ใบจองรอจริง)', 'จับคู่ stock ได้ทันที', 'stock ว่าง', 'รถกำลังมา', 'ควรสั่งเพิ่ม', 'stock เกินใบจอง', 'อายุ stock สูงสุด (วัน)', 'สถานะ'];
   const a1 = [['แผนสั่งรถ AT Honda · ' + fmtD(today)], [], H1];
-  cells.forEach(c => { const [m, g, col] = c.sp.split('|'); a1.push([c.br, m, gradeShort(m, g) || g, col, c.booked, c.has, c.booked ? c.has / c.booked : 0, c.wait, c.match, c.free, c.inc, c.short, c.spare, c.age || '', c.short > 0 ? 'ต้องสั่ง' : c.spare > 2 ? 'stock เกิน' : 'พอดี']); });
+  cells.forEach(c => { const [m, g, col] = c.sp.split('|'); a1.push([c.br, m, gradeShort(m, g) || g, col, c.booked, c.has, c.booked ? c.has / c.booked : 0, c.wait, c.match, c.free, c.inc, c.short, c.spare, c.age || '', c.short > 0 ? 'ต้องสั่ง' : c.mv > 0 ? 'ย้ายรถจากสาขาอื่น' : c.spare > 2 ? 'stock เกิน' : 'พอดี']); });
   const n1 = a1.length;
   a1.push(['รวม', '', '', '', ...[4, 5].map(i => a1.slice(3).reduce((s, r) => s + (r[i] || 0), 0)), '', ...[7, 8, 9, 10, 11, 12].map(i => a1.slice(3, n1).reduce((s, r) => s + (r[i] || 0), 0))]);
   const tr = a1[a1.length - 1]; tr[6] = tr[4] ? tr[5] / tr[4] : 0;
