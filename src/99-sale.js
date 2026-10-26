@@ -61,9 +61,17 @@ function printSaleApp(a, D) {
   if (!cash) terms.push(['เงินดาวน์', M(d.down)], ['ส่วนลดดาวน์', M(d.down_disc)], ['ยอดจัด', M(d.fin_amount)], ['ดอกเบี้ย / งวด', `${d.rate ?? '–'} % · ${d.term || '–'} งวด`]);
   const mg = [['1. Margin รถ', M(d.margin_car)], ['2. AT แคมเปญ', M(d.margin_at)], ['3. Honda แคมเปญ', M(d.margin_honda)], [`4. สิทธิพิเศษ Honda${d.privileges ? ` (${d.privileges})` : ''}`, M(d.margin_priv)], ['Margin รวม', M(s.margin)],
     ['หัก ส่วนลดรวม', M(s.disc)], [`หัก FOC รวม (${s.foc.src || '–'})`, M(s.foc.v)], [s.bal !== null && s.bal < 0 ? 'เกิน Margin' : 'เหลือ', s.bal === null ? '–' : money(Math.abs(s.bal))]];
+  // gifts (accessories PO): each item with its sale value and its FOC cost, then the totals (26/10)
+  const po = (r.flow && r.flow.po) || {}, pit = po.items || [];
+  const qn = x => Number(x.qty) || 1, gv = pit.reduce((n, x) => n + (Number(x.sale) || 0) * qn(x), 0), gc = pit.reduce((n, x) => n + (Number(x.cost) || 0) * qn(x), 0);
+  const gifts = pit.map((x, i) => [`${i + 1}. ${x.name || ''}`, String(qn(x)), M((Number(x.sale) || 0) * qn(x)), M((Number(x.cost) || 0) * qn(x))]);
+  if (pit.length) gifts.push(['รวม', '', M(gv), M(gc)]);
   const blocks = [
     { h: 'ข้อมูลรถและลูกค้า' }, { kv },
     { h: 'เงื่อนไขการขาย' }, { items: { cols: ['รายการ', 'บาท'], widths: [0.7, 0.3], rows: terms } },
+    { h: 'ของแถม (ตามใบสั่งแต่ง PO)' },
+    pit.length ? { items: { cols: ['รายการของแถม', 'จำนวน', 'มูลค่า (ราคาขาย)', 'ทุน FOC'], widths: [0.5, 0.1, 0.2, 0.2], rows: gifts } }
+      : { note: r.foc_total ? `ยังไม่มีใบสั่งแต่ง (PO) · FOC ตามใบจอง ${money(r.foc_total)} บาท` : 'ไม่มีของแถม / ยังไม่มีใบสั่งแต่ง (PO)' },
     { h: 'Margin และยอดคงเหลือ' }, { items: { cols: ['รายการ', 'บาท'], widths: [0.7, 0.3], rows: mg } },
     ...(s.has ? [] : [{ note: 'หมายเหตุ: ใบจองนี้ยังไม่ได้ใส่เงื่อนไขการขาย ตัวเลขยังไม่ครบ' }]),
     { sign: ['พนักงานขาย', 'ผู้จัดการฝ่ายขาย', 'ฝ่ายบัญชี'] }
