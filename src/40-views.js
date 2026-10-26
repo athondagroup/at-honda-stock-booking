@@ -47,7 +47,7 @@ const GROUPS = [
 const groupsFor = () => { const ok = new Set(navFor().map(n => n.id)); return GROUPS.map(g => ({ ...g, views: g.views.filter(v => ok.has(v)) })).filter(g => g.views.length); };
 const groupOf = v => GROUPS.find(g => g.views.includes(v)) || GROUPS[0];
 const groupEntry = g => (S.lastIn && g.views.includes(S.lastIn[g.id])) ? S.lastIn[g.id] : g.views[0];
-const GROUP_TAB = { alerts: 'งานของฉัน', get inbox() { return perms().approve ? 'รอฉันอนุมัติ' : 'คำขอของฉัน (ติดตาม)'; }, stock: 'สต็อก', quota: 'Quota', lock: 'ล็อก', book: 'ใบจอง', flow: 'ตามขั้นตอนส่งมอบ', receive: 'รับรถ', upload: 'อัปเดตข้อมูล IDS', campup: 'อัปเดตข้อมูลแคมเปญ', campsum: 'รายงานสรุปแคมเปญ', datafix: 'ข้อมูลผิด/ขาด/ต้องจับคู่', admin: 'หลังบ้าน' };
+const GROUP_TAB = { dash: 'ภาพรวม', alerts: 'งานของฉัน', get inbox() { return perms().approve ? 'รอฉันอนุมัติ' : 'คำขอของฉัน (ติดตาม)'; }, stock: 'สต็อก', quota: 'Quota', lock: 'ล็อก', book: 'ใบจอง', flow: 'ตามขั้นตอนส่งมอบ', receive: 'รับรถ', upload: 'อัปเดตข้อมูล IDS', campup: 'อัปเดตข้อมูลแคมเปญ', campsum: 'รายงานสรุปแคมเปญ', datafix: 'ข้อมูลผิด/ขาด/ต้องจับคู่', admin: 'หลังบ้าน' };
 function groupTabs(badges) {
   const g = groupsFor().find(x => x.views.includes(S.view));
   if (!g || g.views.length < 2) return '';
