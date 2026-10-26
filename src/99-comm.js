@@ -66,7 +66,7 @@ function campOptions(x) {
       out.push({ value: r.month + '|' + r.id, month: r.month, name: r.name, sup: num(r.sup), group: `แคมเปญ ${fmtM(r.month)} (${by}) · ${r.group}`, ok, why, deliver_by: r.deliver_by });
     });
   });
-  return { opts: [...out, { value: 'none', name: 'ไม่ใช้แคมเปญ Honda (ดอกเบี้ยมาตรฐาน / นอกตาราง)', sup: 0, group: '', ok: true }, { value: 'other', name: 'อื่น ๆ (พิมพ์เอง)', sup: 0, group: '', ok: true }], warns: [...new Set(warns)] };
+  return { opts: [...out, { value: 'pending', name: 'รอเลือกแคมเปญ (ยังไม่ตัดสินใจ)', sup: 0, group: '', ok: true }, { value: 'none', name: 'ไม่ใช้แคมเปญ Honda (ดอกเบี้ยมาตรฐาน / นอกตาราง)', sup: 0, group: '', ok: true }, { value: 'other', name: 'อื่น ๆ (พิมพ์เอง)', sup: 0, group: '', ok: true }], warns: [...new Set(warns)] };
 }
 // the margin table for this sale: the month of the picked campaign, else the booking (Advance: invoice) month
 function marginStdFor(x, campValue) {
@@ -143,7 +143,7 @@ function termsFields(x, v, f) {
     ${o.campaign_id === 'other' ? `<div class="field sm:col-span-3"><label for="${f.idp}-ct">ชื่อแคมเปญ</label><input id="${f.idp}-ct" ${f.attr}="${f.pre}.campaign_text" value="${esc(o.campaign_text ?? '')}" ${dis} autocomplete="off"></div>` : ''}`;
   const step = x.cash ? '' : `<div class="field"><label for="${f.idp}-step">AT แคมเปญ (ช่อง Step)</label><select id="${f.idp}-step" ${f.attr}="${f.pre}.at_step" ${dis}>
     <option value="" ${!o.at_step ? 'selected' : ''}>ไม่มี</option><option value="1" ${o.at_step === '1' ? 'selected' : ''}>Step ช่อง 1 · +${money(st.step1)}</option><option value="2" ${o.at_step === '2' ? 'selected' : ''}>Step ช่อง 2 · +${money(st.step2)}</option></select></div>`;
-  return `<div class="grid sm:grid-cols-3 gap-3">${price}${fin}${sel}</div>
+  return `<div class="grid sm:grid-cols-3 gap-3">${price}${fin}${f.adm ? campAdminBox(f, o, v, sel, opts) : sel}</div>
     <div class="mt-3 p-3 rounded-lg border border-line" style="background:var(--surface)"><div class="font-medium text-sm mb-2">Margin (แก้ตัวเลขได้)</div>
       <div class="grid sm:grid-cols-3 gap-3">${N('margin_car', `1. Margin รถ ${Math.round(st.pct * 100)}%`)}${step}${x.cash ? '' : N('margin_at', '2. AT แคมเปญ (บาท)')}${N('margin_honda', `${x.cash ? '2' : '3'}. Honda แคมเปญ (บาท)`)}</div>
       <div class="text-xs text-muted mt-1">Margin รถ คิดจากราคาไม่รวมค่าสี ${base ? `${money(base)} บาท${f.paint ? ` (ค่าสี ${money(f.paint)})` : ''}` : '(ใส่ราคารถก่อน)'} · ตาราง Margin เดือน ${fmtM(st.month)}${x.cash ? ' · ซื้อสดไม่มี Step AT' : ''}</div>
@@ -236,4 +236,67 @@ document.addEventListener('change', ev => {
   // a select redraws now; a typed number redraws after the focus has moved on (softRender keeps it there)
   if (m[2] === 'priv_hk') { tgt.margin_priv = ''; softRender(); return; }
   if (t.tagName === 'SELECT') render(); else if (m[1] === 'booking.deal') softRender();
+});
+
+// ---------- campaign: the sales' part and the admin's part (ขอ 26/10)
+// The sales pick a campaign when they key the terms (kept as sales_camp_id). The branch admin / manager then decides the campaign
+// that counts: the same as the sales (copied), their own pick, or an uploaded campaign sheet / photo that is matched to the list.
+function campFull(y) { return y ? (y.group ? y.group + ' · ' : '') + y.name : ''; }
+function campAdminBox(f, o, v, sel, opts) {
+  const mode = v.adm_mode || 'own', id = (S.modal && S.modal.id) || (S.modal && S.modal.at && S.modal.at.id) || '';
+  const sc = v.sales_camp_id ? opts.find(y => y.value === v.sales_camp_id) : null, scName = v.sales_camp || campFull(sc);
+  const seg = (k, label) => `<button type="button" class="btn btn-sm ${mode === k ? 'btn-dark' : 'btn-ghost'}" data-act="camp-mode" data-mode="${k}">${label}</button>`;
+  const cur = opts.find(y => y.value === o.campaign_id), cm = S.modal && S.modal.campMatch;
+  const upload = mode !== 'upload' ? '' : `<div class="mt-2 p-3 rounded-lg border border-line" style="background:var(--surface)">
+      <label class="btn btn-ghost btn-sm relative">${cm && cm.busy ? '<span class="spin"></span> กำลังอ่านไฟล์…' : 'เลือกไฟล์แคมเปญ (รูป / Excel / CSV)'}<input type="file" accept="image/*,.xlsx,.xls,.csv" data-camp-up class="absolute w-px h-px opacity-0"></label>
+      ${cm && !cm.busy ? `<div class="text-sm mt-2">ไฟล์ <b>${esc(cm.file)}</b> · ${cm.found.length ? 'ระบบเทียบกับแคมเปญของเดือนนี้ พบที่น่าจะตรง ให้เลือกยืนยัน:' : esc(cm.note || 'ไม่พบแคมเปญที่ตรง เลือกเองจากรายการได้')}</div>
+        <div class="flex flex-col gap-2 mt-2">${cm.found.map(h => `<div class="p-2 rounded-lg border border-line flex flex-wrap items-center gap-2"><div class="flex-1 min-w-[200px] text-sm"><b>${esc(campFull(h.opt))}</b><div class="text-xs text-muted">${esc(h.why)}</div></div>${chip(h.pct + '% ตรง', h.pct >= 80 ? 'good' : 'warn')}<button type="button" class="btn btn-dark btn-sm" data-act="camp-use" data-cid="${esc(h.opt.value)}">ใช้ตัวนี้</button></div>`).join('')}</div>` : '<div class="text-xs text-muted mt-2">ระบบอ่านชื่อ ดอกเบี้ย และค่าช่วยเหลือในไฟล์ แล้วเทียบกับรายการแคมเปญ ตรวจก่อนกดใช้ ไม่เก็บไฟล์ในใบจอง</div>'}
+    </div>`;
+  return `<div class="sm:col-span-3 p-3 rounded-lg border border-line" style="background:var(--surface)">
+    <div class="font-medium text-sm mb-1">แคมเปญ Honda</div>
+    <div class="text-sm mb-2">เซลล์เลือก: ${scName ? `<b>${esc(scName)}</b>` : '<span class="text-muted">เซลล์ยังไม่ได้เลือก</span>'}</div>
+    <div class="flex flex-wrap gap-2" role="group" aria-label="แอดมินเลือกแคมเปญ">${seg('same', 'เลือกเหมือนเซลล์ (copy)')}${seg('own', 'เลือกเอง')}</div>
+    ${mode === 'same' ? `<div class="mt-2 text-sm">${scName ? `ใช้แคมเปญเดียวกับเซลล์: <b>${esc(campFull(cur) || scName)}</b>` : 'เซลล์ยังไม่ได้เลือกแคมเปญ ให้เลือกเองหรืออัปโหลด'}</div>` : `<div class="mt-2">${sel}</div>${mode === 'upload' ? '' : '<div class="text-xs text-muted mt-1">อัปโหลดไฟล์แคมเปญเพื่อเทียบ ทำที่หน้า เพิ่มเติม › อัปเดตแคมเปญ</div>'}`}
+    ${scName && cur && o.campaign_id !== v.sales_camp_id ? `<div class="text-xs mt-2" style="color:var(--warn)">ต่างจากที่เซลล์เลือก · ระบบบันทึกทั้งสองไว้</div>` : ''}</div>`;
+}
+// score each campaign against the text of a file: how many of its parts (interest, free insurance, support baht ...) appear
+function campMatchText(opts, text) {
+  const t = String(text || '').replace(/[\s,]/g, '').toLowerCase(), out = [];
+  for (const y of opts) {
+    const parts = String(y.name).replace(/^ทางเลือก ?\d+ ?:/, '').split('+').map(p => p.replace(/[\s,]/g, '').toLowerCase()).filter(Boolean);
+    const hit = parts.filter(p => t.includes(p));
+    if (hit.length) out.push({ opt: y, pct: Math.round(hit.length / parts.length * 100), why: `พบในไฟล์: ${hit.length} จาก ${parts.length} ส่วน` });
+  }
+  return out.sort((a, b) => b.pct - a.pct).slice(0, 3);
+}
+async function campUpload(file) {
+  const m = S.modal, a = atById(m.id || (m.at && m.at.id)); if (!m || !a) return;
+  const x = termsCtxAt(a, derive()), opts = campOptions(x).opts.filter(y => y.ok && y.value !== 'other');
+  m.campMatch = { busy: true, file: file.name, found: [] }; render();
+  try {
+    let found = [], note = '';
+    if (/^image\//.test(file.type)) {
+      const res = await aiRead(`This photo or screenshot shows a Honda sales campaign for a Honda dealer in Thailand. Match it to ONE to THREE of these campaign options (id: text):\n${opts.map(y => `${y.value}: ${campFull(y)}`).join('\n')}\nReturn JSON only: {"matches":[{"id":"option id","percent":0-100,"why":"short reason in Thai"}]}. Return an empty list when none fits. Do not guess.`, [await shrink(file)]);
+      found = (res && res.matches || []).map(h => ({ opt: opts.find(y => y.value === h.id), pct: Math.round(Number(h.percent) || 0), why: h.why || 'AI อ่านจากรูป' })).filter(h => h.opt);
+    } else {
+      const X = await loadXLSX(), wb = /\.(csv|txt)$/i.test(file.name) ? X.read(await file.text(), { type: 'string' }) : X.read(await file.arrayBuffer(), { type: 'array' });
+      const text = wb.SheetNames.map(n => X.utils.sheet_to_csv(wb.Sheets[n])).join(' ');
+      found = campMatchText(opts, text);
+    }
+    if (!found.length) note = 'ไม่พบแคมเปญที่ตรงกับไฟล์นี้ เลือกเองจากรายการได้';
+    if (S.modal === m) { m.campMatch = { file: file.name, found, note }; render(); }
+  } catch (e) { if (S.modal === m) { m.campMatch = { file: file.name, found: [], note: 'อ่านไฟล์ไม่ได้ ลองไฟล์อื่นหรือเลือกเอง' }; render(); } }
+}
+document.addEventListener('change', ev => {
+  const t = ev.target; if (!t || !t.dataset || t.dataset.campUp === undefined) return;
+  const f = t.files && t.files[0]; t.value = ''; if (f) campUpload(f);
+});
+Object.assign(ACTIONS, {
+  'camp-mode'(el) {
+    const d = S.modal && S.modal.deal; if (!d) return;
+    d.adm_mode = el.dataset.mode;
+    if (d.adm_mode === 'same' && d.sales_camp_id && d.campaign_id !== d.sales_camp_id) { d.campaign_id = d.sales_camp_id; d.margin_honda = ''; d.margin_priv = ''; }
+    render();
+  },
+  'camp-use'(el) { const d = S.modal && S.modal.deal; if (!d) return; d.campaign_id = el.dataset.cid; d.margin_honda = ''; d.margin_priv = ''; d.adm_mode = 'own'; d.adm_file = (S.modal.campMatch || {}).file || null; render(); }
 });

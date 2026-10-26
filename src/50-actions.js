@@ -6,6 +6,8 @@ function renderModal(D) {
   if (m.kind === 'lock') body = lockModal(m, D);
   else if (m.kind === 'remove') body = removeModal(m, D);
   else if (m.kind === 'special') body = spModal(m, D);
+  else if (m.kind === 'quota') body = quotaModal(m, D);
+  else if (m.kind === 'rptedit') body = rptEditModal(m, D);
   else if (m.kind === 'tgtadj') body = tgtAdjModal(m);
   else if (m.kind === 'note') body = noteModal(m);
   else if (m.kind === 'at') { body = atModal(m, D); wide = true; }
@@ -127,7 +129,7 @@ function lockModal(m, D) {
       <span class="block text-xs text-muted">${c.br} ${BR[c.br]?.name || ''} · ${esc(gradeShort(c.model, c.grade))} ${esc(c.color || '')} · อายุ ${c.age ?? '–'} วัน · ล็อกไม่ได้</span></span></div>`;
   const chk = lockChecks(m, D);
   const days = LOCK_DAYS_BY[m.type] || 15;
-  const direct = m.type !== 'dealer' ? canApproveBr(u ? u.br : null) : (p.approveDealer);
+  const direct = m.type !== 'dealer' ? p.approve : (p.approveDealer); // manager locks any branch's car; approving others' requests stays own-branch
   const custTxt = x => (!isSales() || isMine(x.owner)) && x.cust ? ' · ' + x.cust : '';
   const pickCar = c => `<button class="pick text-left ${m.vin === c.vin ? 'on' : ''}" data-act="pick" data-vin="${esc(c.vin)}" aria-pressed="${m.vin === c.vin}">
       <span class="flex-1 min-w-0"><span class="code font-medium">${esc(c.vin)}</span> ${rec.vin === c.vin ? chip('แนะนำ', 'good') : ''} ${spec && c.spec !== spec ? chip(`สเปกไม่ตรง: ${gradeShort(c.model, c.grade)} ${c.color || ''}`, 'warn') : ''} ${c.temps.length ? chip(`ล็อกชั่วคราว ${c.temps.length}`, 'warn') : ''} ${c.status === 'pending' ? chip('มีคำขอรออนุมัติ ขอคิวต่อ', 'warn') : ''} ${c.status === 'invoiced' || c.status === 'sold' ? chip(c.status === 'invoiced' ? 'ออกใบกำกับแล้ว ยังไม่ส่งมอบ' : 'แจ้งขายแล้ว ยังไม่ส่งมอบ', 'warn') : ''}
@@ -609,7 +611,7 @@ const ACTIONS = {
     if ((m.type === 'temp' || m.reason === 'อื่น ๆ') && !(m.note || '').trim()) { toast('ใส่เหตุผลก่อนส่ง (ยังไม่มีใบจอง)', 'bad'); $('#m-note')?.focus(); return; }
     const u = chk.u;
     const b = m.type === 'booking' && m.bkref ? D.bookingByKey.get(m.bkref) : null;
-    const direct = m.type === 'dealer' ? p.approveDealer : canApproveBr(u.br);
+    const direct = m.type === 'dealer' ? p.approveDealer : p.approve;
     const days = LOCK_DAYS_BY[m.type] || 15;
     const owner = m.type === 'booking' ? (b ? b.owner : null) : m.type === 'temp' ? (isSales() ? S.role.sales : m.sales) : null;
     const id = newId('locks'), now = new Date().toISOString();
@@ -633,7 +635,7 @@ const ACTIONS = {
     const cur0 = S.locks.get(el.dataset.id);
     const L0 = derive().locks.find(x => x.id === el.dataset.id);
     if (L0 && L0.idsTook && !L0.idsTook.same) { toast(L0.idsTook.st === 'delivered' ? 'รถคันนี้ส่งมอบแล้ว อนุมัติไม่ได้ กดไม่อนุมัติเพื่อปิดคำขอ' : 'IDS จัดสรรรถคันนี้ให้ใบจองอื่นแล้ว อนุมัติไม่ได้ กดไม่อนุมัติเพื่อปิดคำขอ', 'bad'); return; }
-    if (cur0 && !(cur0.type === 'dealer' ? perms().approveDealer : canApproveBr(cur0.car_br))) { toast(`อนุมัติได้เฉพาะ${cur0.type === 'dealer' ? 'พี่อั้ม' : MGR_NAME[cur0.car_br] || 'ผู้จัดการสาขานั้น'}`, 'bad'); return; }
+    if (cur0 && !(cur0.type === 'dealer' ? perms().approveDealer : canLockMgr(lkD(cur0)))) { toast(`อนุมัติได้เฉพาะ${cur0.type === 'dealer' ? 'พี่อั้ม' : MGR_NAME[cur0.car_br] || 'ผู้จัดการสาขานั้น'}`, 'bad'); return; }
     const id = el.dataset.id, l = await claimFresh('locks', id, x => x.status === 'pending');
     if (!l) return;
     const D = derive();
@@ -685,7 +687,7 @@ const ACTIONS = {
     const L0 = derive().locks.find(x => x.id === id);
     if (L0 && (L0.autoReleased || L0.expired)) { toast('ล็อกนี้ปล่อยคิวไปแล้ว ถ้าต้องการรถคันนี้ให้ขอล็อกใหม่', 'bad'); return; }
     if (L0 && L0.idsTook && !L0.idsTook.same) { toast(L0.idsTook.st === 'delivered' ? 'รถคันนี้ส่งมอบแล้ว ต่อล็อกไม่ได้' : 'IDS จัดสรรรถคันนี้ให้ใบจองอื่นแล้ว ต่อล็อกไม่ได้', 'bad'); return; }
-    if (L0 && !canApproveBr(L0.car_br)) { toast(`ต่อล็อกได้เฉพาะ${MGR_NAME[L0.car_br] || 'ผู้จัดการสาขาของรถ'}`, 'bad'); return; }
+    if (L0 && !canLockMgr(lkD(L0))) { toast(`ต่อล็อกได้เฉพาะ${MGR_NAME[L0.car_br] || 'ผู้จัดการสาขาของรถ'}`, 'bad'); return; }
     const l = await claimFresh('locks', id, x => x.status === 'approved' && x.end === was);
     if (!l) return;
     const L = derive().locks.find(x => x.id === id), days = LOCK_DAYS_BY[l.type] || 15;

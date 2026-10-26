@@ -127,6 +127,8 @@ tr.low td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 .tbl td, .tbl th { padding: 7px 9px; }
 .tbl tbody tr:hover td { background: var(--surface-2); }
 .nowrap { white-space: nowrap; }
+.opt-tip { display: inline-block; border-bottom: 1px dotted currentColor; cursor: help; font-weight: 600; white-space: nowrap; }
+.opt-pop { position: fixed; z-index: 9999; max-width: min(420px, calc(100vw - 16px)); padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.45; background: var(--ink, #222); color: var(--bg, #fff); box-shadow: 0 6px 24px rgba(0,0,0,.25); pointer-events: none; }
 .ai-field { box-shadow: inset 3px 0 0 var(--good); }
 .sheet-menu a { display: flex; align-items: center; gap: 12px; padding: 14px 4px; border-bottom: 1px solid var(--line); font-weight: 500; }
 #print-root { display: none; }

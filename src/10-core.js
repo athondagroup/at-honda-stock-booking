@@ -75,7 +75,7 @@ const emptyBox = (t, s) => `<div class="p-6 text-center"><div class="font-medium
 const plain = o => JSON.parse(JSON.stringify(o, (k, v) => v === undefined ? null : v));
 
 // ------------------------------------------------------------------ state
-const VIEWS = ['dash', 'alerts', 'inbox', 'stock', 'book', 'quota', 'lock', 'flow', 'receive', 'upload', 'admin', 'datafix'];
+const VIEWS = ['dash', 'alerts', 'inbox', 'stock', 'book', 'quota', 'lock', 'flow', 'receive', 'upload', 'campup', 'campsum', 'admin', 'datafix'];
 const S = {
   mode: 'connecting', // shared | local | readonly | connecting
   view: 'dash',
@@ -135,7 +135,14 @@ const MGR_OF = { aum: ['PSC', 'ATE'], nuch: ['SPH', 'KPA'] };
 const MGR_NAME = { PSC: 'พี่อั้ม', ATE: 'พี่อั้ม', SPH: 'นุช', KPA: 'นุช' };
 const mgrBranches = () => S.role.role === 'exec' ? BRS : MGR_OF[S.role.role] || [];
 const mgrRoleOf = br => Object.keys(MGR_OF).find(k => MGR_OF[k].includes(br)) || null;
+// a manager approves, extends, allocates and edits only for the own branches (ตกลง 26/10). A lock follows the BOOKING's branch
+// too: a manager can handle a car of another branch when it is for a booking of the own branch (canLockMgr); the manager who
+// looks after the car's branch is told (alert 'xmgr').
+const isMgrRole = () => S.role.role === 'exec' || !!MGR_OF[S.role.role];
 const canApproveBr = br => perms().approve && !!br && mgrBranches().includes(br);
+const inChargeBr = canApproveBr;
+const lockBrs = l => [l && l.car_br, l && l.booking && (l.booking.br || (l.booking.app && l.booking.app.br))].filter(Boolean);
+const canLockMgr = l => perms().approve && lockBrs(l).some(b => mgrBranches().includes(b));
 // allocating a car: the branch admin, or the manager of that branch
 const canAllocBr = br => (S.role.role === 'admin' && br === S.role.branch) || canApproveBr(br);
 function custCell(name, sales, o = {}) {

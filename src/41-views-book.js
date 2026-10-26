@@ -345,7 +345,7 @@ function lockRow(l, D, o = {}) {
     : l.status === 'approved' ? (l.mgrDue ? chip(`ครบกำหนด ผู้จัดการต่อหรือปล่อยภายใน ${fmtD(addDays(l.releaseOn, -1))}`, 'bad') : l.autoReleased ? chip(`ปล่อยคิวแล้ว ${fmtD(l.releaseOn)} (ผู้จัดการไม่ได้ต่อ)`, 'muted') : l.hold ? chip(`ถือไว้จนส่งมอบ ${fmtD(l.holdUntil)}`, 'red') : l.expired ? chip('หมดอายุ', 'bad') : chip(`ล็อก เหลือ ${l.daysLeft} วัน`, l.daysLeft <= 2 ? 'bad' : 'red'))
     : l.status === 'allocated' ? chip('แจ้งจัดสรรแล้ว รอไฟล์ IDS', 'ink') : l.status === 'rejected' ? chip('ไม่อนุมัติ', 'muted') : l.status === 'converted' ? chip('เปลี่ยนเป็นล็อกให้ใบจอง', 'muted') : l.status === 'bumped' ? chip(`มีคนจองก่อน (${l.bumped_by || ''})`, 'muted') : l.status === 'done' ? chip(l.ids_done ? 'สำเร็จ: IDS จัดสรรให้แล้ว' : l.type === 'dealer' ? 'ขายให้ดีลเลอร์แล้ว' : 'ส่งมอบแล้ว', 'good') : l.status === 'withdrawn' ? chip('ถอนคำขอแล้ว', 'muted') : chip('ปล่อยแล้ว', 'muted');
   const took = l.idsTook && !l.idsTook.same ? l.idsTook : null;
-  const canDecide = p.write && l.status === 'pending' && (l.type === 'dealer' ? p.approveDealer : canApproveBr(br));
+  const canDecide = p.write && l.status === 'pending' && (l.type === 'dealer' ? p.approveDealer : canLockMgr(l));
   const sheet = sheetTextOf(l);
   const mine = isMine(l.owner);
   // the person who sent the request (a sales for own customer, or an admin/manager on someone's behalf) can withdraw it
@@ -370,15 +370,15 @@ function lockRow(l, D, o = {}) {
   // a booking lock that is sold: the delivery is recorded in the booking (or comes from the IDS delivery file)
   if (l.type === 'booking' && p.write && !o.compact && ['approved', 'allocated'].includes(l.status) && bk && bk.app && (canAllocBr(br) || mine)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(bk.app.id)}">ขายสำเร็จ · บันทึกส่งมอบ</button>`);
   if (l.status === 'approved' && p.write && !o.compact && l.live) {
-    if (l.mgrDue && canApproveBr(br) && (l.finWait || (l.ext || 0) < MAX_EXT)) acts.push(`<button class="btn btn-red btn-sm" data-act="extend" data-id="${l.id}">ต่อ ${l.days} วัน${l.finWait ? ' (ไฟแนนซ์ยังไม่ผ่าน)' : ` (${l.ext || 0}/${MAX_EXT})`}</button>`);
-    else if (!l.mgrDue && canApproveBr(br) && (l.ext || 0) < MAX_EXT && !l.hold) acts.push(`<button class="btn btn-ghost btn-sm" data-act="extend" data-id="${l.id}">ต่ออายุ ${l.days} วัน (${l.ext || 0}/${MAX_EXT})</button>`);
+    if (l.mgrDue && canLockMgr(l) && (l.finWait || (l.ext || 0) < MAX_EXT)) acts.push(`<button class="btn btn-red btn-sm" data-act="extend" data-id="${l.id}">ต่อ ${l.days} วัน${l.finWait ? ' (ไฟแนนซ์ยังไม่ผ่าน)' : ` (${l.ext || 0}/${MAX_EXT})`}</button>`);
+    else if (!l.mgrDue && canLockMgr(l) && (l.ext || 0) < MAX_EXT && !l.hold) acts.push(`<button class="btn btn-ghost btn-sm" data-act="extend" data-id="${l.id}">ต่ออายุ ${l.days} วัน (${l.ext || 0}/${MAX_EXT})</button>`);
     if (l.type === 'temp' && mine && !l.bumped) acts.push(`<button class="btn btn-dark btn-sm" data-act="lock-convert" data-id="${l.id}">ลูกค้ามาจองแล้ว</button>`);
     if (rec && mine && l.finDue) acts.push(`<button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(bk.app.id)}">อัปเดตไฟแนนซ์</button>`);
     if (canAllocBr(br) && l.type !== 'temp') acts.push(`<button class="btn btn-dark btn-sm" data-act="allocate" data-id="${l.id}">จัดสรรใน IDS แล้ว</button>`);
     if (canAllocBr(br) || mine) acts.push(`<button class="btn btn-ghost btn-sm" data-act="release-open" data-id="${l.id}">${l.type === 'dealer' ? 'ยกเลิกการแลก/ขาย' : 'ยกเลิกล็อก (ปล่อยรถ)'}</button>`);
   }
   if (!o.compact && l.type === 'booking' && l.vin && ['approved', 'allocated'].includes(l.status) && canSwap(swapCtx(D, { lockId: l.id }))) acts.push(`<button class="btn btn-ghost btn-sm" data-act="swap-open" data-lock="${esc(l.id)}">เปลี่ยนคัน</button>`);
-  const unit = l.vin ? `<span class="code font-medium">${esc(l.vin)}</span>` : `<span class="code font-medium">Quota ${esc(l.ref)}</span> <span class="text-xs text-muted">${q ? fmtM(q.m) : ''}</span>`;
+  const unit = l.vin ? vinLink({ vin: l.vin }) : `<button class="code font-medium underline decoration-dotted text-left" data-act="quota-open" data-ref="${esc(l.ref)}" title="ดูรายละเอียด Quota">Quota ${esc(l.ref)}</button> <span class="text-xs text-muted">${q ? fmtM(q.m) : ''}</span>`;
   const reqH = (l.history || [])[0];
   return `<div class="p-3 md:px-4 flex flex-wrap gap-x-5 gap-y-2 items-center">
     <div class="w-36">${stTxt}<div class="mt-1">${chip(LOCK_TYPE[l.type]?.[0] || l.type, LOCK_TYPE[l.type]?.[1] || 'neutral')}</div>${l.queueN > 1 ? `<div class="mt-1">${chip(`คำขอที่ ${l.queuePos}/${l.queueN} ของคันนี้`, l.queuePos === 1 ? 'ink' : 'warn')}</div>` : ''}</div>
@@ -393,7 +393,7 @@ function lockRow(l, D, o = {}) {
     ${o.compact ? '' : `<div class="w-36 text-xs text-muted">${l.start ? `${fmtD(l.start)} → <b class="num" style="color:var(--fg)">${l.hold ? 'จนส่งมอบ' : fmtD(l.end)}</b>` : `ขอเมื่อ ${fmtDT(l.requested_at)}`}<div>ขอโดย ${who(reqH)}</div>${(() => { const d = l.status !== 'pending' ? decidedBy(l) : null; return d ? `<div>${esc(d.act)}: ${who(d)}</div>` : ''; })()}</div>`}
     ${mv ? lockMoveBox(l, mv, D) : ''}
     ${(l.warnings || []).length && l.status === 'pending' ? `<div class="w-full text-xs" style="color:var(--warn)">⚠ ${l.warnings.map(esc).join(' · ')}${l.note ? `<div class="text-muted">${esc(l.note)}</div>` : ''}</div>` : ''}
-    ${acts.length ? `<div class="ml-auto flex flex-wrap gap-2">${acts.join('')}</div>` : l.status === 'pending' && !o.compact ? `<div class="ml-auto text-xs text-muted">รอ${l.type === 'dealer' ? 'พี่อั้ม' : MGR_NAME[br] || 'ผู้จัดการ'}อนุมัติ${l.type === 'dealer' ? '' : ` (สาขา ${esc(br || '')})`} · ถอนคำขอได้เฉพาะคนที่ส่งคำขอ</div>` : ''}
+    ${acts.length ? `<div class="ml-auto flex flex-wrap gap-2">${acts.join('')}</div>` : l.status === 'pending' && !o.compact ? `<div class="ml-auto text-xs text-muted">รอ${l.type === 'dealer' ? 'พี่อั้ม' : MGR_NAME[br] || 'ผู้จัดการ'}อนุมัติ${l.type === 'dealer' ? '' : ` (สาขา ${esc(br || '')})`} · ถอนคำขอได้เฉพาะคนที่ส่งคำขอ</div>` : !o.compact && ['approved', 'allocated'].includes(l.status) ? `<div class="ml-auto text-xs text-muted max-w-[210px]">${!p.write ? 'บัญชีนี้ดูได้อย่างเดียว' : l.type === 'dealer' ? 'แก้ได้เฉพาะพี่อั้มและสาขาของรถ' : `แก้ไม่ได้: ล็อกนี้แก้ได้เฉพาะผู้จัดการสาขา ${esc(br || '')} (หรือสาขาของใบจอง) ผู้บริหาร แอดมินสาขา ${esc(br || '')} หรือเซลล์เจ้าของล็อก`}</div>` : ''}
   </div>`;
 }
 function approveList(D, pend) {
@@ -402,7 +402,7 @@ function approveList(D, pend) {
   // requests closed in the last day can be put back if the button was pressed by mistake
   const recent = D.locks.filter(lockVisible).filter(l => ['withdrawn', 'rejected', 'released'].includes(l.status) && canUndo(l)).sort((a, b) => (b.undo.at || '').localeCompare(a.undo.at || ''));
   // a manager sees own-branch requests first; other branches stay visible but folded away
-  const decide = l => l.type === 'dealer' ? p.approveDealer : canApproveBr(l.car_br);
+  const decide = l => l.type === 'dealer' ? p.approveDealer : canLockMgr(l);
   const own = p.approve ? pend.filter(decide) : pend, other = p.approve ? pend.filter(l => !decide(l)) : [];
   return `<p class="text-sm text-muted mb-3">${!p.approve ? `บทบาท ${esc(roleLabel())} ${isSales() ? 'เห็นเฉพาะคำขอของตัวเอง ' : ''}อนุมัติไม่ได้ · ` : ''}พี่อั้มอนุมัติสาขา PSC, ATE · นุชอนุมัติสาขา SPH, KPA (ตามสาขาของรถ) · ขอล็อกรถได้ทุกสาขา · แลก/ขายดีลเลอร์ พี่อั้มอนุมัติ</p>
   <div class="bg-surface border border-line rounded-lg divide-y divide-line">${own.map(l => lockRow(l, D)).join('') || emptyBox(p.approve ? 'ไม่มีคำขอที่รอคุณอนุมัติ' : 'ไม่มีคำขอที่รออนุมัติ', 'ขอล็อกได้จากรถรายคันในหน้าสต็อก จาก Quota หรือจากใบจองในหน้า Booking')}</div>
