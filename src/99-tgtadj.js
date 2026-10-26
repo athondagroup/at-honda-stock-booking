@@ -34,9 +34,12 @@ function tgtAdjCard(D) {
   const T = tgtKiTable(sel), B = tgtBacklog(sel), sum = k => T.reduce((n, r) => n + r[k], 0);
   const brs = BRS.filter(b => inBr({ br: b })), can = tgtCanEdit();
   const L = tgtAdjRows().filter(r => kiMonths(sel).includes(r.m) && inBr(r)).sort((a, b) => (b.at || '').localeCompare(a.at || ''));
-  return `<section class="bg-surface border border-line rounded-lg p-4 min-w-0 mb-5"><div class="flex flex-wrap items-center gap-3 mb-2"><h2 class="font-head font-semibold">การปรับเป้า · ${esc(kiLabel(sel))}</h2>
-    <div class="seg" role="group" aria-label="Ki">${kis.map(k => `<button data-act="ki-sel" data-k="${k}" aria-pressed="${k === sel}">Ki ${k}</button>`).join('')}</div>
-    ${can ? '<button class="btn btn-ghost btn-sm ml-auto" data-act="tgtadj-open">ปรับเป้า</button>' : ''}</div>
+  const open = !!S.filters.tgtAdjOpen;
+  const head = `<div class="flex flex-wrap items-center gap-3 ${open ? 'mb-2' : ''}"><button class="flex items-center gap-2 text-left" data-act="tgtadj-toggle" aria-expanded="${open}"><span aria-hidden="true">${open ? '▾' : '▸'}</span><h2 class="font-head font-semibold">การปรับเป้า · ${esc(kiLabel(sel))}</h2></button>
+    ${open ? `<div class="seg" role="group" aria-label="Ki">${kis.map(k => `<button data-act="ki-sel" data-k="${k}" aria-pressed="${k === sel}">Ki ${k}</button>`).join('')}</div>` : `<span class="text-sm text-muted">เป้าปัจจุบัน <b class="num">${fmtN(sum('now'))}</b>${sum('now') !== sum('orig') ? ` (เดิม ${fmtN(sum('orig'))})` : ''}${B.left ? ` · ค้างปรับ <b class="num" style="color:var(--bad)">${fmtN(B.left)}</b>` : ''}</span>`}
+    ${can ? '<button class="btn btn-ghost btn-sm ml-auto" data-act="tgtadj-open">ปรับเป้า</button>' : ''}</div>`;
+  if (!open) return `<section class="bg-surface border border-line rounded-lg p-3 px-4 min-w-0 mb-5">${head}</section>`;
+  return `<section class="bg-surface border border-line rounded-lg p-4 min-w-0 mb-5">${head}
   ${tiles([
     tile('เป้าเดิมทั้ง Ki', fmtN(sum('orig')), { sub2: 'คัน ใบกำกับภาษี' }),
     tile('ลดเป้า', fmtN(sum('cut')), { tone: sum('cut') ? 'warn' : '', sub2: 'รวมทุกเดือน' }),
@@ -79,6 +82,7 @@ document.addEventListener('change', ev => {
 Object.assign(ACTIONS, {
   'tgtadj-open'() { if (!tgtCanEdit()) return; S.modal = { kind: 'tgtadj', m: todayISO().slice(0, 7), br: tgtEditBrs()[0], k: 'cut', n: '', reason: TGT_ADJ_REASONS[0], carry: true, link: true, note: '' }; render(); },
   'tgtadj-set'(el) { S.modal[el.dataset.k] = el.dataset.v; render(); },
+  'tgtadj-toggle'() { S.filters.tgtAdjOpen = !S.filters.tgtAdjOpen; render(); },
   'ki-sel'(el) { S.filters.kiSel = Number(el.dataset.k); render(); },
   async 'tgtadj-save'() {
     const m = S.modal, n = Math.round(Number(m.n));
