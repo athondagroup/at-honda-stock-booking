@@ -5,6 +5,7 @@ function renderModal(D) {
   let body = '', wide = false;
   if (m.kind === 'lock') body = lockModal(m, D);
   else if (m.kind === 'remove') body = removeModal(m, D);
+  else if (m.kind === 'special') body = spModal(m, D);
   else if (m.kind === 'note') body = noteModal(m);
   else if (m.kind === 'at') { body = atModal(m, D); wide = true; }
   else if (m.kind === 'receive') { body = receiveModal(m, D); wide = true; }
@@ -952,6 +953,7 @@ document.addEventListener('input', ev => {
   } else if (t.dataset.modal && S.modal) {
     const path = t.dataset.modal, val = t.type === 'checkbox' ? t.checked : t.value;
     setPath(S.modal, path, val);
+    if (path === 'd.reason' && S.modal.kind === 'special') { if (val !== 'demo') S.modal.d.test = null; render(); }
     if (path === 'd.model') { S.modal.d.grade = ''; S.modal.d.color = ''; }
     if (path === 'edit.model') { S.modal.edit.grade = ''; S.modal.edit.color = ''; }
     if (path === 'edit.grade') S.modal.edit.color = '';
