@@ -78,6 +78,12 @@ function rptSuggest(opts, optText, camp) {
   const score = y => (campNo(y.name) === no && no ? 2 : 0) + (code && campFull(y).toUpperCase().includes(code) ? 1 : 0);
   return opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value) && campFeats(y.name) === ff && (!no || campNo(y.name) === no)).sort((p, q) => score(q) - score(p));
 }
+// เงินทางเลือก column when Honda's money file has no baht for the car: the picked campaign's money from the campaign table (goes into Margin when the terms are keyed)
+function rptPickMoney(r, a, D, pr) {
+  const pk = (((S.ref.get('honda_pay') || {}).picks || {})[r.vin]) || null; if (!pk || !a) return '–';
+  const y = campOptions(termsCtxAt(a, D)).opts.find(o => o.value === pk.cid), sup = y ? Number(y.sup) || 0 : Number(pk.sup) || 0;
+  return pr ? money(sup) + ' (ตามตารางแคมเปญ)' : `${money(sup)}<div class="text-xs text-muted">ตามตารางแคมเปญ</div>`;
+}
 function rptPickBox(vin, a, D, optText, camp, pay, pr) {
   const opts = campOptions(termsCtxAt(a, D)).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value));
   const pk = (((S.ref.get('honda_pay') || {}).picks || {})[vin]) || null, cur = pk && opts.find(y => y.value === pk.cid), sug = rptSuggest(opts, optText, camp)[0] || null;
