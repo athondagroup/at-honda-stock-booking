@@ -28,7 +28,8 @@ function rptRows(rep) {
   });
   // a car with no baht in Honda's money file but a campaign picked in this report: the campaign table's money counts as an estimate (est)
   const picks = (S.ref.get('honda_pay') || {}).picks || {};
-  return [...by.values()].map(r => { const pk = !r.pay && picks[r.vin], est = pk ? Number(pk.sup) || 0 : 0; return { ...r, pay: r.pay || 0, est, actAmt: r.actAmt || 0, acts: r.acts || [], tot: (r.pay || 0) + est + (r.actAmt || 0) }; }).sort((a, b) => (a.camp + a.opt).localeCompare(b.camp + b.opt) || (a.name || '').localeCompare(b.name || ''));
+  // toDel: Honda's file said ALLOCATED before and says DELIVERED now (kept from the earlier imports)
+  return [...by.values()].map(r => { const pk = !r.pay && picks[r.vin], est = pk ? Number(pk.sup) || 0 : 0, toDel = rptKind(r.st) === 'del' && (r.prev || []).some(p => rptKind(p.st) === 'adv'); return { ...r, toDel, pay: r.pay || 0, est, actAmt: r.actAmt || 0, acts: r.acts || [], tot: (r.pay || 0) + est + (r.actAmt || 0) }; }).sort((a, b) => (a.camp + a.opt).localeCompare(b.camp + b.opt) || (a.name || '').localeCompare(b.name || ''));
 }
 // what the web knows for the same month
 function rptWeb(D, ym) {
@@ -135,15 +136,28 @@ function rptBars(title, items, segs, fmt) {
     <div class="flex flex-col gap-2">${items.map(i => { const tot = sumBy(segs, s => i[s.k] || 0); const tip = `${i.label} · ${i.n || 0} คัน`; const T = x => `class="opt-tip" tabindex="0" role="button" data-full="${esc(x)}"`; return `<div class="flex items-center gap-2"><div class="w-24 shrink-0 text-xs truncate" ${T(tip)}>${esc(i.label)}</div><div class="flex-1 min-w-0 flex h-5 rounded overflow-hidden" style="background:var(--surface-2)">${segs.map(s => (i[s.k] || 0) ? `<div style="width:${(i[s.k] / max * 100).toFixed(1)}%;background:${s.c}" ${T(i.label + ' · ' + s.n + ' ' + fmt(i[s.k]) + (i['n_' + s.k] !== undefined ? ' · ' + i['n_' + s.k] + ' คัน' : ' · ' + (i.n || 0) + ' คัน'))}></div>` : '').join('')}</div><div class="w-20 shrink-0 text-right text-xs num" ${T(tip)}>${fmt(tot)}</div></div>`; }).join('')}</div>
     <div class="flex flex-wrap gap-3 mt-2 text-xs text-muted">${segs.map(s => `<span class="inline-flex items-center gap-1"><span style="width:10px;height:10px;border-radius:2px;background:${s.c};display:inline-block"></span>${esc(s.n)}</span>`).join('')}</div></div>`;
 }
-function rptCharts(rows) {
+// the web already shows the car as handed over (DL delivery date, or handed over in this system)
+function rptWebDelivered(D, vin) {
+  const i = D.invByVin.get(vin); if (i && !i.company && i.ddate) return true;
+  const c = D.deliveredOut.find(x => x.vin === vin); return !!(c && c.handed && c.handed.date);
+}
+// under the count chart: which cars Honda's file moved from ALLOCATED to DELIVERED, and which the web has handed over but the file still says ALLOCATED
+function rptStatusNote(rows, D) {
+  const toDel = rows.filter(r => r.toDel), webDel = rows.filter(r => rptKind(r.st) === 'adv' && rptWebDelivered(D, r.vin));
+  const list = (t, l, hint) => `<details class="mt-2"><summary class="text-sm cursor-pointer"><b>${l.length}</b> คัน ${esc(t)}</summary><div class="text-xs text-muted">${esc(hint)}</div><div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">${l.map(r => `<span>${vinLink({ vin: r.vin })} <span class="text-xs text-muted">${esc(r.br || '')} ${esc(rptModel(r.name))}</span></span>`).join('') || '<span class="text-muted">ไม่มี</span>'}</div></details>`;
+  return `<div class="p-3 rounded-lg border border-line bg-surface mt-3"><div class="text-sm font-medium">เทียบสถานะ ไฟล์ Honda กับเว็บ</div>
+    ${list('ปรับจาก Allocated เป็นส่งมอบแล้วในไฟล์ Honda', toDel, 'ไฟล์เดือนก่อนหน้าเป็น ALLOCATED ไฟล์ล่าสุดเป็น DELIVERED (นับจากไฟล์ที่นำเข้าไว้ในระบบ)')}
+    ${list('เว็บส่งมอบแล้ว แต่ไฟล์ Honda ยังเป็น Allocated', webDel, 'รอไฟล์ Honda รอบถัดไปปรับเป็น DELIVERED ถ้านานเกินไปให้ตรวจกับ Honda')}</div>`;
+}
+function rptCharts(rows, D) {
   const byBr = !rptBr(), keyOf = r => byBr ? (r.br || '–') : rptModel(r.name), labelOf = k => byBr && BR[k] ? `${k} ${BR[k].name}` : k, g = new Map();
-  rows.forEach(r => { const k = keyOf(r); if (!g.has(k)) g.set(k, { label: labelOf(k), del: 0, adv: 0, pay: 0, act: 0, n: 0, n_pay: 0, n_act: 0 }); const x = g.get(k); x.n++; if (r.pay + r.est) x.n_pay++; if (r.actAmt) x.n_act++; rptKinds(r) === 'adv' ? x.adv++ : x.del++; x.pay += r.pay + r.est; x.act += r.actAmt; });
-  g.forEach(x => { x.n_del = x.del; x.n_adv = x.adv; });
-  const items = [...g.values()].sort((a, b) => (b.del + b.adv) - (a.del + a.adv));
+  rows.forEach(r => { const k = keyOf(r); if (!g.has(k)) g.set(k, { label: labelOf(k), del: 0, adv: 0, wd: 0, pay: 0, act: 0, n: 0, n_pay: 0, n_act: 0 }); const x = g.get(k); x.n++; if (r.pay + r.est) x.n_pay++; if (r.actAmt) x.n_act++; if (rptKinds(r) === 'adv') { D && rptWebDelivered(D, r.vin) ? x.wd++ : x.adv++; } else x.del++; x.pay += r.pay + r.est; x.act += r.actAmt; });
+  g.forEach(x => { x.n_del = x.del; x.n_adv = x.adv; x.n_wd = x.wd; });
+  const items = [...g.values()].sort((a, b) => (b.del + b.adv + b.wd) - (a.del + a.adv + a.wd));
   // reward money by model is always shown (by branch as well when all branches are on)
   const gm = new Map(); rows.forEach(r => { const k = rptModel(r.name); if (!gm.has(k)) gm.set(k, { label: k, pay: 0, act: 0, n: 0, n_pay: 0, n_act: 0 }); const x = gm.get(k); x.n++; if (r.pay + r.est) x.n_pay++; if (r.actAmt) x.n_act++; x.pay += r.pay + r.est; x.act += r.actAmt; });
   const byModel = byBr ? `<div class="md:col-span-2">${rptBars('เงินรางวัล (บาท) แยกรุ่น', [...gm.values()].sort((a, b) => (b.pay + b.act) - (a.pay + a.act)), [{ k: 'pay', n: 'ตามทางเลือกแคมเปญ', c: 'var(--red)' }, { k: 'act', n: 'แคมเปญพิเศษ', c: 'var(--warn)' }], v => money(v))}</div>` : '';
-  return `<div class="grid md:grid-cols-2 gap-3">${rptBars(byBr ? 'จำนวนคัน แยกสาขา' : 'จำนวนคัน แยกรุ่น', items, [{ k: 'del', n: 'ส่งมอบ', c: 'var(--good)' }, { k: 'adv', n: 'Advance (ALLOCATED)', c: 'var(--warn)' }], v => String(v))}
+  return `<div class="grid md:grid-cols-2 gap-3">${rptBars(byBr ? 'จำนวนคัน แยกสาขา' : 'จำนวนคัน แยกรุ่น', items, [{ k: 'del', n: 'Delivered (ไฟล์ส่งมอบแล้ว)', c: 'var(--good)' }, { k: 'adv', n: 'Allocated (ไฟล์ · รอส่งมอบ)', c: 'var(--warn)' }, { k: 'wd', n: 'Web delivered (เว็บส่งมอบแล้ว ไฟล์ยังเป็น Allocated)', c: 'var(--viz-2, #3b6fb6)' }], v => String(v))}
     ${rptBars(byBr ? 'เงินรางวัล (บาท) แยกสาขา' : 'เงินรางวัล (บาท) แยกรุ่น', items, [{ k: 'pay', n: 'ตามทางเลือกแคมเปญ', c: 'var(--red)' }, { k: 'act', n: 'แคมเปญพิเศษ', c: 'var(--warn)' }], v => money(v))}${byModel}</div>`;
 }
 // ---- by model: tap a model to see each car's campaign and baht
@@ -151,8 +165,8 @@ function rptCarTable(list, pr, D, byVin) {
   const tr = list.map((r, i) => { const a = byVin.get(r.vin), d = a && a.rec && a.rec.deal, h = rptOptHead(r.opt), adv = rptKind(r.st) === 'adv';
     const chk = !r.hasDir ? '–' : !d || !d.campaign_id ? '–' : d.campaign_id === 'pending' ? 'รอเลือก' : campFeats(d.campaign) === campFeats(r.opt) ? 'ตรง' : 'ต่าง';
     const mc = rptMoneyCheck(r, a, D, pr); mc.txt = String(mc.html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    const stt = !r.hasDir ? '–' : adv ? 'ALLOCATED (Advance)' : (r.st || '–');
-    return `<tr><td class="num">${i + 1}</td><td>${esc(r.br || '')}</td><td>${esc(r.name)}</td><td>${pr ? esc(r.vin) : vinLink({ vin: r.vin })}</td><td>${a ? esc(a.cust) : '<span class="text-muted">–</span>'}</td><td>${optTip(r.opt, pr)}${r.optAdj ? ' <span class="text-xs text-muted">(แก้)</span>' : ''}</td><td class="text-right num">${r.pay ? money(r.pay) : rptPickMoney(r, a, D, pr)}</td><td class="text-xs">${r.acts.length ? r.acts.map(x => esc(String(x.name).replace(/^SP\d+\/\d+ ?: ?/, '').slice(0, 60)) + ' ' + money(x.amt)).join('<br>') : '–'}</td><td class="text-right num"><b>${r.tot ? money(r.tot) : '–'}</b></td><td class="nowrap">${pr ? esc(stt) : !r.hasDir ? '–' : adv ? chip('Advance', 'warn') : chip(r.st || '–', 'good')}</td><td class="nowrap">${pr ? esc(chk) : chk === 'ตรง' ? chip(chk, 'good') : chk === 'ต่าง' ? chip(chk, 'warn') : chk}</td><td>${pr ? esc(mc.txt) : mc.html}</td>${pr ? '' : `<td>${rptEditBtn(r, a)}</td>`}</tr>`; }).join('');
+    const wd = adv && rptWebDelivered(D, r.vin), stt = !r.hasDir ? '–' : adv ? 'ALLOCATED (Advance)' + (wd ? ' · เว็บส่งมอบแล้ว' : '') : (r.st || '–') + (r.toDel ? ' (ปรับจาก Allocated)' : '');
+    return `<tr><td class="num">${i + 1}</td><td>${esc(r.br || '')}</td><td>${esc(r.name)}</td><td>${pr ? esc(r.vin) : vinLink({ vin: r.vin })}</td><td>${a ? esc(a.cust) : '<span class="text-muted">–</span>'}</td><td>${optTip(r.opt, pr)}${r.optAdj ? ' <span class="text-xs text-muted">(แก้)</span>' : ''}</td><td class="text-right num">${r.pay ? money(r.pay) : rptPickMoney(r, a, D, pr)}</td><td class="text-xs">${r.acts.length ? r.acts.map(x => esc(String(x.name).replace(/^SP\d+\/\d+ ?: ?/, '').slice(0, 60)) + ' ' + money(x.amt)).join('<br>') : '–'}</td><td class="text-right num"><b>${r.tot ? money(r.tot) : '–'}</b></td><td class="nowrap">${pr ? esc(stt) : !r.hasDir ? '–' : adv ? chip('Advance', 'warn') + (wd ? ' ' + chip('เว็บส่งมอบแล้ว', 'neutral') : '') : chip(r.st || '–', 'good') + (r.toDel ? ' ' + chip('ปรับจาก Allocated', 'good') : '')}</td><td class="nowrap">${pr ? esc(chk) : chk === 'ตรง' ? chip(chk, 'good') : chk === 'ต่าง' ? chip(chk, 'warn') : chk}</td><td>${pr ? esc(mc.txt) : mc.html}</td>${pr ? '' : `<td>${rptEditBtn(r, a)}</td>`}</tr>`; }).join('');
   const tot = `<tr class="rpt-tot"><td colspan="6"><b>รวม ${list.length} คัน</b></td><td class="text-right num"><b>${money(sumBy(list, r => r.pay + r.est))}</b></td><td></td><td class="text-right num"><b>${money(sumBy(list, r => r.tot))}</b></td><td colspan="${pr ? 3 : 4}"></td></tr>`;
   return `<div class="${pr ? '' : 'bg-surface border border-line rounded-lg overflow-x-auto'}"><table class="${pr ? '' : 'tbl'}"><thead><tr><th>#</th><th>สาขา</th><th>รุ่น</th><th>เลขตัวถัง</th><th>ลูกค้า</th><th>ทางเลือก</th><th class="text-right">เงินทางเลือก</th><th>แคมเปญพิเศษ</th><th class="text-right">รวมเงิน</th><th>สถานะ</th><th>เทียบเว็บ</th><th>เทียบเงิน</th>${pr ? '' : '<th></th>'}</tr></thead><tbody>${tr}${tot}</tbody></table></div>`;
 }
@@ -204,7 +218,7 @@ function viewCampSum(D) {
   const secH = (t, sub, body, key) => { const hid = !!S.filters[key]; secN++; return `<section class="mb-6" id="rpt-s${secN}" style="scroll-margin-top:72px"><div class="flex items-center gap-2"><h3 class="font-head font-semibold">${t}</h3><button type="button" class="btn btn-ghost btn-sm ml-auto" data-act="rpt-hide" data-k="${key}">${hid ? 'แสดง' : 'ซ่อน'}</button></div>${hid ? '<div class="mb-2"></div>' : `${sub ? `<p class="text-xs text-muted mb-2">${sub}</p>` : ''}${body}`}</section>`; };
   return `${pageHead('รายงานสรุปแคมเปญ', 'ยอดแจ้งขายและเงินรางวัลตามไฟล์ของ Honda เทียบกับข้อมูลในเว็บ')}${ctl}
   <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">${k.map(([t, n, sub, go]) => `<button type="button" class="p-3 rounded-lg border border-line bg-surface text-left hover:bg-surface2" data-act="rpt-go" data-t="${go}" title="กดเพื่อไปที่รายละเอียด"><div class="text-xs text-muted">${esc(t)}</div><div class="num text-2xl font-semibold">${n}</div>${sub ? `<div class="text-xs text-muted">${esc(sub)}</div>` : ''}<div class="text-xs underline mt-1">ดูรายละเอียด ↓</div></button>`).join('')}</div>
-  <section class="mb-6">${rptCharts(rows)}</section>
+  <section class="mb-6">${rptCharts(rows, D)}${rptStatusNote(rows, D)}</section>
   ${sec('1. สรุปรายรุ่น', 'กดที่รุ่นเพื่อดูว่าแต่ละคันเลือกแคมเปญอะไรและได้เงินเท่าไร', rptModelTable(rows, D, false))}
   ${sec('2. เทียบกับข้อมูลในเว็บ', 'เทียบเฉพาะคันที่มีในไฟล์ Dealer Incentive Report · กด "ดูรายคัน" แล้วกด VIN เพื่อเปิดรายละเอียดรถ', rptChecksTable(rptChecks(D, rep, rows, cmp), false))}
   ${secH('3. คันที่ยังไม่เลือกแคมเปญ', 'รอเลือกแคมเปญ · ไม่ระบุแคมเปญ · ส่งมอบเดือนนี้แต่ยังไม่ลงเงื่อนไขขาย · เลือกแคมเปญจากตารางได้เลย', rptNoneTable(D, rep, false, rows), 'rptHide3')}

@@ -99,7 +99,7 @@ function campUpVinRows(D) {
       state = ff && ff === campFeats(d.campaign) ? 'ok' : 'diff';
       if (state === 'diff') found = opts.filter(y => ff && campFeats(y.name) === ff && (!campNo(it.opt) || campNo(y.name) === campNo(it.opt))).map(y => ({ opt: y, pct: 100 }));
     }
-    const done = !!(sv && sv.opt === it.opt && sv.rep === U.report && sv.br === U.br);
+    const done = !!(sv && sv.opt === it.opt && sv.st === it.st && sv.date === it.date && sv.rep === U.report && sv.br === U.br);
     out.push({ a, d, it, opts, found, state, done, chg: !!(sv && sv.rep === U.report && sv.br === U.br && sv.opt !== it.opt), old: sv });
   }
   const ord = { diff: 0, new: 1, ok: 2 };
@@ -224,7 +224,7 @@ Object.assign(ACTIONS, {
     const cur = S.ref.get('honda_rpt') || { v: {} }, v = { ...(cur.v || {}) }, now = new Date().toISOString(); let n = 0, ch = 0;
     for (const it of U.items.values()) {
       if (!U.sel || !U.sel.has(it.vin)) continue;
-      const sv = v[it.vin]; if (sv && sv.opt === it.opt && sv.rep === U.report && sv.br === U.br) continue;
+      const sv = v[it.vin]; if (sv && sv.opt === it.opt && sv.st === it.st && sv.date === it.date && sv.rep === U.report && sv.br === U.br) continue;   // a new status (ALLOCATED → DELIVERED) is saved too, the old one stays in prev
       const prev = sv ? [...(sv.prev || []), { opt: sv.opt, camp: sv.camp, date: sv.date, st: sv.st, rep: sv.rep, file: sv.file, at: sv.at, role: sv.role }].slice(-5) : [];
       v[it.vin] = { camp: it.camp, opt: it.opt, date: it.date, st: it.st, name: it.name, mtoc: it.mtoc, typ: it.typ, br: U.br, rep: U.report, file: U.file, ...actor(), at: now, prev }; n++; if (sv) ch++;
     }
