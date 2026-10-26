@@ -77,7 +77,7 @@ function campUpVinRow(r) {
   const sv = '';
   const chgBox = chg ? `<div class="p-2 rounded-lg text-sm" style="background:var(--warn-soft);color:var(--warn)"><b>ทางเลือกเปลี่ยน</b> จากที่บันทึกไว้: ${esc(old.opt || '–')} → ${esc(it.opt || '–')}<div class="text-xs">ติ๊กเลือกเพื่อบันทึกตามไฟล์ใหม่ ค่าเก่าเก็บไว้ในประวัติ</div></div>` : '';
   return `<div class="p-3 rounded-lg border border-line bg-surface flex flex-col gap-2">
-    <div class="flex flex-wrap items-center gap-2">${tick}<span class="code font-medium">${esc(it.vin)}</span><span class="text-xs text-muted">${esc(it.name)}${a ? ' · ' + esc(a.cust) + ' · ' + esc(a.br) : ' · ไม่พบใบจองที่ผูกกับ VIN นี้'}</span><span class="ml-auto flex gap-1">${done ? chip('บันทึกแล้ว', 'good') : ''}${chip(label, tone)}</span></div>
+    <div class="flex flex-wrap items-center gap-2">${tick}${vinLink({ vin: it.vin })}<span class="text-xs text-muted">${esc(it.name)}${a ? ' · ' + esc(a.cust) + ' · ' + esc(a.br) : ' · ไม่พบใบจองที่ผูกกับ VIN นี้'}</span>${a ? `<button type="button" class="text-xs underline" data-act="at-open" data-id="${esc(a.id)}">เปิดใบจอง</button>` : ''}<span class="ml-auto flex gap-1">${done ? chip('บันทึกแล้ว', 'good') : ''}${chip(label, tone)}</span></div>
     <div class="text-sm p-2 rounded-lg" style="background:var(--surface-2)">ในไฟล์ Honda: <b>${esc(it.opt || '–')}</b><div class="text-xs text-muted">${esc(it.camp)}${it.date ? ' · ส่งมอบ ' + esc(it.date) : ''}${it.st ? ' · ' + esc(it.st) : ''}</div></div>
     ${d ? `<div class="text-sm">เงื่อนไขขายในเว็บ: <b>${esc(d.campaign || '–')}</b></div>` : ''}
     ${chgBox}${fix}${sv}</div>`;

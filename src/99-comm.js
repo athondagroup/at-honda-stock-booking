@@ -66,7 +66,7 @@ function campOptions(x) {
       out.push({ value: r.month + '|' + r.id, month: r.month, name: r.name, sup: num(r.sup), group: `แคมเปญ ${fmtM(r.month)} (${by}) · ${r.group}`, ok, why, deliver_by: r.deliver_by });
     });
   });
-  return { opts: [...out, { value: 'none', name: 'ไม่ใช้แคมเปญ Honda (ดอกเบี้ยมาตรฐาน / นอกตาราง)', sup: 0, group: '', ok: true }, { value: 'other', name: 'อื่น ๆ (พิมพ์เอง)', sup: 0, group: '', ok: true }], warns: [...new Set(warns)] };
+  return { opts: [...out, { value: 'pending', name: 'รอเลือกแคมเปญ (ยังไม่ตัดสินใจ)', sup: 0, group: '', ok: true }, { value: 'none', name: 'ไม่ใช้แคมเปญ Honda (ดอกเบี้ยมาตรฐาน / นอกตาราง)', sup: 0, group: '', ok: true }, { value: 'other', name: 'อื่น ๆ (พิมพ์เอง)', sup: 0, group: '', ok: true }], warns: [...new Set(warns)] };
 }
 // the margin table for this sale: the month of the picked campaign, else the booking (Advance: invoice) month
 function marginStdFor(x, campValue) {
