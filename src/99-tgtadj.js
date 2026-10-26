@@ -3,9 +3,9 @@
 //   cut  = ลดเป้า n คัน   carry = true: the cut will be made up in another month -> counts in ค้างปรับ
 //   add  = เพิ่มเป้า n คัน  link = true: made up from ค้างปรับ -> takes it off ค้างปรับ
 //   ค้างปรับ = (cuts with carry) − (adds with link)   current target of a month = original − cuts + adds
-// Honda counts targets by "Ki": Ki 103 starts 2026-03, a Ki is 12 months (Ki 104 starts 2027-03)
+// Honda counts targets by "Ki": Ki 103 starts 2026-04 (April to March), a Ki is 12 months (Ki 104 starts 2027-04)
 // Only function declarations at the top level: the first render runs before this file.
-const KI0 = { n: 103, start: '2026-03' };
+const KI0 = { n: 103, start: '2026-04' };
 const TGT_ADJ_REASONS = ['รถโควต้าไม่มาส่ง', 'ฮอนด้าปรับเป้า', 'สาขาปรับแผนการขาย', 'เกลี่ยเป้าจากเดือนอื่น', 'อื่น ๆ'];
 function mAdd(m, k) { const [y, mo] = m.split('-').map(Number), t = y * 12 + (mo - 1) + k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}`; }
 function mDiff(a, b) { const [ya, ma] = a.split('-').map(Number), [yb, mb] = b.split('-').map(Number); return (yb - ya) * 12 + (mb - ma); }
@@ -51,7 +51,7 @@ function tgtAdjCard(D) {
     <div class="min-w-0"><div class="text-sm font-semibold mb-1">ค้างปรับแยกสาขา</div><div class="flex flex-wrap gap-2 mb-3">${brs.map(b => { const x = tgtBacklog(sel, b); return `<span class="inline-flex items-center gap-1 border border-line rounded-lg px-2 py-1 text-sm"><b>${b}</b> ${x.left > 0 ? chip('ค้าง ' + x.left, 'bad') : x.left < 0 ? chip('เกิน ' + (-x.left), 'warn') : chip('ไม่ค้าง', 'good')}</span>`; }).join('')}</div>
       <div class="text-sm font-semibold mb-1">ประวัติการปรับ</div>
       <div class="border border-line rounded-lg divide-y divide-line max-h-56 overflow-auto">${L.map(r => `<div class="p-2 px-3 text-sm flex flex-wrap gap-x-3 gap-y-1 items-center"><b>${esc(r.br)}</b><span class="nowrap">${monLabel(r.m)}</span>${r.k === 'cut' ? chip('ลด ' + r.n, 'bad') : chip('เพิ่ม ' + r.n, 'good')}${r.k === 'cut' ? chip(r.carry ? 'เกลี่ยเดือนอื่น' : 'ลดจริง', 'muted') : chip(r.link ? 'หักค้างปรับ' : 'ไม่หักค้าง', 'muted')}<span class="text-muted">${esc(r.reason || '')}${r.note ? ' · ' + esc(r.note) : ''}</span><span class="ml-auto text-xs text-muted">${esc(r.role || '')} · ${fmtDT(r.at)}</span>${S.role.role === 'exec' ? `<button class="btn btn-ghost btn-sm" data-act="tgtadj-del" data-id="${esc(r.id)}">ลบ</button>` : ''}</div>`).join('') || '<div class="p-3 text-sm text-muted">ยังไม่มีการปรับเป้าใน Ki นี้</div>'}</div></div></div>
-  <p class="text-xs text-muted mt-2">ลดเป้าแล้วเลือก "จะเกลี่ยไปเดือนอื่น" ยอดนั้นจะขึ้นเป็นค้างปรับ เมื่อเพิ่มเป้าเดือนอื่นและเลือก "เกลี่ยจากค้างปรับ" ระบบหักค้างปรับออกให้ · เป้าปัจจุบันใช้คำนวณ % เป้าในหน้ายอดขายและเป้าทั้งหมด · Ki ของฮอนด้าเริ่มเดือนมีนาคม</p></section>`;
+  <p class="text-xs text-muted mt-2">ลดเป้าแล้วเลือก "จะเกลี่ยไปเดือนอื่น" ยอดนั้นจะขึ้นเป็นค้างปรับ เมื่อเพิ่มเป้าเดือนอื่นและเลือก "เกลี่ยจากค้างปรับ" ระบบหักค้างปรับออกให้ · เป้าปัจจุบันใช้คำนวณ % เป้าในหน้ายอดขายและเป้าทั้งหมด · Ki ของฮอนด้าเริ่มเดือนเมษายน สิ้นสุดมีนาคม</p></section>`;
 }
 function tgtAdjModal(m) {
   const brs = tgtEditBrs(), cut = m.k === 'cut', n = Number(m.n) || 0, ki = kiOf(m.m);
