@@ -182,7 +182,7 @@ function carHistView(D) {
 }
 function lockStatusTxt(s) { return { pending: 'รออนุมัติ', approved: 'ล็อกอยู่', allocated: 'แจ้งจัดสรรแล้ว', done: 'สำเร็จ', released: 'ปล่อยแล้ว', rejected: 'ไม่อนุมัติ', withdrawn: 'ถอนคำขอ', bumped: 'มีคนจองก่อน', converted: 'เปลี่ยนเป็นล็อกใบจอง', cancelled: 'ยกเลิก' }[s] || s || ''; }
 function stockSeg(mode) {
-  return `<div class="seg" role="group" aria-label="มุมมอง"><button data-act="sub" data-key="stock" data-sub="spec" aria-pressed="${mode === 'spec'}">ตามสเปก</button><button data-act="sub" data-key="stock" data-sub="list" aria-pressed="${mode === 'list'}">รายคัน${isSales() ? '' : ' พร้อมชื่อลูกค้า'}</button>${perms().approve ? `<button data-act="sub" data-key="stock" data-sub="hist" aria-pressed="${mode === 'hist'}">ประวัติรถ</button>` : ''}</div>`;
+  return `<div class="seg" role="group" aria-label="มุมมอง"><button data-act="sub" data-key="stock" data-sub="spec" aria-pressed="${mode === 'spec'}">ตามสเปก</button><button data-act="sub" data-key="stock" data-sub="list" aria-pressed="${mode === 'list'}">รายคัน${isSales() ? '' : ' พร้อมชื่อลูกค้า'}</button>${S.spCount || spCan() ? `<button data-act="sub" data-key="stock" data-sub="sp" aria-pressed="${mode === 'sp'}">รถพิเศษ${S.spCount ? ' (' + S.spCount + ')' : ''}</button>` : ''}${perms().approve ? `<button data-act="sub" data-key="stock" data-sub="hist" aria-pressed="${mode === 'hist'}">ประวัติรถ</button>` : ''}</div>`;
 }
 // every event of one car, oldest first
 function carHistEvents(r) {

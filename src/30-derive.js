@@ -316,6 +316,8 @@ function deriveNow() {
     car.assignedTo = assignedBy.get(car.vin) || null;
     if (car.assignedTo && ['free', 'temp', 'noted', 'locked', 'pending'].includes(car.status)) car.status = 'assigned';
   }
+  // special cars (รถพิเศษ) are kept apart from stock: looping over the stock skips them, get/has still find them
+  cars.values = function* () { for (const c of Map.prototype.values.call(this)) if (!c.special) yield c; };
   for (const b of bookings) {
     const l = locks.find(x => x.live && x.type === 'booking' && (x.bkref === b.key || (b.app && x.bkref === b.app.key)));
     b.lock = l || null;
@@ -388,6 +390,7 @@ function deriveNow() {
 
   const receipts = [...S.receipts.entries()].filter(([, r]) => !r.hidden).map(([id, r]) => ({ id, ...r })).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
   const D = { today, X, cars, removed, deliveredOut, locks, idsB, at, bookings, bookingByKey, bySpec, quota, specs, sum, receipts, invByVin, idsOnly: M.idsOnly };
+  D.spCars = [...Map.prototype.values.call(cars)].filter(c => c.special); S.spCount = D.spCars.length;
   D.alerts = buildAlerts(D);
   return D;
 }

@@ -22,7 +22,8 @@ function spInsChip(d) {
   const n = daysBetween(todayISO(), d);
   return n < 0 ? chip(`หมดแล้ว ${-n} วัน`, 'bad') : n <= 30 ? chip(`อีก ${n} วันหมด`, 'warn') : '';
 }
-function spCan() { return perms().write && !isSales(); }
+// only the manager and above press it
+function spCan() { return perms().write && (S.role.role === 'exec' || !!MGR_OF[S.role.role]); }
 // the box in the car window
 function spBox(c, D) {
   if (!spCan()) return c.special ? spDetail(c, D, false) : '';
@@ -31,7 +32,7 @@ function spBox(c, D) {
     const out = c.fromInv || ['company', 'free'].includes(c.status) || D.deliveredOut.some(x => x.vin === c.vin);
     if (!out) return '';
     return `<div class="mb-3 p-3 rounded-lg text-sm flex flex-wrap items-center gap-3" style="background:var(--surface-2)">
-      <div class="flex-1 min-w-[220px]">${c.fromInv ? 'รถคันนี้ไม่อยู่ในไฟล์ Stock IDS แล้ว · ' : ''}รถบริษัท Advance · รถ Demon · ลูกค้าคืนรถ ที่ยังอยู่ที่สาขา ดึงเข้า Stock พิเศษได้ ระบบจะจำวันที่ใบกำกับ วันที่ส่งมอบ และว่าขายได้หรือไม่</div>
+      <div class="flex-1 min-w-[220px]">${c.fromInv ? 'รถคันนี้ไม่อยู่ในไฟล์ Stock IDS แล้ว · ' : ''}รถบริษัท Advance · รถ Demon · ลูกค้าคืนรถ ที่ยังอยู่ที่สาขา ดึงเข้าแท็บ "รถพิเศษ" (แยกจาก Stock ปกติ) ได้ ระบบจะจำวันที่ใบกำกับ วันที่ส่งมอบ และว่าขายได้หรือไม่</div>
       <button class="btn btn-red btn-sm" data-act="sp-open" data-vin="${vin}">ดึงกลับเข้า Stock พิเศษ</button></div>`;
   }
   return spDetail(c, D, true);
@@ -61,7 +62,9 @@ function spDetail(c, D, edit) {
 function spModal(m, D) {
   const c = carAny(m.vin, D) || { vin: m.vin }, d = m.d, ok = (k, v) => d[k] === v;
   const seg = (k, v, label, tone) => `<button type="button" class="btn btn-sm ${ok(k, v) ? (tone || 'btn-dark') : 'btn-ghost'}" data-act="sp-set" data-k="${k}" data-v="${v}">${label}</button>`;
-  const f = (id, label, key, type, extra = '', req = false) => `<div class="field"><label for="${id}" class="${req ? 'req' : ''}">${label}</label><input id="${id}" ${type ? `type="${type}"` : ''} ${extra} data-modal="d.${key}" value="${esc(d[key] ?? '')}"></div>`;
+  const sys = m.sys || {};
+  const f = (id, label, key, type, extra = '', req = false) => { const lk = !!sys[key];
+    return `<div class="field min-w-0"><label for="${id}" class="${req ? 'req' : ''}">${label}${lk ? ` <span class="text-xs" style="color:var(--good)">ข้อมูลจากระบบ (${esc(sys[key + 'Src'] || 'DL')})</span>` : ''}</label><input id="${id}" ${type ? `type="${type}"` : ''} ${extra} ${lk ? 'disabled' : ''} data-modal="d.${key}" value="${esc(d[key] ?? '')}" style="display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;text-align:left"></div>`; };
   return `<div class="flex items-start justify-between gap-3 mb-1"><h2 class="font-head text-xl font-semibold">${m.edit ? 'แก้ข้อมูลรถ Stock พิเศษ' : 'ดึงกลับเข้า Stock พิเศษ'}</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
   <p class="text-sm mb-4"><span class="code font-medium">${esc(c.vin)}</span> ${c.spec ? specLabel(c.spec) : ''}</p>
   <div class="flex flex-col gap-4">
@@ -69,7 +72,7 @@ function spModal(m, D) {
     ${d.reason === 'demo' ? `<div class="field"><label class="req">รถ Demon คันนี้</label><div class="flex flex-wrap gap-2">${seg('test', true, 'เปิดเป็นรถทดลองขับ')}${seg('test', false, 'ไม่เปิดทดลองขับ')}</div></div>` : ''}
     <div class="field"><label class="req">รถคันนี้ขายได้ไหม</label>
       <div class="flex flex-wrap gap-2">${seg('sellable', true, 'ขายได้', 'btn-red')}${seg('sellable', false, 'ขายไม่ได้')}${seg('sellable', null, 'ยังไม่ตัดสินใจ')}</div>
-      <p class="text-xs text-muted mt-1">${d.sellable === true ? 'ขายได้ = เข้า Stock เป็นรถว่าง มีราคาและข้อมูลรถพิเศษกำกับ ล็อก/จัดสรรได้ตามปกติ' : d.sellable === false ? 'ขายไม่ได้ = อยู่ใน Stock เป็นรถบริษัท ล็อกและขายไม่ได้' : 'ยังไม่ตัดสินใจ = อยู่ใน Stock เป็นรถบริษัท ไว้ก่อน แก้เป็นขายได้ทีหลังได้'}</p></div>
+      <p class="text-xs text-muted mt-1">${d.sellable === true ? 'ขายได้ = เป็นรถพิเศษที่ขายได้ อยู่ในแท็บ "รถพิเศษ" แยกจาก Stock ปกติ มีราคาและข้อมูลรถกำกับ ล็อก จัดสรร ส่งมอบได้ตามปกติ' : d.sellable === false ? 'ขายไม่ได้ = อยู่ในแท็บ "รถพิเศษ" เป็นรถบริษัท ล็อกและขายไม่ได้' : 'ยังไม่ตัดสินใจ = อยู่ในแท็บ "รถพิเศษ" เป็นรถบริษัทไว้ก่อน แก้เป็นขายได้ทีหลังได้'}</p></div>
     ${d.sellable === true ? `<div class="p-3 rounded-lg border border-line flex flex-col gap-3" style="background:var(--surface-2)"><b class="text-sm">ข้อมูลรถพิเศษสำหรับขาย</b>
       <div class="grid sm:grid-cols-2 gap-3">
         ${f('sp-price', 'ราคาขาย (บาท)', 'price', 'number', 'inputmode="numeric" min="0" step="1000"', true)}
@@ -83,7 +86,7 @@ function spModal(m, D) {
       ${f('sp-dd', 'วันที่ส่งมอบ (เดิม)', 'delivDate', 'date', '')}</div>
     <div class="field"><label for="sp-br" class="req">อยู่สาขา</label><select id="sp-br" data-modal="d.br">${BRS.map(b => `<option value="${b}" ${d.br === b ? 'selected' : ''}>${b} ${esc(BR[b].name)}</option>`).join('')}</select></div>
     ${f('sp-note', d.sellable === false ? 'เหตุผลที่ขายไม่ได้' : 'หมายเหตุ', 'note', '', '', d.sellable === false)}
-    <p class="text-xs text-muted">ระบบจำว่าใครดึงกลับและเมื่อไร ดูได้ในประวัติรถ · วันที่ใบกำกับและวันที่ส่งมอบดึงมาจากไฟล์ DL ให้แล้ว แก้ได้</p>
+    <p class="text-xs text-muted">ระบบจำว่าใครดึงกลับและเมื่อไร ดูได้ในประวัติรถ · ถ้าระบบมีเลขใบกำกับ วันที่ออกใบกำกับ หรือวันที่ส่งมอบอยู่แล้ว จะใช้ข้อมูลของระบบ (แก้ไม่ได้) ช่องที่ระบบไม่มีกรอกเองได้</p>
     <div class="flex flex-wrap justify-between gap-2">
       <div>${m.edit ? (m.undoAsk ? `<button class="btn btn-red" data-act="sp-undo-go">ยืนยัน นำออกจาก Stock พิเศษ</button>` : `<button class="btn btn-ghost" data-act="sp-undo">นำออกจาก Stock พิเศษ</button>`) : ''}</div>
       <div class="flex gap-2"><button class="btn btn-ghost" data-act="sp-cancel">ยกเลิก</button><button class="btn btn-red" data-act="sp-submit">${m.edit ? 'บันทึก' : 'ดึงกลับเข้า Stock พิเศษ'}</button></div></div>
@@ -94,12 +97,19 @@ Object.assign(ACTIONS, {
     if (!spCan()) return;
     const vin = el.dataset.vin, D = derive(), c = carAny(vin, D); if (!c) return;
     const sp = c.special, inv = D.invByVin.get(vin);
+    // dates and invoice the system already has are used as they are (locked); only what is missing is typed
+    const lg = typeof carlogAll === 'function' ? carlogAll().get(vin) : null, lo = lg && lg.e.out && /ส่งมอบ/.test(lg.e.out.why || '') ? lg.e.out.d : null;
+    const sys = {};
+    if (inv && inv.inv) { sys.invNo = inv.inv; sys.invNoSrc = 'DL'; }
+    if (inv && inv.idate) { sys.invDate = inv.idate; sys.invDateSrc = 'DL'; }
+    if (inv && inv.ddate) { sys.delivDate = inv.ddate; sys.delivDateSrc = 'DL'; } else if (lo) { sys.delivDate = lo; sys.delivDateSrc = 'ประวัติ IDS'; }
     const d = sp ? { ...sp } : {
       reason: inv && inv.company ? 'adv' : 'returned', test: null, sellable: null, price: '', km: '', ins: '', plate: '', cond: '', note: '',
-      invNo: (inv && inv.inv) || '', invDate: (inv && inv.idate) || '', delivDate: (inv && inv.ddate) || '', br: c.br || (inv && inv.br) || BRS[0]
+      invNo: sys.invNo || '', invDate: sys.invDate || '', delivDate: sys.delivDate || '', br: c.br || (inv && inv.br) || BRS[0]
     };
     if (el.dataset.sell) d.sellable = el.dataset.sell === 'true';
-    S.modal = { kind: 'special', vin, edit: !!sp, d, undoAsk: false }; render();
+    for (const k of ['invNo', 'invDate', 'delivDate']) if (sys[k]) d[k] = sys[k];
+    S.modal = { kind: 'special', vin, edit: !!sp, d, sys, undoAsk: false }; render();
   },
   'sp-set'(el) { const v = el.dataset.v, d = S.modal.d; d[el.dataset.k] = v === 'true' ? true : v === 'false' ? false : v === 'null' ? null : v; render(); },
   'sp-cancel'() { const vin = S.modal && S.modal.vin; S.modal = vin ? { kind: 'car', vin } : null; render(); },
@@ -124,9 +134,32 @@ Object.assign(ACTIONS, {
       reason: d.reason, test: d.reason === 'demo' ? d.test : null, sellable: d.sellable,
       price: d.sellable === true ? Number(d.price) : null, km: d.sellable === true ? Number(d.km) : null, ins: d.sellable === true ? d.ins : null,
       plate: d.sellable === true ? (d.plate || '').trim() || null : null, cond: d.sellable === true ? (d.cond || '').trim() || null : null,
-      note: (d.note || '').trim() || null, invNo: (d.invNo || '').trim() || null, invDate: d.invDate || null, delivDate: d.delivDate || null, br: d.br,
+      note: (d.note || '').trim() || null, invNo: String(d.invNo || '').trim() || null, invDate: d.invDate || null, delivDate: d.delivDate || null, br: d.br,
       ...actor(), hist: [...((prev && prev.hist) || []), { act, note: (d.note || '').trim() || null, price: d.sellable === true ? Number(d.price) : null, ...actor() }]
     };
     if (await write('vehicles', m.vin, { ...cur, special: sp })) { S.modal = { kind: 'car', vin: m.vin }; toast(act); render(); }
   }
 });
+
+// the "รถพิเศษ" tab of สต็อก: kept apart from the normal stock (not counted in the spec table / free cars)
+function spView(D) {
+  const L = (D.spCars || []).filter(inBr), p = perms();
+  const n = k => L.filter(c => k === 'y' ? c.special.sellable === true : k === 'n' ? c.special.sellable === false : c.special.sellable == null).length;
+  const head = k => `<th>${k}</th>`;
+  return `${pageHead('สต็อกรถ', 'รถพิเศษ: รถบริษัท Advance · รถ Demon · ลูกค้าคืนรถ ข้อมูลแยกจาก Stock ปกติ ไม่นับในรถว่างหรือตารางสเปก')}
+  ${brSeg()}
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-3">${stockSeg('sp')}</div>
+  <p class="text-sm mb-2">รถพิเศษ <b class="num">${L.length}</b> คัน · ขายได้ <b class="num" style="color:var(--good)">${n('y')}</b> · ขายไม่ได้ <b class="num">${n('n')}</b> · รอตัดสินใจ <b class="num">${n('w')}</b></p>
+  ${L.length ? `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl">
+    <thead><tr>${['หมายเลขตัวถัง', 'สาขา', 'รุ่น / เกรด / สี', 'เหตุผล', 'ขายได้ไหม', 'ราคา', 'เลขไมล์', 'ประกันหมดอายุ', 'ใบกำกับ', 'สถานะ', ''].map(head).join('')}</tr></thead>
+    <tbody>${L.sort((a, b) => (a.br || '').localeCompare(b.br || '')).map(c => { const sp = c.special; return `<tr>
+      <td class="nowrap">${vinLink(c)}</td><td><b>${esc(c.br || '')}</b></td><td class="nowrap">${c.spec ? specLabel(c.spec) : ''}</td>
+      <td class="nowrap text-sm">${esc(spReasonText(sp))}</td>
+      <td class="nowrap">${sp.sellable === true ? chip('ขายได้', 'good') : sp.sellable === false ? chip('ขายไม่ได้', 'bad') : chip('รอตัดสิน', 'muted')}</td>
+      <td class="nowrap num text-right">${sp.price ? fmtN(sp.price) : '–'}</td><td class="nowrap num text-right">${sp.km != null && sp.km !== '' ? fmtN(sp.km) : '–'}</td>
+      <td class="nowrap text-sm">${sp.ins ? fmtD(sp.ins) + ' ' + spInsChip(sp.ins) : '–'}</td>
+      <td class="nowrap text-sm">${esc(sp.invNo || '')}${sp.invDate ? ' · ' + fmtD(sp.invDate) : ''}</td>
+      <td class="nowrap">${carStatusCell(c, D)}</td>
+      <td><div class="flex gap-2">${sp.sellable === true ? stockActions(c, p, D) : ''}</div></td></tr>`; }).join('')}</tbody></table></div>`
+    : `<div class="bg-surface border border-line rounded-lg">${emptyBox('ยังไม่มีรถพิเศษ', 'เปิดรถจากหน้าข้อมูลรถ แล้วกด "ดึงกลับเข้า Stock พิเศษ" (ผู้จัดการขึ้นไป)')}</div>`}`;
+}
