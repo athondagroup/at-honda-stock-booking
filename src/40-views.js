@@ -16,7 +16,7 @@ const ICON = {
 const NAV = [
   { id: 'dash', label: 'ภาพรวม' }, { id: 'alerts', label: 'แจ้งเตือน' }, { id: 'inbox', get label() { return perms().approve ? 'รออนุมัติ' : 'คำขอของฉัน'; } }, { id: 'stock', label: 'สต็อก' }, { id: 'book', label: 'Booking' },
   { id: 'quota', label: 'Quota' }, { id: 'lock', label: 'ล็อกรถ' }, { id: 'flow', label: 'ขั้นตอนส่งมอบ' }, { id: 'receive', label: 'รับรถเข้า' },
-  { id: 'upload', label: 'อัปเดตข้อมูล IDS' }, { id: 'campup', label: 'อัปเดตแคมเปญ' }, { id: 'campdb', label: 'ตารางแคมเปญรายเดือน' }, { id: 'campsum', label: 'รายงานสรุปแคมเปญ' }, { id: 'admin', label: 'หลังบ้าน' }, { id: 'datafix', label: 'ข้อมูลผิด/ขาด' }
+  { id: 'upload', label: 'อัปเดตข้อมูล IDS' }, { id: 'campup', label: 'อัปเดตแคมเปญ' }, { id: 'campdb', label: 'ตารางแคมเปญรายเดือน' }, { id: 'campsum', label: 'รายงานสรุปแคมเปญ' }, { id: 'campclose', label: 'ปิดเดือน' }, { id: 'admin', label: 'หลังบ้าน' }, { id: 'datafix', label: 'ข้อมูลผิด/ขาด' }
 ];
 const svg = (id, n = 20) => `<svg width="${n}" height="${n}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${ICON[id]}</svg>`;
 const isSales = () => S.role.role === 'sales';
@@ -34,20 +34,20 @@ function badgeCounts(D) {
   };
 }
 // each role sees only the pages it works with: sales do not receive cars or upload IDS files
-const navFor = () => NAV.filter(n => !(isSales() && (n.id === 'receive' || n.id === 'upload' || n.id === 'campup' || n.id === 'campdb' || n.id === 'campsum' || n.id === 'datafix')) && !(n.id === 'admin' && !adminCan()));
+const navFor = () => NAV.filter(n => !(isSales() && (n.id === 'receive' || n.id === 'upload' || n.id === 'campup' || n.id === 'campdb' || n.id === 'campsum' || n.id === 'campclose' || n.id === 'datafix')) && !(n.id === 'admin' && !adminCan()));
 // the menu shows 6 groups (ตกลง 13/10 แบบ ค); pages of one group switch with the tabs at the top of the page
 // ปรับตามบทวิเคราะห์ 19/10 (ตัวอย่างใน artifact): งานวันนี้ / ใบจอง / รถ / รายงาน + เพิ่มเติม (เครื่องมือแอดมิน/ผู้จัดการ)
 const GROUPS = [
   { id: 'work', label: 'งานวันนี้', get views() { return perms().approve ? ['inbox', 'alerts'] : ['alerts', 'inbox']; }, icon: 'alerts' },
   { id: 'bookg', label: 'ใบจอง', views: ['book'], icon: 'book' },
   { id: 'stockg', label: 'รถ', views: ['stock', 'quota', 'lock', 'receive'], icon: 'stock' },
-  { id: 'dash', get label() { return isSales() || S.role.role === 'admin' ? 'สรุป' : 'รายงาน'; }, views: ['dash', 'campsum'] },
+  { id: 'dash', get label() { return isSales() || S.role.role === 'admin' ? 'สรุป' : 'รายงาน'; }, views: ['dash', 'campsum', 'campclose'] },
   { id: 'tools', label: 'เพิ่มเติม', views: ['datafix', 'upload', 'campup', 'campdb', 'admin'], icon: 'upload' }
 ];
 const groupsFor = () => { const ok = new Set(navFor().map(n => n.id)); return GROUPS.map(g => ({ ...g, views: g.views.filter(v => ok.has(v)) })).filter(g => g.views.length); };
 const groupOf = v => GROUPS.find(g => g.views.includes(v)) || GROUPS[0];
 const groupEntry = g => (S.lastIn && g.views.includes(S.lastIn[g.id])) ? S.lastIn[g.id] : g.views[0];
-const GROUP_TAB = { dash: 'ภาพรวม', alerts: 'งานของฉัน', get inbox() { return perms().approve ? 'รอฉันอนุมัติ' : 'คำขอของฉัน (ติดตาม)'; }, stock: 'สต็อก', quota: 'Quota', lock: 'ล็อก', book: 'ใบจอง', flow: 'ตามขั้นตอนส่งมอบ', receive: 'รับรถ', upload: 'อัปเดตข้อมูล IDS', campup: 'อัปเดตข้อมูลแคมเปญ', campdb: 'ตารางแคมเปญ', campsum: 'รายงานสรุปแคมเปญ', datafix: 'ข้อมูลผิด/ขาด/ต้องจับคู่', admin: 'หลังบ้าน' };
+const GROUP_TAB = { dash: 'ภาพรวม', alerts: 'งานของฉัน', get inbox() { return perms().approve ? 'รอฉันอนุมัติ' : 'คำขอของฉัน (ติดตาม)'; }, stock: 'สต็อก', quota: 'Quota', lock: 'ล็อก', book: 'ใบจอง', flow: 'ตามขั้นตอนส่งมอบ', receive: 'รับรถ', upload: 'อัปเดตข้อมูล IDS', campup: 'อัปเดตข้อมูลแคมเปญ', campdb: 'ตารางแคมเปญ', campsum: 'รายงานสรุปแคมเปญ', campclose: 'ปิดเดือน', datafix: 'ข้อมูลผิด/ขาด/ต้องจับคู่', admin: 'หลังบ้าน' };
 function groupTabs(badges) {
   const g = groupsFor().find(x => x.views.includes(S.view));
   if (!g || g.views.length < 2) return '';
@@ -163,7 +163,7 @@ function renderNow() {
   if (S.view === 'flow') { S.view = 'book'; S.sub.book = 'steps'; }
   if (!navFor().some(n => n.id === S.view)) S.view = 'dash';
   renderChrome(D);
-  const V = { dash: viewDash, alerts: viewAlerts, inbox: viewInbox, stock: viewStock, book: viewBook, quota: viewQuota, lock: viewLock, flow: viewFlow, receive: viewReceive, upload: viewUpload, campup: viewCampUp, campdb: viewCampDb, campsum: viewCampSum, admin: viewAdmin, datafix: viewDatafix }[S.view] || viewDash;
+  const V = { dash: viewDash, alerts: viewAlerts, inbox: viewInbox, stock: viewStock, book: viewBook, quota: viewQuota, lock: viewLock, flow: viewFlow, receive: viewReceive, upload: viewUpload, campup: viewCampUp, campdb: viewCampDb, campsum: viewCampSum, campclose: viewCampClose, admin: viewAdmin, datafix: viewDatafix }[S.view] || viewDash;
   const ae = document.activeElement, main = $('#main');
   const fid = ae && ae.id && main.contains(ae) && /INPUT|SELECT|TEXTAREA/.test(ae.tagName) ? ae.id : null;
   let caret = null; try { caret = fid && typeof ae.selectionStart === 'number' ? ae.selectionStart : null; } catch (e) { caret = null; }

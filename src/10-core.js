@@ -75,7 +75,7 @@ const emptyBox = (t, s) => `<div class="p-6 text-center"><div class="font-medium
 const plain = o => JSON.parse(JSON.stringify(o, (k, v) => v === undefined ? null : v));
 
 // ------------------------------------------------------------------ state
-const VIEWS = ['dash', 'alerts', 'inbox', 'stock', 'book', 'quota', 'lock', 'flow', 'receive', 'upload', 'campup', 'campdb', 'campsum', 'admin', 'datafix'];
+const VIEWS = ['dash', 'alerts', 'inbox', 'stock', 'book', 'quota', 'lock', 'flow', 'receive', 'upload', 'campup', 'campdb', 'campsum', 'campclose', 'admin', 'datafix'];
 const S = {
   mode: 'connecting', // shared | local | readonly | connecting
   view: 'dash',
