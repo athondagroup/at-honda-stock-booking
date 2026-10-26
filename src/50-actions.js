@@ -128,7 +128,7 @@ function lockModal(m, D) {
       <span class="block text-xs text-muted">${c.br} ${BR[c.br]?.name || ''} · ${esc(gradeShort(c.model, c.grade))} ${esc(c.color || '')} · อายุ ${c.age ?? '–'} วัน · ล็อกไม่ได้</span></span></div>`;
   const chk = lockChecks(m, D);
   const days = LOCK_DAYS_BY[m.type] || 15;
-  const direct = m.type !== 'dealer' ? canApproveBr(u ? u.br : null) : (p.approveDealer);
+  const direct = m.type !== 'dealer' ? p.approve : (p.approveDealer); // manager locks any branch's car; approving others' requests stays own-branch
   const custTxt = x => (!isSales() || isMine(x.owner)) && x.cust ? ' · ' + x.cust : '';
   const pickCar = c => `<button class="pick text-left ${m.vin === c.vin ? 'on' : ''}" data-act="pick" data-vin="${esc(c.vin)}" aria-pressed="${m.vin === c.vin}">
       <span class="flex-1 min-w-0"><span class="code font-medium">${esc(c.vin)}</span> ${rec.vin === c.vin ? chip('แนะนำ', 'good') : ''} ${spec && c.spec !== spec ? chip(`สเปกไม่ตรง: ${gradeShort(c.model, c.grade)} ${c.color || ''}`, 'warn') : ''} ${c.temps.length ? chip(`ล็อกชั่วคราว ${c.temps.length}`, 'warn') : ''} ${c.status === 'pending' ? chip('มีคำขอรออนุมัติ ขอคิวต่อ', 'warn') : ''} ${c.status === 'invoiced' || c.status === 'sold' ? chip(c.status === 'invoiced' ? 'ออกใบกำกับแล้ว ยังไม่ส่งมอบ' : 'แจ้งขายแล้ว ยังไม่ส่งมอบ', 'warn') : ''}
@@ -610,7 +610,7 @@ const ACTIONS = {
     if ((m.type === 'temp' || m.reason === 'อื่น ๆ') && !(m.note || '').trim()) { toast('ใส่เหตุผลก่อนส่ง (ยังไม่มีใบจอง)', 'bad'); $('#m-note')?.focus(); return; }
     const u = chk.u;
     const b = m.type === 'booking' && m.bkref ? D.bookingByKey.get(m.bkref) : null;
-    const direct = m.type === 'dealer' ? p.approveDealer : canApproveBr(u.br);
+    const direct = m.type === 'dealer' ? p.approveDealer : p.approve;
     const days = LOCK_DAYS_BY[m.type] || 15;
     const owner = m.type === 'booking' ? (b ? b.owner : null) : m.type === 'temp' ? (isSales() ? S.role.sales : m.sales) : null;
     const id = newId('locks'), now = new Date().toISOString();

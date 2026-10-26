@@ -255,9 +255,8 @@ function campAdminBox(f, o, v, sel, opts) {
   return `<div class="sm:col-span-3 p-3 rounded-lg border border-line" style="background:var(--surface)">
     <div class="font-medium text-sm mb-1">แคมเปญ Honda</div>
     <div class="text-sm mb-2">เซลล์เลือก: ${scName ? `<b>${esc(scName)}</b>` : '<span class="text-muted">เซลล์ยังไม่ได้เลือก</span>'}</div>
-    <div class="flex flex-wrap gap-2" role="group" aria-label="แอดมินเลือกแคมเปญ">${seg('same', 'เลือกเหมือนเซลล์ (copy)')}${seg('own', 'เลือกเอง')}${seg('upload', 'อัปโหลดแคมเปญ match')}</div>
-    ${mode === 'same' ? `<div class="mt-2 text-sm">${scName ? `ใช้แคมเปญเดียวกับเซลล์: <b>${esc(campFull(cur) || scName)}</b>` : 'เซลล์ยังไม่ได้เลือกแคมเปญ ให้เลือกเองหรืออัปโหลด'}</div>` : mode === 'upload' ? upload : `<div class="mt-2">${sel}</div>`}
-    ${mode === 'upload' && cur ? `<div class="mt-2 text-sm">ที่เลือกตอนนี้: <b>${esc(campFull(cur))}</b></div>` : ''}
+    <div class="flex flex-wrap gap-2" role="group" aria-label="แอดมินเลือกแคมเปญ">${seg('same', 'เลือกเหมือนเซลล์ (copy)')}${seg('own', 'เลือกเอง')}</div>
+    ${mode === 'same' ? `<div class="mt-2 text-sm">${scName ? `ใช้แคมเปญเดียวกับเซลล์: <b>${esc(campFull(cur) || scName)}</b>` : 'เซลล์ยังไม่ได้เลือกแคมเปญ ให้เลือกเองหรืออัปโหลด'}</div>` : `<div class="mt-2">${sel}</div>${mode === 'upload' ? '' : '<div class="text-xs text-muted mt-1">อัปโหลดไฟล์แคมเปญเพื่อเทียบ ทำที่หน้า เพิ่มเติม › อัปเดตแคมเปญ</div>'}`}
     ${scName && cur && o.campaign_id !== v.sales_camp_id ? `<div class="text-xs mt-2" style="color:var(--warn)">ต่างจากที่เซลล์เลือก · ระบบบันทึกทั้งสองไว้</div>` : ''}</div>`;
 }
 // score each campaign against the text of a file: how many of its parts (interest, free insurance, support baht ...) appear
