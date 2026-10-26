@@ -198,7 +198,7 @@
     try { const { data } = await sb.functions.invoke('gsheet', { body: { ping: true } }); if (!data || !data.ready) return null; } catch (e) { return null; }
     return {
       async callTool(server, tool, input) {
-        const { data, error } = await sb.functions.invoke('gsheet', { body: input });
+        const { data, error } = await sb.functions.invoke('gsheet', { body: { tool, ...input } });
         if (error) {
           // the function says why (Google's status, and the account the sheet must be shared with)
           let info = {}; try { info = (error.context && typeof error.context.json === 'function') ? await error.context.json() : {}; } catch (e) { info = {}; }

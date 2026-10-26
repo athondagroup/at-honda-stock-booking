@@ -146,6 +146,7 @@ function moneyHistEvents(D) {
   }
   Object.entries(rptPayAll()).forEach(([vin, p]) => (p.hist || []).forEach(h => ev.push({ at: h.at, by: h.by, role: h.role, kind: 'เงินรางวัล Honda', vin, cust: '', br: p.br, reason: h.reason || '', how: '', changes: h.changes || [] })));
   Object.entries(rptAll()).forEach(([vin, r]) => (r.prev || []).forEach(h => ev.push({ at: h.at || r.at, by: h.by, role: h.role, kind: 'ทางเลือกตามไฟล์ Honda', vin, cust: '', br: r.br, reason: 'ไฟล์ใหม่เปลี่ยนทางเลือก', how: '', changes: [{ f: 'ทางเลือก', old: h.opt || '–', new: r.opt || '–' }] })));
+  ['camp', 'margin'].forEach(k => (cdbDoc(k).log || []).filter(h => (h.changes || []).length).forEach(h => ev.push({ at: h.at, by: h.by, role: h.role, kind: 'ตารางแคมเปญ', vin: '–', cust: k === 'camp' ? 'แคมเปญ Honda' : 'Margin มาตรฐาน', br: '', reason: h.act, how: '', changes: h.changes })));
   return ev.sort((x, y) => (y.at || '').localeCompare(x.at || ''));
 }
 function moneyHistFiltered(D) {
@@ -159,7 +160,7 @@ function adminMoney(D) {
     <div class="field"><label for="mh-from">ตั้งแต่</label><input id="mh-from" type="date" data-filter="mhFrom" value="${esc(F.mhFrom || '')}"></div>
     <div class="field"><label for="mh-to">ถึง</label><input id="mh-to" type="date" data-filter="mhTo" value="${esc(F.mhTo || '')}"></div>
     <div class="field"><label for="mh-br">สาขา</label><select id="mh-br" data-filter="mhBr"><option value="">ทุกสาขา</option>${Object.keys(BR).map(b => `<option value="${esc(b)}" ${F.mhBr === b ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select></div>
-    <div class="field"><label for="mh-kind">ประเภท</label><select id="mh-kind" data-filter="mhKind"><option value="">ทั้งหมด</option>${['เงื่อนไขขาย', 'เงินรางวัล Honda', 'ทางเลือกตามไฟล์ Honda'].map(k => `<option ${F.mhKind === k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
+    <div class="field"><label for="mh-kind">ประเภท</label><select id="mh-kind" data-filter="mhKind"><option value="">ทั้งหมด</option>${['เงื่อนไขขาย', 'เงินรางวัล Honda', 'ทางเลือกตามไฟล์ Honda', 'ตารางแคมเปญ'].map(k => `<option ${F.mhKind === k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
     <div class="field flex-1 min-w-[160px]"><label for="mh-q">ค้นหา VIN / ลูกค้า / ผู้แก้ / เหตุผล</label><input id="mh-q" data-filter="mhQ" value="${esc(F.mhQ || '')}" autocomplete="off"></div>
     <button class="btn btn-ghost" data-act="mh-export" ${ev.length ? '' : 'disabled'}>ดาวน์โหลด Excel (${ev.length})</button></div>
   <div class="text-xs text-muted mb-2">ประวัติทุกการแก้เกี่ยวกับแคมเปญ / เงื่อนไขการขาย / เงินรางวัล · ${ev.length} รายการ</div>
