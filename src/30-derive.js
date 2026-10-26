@@ -121,10 +121,14 @@ function deriveNow() {
   for (const [vin, o] of S.vehicles) {
     const car0 = cars.get(vin);
     if (o.added && !car0) cars.set(vin, { ...o.added, vin, st: 'free', src: 'รับเข้าในระบบนี้ รอไฟล์ IDS' });
+    // pulled back into stock as a special car (company Advance / Demon / returned by the customer): IDS no longer lists it
+    else if (o.special && !car0 && !o.removed) { const i = invByVin.get(vin) || {}, sp = o.special;
+      cars.set(vin, { vin, br: sp.br || i.br, model: i.model, grade: i.grade, color: i.color, st: spStatus(sp), src: 'ดึงกลับเข้า Stock พิเศษ (ไม่อยู่ในไฟล์ Stock IDS)', special: sp, fromInv: false }); }
     else if (o.added && car0) car0.received = o.added;
     const car = cars.get(vin);
     if (!car) continue;
     if (o.branch) car.br = o.branch;
+    if (o.special) { car.special = o.special; if (car0 && ['company', 'free'].includes(car.st)) car.st = spStatus(o.special); }
     // production date keyed here (from the label on the car), kept even after IDS later has its own value
     car.prodKey = (o.prod_info && o.prod_info.date) || (o.added && o.added.prod) || null;
     car.prodInfo = o.prod_info || null;
@@ -141,7 +145,7 @@ function deriveNow() {
   // invoiced and handed over (DL has a delivery date): the car has left, so it is no longer stock.
   // Company cars invoiced to AT Honda itself stay (they are still at the branch).
   const deliveredOut = [];
-  for (const [vin, car] of cars) { const i = invByVin.get(vin); if (i && !i.company && i.ddate) { deliveredOut.push({ ...car, inv: i }); cars.delete(vin); } }
+  for (const [vin, car] of cars) { const i = invByVin.get(vin); if (i && !i.company && i.ddate && !car.special) { deliveredOut.push({ ...car, inv: i }); cars.delete(vin); } }
 
   // AT Honda bookings: the reference for who owns the customer
   const at = [];
@@ -312,6 +316,8 @@ function deriveNow() {
     car.assignedTo = assignedBy.get(car.vin) || null;
     if (car.assignedTo && ['free', 'temp', 'noted', 'locked', 'pending'].includes(car.status)) car.status = 'assigned';
   }
+  // special cars (รถพิเศษ) are kept apart from stock: looping over the stock skips them, get/has still find them
+  cars.values = function* () { for (const c of Map.prototype.values.call(this)) if (!c.special) yield c; };
   for (const b of bookings) {
     const l = locks.find(x => x.live && x.type === 'booking' && (x.bkref === b.key || (b.app && x.bkref === b.app.key)));
     b.lock = l || null;
@@ -384,6 +390,7 @@ function deriveNow() {
 
   const receipts = [...S.receipts.entries()].filter(([, r]) => !r.hidden).map(([id, r]) => ({ id, ...r })).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
   const D = { today, X, cars, removed, deliveredOut, locks, idsB, at, bookings, bookingByKey, bySpec, quota, specs, sum, receipts, invByVin, idsOnly: M.idsOnly };
+  D.spCars = [...Map.prototype.values.call(cars)].filter(c => c.special); S.spCount = D.spCars.length;
   D.alerts = buildAlerts(D);
   return D;
 }

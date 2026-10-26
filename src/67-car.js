@@ -9,6 +9,8 @@ function carHist(vin, D) {
     if (o.added) ev.push({ ...o.added, act: o.added.receipt ? 'รับรถเข้า (ยืนยันจากรูป)' : 'รับรถเข้า', what: 'รถ' });
     if (o.moved) ev.push({ ...o.moved, act: `ย้ายไป ${o.branch}`, what: 'รถ' });
     if (o.removed) ev.push({ ...o.removed, act: 'นำรถออก', note: o.removed.dealer || o.removed.note, what: 'รถ' });
+    (o.special && o.special.hist || []).forEach(h => ev.push({ ...h, what: 'Stock พิเศษ', note: [h.note, h.price ? 'ราคา ' + fmtN(h.price) : ''].filter(Boolean).join(' · ') }));
+    (o.special_log || []).forEach(h => ev.push({ ...h, what: 'Stock พิเศษ' }));
     if (o.prod_info) ev.push({ ...o.prod_info, act: 'ใส่วันผลิต', note: fmtD(o.prod_info.date), what: 'รถ' });
   }
   return ev.sort((a, b) => (b.at || '').localeCompare(a.at || ''));
@@ -34,6 +36,7 @@ function carModal(m, D) {
       <div class="mt-1 flex flex-wrap gap-2">${c.status === 'temp' ? chip('ว่าง', 'good') : statusChip(CAR_STATUS, c.status)} ${c.fromInv ? '' : tempChip(c)} ${chip(`${c.br} ${BR[c.br]?.name || ''}`, 'neutral')}</div>${c.fromInv ? '<p class="text-xs text-muted mt-1">รถคันนี้ไม่อยู่ในไฟล์ Stock IDS แล้ว (ออกใบกำกับแล้ว) แสดงข้อมูลจากไฟล์ DL</p>' : ''}</div>
     ${m.back ? '<button class="btn btn-dark btn-sm" data-act="car-back">← กลับ</button>' : '<button class="btn btn-ghost btn-sm" data-act="close">ปิด</button>'}</div>
   ${carWhyBox(c, D, inv, bk, hideCust)}
+  ${spBox(c, D)}
   <div class="grid md:grid-cols-2 gap-5">
     <div><table class="tbl text-sm"><tbody>
       ${row('รุ่น เกรด สี', specLabel(c.spec))}

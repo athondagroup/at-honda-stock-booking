@@ -6,7 +6,11 @@ function tgtRows() { return (S.ref.get('targets') || {}).rows || []; }
 function tgtEditBrs() { return S.role.role === 'exec' ? BRS : (MGR_OF[S.role.role] || []); }
 function tgtCanEdit() { return perms().write && tgtEditBrs().length > 0; }
 // target for a month (optionally one branch / one model), following the branch filter on screen
-function tgtOf(m, br, model) { return tgtRows().filter(r => r.m === m && (br ? r.br === br : inBr(r)) && (!model || r.model === model)).reduce((n, r) => n + (Number(r.n) || 0), 0); }
+// the original target (before any adjustment)
+function tgtBase(m, br, model) { return tgtRows().filter(r => r.m === m && (br ? r.br === br : inBr(r)) && (!model || r.model === model))
+  .reduce((n, r) => n + (Number(r.n) || 0), 0); }
+// the current target: the original with the adjustments (ปรับเป้า) of the month; one model = the original only
+function tgtOf(m, br, model) { return tgtBase(m, br, model) + (model ? 0 : tgtAdjNet(m, br)); }
 function tgtModels() { const s = new Set(Object.keys(CATALOG)); tgtRows().forEach(r => s.add(r.model)); return [...s]; }
 function tgtMatchModel(t) {
   const k = norm(t); if (!k) return null;

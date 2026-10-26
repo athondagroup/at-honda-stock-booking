@@ -170,7 +170,7 @@ function carLockModal(m, D) {
 }
 // the status itself opens the car's locks, so a pending request is approved or changed where it is seen
 function carStatusCell(c, D) {
-  const chips = `${c.status === 'temp' ? chip('ว่าง', 'good') : statusChip(CAR_STATUS, c.status)} ${tempChip(c)}`;
+  const chips = `${c.status === 'temp' ? chip('ว่าง', 'good') : statusChip(CAR_STATUS, c.status)} ${tempChip(c)}${spChip(c)}`;
   if (!D || !carLocks(c, D).length) return chips;
   const pend = carLocks(c, D).some(canDecideLock);
   return `<button class="text-left inline-flex flex-wrap items-center gap-1" data-act="carlock-open" data-vin="${esc(c.vin)}" title="กดเพื่ออนุมัติหรือแก้ไขล็อก">${chips}<span class="text-xs underline ${pend ? '' : 'text-muted'}" ${pend ? 'style="color:var(--red)"' : ''}>${pend ? 'อนุมัติ/แก้' : 'ดูล็อก'}</span></button>`;
