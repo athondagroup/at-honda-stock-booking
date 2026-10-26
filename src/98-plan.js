@@ -143,5 +143,5 @@ Object.assign(ACTIONS, {
   'plan-row'(el) { const k = el.dataset.k; PLAN.open.has(k) ? PLAN.open.delete(k) : PLAN.open.add(k); render(); },
   'plan-itm'(el) { const k = el.dataset.k; PLAN.itm.has(k) ? PLAN.itm.delete(k) : PLAN.itm.add(k); render(); },
   'plan-xlsx'() { planXlsx(); },
-  'plan-queue'(el) { S.filters.qModel = el.dataset.model; S.sub.book = 'queue'; render(); }
+  'plan-queue'(el) { S.filters.qModel = el.dataset.model; S.view = 'book'; S.sub.book = 'queue'; render(); }
 });
