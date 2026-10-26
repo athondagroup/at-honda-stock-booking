@@ -192,7 +192,7 @@ function rptLetterBox(rows, rep) {
 }
 function rptKpi(rows, cmp, nNone) {
   const nAdv = rows.filter(r => rptKinds(r) === 'adv').length;
-  return [['จำนวนรถ', rows.length, `ส่งมอบ ${rows.length - nAdv} · Advance ${nAdv}`, 'rpt-s1'], ['เงินรางวัลรวม (บาท)', money(sumBy(rows, r => r.tot)), `ทางเลือก ${money(sumBy(rows, r => r.pay + r.est))}${sumBy(rows, r => r.est) ? ` (ตามตารางประมาณ ${money(sumBy(rows, r => r.est))})` : ''} · พิเศษ ${money(sumBy(rows, r => r.actAmt))}`, 'rpt-s4'], ['ALLOCATED = Advance', nAdv, `${cmp.adv.filter(r => r.kind === 'wait').length} รอส่งมอบ · ${cmp.adv.filter(r => r.kind === 'next').length} ส่งมอบเดือนถัดไป`, 'rpt-s2'], ['ยังไม่เลือกแคมเปญ', nNone, 'ในเว็บ', 'rpt-s3']];
+  return [['จำนวนรถ', rows.length, `ส่งมอบ ${rows.length - nAdv} · Advance ${nAdv}`, 'rpt-s1'], ['เงินรางวัลรวม (บาท)', money(sumBy(rows, r => r.tot)), `ทางเลือก ${money(sumBy(rows, r => r.pay + r.est))}${sumBy(rows, r => r.est) ? ` (ตามตารางประมาณ ${money(sumBy(rows, r => r.est))})` : ''} · พิเศษ ${money(sumBy(rows, r => r.actAmt))}`, 'rpt-s2'], ['ALLOCATED = Advance', nAdv, `${cmp.adv.filter(r => r.kind === 'wait').length} รอส่งมอบ · ${cmp.adv.filter(r => r.kind === 'next').length} ส่งมอบเดือนถัดไป`, 'rpt-s2'], ['ยังไม่เลือกแคมเปญ', nNone, 'ในเว็บ', 'rpt-s2']];
 }
 function rptSheet(D, rep, rows, cmp) {
   const k = rptKpi(rows, cmp, rptNoneCount(D, rep));
@@ -215,17 +215,16 @@ function viewCampSum(D) {
   // once per month / branch / file content: match the file to the campaigns by itself (never inside the draw)
   const ak = [rep, rptBr(), rows.length, Object.keys(rptAll()).length].join('|');
   if (S.rptAutoKey !== ak) { S.rptAutoKey = ak; setTimeout(() => { rptAutoRun(rep).catch(() => { /* the chooser stays for the admin */ }); }, 0); }
+  const CB = ccBuild(D, rptMonth(rep));
   let secN = 0; const sec = (t, sub, body) => `<section class="mb-6" id="rpt-s${++secN}" style="scroll-margin-top:72px"><h3 class="font-head font-semibold">${t}</h3>${sub ? `<p class="text-xs text-muted mb-2">${sub}</p>` : '<div class="mb-2"></div>'}${body}</section>`;
   // a section that can be hidden (the choice is kept while the page is open)
   const secH = (t, sub, body, key) => { const hid = !!S.filters[key]; secN++; return `<section class="mb-6" id="rpt-s${secN}" style="scroll-margin-top:72px"><div class="flex items-center gap-2"><h3 class="font-head font-semibold">${t}</h3><button type="button" class="btn btn-ghost btn-sm ml-auto" data-act="rpt-hide" data-k="${key}">${hid ? 'แสดง' : 'ซ่อน'}</button></div>${hid ? '<div class="mb-2"></div>' : `${sub ? `<p class="text-xs text-muted mb-2">${sub}</p>` : ''}${body}`}</section>`; };
   return `${pageHead('รายงานสรุปแคมเปญ', 'ยอดแจ้งขายและเงินรางวัลตามไฟล์ของ Honda เทียบกับข้อมูลในเว็บ')}${ctl}
   <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">${k.map(([t, n, sub, go]) => `<button type="button" class="p-3 rounded-lg border border-line bg-surface text-left hover:bg-surface2" data-act="rpt-go" data-t="${go}" title="กดเพื่อไปที่รายละเอียด"><div class="text-xs text-muted">${esc(t)}</div><div class="num text-2xl font-semibold">${n}</div>${sub ? `<div class="text-xs text-muted">${esc(sub)}</div>` : ''}<div class="text-xs underline mt-1">ดูรายละเอียด ↓</div></button>`).join('')}</div>
   <section class="mb-6">${rptCharts(rows, D)}${rptStatusNote(rows, D)}</section>
-  <section class="mb-6" id="rpt-inv" style="scroll-margin-top:72px"><h3 class="font-head font-semibold">ตรวจใบกำกับเทียบไฟล์ Honda</h3><p class="text-xs text-muted mb-2">ใบกำกับทุกคันในเดือนนี้เทียบกับไฟล์ · เงินรางวัลจ่ายตามเดือนที่ออกใบกำกับ</p>${ccSection(D, rep)}</section>
+  <section class="mb-6" id="rpt-inv" style="scroll-margin-top:72px"><h3 class="font-head font-semibold">ตรวจใบกำกับเทียบไฟล์ Honda</h3><p class="text-xs text-muted mb-2">ใบกำกับทุกคันในเดือนนี้เทียบกับไฟล์ · เงินรางวัลจ่ายตามเดือนที่ออกใบกำกับ</p>${ccSummary(D, rep, CB)}</section>
   ${sec('1. สรุปรายรุ่น', 'กดที่รุ่นเพื่อดูว่าแต่ละคันเลือกแคมเปญอะไรและได้เงินเท่าไร', rptModelTable(rows, D, false))}
-  ${sec('2. เทียบกับข้อมูลในเว็บ', 'เทียบเฉพาะคันที่มีในไฟล์ Dealer Incentive Report · กด "ดูรายคัน" แล้วกด VIN เพื่อเปิดรายละเอียดรถ', rptChecksTable(rptChecks(D, rep, rows, cmp), false))}
-  ${secH('3. คันที่ยังไม่เลือกแคมเปญ', 'รอเลือกแคมเปญ · ไม่ระบุแคมเปญ · ส่งมอบเดือนนี้แต่ยังไม่ลงเงื่อนไขขาย · เลือกแคมเปญจากตารางได้เลย', rptNoneTable(D, rep, false, rows), 'rptHide3')}
-  ${sec(`4. รายคัน (${rows.length}) สำหรับส่งบัญชีตรวจเทียบ`, 'เงินตามทางเลือกแคมเปญ + แคมเปญพิเศษ ต่อคัน กด "ส่งออก Excel" หรือ "พิมพ์รายงาน" ส่งบัญชีได้', `${rptCarTable(rows, false, D, rptByVin(D))}<div class="mt-3">${rptLetterBox(rows, rep)}</div>`)}`;
+  ${sec('2. รายคัน', 'ใบกำกับทุกคัน + คันที่มีในไฟล์ · เลือกแคมเปญ ใส่เหตุผล และดูเงินในแถวเดียว · "ส่งออก Excel" / "พิมพ์รายงาน" ส่งบัญชีได้', `${ccCars(D, rep, CB)}<div class="mt-3">${rptLetterBox(rows, rep)}</div>`)}`;
 }
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t || !t.dataset) return;
