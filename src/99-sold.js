@@ -1,5 +1,6 @@
 // ---------- ส่งมอบ / แจ้งขาย: cars invoiced or delivered, to check and fix the sale terms in one place (24/10)
 // who sees what follows the booking list: sales their own, a branch admin the branch, managers and exec their branches
+const SOLD_DV = [['', 'ทุกรายการ'], ['webonly', 'ส่งมอบในเว็บ แต่ IDS ยังไม่ส่งมอบ'], ['idsonly', 'IDS ส่งมอบแล้ว แต่เว็บยังไม่บันทึก'], ['nodate', 'ส่งมอบแล้ว ไม่มีวันที่']];
 function soldSt() { return [['', 'ทั้งหมด'], ['none', 'ยังไม่ใส่เงื่อนไข'], ['nocamp', 'ยังไม่เลือกแคมเปญ'], ['req', 'มีคำขอแก้รออนุมัติ'], ['wait', 'รอผู้จัดการยืนยัน'], ['done', 'ยืนยันแล้ว']]; }
 function soldInv(a, D) {
   const vin = atVin(a); if (!vin) return null;
@@ -21,7 +22,10 @@ function soldRows(D) {
     if (a.cancelled || a.demo || !inBr(a) || !atVisible(a)) continue;
     const inv = soldInv(a, D), fl = a.flow || {}, dd = fl.deliveredDate || (inv && inv.ddate) || null;
     if (!inv && !dd) continue;
-    out.push({ a, idate: inv ? inv.idate : null, adv: !!(inv && inv.adv), ddate: dd, st: soldStatus(a), vin: atVin(a) || '' });
+    // delivery as the web and IDS tell it (26/10): web recorded by hand, IDS (DL) delivery date, or a delivered car with no date at all
+    const rec = fl.done && fl.done.delivered, recDate = a.rec.flow && a.rec.flow.delivered && a.rec.flow.delivered.date, idsDd = inv && !inv.adv ? inv.ddate : null;
+    const dv = (rec && !(a.rec.flow.delivered.src === 'IDS') && !idsDd) ? 'webonly' : (idsDd && !recDate && !fl.history) ? 'idsonly' : (a.done && !dd) ? 'nodate' : '';
+    out.push({ a, idate: inv ? inv.idate : null, adv: !!(inv && inv.adv), ddate: dd, st: soldStatus(a), dv, vin: atVin(a) || '' });
   }
   return out;
 }
@@ -34,9 +38,10 @@ function soldList(D) {
   const q = norm(f.soQ || '');
   const base = all.filter(r => (!month || mOf(r) === month) && (!f.soSales || r.a.sales === f.soSales)
     && (!q || norm(r.a.cust).includes(q) || norm(r.vin).includes(q)));
-  const list = base.filter(r => !f.soSt || r.st === f.soSt).sort((x, y) => String(y.idate || y.ddate || '').localeCompare(String(x.idate || x.ddate || '')));
+  const list = base.filter(r => (!f.soSt || r.st === f.soSt) && (!f.soDv || r.dv === f.soDv)).sort((x, y) => String(y.idate || y.ddate || '').localeCompare(String(x.idate || x.ddate || '')));
   const sales = [...new Set(all.map(r => r.a.sales).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'th'));
-  const cnt = k => base.filter(r => !k || r.st === k).length;
+  const cnt = k => base.filter(r => (!k || r.st === k) && (!f.soDv || r.dv === f.soDv)).length;
+  const cntDv = k => base.filter(r => (!f.soSt || r.st === f.soSt) && (!k || r.dv === k)).length;
   const tone = { none: 'var(--bad)', nocamp: 'var(--warn)', req: 'var(--warn)', wait: 'var(--muted)', done: 'var(--good)' };
   const stChip = k => `<span class="text-xs font-medium nowrap" style="color:${tone[k]}">● ${soldSt().find(s => s[0] === k)[1]}</span>`;
   const mLabel = m => { const [y, mm] = m.split('-'); return `${TH_MON_FULL()[Number(mm) - 1]} ${Number(y) + 543}`; };
@@ -49,6 +54,9 @@ function soldList(D) {
     <div class="field flex-1" style="min-width:200px"><label for="so-q">ค้นหา</label><input id="so-q" type="search" data-filter="soQ" value="${esc(f.soQ || '')}" placeholder="ชื่อลูกค้า หรือ เลขตัวถัง"></div>
   </div>
   <div class="flex flex-wrap gap-2 mb-3" role="group" aria-label="สถานะเงื่อนไข">${soldSt().map(([k, t]) => `<button class="btn btn-sm ${(f.soSt || '') === k ? 'btn-dark' : 'btn-ghost'}" data-act="so-st" data-k="${k}" aria-pressed="${(f.soSt || '') === k}">${t} <span class="badge" style="background:var(--surface-2);color:var(--fg)">${cnt(k)}</span></button>`).join('')}</div>
+  <div class="flex flex-wrap items-center gap-2 mb-3" role="group" aria-label="เทียบการส่งมอบกับ IDS"><span class="text-sm text-muted">เทียบกับ IDS:</span>${SOLD_DV.map(([k, t]) => `<button class="btn btn-sm ${(f.soDv || '') === k ? 'btn-dark' : 'btn-ghost'}" data-act="so-dv" data-k="${k}" aria-pressed="${(f.soDv || '') === k}">${t} <span class="badge" style="background:var(--surface-2);color:var(--fg)">${cntDv(k)}</span></button>`).join('')}</div>
+  ${f.soDv === 'idsonly' && typeof delivSyncBox === 'function' ? delivSyncBox(D) : ''}
+  ${f.soDv ? `<p class="text-sm text-muted mb-2">${{ webonly: 'ในเว็บบันทึกส่งมอบเองแล้ว แต่ไฟล์ IDS (DL) ยังไม่มีวันที่ส่งมอบ ตรวจว่ารถส่งมอบจริงหรือยัง', idsonly: 'IDS (DL) ลงวันที่ส่งมอบแล้ว แต่ในเว็บยังไม่ได้บันทึก · ปุ่ม "บันทึกส่งมอบจาก DL" บันทึกให้เฉพาะรายการของเดือนนี้ และบันทึกเมื่อกดปุ่มเท่านั้น', nodate: 'ส่งมอบแล้ว แต่ไม่มีวันที่ส่งมอบทั้งในเว็บและ IDS · เปิดใบจองแล้วใส่วันส่งมอบ' }[f.soDv]}</p>` : ''}
   ${list.length ? `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl">
     <thead><tr><th>ออกใบกำกับ</th><th>ส่งมอบ</th><th>ลูกค้า</th><th>รุ่น / เกรด / สี</th><th>เลขตัวถัง</th><th>เซลล์</th><th>แคมเปญ</th><th class="text-right">Margin รวม</th><th>สถานะ</th></tr></thead>
     <tbody>${list.slice(0, 400).map(r => { const a = r.a, d = a.rec.deal || {}; return `<tr class="cursor-pointer hover:bg-surface2" data-act="so-open" data-id="${esc(a.id)}" tabindex="0">
@@ -64,6 +72,7 @@ function soldList(D) {
 RERENDER_ON_CHANGE.add('soQ');
 Object.assign(ACTIONS, {
   'so-st'(el) { S.filters.soSt = el.dataset.k; render(); },
+  'so-dv'(el) { S.filters.soDv = el.dataset.k; render(); },
   // open the booking and bring the sale-terms box into view
   'so-open'(el) {
     ACTIONS['at-open'](el);
