@@ -257,6 +257,7 @@ function prepareUploads(results) {
         else if (inv && inv.ddate) why = `ส่งมอบแล้ว ${fmtD(inv.ddate)}`;
         else if (inv) why = `ออกใบกำกับแล้ว ${fmtD(inv.idate)} รอส่งมอบ`;
         else if (moved && moved !== r.br) why = `ย้ายไปสาขา ${moved}`;
+        else if (veh && veh.moved) why = `ย้ายไปสาขา ${veh.moved.to}`;
         else if (veh && veh.removed) why = veh.removed.reason === 'dealer' ? `ขาย/แลกดีลเลอร์ ${veh.removed.dealer || ''}` : veh.removed.reason === 'other_br' ? `ขายให้สาขาอื่น ${veh.removed.note || ''}` : `นำออก: ${veh.removed.note || ''}`;
         else if (c.st === 'invoiced' || c.st === 'delivered') why = 'ออกใบกำกับแล้วตามข้อมูลเดิม';
         else { why = 'ไม่พบข้อมูลว่าไปไหน (ไม่มีใบกำกับ ไม่ได้ย้ายสาขา ไม่ได้บันทึกขายดีลเลอร์) ต้องตรวจสอบ'; flag = true; }

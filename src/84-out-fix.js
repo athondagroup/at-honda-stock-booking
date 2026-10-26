@@ -15,7 +15,7 @@ function outBackBr(u, o) { const c = derive().cars.get(o.vin); return c && c.br 
 function outOpen(u, o) { return !!(o && o.flag && !o.res && !outBack(u, o)); }
 function outOpenLocks(vin) { return [...S.locks.entries()].filter(([, l]) => l.vin === vin && !l.hidden && ['pending', 'approved', 'allocated'].includes(l.status)); }
 function outFixList(u) {
-  const can = canApproveBr(u.br) && perms().write, F = S.outFix && S.outFix.id === u.id ? S.outFix : null;
+  const can = canAllocBr(u.br) && perms().write, F = S.outFix && S.outFix.id === u.id ? S.outFix : null;
   const todo = (u.out || []).filter(o => outOpen(u, o)), sel = F ? todo.filter(o => F.sel[o.vin]) : [];
   const row = o => {
     const back = o.flag && !o.res && outBack(u, o), lk = outOpen(u, o) ? outOpenLocks(o.vin).length : 0;
@@ -34,7 +34,7 @@ function outFixList(u) {
           : `<div class="field"><label for="of-n">หมายเหตุ</label><input id="of-n" data-outfixf="text" value="${esc(F && F.text || '')}"></div>`}
         ${outFixLockField(sel, F)}
         <button class="btn btn-red btn-sm" data-act="outfix-save" data-id="${esc(u.id)}" ${sel.length && !(F && F.busy) ? '' : 'disabled'}>${F && F.busy ? '<span class="spin"></span> กำลังบันทึก…' : `บันทึก ${sel.length} คัน`}</button></div>
-      <p class="text-xs text-muted mt-1">"ยังอยู่" ไม่เอารถออกจากระบบ ใช้เมื่อไฟล์ Stock ไม่ครบ ให้อัปโหลดไฟล์ที่ครบภายหลัง · ขายให้สาขาอื่น / ดีลเลอร์ / นำออก จะจำไว้ อัปโหลดครั้งหน้าจะไม่ขึ้นแดงอีก</p></div>` : '';
+      <p class="text-xs text-muted mt-1">"ยังอยู่" ไม่เอารถออกจากระบบ ใช้เมื่อไฟล์ Stock ไม่ครบ ให้อัปโหลดไฟล์ที่ครบภายหลัง · ขายให้สาขาอื่น จะเอารถเข้า Stock สาขานั้นให้ · ดีลเลอร์ / นำออก จะจำไว้ อัปโหลดครั้งหน้าจะไม่ขึ้นแดงอีก</p></div>` : '';
   return `<div class="mt-2 text-sm flex flex-col gap-1">${bar}${u.out.map(row).join('')}</div>`;
 }
 // what to do with the locks still open on the chosen cars: said in words, no unclear tick box (22/10)
@@ -50,7 +50,7 @@ function outFixLockField(sel, F) {
 }
 function outFixState(id) { if (!S.outFix || S.outFix.id !== id) S.outFix = { id, sel: {}, reason: 'other_br', text: '', closeLocks: true }; return S.outFix; }
 async function outFixSave(id) {
-  const F = S.outFix, u0 = S.uploads.get(id); if (!F || F.id !== id || !u0 || !canApproveBr(u0.br) || F.busy) return;
+  const F = S.outFix, u0 = S.uploads.get(id); if (!F || F.id !== id || !u0 || !canAllocBr(u0.br) || !perms().write || F.busy) return;
   const vins = (u0.out || []).filter(o => outOpen(u0, o) && F.sel[o.vin]).map(o => o.vin); if (!vins.length) return;
   const text = (F.text || '').trim();
   if (F.reason === 'dealer' && !text) { toast('ใส่ชื่อดีลเลอร์', 'bad'); return; }
@@ -61,7 +61,9 @@ async function outFixSave(id) {
     for (const vin of vins) {
       if (F.reason !== 'still') {
         const cur = S.vehicles.get(vin) || { added: null, removed: null, branch: null };
-        if (!cur.removed) await write('vehicles', vin, { ...cur, removed: { reason: F.reason, dealer: F.reason === 'dealer' ? text : null, note: F.reason === 'dealer' ? null : text || null, from_upload: id, ...actor() } });
+        // sold/moved to another AT Honda branch: the car goes into that branch's stock (until its own IDS file lists it)
+        if (F.reason === 'other_br' && BRS.includes(text)) { const o = (u0.out || []).find(x => x.vin === vin); if (!cur.removed) await write('vehicles', vin, { ...cur, moved: { to: text, from: u0.br, spec: o ? o.spec : null, from_upload: id, ...actor() } }); }
+        else if (!cur.removed) await write('vehicles', vin, { ...cur, removed: { reason: F.reason, dealer: F.reason === 'dealer' ? text : null, note: F.reason === 'dealer' ? null : text || null, from_upload: id, ...actor() } });
       }
       if (F.closeLocks) for (const [lid] of outOpenLocks(vin)) { const l = findLock(lid); if (!l) continue; l.status = 'released'; if (await saveLock(lid, l, 'ปล่อยล็อก', `รถออกจากสต็อก: ${outFixWhy({ reason: F.reason, text })}`)) closed++; }
     }

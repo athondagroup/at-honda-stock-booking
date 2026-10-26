@@ -124,6 +124,9 @@ function deriveNow() {
     // pulled back into stock as a special car (company Advance / Demon / returned by the customer): IDS no longer lists it
     else if (o.special && !car0 && !o.removed) { const i = invByVin.get(vin) || {}, sp = o.special;
       cars.set(vin, { vin, br: sp.br || i.br, model: i.model, grade: i.grade, color: i.color, st: spStatus(sp), src: 'ดึงกลับเข้า Stock พิเศษ (ไม่อยู่ในไฟล์ Stock IDS)', special: sp, fromInv: false }); }
+    // keyed as sold/moved to this branch from another branch's Stock upload: it is this branch's stock until its own IDS file lists the car
+    else if (o.moved && !car0 && !o.removed) { const [m, g, c] = String(o.moved.spec || '').split('|'), q = v => (v && v !== '?' ? v : null);
+      cars.set(vin, { vin, br: o.moved.to, fromBr: o.moved.from, model: q(m), grade: q(g), color: q(c), st: 'free', note: `โอนจาก ${o.moved.from}`, src: `ย้ายมาจาก ${o.moved.from} รอไฟล์ Stock สาขา ${o.moved.to}` }); }
     else if (o.added && car0) car0.received = o.added;
     const car = cars.get(vin);
     if (!car) continue;
