@@ -125,8 +125,11 @@ function dashManager(D) {
     tile('ยังไม่อยู่ใน IDS เกิน 3 วัน', fmtN(noIds), { st: 'noids', tone: noIds ? 'bad' : '' }),
     tile('รถว่าง ขายได้ (ทุกสาขา)', fmtN(tot.free), { view: 'stock', tone: 'good' })
   ], 'lg:grid-cols-5')}
+  ${(() => { const P = planCalc(D).tot, pc = P.booked ? Math.round(P.has / P.booked * 100) : 0; return tiles([
+    tile('ใบจองค้างส่งมอบ', fmtN(P.booked), { view: 'book', sub: 'plan' }), tile('มีรถแล้ว (match stock)', `${pc}%`, { view: 'book', sub: 'plan', tone: 'good', sub2: `${fmtN(P.has)} จาก ${fmtN(P.booked)} ใบ` }),
+    tile('ควรสั่งเพิ่ม (คัน)', fmtN(P.short), { view: 'book', sub: 'plan', tone: P.short ? 'bad' : 'good', sub2: 'ดูแผนสั่งรถ' })], 'lg:grid-cols-3'); })()}
   <div>
-    ${sectionBox('คิวรถ: สเปกที่ไม่พอ', go('stock', 'spec', undefined, 'ไปหน้าสต็อก', 'text-sm text-red'), `<div class="bg-surface border border-line rounded-lg scroll-x">${low.length ? `<table class="tbl"><thead><tr><th>รุ่น / เกรด / สี</th><th class="text-right">รอรถ</th><th class="text-right">ว่าง</th><th class="text-right">Quota ว่าง</th><th class="text-right">ขาด</th></tr></thead><tbody>
+    ${sectionBox('คิวรถ: สเปกที่ไม่พอ', go('book', 'plan', undefined, 'ไปแผนสั่งรถ', 'text-sm text-red'), `<div class="bg-surface border border-line rounded-lg scroll-x">${low.length ? `<table class="tbl"><thead><tr><th>รุ่น / เกรด / สี</th><th class="text-right">รอรถ</th><th class="text-right">ว่าง</th><th class="text-right">Quota ว่าง</th><th class="text-right">ขาด</th></tr></thead><tbody>
       ${low.slice(0, 8).map(s => `<tr class="low"><td>${specLabel(s.key)}</td><td class="num text-right">${s.waiting}</td><td class="num text-right">${s.free}</td><td class="num text-right">${s.incoming}</td><td class="num text-right font-semibold" style="color:var(--bad)">${Math.min(0, s.free + s.incoming - s.waiting)}</td></tr>`).join('')}</tbody></table>` : emptyBox('ทุกสเปกมีรถพอกับคิว', '')}</div>`)}
   </div>
   ${sectionBox('ภาพรวม Stock และ Booking ทุกสาขา (สำหรับรายงานผู้บริหาร)', '', `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl"><thead><tr><th>สาขา</th><th class="text-right">Stock</th><th class="text-right">ว่าง</th><th class="text-right">ติดจอง/ขาย</th><th class="text-right">ล็อก</th><th class="text-right">Booking IDS</th><th class="text-right">รอรถ</th><th class="text-right">ใบจอง AT ยังไม่ส่งมอบ</th><th class="text-right">Quota ว่าง / ทั้งหมด</th></tr></thead>

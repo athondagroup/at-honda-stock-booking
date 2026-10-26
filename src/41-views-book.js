@@ -27,13 +27,14 @@ function viewBook(D) {
   const p = perms();
   if (S.sub.book === 'ids' || S.sub.book === 'at') S.sub.book = 'list';
   if (S.sub.book === 'new' && !p.book) S.sub.book = 'list';
+  if (S.sub.book === 'plan' && !p.mgr) S.sub.book = 'list';
   const sub = S.sub.book;
-  const body = sub === 'new' ? bookingForm(D) : sub === 'steps' ? flowBody(D) : sub === 'queue' ? queueList(D) : sub === 'summary' ? summaryView(D) : sub === 'cancels' ? cancelHistory(D) : sub === 'sold' ? soldList(D) : gsBookBox(D) + bookList(D);
+  const body = sub === 'new' ? bookingForm(D) : sub === 'steps' ? flowBody(D) : sub === 'queue' ? queueList(D) : sub === 'plan' ? planView(D) : sub === 'summary' ? summaryView(D) : sub === 'cancels' ? cancelHistory(D) : sub === 'sold' ? soldList(D) : gsBookBox(D) + bookList(D);
   const active = bookRows(D).filter(r => rowState(r, D, 'active')).length;
   return `
   ${pageHead('Booking', 'ใบจอง AT Honda กับ Booking IDS อยู่ในรายการเดียว ระบบจับคู่ด้วยชื่อลูกค้า รุ่น และวันที่ เจ้าของเคสตามฟอร์ม AT Honda รุ่น เกรด สี ตาม IDS',
     sub === 'new' || !p.book ? '' : `<button class="btn btn-red" data-act="sub" data-key="book" data-sub="new">+ ใบจอง AT Honda</button>`)}
-  ${tabs('book', [['list', 'ใบจอง', String(active)], ['steps', 'ตามขั้นตอนส่งมอบ'], ['queue', 'คิวรอรถ'], ['sold', 'ส่งมอบ / แจ้งขาย'], ['summary', 'สรุปจอง'], ['cancels', 'ประวัติยกเลิก'], ...(p.book ? [['new', '+ ใบจองใหม่']] : [])])}
+  ${tabs('book', [['list', 'ใบจอง', String(active)], ['steps', 'ตามขั้นตอนส่งมอบ'], ...(p.mgr ? [['plan', 'แผนสั่งรถ']] : []), ['queue', 'คิวรอรถ'], ['sold', 'ส่งมอบ / แจ้งขาย'], ['summary', 'สรุปจอง'], ['cancels', 'ประวัติยกเลิก'], ...(p.book ? [['new', '+ ใบจองใหม่']] : [])])}
   ${sub === 'new' ? '' : brSeg()}${body}`;
 }
 // every AT form (with its IDS booking when paired) plus IDS bookings that have no form
