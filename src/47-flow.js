@@ -98,7 +98,7 @@ function atModal(m, D) {
 }
 function flowPanel(m, a, D) {
   const f = a.rec.flow || {}, r = a.rec, fl = a.flow;
-  if (fl.history) return `<div class="p-3 rounded-lg text-sm" style="background:var(--surface-2)">ส่งมอบแล้ว${fl.deliveredDate ? ` ${fmtD(fl.deliveredDate)}` : ''} ก่อนเริ่มใช้ระบบนี้ เก็บไว้เป็นประวัติ</div>${discBox(a, m, D, 'deliv')}`;
+  if (fl.history) return `<div class="p-3 rounded-lg text-sm" style="background:var(--surface-2)">ส่งมอบแล้ว${fl.deliveredDate ? ` ${fmtD(fl.deliveredDate)}` : ''} ก่อนเริ่มใช้ระบบนี้ เก็บไว้เป็นประวัติ</div>${dealBox(a, m, D)}${discBox(a, m, D, 'deliv')}`;
   const step = (k, body) => {
     const done = fl.done[k] || (k !== 'confirmed' && fl.lateUpdate && FLOW.indexOf(k) <= FLOW.indexOf('delivered'));
     const cur = fl.next === k;
