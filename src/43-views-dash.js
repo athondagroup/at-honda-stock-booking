@@ -125,10 +125,8 @@ function dashManager(D) {
     tile('ยังไม่อยู่ใน IDS เกิน 3 วัน', fmtN(noIds), { st: 'noids', tone: noIds ? 'bad' : '' }),
     tile('รถว่าง ขายได้ (ทุกสาขา)', fmtN(tot.free), { view: 'stock', tone: 'good' })
   ], 'lg:grid-cols-5')}
-  <div>
-    ${sectionBox('คิวรถ: สเปกที่ไม่พอ', go('stock', 'spec', undefined, 'ไปหน้าสต็อก', 'text-sm text-red'), `<div class="bg-surface border border-line rounded-lg scroll-x">${low.length ? `<table class="tbl"><thead><tr><th>รุ่น / เกรด / สี</th><th class="text-right">รอรถ</th><th class="text-right">ว่าง</th><th class="text-right">Quota ว่าง</th><th class="text-right">ขาด</th></tr></thead><tbody>
-      ${low.slice(0, 8).map(s => `<tr class="low"><td>${specLabel(s.key)}</td><td class="num text-right">${s.waiting}</td><td class="num text-right">${s.free}</td><td class="num text-right">${s.incoming}</td><td class="num text-right font-semibold" style="color:var(--bad)">${Math.min(0, s.free + s.incoming - s.waiting)}</td></tr>`).join('')}</tbody></table>` : emptyBox('ทุกสเปกมีรถพอกับคิว', '')}</div>`)}
-  </div>
+  ${brSeg()}
+  ${sectionBox('แผนสั่งรถ', '', planView(D))}
   ${sectionBox('ภาพรวม Stock และ Booking ทุกสาขา (สำหรับรายงานผู้บริหาร)', '', `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl"><thead><tr><th>สาขา</th><th class="text-right">Stock</th><th class="text-right">ว่าง</th><th class="text-right">ติดจอง/ขาย</th><th class="text-right">ล็อก</th><th class="text-right">Booking IDS</th><th class="text-right">รอรถ</th><th class="text-right">ใบจอง AT ยังไม่ส่งมอบ</th><th class="text-right">Quota ว่าง / ทั้งหมด</th></tr></thead>
     <tbody>${BRS.map(b => row(b, D.sum[b])).join('')}${row(null, tot, 'รวม 4 สาขา')}</tbody></table></div>`)}`;
 }
