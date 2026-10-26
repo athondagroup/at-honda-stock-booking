@@ -25,7 +25,7 @@ function campParseDIR(X, wb) {
       const vin = String(r[iV] || '').trim().toUpperCase(); if (!/^[A-Z0-9]{17}$/.test(vin)) continue;
       items.set(vin, { vin, camp: String(r[iC] || '').trim(), opt: String(r[iO] || '').replace(/\s+/g, ' ').trim(), date: String(r[iD] || '').trim(), name: String(r[iN] || '').trim(), st: String(r[iS] || '').trim(), mtoc: String(r[iM] || '').trim(), typ: String(r[iT] || '').trim() });
     }
-    if (items.size) { const rep = rows.slice(0, hi).map(r => r.join(' ')).join(' ').match(/(\d{2}\/\d{4})/); return { items, report: rep ? rep[1] : '' }; }
+    if (items.size) { const head = rows.slice(0, hi).map(r => r.join(' ')).join(' '), rep = head.match(/(\d{2}\/\d{4})/); return { items, report: rep ? rep[1] : '', br: BRS.find(b => head.includes(BR[b].name)) || '' }; }
   }
   return null;
 }
@@ -58,8 +58,8 @@ function campUpVinRows(D) {
       state = ff && ff === campFeats(d.campaign) ? 'ok' : 'diff';
       if (state === 'diff') found = opts.filter(y => ff && campFeats(y.name) === ff && (!campNo(it.opt) || campNo(y.name) === campNo(it.opt))).map(y => ({ opt: y, pct: 100 }));
     }
-    const done = !!(sv && sv.opt === it.opt && sv.rep === U.report);
-    out.push({ a, d, it, opts, found, state, done, chg: !!(sv && sv.rep === U.report && sv.opt !== it.opt), old: sv });
+    const done = !!(sv && sv.opt === it.opt && sv.rep === U.report && sv.br === U.br);
+    out.push({ a, d, it, opts, found, state, done, chg: !!(sv && sv.rep === U.report && sv.br === U.br && sv.opt !== it.opt), old: sv });
   }
   const ord = { diff: 0, new: 1, ok: 2 };
   return out.sort((p, q) => ord[p.state] - ord[q.state]);
@@ -86,10 +86,10 @@ function campUpRptBox(vr) {
   const U = S.campUp, by = {}, st = {};
   vr.forEach(r => { const m = r.it.name.split(' ')[0] || '–'; by[m] = (by[m] || 0) + 1; st[r.it.st || '–'] = (st[r.it.st || '–'] || 0) + 1; });
   const todo = vr.filter(r => !r.done).length, nSel = vr.filter(r => !r.done && U.sel && U.sel.has(r.it.vin)).length, nChg = vr.filter(r => r.chg).length;
-  return `<section class="bg-surface border border-line rounded-lg p-4 mb-4"><div class="flex flex-wrap items-center gap-2"><h3 class="font-head font-semibold">ยอดแจ้งขาย Honda${U.report ? ' ' + esc(U.report) : ''}: ${vr.length} คัน</h3>
+  return `<section class="bg-surface border border-line rounded-lg p-4 mb-4"><div class="flex flex-wrap items-center gap-2"><h3 class="font-head font-semibold">ยอดแจ้งขาย Honda${U.br ? ' สาขา ' + esc(U.br) : ''}${U.report ? ' ' + esc(U.report) : ''}: ${vr.length} คัน</h3>
     <span class="text-sm text-muted">${Object.entries(st).map(([k, v]) => esc(k) + ' ' + v).join(' · ')}</span>
-    ${campUpCan() ? `<span class="ml-auto flex flex-wrap gap-2"><button class="btn btn-ghost btn-sm" data-act="campup-selall" ${todo ? '' : 'disabled'}>เลือกทั้งหมด (${todo})</button><button class="btn btn-ghost btn-sm" data-act="campup-selnone">ไม่เลือก</button><button class="btn btn-red btn-sm" data-act="campup-save" ${nSel ? '' : 'disabled'}>${todo ? `บันทึกที่เลือก (${nSel} คัน)` : 'บันทึกครบแล้ว'}</button></span>` : ''}</div>
-    ${nChg ? `<div class="text-sm mt-2" style="color:var(--warn)">มี ${nChg} คันที่ทางเลือกเปลี่ยนจากที่บันทึกไว้ ตรวจแล้วติ๊กเลือกเองก่อนบันทึก</div>` : ''}<div class="text-xs text-muted mt-1">รุ่น: ${Object.entries(by).map(([k, v]) => esc(k) + ' ' + v).join(' · ')} · บันทึกแล้วเก็บไว้ที่ VIN แต่ละคัน (เห็นเฉพาะแอดมินขึ้นไป) ไม่เปลี่ยนเงื่อนไขขายในใบจอง · ดูสรุปและเทียบกับยอดจริงที่ เพิ่มเติม › รายงานสรุปแคมเปญ</div></section>`;
+    ${campUpCan() ? `<span class="ml-auto flex flex-wrap gap-2"><button class="btn btn-ghost btn-sm" data-act="campup-selall" ${todo ? '' : 'disabled'}>เลือกทั้งหมด (${todo})</button><button class="btn btn-ghost btn-sm" data-act="campup-selnone">ไม่เลือก</button><button class="btn btn-red btn-sm" data-act="campup-save" ${nSel && U.br ? '' : 'disabled'}>${todo ? `บันทึกที่เลือก (${nSel} คัน)` : 'บันทึกครบแล้ว'}</button></span>` : ''}</div>
+    ${nChg ? `<div class="text-sm mt-2" style="color:var(--warn)">มี ${nChg} คันที่ทางเลือกเปลี่ยนจากที่บันทึกไว้ ตรวจแล้วติ๊กเลือกเองก่อนบันทึก</div>` : ''}<div class="text-xs text-muted mt-1">รุ่น: ${Object.entries(by).map(([k, v]) => esc(k) + ' ' + v).join(' · ')} · บันทึกแล้วเก็บไว้ที่ VIN แต่ละคัน (เห็นเฉพาะแอดมินขึ้นไป) ไม่เปลี่ยนเงื่อนไขขายในใบจอง · ดูสรุปที่ รายงาน › รายงานสรุปแคมเปญ</div></section>`;
 }
 function campUpRow(r) {
   const { a, d, opts, found, state, it, why } = r, U = S.campUp, pick = (U.pick || {})[a.id] || '';
@@ -129,6 +129,7 @@ function viewCampUp(D) {
       <span class="text-xs text-muted">${can ? 'อ่านในเครื่อง ไม่เก็บไฟล์ในระบบ · ระบบเทียบกับแคมเปญของเดือนที่ใบจองนั้นใช้' : 'เฉพาะแอดมินและผู้จัดการ'}</span>
     </label>
     ${U.msg ? `<p class="mt-3 text-sm" style="color:var(--bad)">${esc(U.msg)}</p>` : ''}
+    ${U.items ? `<div class="mt-3 flex flex-wrap items-center gap-2 text-sm"><label for="cu-br" class="font-medium">ไฟล์นี้เป็นของสาขา</label><select id="cu-br" data-campup-br ${myBranch() ? 'disabled' : ''}><option value="">เลือกสาขา…</option>${BRS.map(b => `<option value="${b}" ${U.br === b ? 'selected' : ''}>${b} ${esc(BR[b].name)}</option>`).join('')}</select>${U.brAuto && U.br ? '<span class="text-xs text-muted">อ่านจากหัวไฟล์ ตรวจให้ถูกก่อนบันทึก</span>' : !U.br ? '<span class="text-xs" style="color:var(--bad)">ต้องเลือกสาขาก่อนบันทึก</span>' : ''}</div>` : ''}
     ${U.text || U.items ? `<div class="mt-3 flex flex-wrap items-center gap-2 text-sm">ไฟล์ <b>${esc(U.file)}</b>${U.report ? ` (รายงาน ${esc(U.report)})` : ''} ${chip('ตรง ' + n('ok'), 'good')}${chip('ไม่ตรง ' + n('diff'), 'warn')}${(U.items ? chip('ยังไม่มีข้อมูล ' + n('new'), 'muted') : chip('ไม่พบ ' + n('miss'), 'bad'))}<button class="btn btn-ghost btn-sm ml-auto" data-act="campup-clear">ล้างไฟล์</button></div>` : ''}
   </section>
   ${U.items ? campUpItems(D) : `<h3 class="font-head font-semibold mb-2">ใบจองที่ลงเงื่อนไขการขายแล้ว (${rows.length})</h3>
@@ -144,7 +145,7 @@ async function campUpRead(file) {
     } else {
       const X = await loadXLSX(), wb = /\.(csv|txt)$/i.test(file.name) ? X.read(await file.text(), { type: 'string' }) : X.read(await file.arrayBuffer(), { type: 'array' });
       const dir = campParseDIR(X, wb);
-      if (dir) { Object.assign(U, { items: dir.items, report: dir.report, text: '', file: file.name, pick: {} }); U.sel = new Set(campUpVinRows(derive()).filter(r => !r.done && !r.chg).map(r => r.it.vin)); U.busy = false; render(); return; }
+      if (dir) { Object.assign(U, { items: dir.items, report: dir.report, text: '', file: file.name, pick: {}, br: myBranch() || dir.br || '', brAuto: !!dir.br }); U.sel = new Set(campUpVinRows(derive()).filter(r => !r.done && !r.chg).map(r => r.it.vin)); U.busy = false; render(); return; }
       text = wb.SheetNames.map(n => X.utils.sheet_to_csv(wb.Sheets[n])).join(' ');
     }
     if (!text.trim()) U.msg = 'อ่านข้อความจากไฟล์ไม่ได้ ลองไฟล์อื่น';
@@ -156,6 +157,7 @@ document.addEventListener('change', ev => {
   const t = ev.target; if (!t || !t.dataset) return;
   if (t.dataset.campupFile !== undefined) { const f = t.files && t.files[0]; t.value = ''; if (f) campUpRead(f); }
   else if (t.dataset.campupSel !== undefined) { const U = S.campUp; U.sel = U.sel || new Set(); t.checked ? U.sel.add(t.dataset.campupSel) : U.sel.delete(t.dataset.campupSel); render(); }
+  else if (t.dataset.campupBr !== undefined) { S.campUp.br = t.value; render(); }
   else if (t.dataset.campupPick !== undefined) { const U = S.campUp; U.pick[t.dataset.campupPick] = t.value; render(); }
 });
 Object.assign(ACTIONS, {
@@ -163,12 +165,13 @@ Object.assign(ACTIONS, {
   'campup-selnone'() { S.campUp.sel = new Set(); render(); },
   async 'campup-save'() {
     const U = S.campUp; if (!U || !U.items || !campUpCan()) return;
+    if (!U.br) { toast('เลือกสาขาของไฟล์ก่อน', 'bad'); return; }
     const cur = S.ref.get('honda_rpt') || { v: {} }, v = { ...(cur.v || {}) }, now = new Date().toISOString(); let n = 0, ch = 0;
     for (const it of U.items.values()) {
       if (!U.sel || !U.sel.has(it.vin)) continue;
-      const sv = v[it.vin]; if (sv && sv.opt === it.opt && sv.rep === U.report) continue;
+      const sv = v[it.vin]; if (sv && sv.opt === it.opt && sv.rep === U.report && sv.br === U.br) continue;
       const prev = sv ? [...(sv.prev || []), { opt: sv.opt, camp: sv.camp, date: sv.date, st: sv.st, rep: sv.rep, file: sv.file, at: sv.at, role: sv.role }].slice(-5) : [];
-      v[it.vin] = { camp: it.camp, opt: it.opt, date: it.date, st: it.st, name: it.name, mtoc: it.mtoc, typ: it.typ, rep: U.report, file: U.file, ...actor(), at: now, prev }; n++; if (sv) ch++;
+      v[it.vin] = { camp: it.camp, opt: it.opt, date: it.date, st: it.st, name: it.name, mtoc: it.mtoc, typ: it.typ, br: U.br, rep: U.report, file: U.file, ...actor(), at: now, prev }; n++; if (sv) ch++;
     }
     if (!n) { toast('ยังไม่ได้เลือกคัน', 'bad'); return; }
     if (await write('ref', 'honda_rpt', { ...cur, v })) { U.sel = new Set(); toast(`บันทึกยอดแจ้งขาย ${n} คันเข้า VIN แล้ว${ch ? ` (ทางเลือกเปลี่ยน ${ch} คัน เก็บค่าเก่าในประวัติ)` : ''}`); render(); }

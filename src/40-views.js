@@ -41,8 +41,8 @@ const GROUPS = [
   { id: 'work', label: 'งานวันนี้', get views() { return perms().approve ? ['inbox', 'alerts'] : ['alerts', 'inbox']; }, icon: 'alerts' },
   { id: 'bookg', label: 'ใบจอง', views: ['book'], icon: 'book' },
   { id: 'stockg', label: 'รถ', views: ['stock', 'quota', 'lock', 'receive'], icon: 'stock' },
-  { id: 'dash', get label() { return isSales() || S.role.role === 'admin' ? 'สรุป' : 'รายงาน'; }, views: ['dash'] },
-  { id: 'tools', label: 'เพิ่มเติม', views: ['datafix', 'upload', 'campup', 'campsum', 'admin'], icon: 'upload' }
+  { id: 'dash', get label() { return isSales() || S.role.role === 'admin' ? 'สรุป' : 'รายงาน'; }, views: ['dash', 'campsum'] },
+  { id: 'tools', label: 'เพิ่มเติม', views: ['datafix', 'upload', 'campup', 'admin'], icon: 'upload' }
 ];
 const groupsFor = () => { const ok = new Set(navFor().map(n => n.id)); return GROUPS.map(g => ({ ...g, views: g.views.filter(v => ok.has(v)) })).filter(g => g.views.length); };
 const groupOf = v => GROUPS.find(g => g.views.includes(v)) || GROUPS[0];
