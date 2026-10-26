@@ -21,7 +21,7 @@ Object.assign(ACTIONS, {
     const id = el.dataset.id, oldId = el.dataset.old, D0 = derive();
     const L = D0.locks.find(x => x.id === id), O = D0.locks.find(x => x.id === oldId);
     if (!L || !O) { toast('ไม่พบล็อก ลองโหลดหน้าใหม่', 'bad'); return; }
-    if (!(L.type === 'dealer' ? perms().approveDealer : canApproveBr(L.car_br))) { toast(`อนุมัติได้เฉพาะ${MGR_NAME[L.car_br] || 'ผู้จัดการสาขาของรถ'}`, 'bad'); return; }
+    if (!(L.type === 'dealer' ? perms().approveDealer : canLockMgr(lkD(L)))) { toast(`อนุมัติได้เฉพาะ${MGR_NAME[L.car_br] || 'ผู้จัดการสาขาของรถ'}`, 'bad'); return; }
     if (L.idsTook && !L.idsTook.same) { toast('IDS จัดสรรรถคันใหม่ให้ใบจองอื่นแล้ว ย้ายไม่ได้', 'bad'); return; }
     if (!confirm(`ย้ายล็อกไปคัน ${L.vin || L.ref} และปลดล็อกคัน ${O.vin || O.ref}?`)) return;
     const hard = D0.locks.find(x => x.id !== id && x.id !== oldId && x.live && x.type !== 'temp' && x.status !== 'pending' && sameUnit(x, L, D0));

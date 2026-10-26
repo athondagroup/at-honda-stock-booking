@@ -80,7 +80,7 @@ function lockBkModal(m, D) {
   const p = parseSheetText(sheetTextOf(l) || ''), cands = sheetCands(l, D, m.q);
   const cur = m.pick ?? (l.type === 'booking' ? l.bkref : l.type);
   const sales = l.sales || p.sales;
-  const canApprove = perms().write && (cur === 'dealer' ? perms().approveDealer : canApproveBr(l.car_br));
+  const canApprove = perms().write && (cur === 'dealer' ? perms().approveDealer : canLockMgr(l));
   const pickBtn = (v, body, on) => `<button class="pick text-left ${on ? 'on' : ''}" data-act="lockbk-pick" data-v="${esc(v)}" aria-pressed="${on}"><span class="flex-1 min-w-0">${body}</span></button>`;
   const tags = c => [c.name ? chip('ชื่อตรง', 'good') : c.qHit ? chip('ตรงกับที่ค้นหา', 'neutral') : '', c.sameSpec ? chip('สเปกตรง', 'good') : c.sameModel ? chip('รุ่นตรง', 'neutral') : chip('รุ่นอื่น', 'warn'), c.mine ? chip('เซลล์เดียวกัน', 'neutral') : '',
     c.key === l.bkref ? chip('ระบบจับคู่ให้', 'ink') : '', c.sameCar ? chip('IDS จัดสรรคันนี้ให้ใบจองนี้แล้ว', 'good') : c.hasCar ? chip('ใบจองนี้มีรถคันอื่นแล้ว', 'bad') : c.other ? chip('มีคำขอล็อกอื่นค้าง', 'warn') : ''].join(' ');
@@ -141,7 +141,7 @@ function sheetSyncBox(D) {
     </div></section>`;
 }
 // a request this person can decide: the manager of the car's branch (dealer trades: พี่อั้ม), the executive
-const canDecideLock = l => l.status === 'pending' && perms().write && !(l.idsTook && !l.idsTook.same) && (l.type === 'dealer' ? perms().approveDealer : canApproveBr(l.car_br));
+const canDecideLock = l => l.status === 'pending' && perms().write && !(l.idsTook && !l.idsTook.same) && (l.type === 'dealer' ? perms().approveDealer : canLockMgr(l));
 // ---------- the locks of one car, handled right from the stock page (approve, pick the booking, extend, release …)
 const carLocks = (c, D) => D.locks.filter(l => (l.vin === c.vin || (!l.vin && c.ref && l.ref === c.ref))
   && (l.live || l.status === 'pending' || (l.idsTook && !l.idsTook.same && l.status === 'approved'))).filter(lockVisible)

@@ -27,7 +27,7 @@ function badgeCounts(D) {
     alerts: mine.filter(a => a.tone !== 'muted').length,
     inbox: perms().approve ? inboxItems(D).length : myRequests(D).bookings.filter(x => x.pending).length,
     lock: S.role.role === 'admin' ? D.locks.filter(l => l.status === 'approved' && l.type !== 'temp' && l.car_br === myBranch()).length
-      : D.locks.filter(l => l.status === 'pending' && (isSales() ? isMine(l.owner) : l.type === 'dealer' ? perms().approveDealer : inChargeBr(l.car_br))).length,
+      : D.locks.filter(l => l.status === 'pending' && (isSales() ? isMine(l.owner) : l.type === 'dealer' ? perms().approveDealer : canLockMgr(l))).length,
     book: gsCan() && S.gs && S.gs.rows ? S.gs.rows.length : 0,   // new Google Form bookings to import (on the bookings page)
     receive: D.receipts.filter(r => r.status === 'pending' && (!myBranch() || r.br === myBranch())).length,
     flow: D.at.filter(a => a.flow.next === 'confirmed' && inChargeBr(a.br)).length

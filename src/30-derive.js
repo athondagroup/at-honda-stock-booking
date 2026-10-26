@@ -529,7 +529,8 @@ function myAlerts(D) {
 const inBr = x => S.br ? x.br === S.br : (!S.brScope || S.brScope.includes(x.br));
 // the person who did it, or the branch manager, can reverse the last lock action within UNDO_HOURS
 // the person who pressed it can undo within 24 hours; the manager of the car's branch (พี่อั้ม for dealer trades) at any time (ตกลง 13/10)
-const lockMgr = l => l.type === 'dealer' ? perms().approveDealer || canApproveBr(l.car_br) : canApproveBr(l.car_br);
+const lkD = l => (l && l.id && derive().locks.find(x => x.id === l.id)) || l;
+const lockMgr = l => l.type === 'dealer' ? perms().approveDealer || canLockMgr(l) : canLockMgr(l);
 const canUndo = l => !!(l.undo && l.undo.at && ['pending', 'approved', 'allocated', 'rejected', 'released', 'withdrawn'].includes(l.status) && (lockMgr(l) || (l.undo.role === roleLabel() && Date.now() - Date.parse(l.undo.at) < UNDO_HOURS * 3600e3)));
 // the managers are equal, so the screen says which of them acted
 const decidedBy = l => { const h = [...(l.history || [])].reverse().find(x => /อนุมัติ|ไม่อนุมัติ|ผู้จัดการ|ปล่อยล็อก|จัดสรร/.test(x.act || '')); return h || null; };

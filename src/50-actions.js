@@ -634,7 +634,7 @@ const ACTIONS = {
     const cur0 = S.locks.get(el.dataset.id);
     const L0 = derive().locks.find(x => x.id === el.dataset.id);
     if (L0 && L0.idsTook && !L0.idsTook.same) { toast(L0.idsTook.st === 'delivered' ? 'รถคันนี้ส่งมอบแล้ว อนุมัติไม่ได้ กดไม่อนุมัติเพื่อปิดคำขอ' : 'IDS จัดสรรรถคันนี้ให้ใบจองอื่นแล้ว อนุมัติไม่ได้ กดไม่อนุมัติเพื่อปิดคำขอ', 'bad'); return; }
-    if (cur0 && !(cur0.type === 'dealer' ? perms().approveDealer : canApproveBr(cur0.car_br))) { toast(`อนุมัติได้เฉพาะ${cur0.type === 'dealer' ? 'พี่อั้ม' : MGR_NAME[cur0.car_br] || 'ผู้จัดการสาขานั้น'}`, 'bad'); return; }
+    if (cur0 && !(cur0.type === 'dealer' ? perms().approveDealer : canLockMgr(lkD(cur0)))) { toast(`อนุมัติได้เฉพาะ${cur0.type === 'dealer' ? 'พี่อั้ม' : MGR_NAME[cur0.car_br] || 'ผู้จัดการสาขานั้น'}`, 'bad'); return; }
     const id = el.dataset.id, l = await claimFresh('locks', id, x => x.status === 'pending');
     if (!l) return;
     const D = derive();
@@ -686,7 +686,7 @@ const ACTIONS = {
     const L0 = derive().locks.find(x => x.id === id);
     if (L0 && (L0.autoReleased || L0.expired)) { toast('ล็อกนี้ปล่อยคิวไปแล้ว ถ้าต้องการรถคันนี้ให้ขอล็อกใหม่', 'bad'); return; }
     if (L0 && L0.idsTook && !L0.idsTook.same) { toast(L0.idsTook.st === 'delivered' ? 'รถคันนี้ส่งมอบแล้ว ต่อล็อกไม่ได้' : 'IDS จัดสรรรถคันนี้ให้ใบจองอื่นแล้ว ต่อล็อกไม่ได้', 'bad'); return; }
-    if (L0 && !canApproveBr(L0.car_br)) { toast(`ต่อล็อกได้เฉพาะ${MGR_NAME[L0.car_br] || 'ผู้จัดการสาขาของรถ'}`, 'bad'); return; }
+    if (L0 && !canLockMgr(lkD(L0))) { toast(`ต่อล็อกได้เฉพาะ${MGR_NAME[L0.car_br] || 'ผู้จัดการสาขาของรถ'}`, 'bad'); return; }
     const l = await claimFresh('locks', id, x => x.status === 'approved' && x.end === was);
     if (!l) return;
     const L = derive().locks.find(x => x.id === id), days = LOCK_DAYS_BY[l.type] || 15;

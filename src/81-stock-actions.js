@@ -15,7 +15,7 @@ function stockActions(c, p, D) {
   const lockB = nLocks ? `<button class="btn ${pendMine ? 'btn-red' : 'btn-ghost'} btn-sm" data-act="carlock-open" data-vin="${esc(c.vin)}">ล็อก${nLocks > 1 ? ` (${nLocks})` : ''} ▾</button>`
     : btn('lock-open', 'ล็อก', p.request && carLockable(c), carLockable(c) ? '' : 'สถานะนี้ล็อกไม่ได้');
   const deliv = delivBtn(c, D) || btn('cdeliv-open', 'ส่งมอบ', false, 'ต้องจัดสรรหรือออกใบกำกับก่อน');
-  return `${lockB}${btn('st-assign', c.assignedTo ? 'จัดสรร ▾' : 'จัดสรร', brOk && c.status !== 'company', brOk ? '' : 'ไม่ใช่สาขาที่ดูแล')}${deliv}${mgrLike ? btn('remove-open', '− นำออก', p.remove && !c.lock && brOk, c.lock ? 'ยกเลิกล็อกก่อน' : '') : ''}`;
+  return `${lockB}${btn('st-assign', c.assignedTo ? 'จัดสรร ▾' : 'จัดสรร', (brOk || mgrLike) && c.status !== 'company', brOk || mgrLike ? (brOk ? '' : 'รถสาขาอื่น: จัดสรรได้เฉพาะใบจองของสาขาที่ตัวเองดูแล') : 'ไม่ใช่สาขาที่ดูแล')}${deliv}${mgrLike ? btn('remove-open', '− นำออก', p.remove && !c.lock && brOk, c.lock ? 'ยกเลิกล็อกก่อน' : '') : ''}`;
 }
 // can this person give a car to this booking?
 function stAssignWhy(a) {

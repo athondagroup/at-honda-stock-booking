@@ -28,7 +28,7 @@ Object.assign(ACTIONS, {
   async 'lockbk-save'(el) {
     const m = S.modal, D = derive(), L = D.locks.find(x => x.id === m.id);
     if (!L) return;
-    if (!(perms().write && perms().approve && (canApproveBr(L.car_br) || perms().approveDealer))) { toast('เลือกใบจองได้เฉพาะผู้จัดการ', 'bad'); return; }
+    if (!(perms().write && perms().approve && (canLockMgr(lkD(L)) || perms().approveDealer))) { toast('เลือกใบจองได้เฉพาะผู้จัดการ', 'bad'); return; }
     const pick = m.pick ?? (L.type === 'booking' ? L.bkref : L.type);
     const p = parseSheetText(sheetTextOf(L) || '');
     let set, label;

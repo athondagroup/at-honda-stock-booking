@@ -20,7 +20,7 @@ function lockIdsCands(l, D) {
 }
 function lockIdsCust(l) { return l.booking ? l.booking.cust || '' : l.type === 'temp' ? l.prospect || '' : l.dealer_name || ''; }
 function lockIdsBox(l, D) {
-  const info = l.idsInfo || {}, br = l.car_br, can = perms().write && canApproveBr(br), pick = (S.lockIds || {})[l.id] || '';
+  const info = l.idsInfo || {}, br = l.car_br, can = perms().write && canLockMgr(l), pick = (S.lockIds || {})[l.id] || '';
   const cands = lockIdsCands(l, D);
   return `<div class="p-3 md:px-4" style="background:var(--warn-soft)">
     <div class="text-sm"><b>IDS จัดสรรรถคันนี้ให้ ${esc(info.cust || '–')}</b>${info.no ? ` (ใบจอง ${esc(info.no)})` : ''} · ล็อกนี้ทำไว้ให้ <b>${esc(lockIdsCust(l) || '–')}</b> · เซลล์ ${esc(l.owner || '–')} · ชื่อไม่ตรงกัน</div>
@@ -72,7 +72,7 @@ async function lockIdsSync() {
   return res;
 }
 async function lockIdsClose(id, why, extra) {
-  const l = derive().locks.find(x => x.id === id); if (!l || !canApproveBr(l.car_br)) return;
+  const l = derive().locks.find(x => x.id === id); if (!l || !canLockMgr(l)) return;
   const info = l.idsInfo || {};
   const x = await claimFresh('locks', id, r => ['pending', 'approved', 'allocated'].includes(r.status)); if (!x) return;
   markUndo(x, 'ยกเลิกล็อก (IDS จัดสรรให้คนอื่น)', x.status);
@@ -87,7 +87,7 @@ async function lockIdsClose(id, why, extra) {
 Object.assign(ACTIONS, {
   async 'lockids-pick'(el) {
     const id = el.dataset.id, key = (S.lockIds || {})[id], D = derive(), l = D.locks.find(x => x.id === id);
-    if (!l || !key || !canApproveBr(l.car_br)) return;
+    if (!l || !key || !canLockMgr(l)) return;
     const c = lockIdsCands(l, D).find(x => x.key === key); if (!c) return;
     if (!c.took) {
       const b = D.bookingByKey.get(key);
@@ -105,7 +105,7 @@ Object.assign(ACTIONS, {
   },
   async 'lockids-close'(el) { if (confirm('ยกเลิกล็อกนี้ เพราะ IDS จัดสรรรถให้คนอื่นแล้ว และแจ้งเซลล์ทาง Telegram?')) await lockIdsClose(el.dataset.id, 'ไม่มีใบจองที่ตรง'); },
   async 'lockids-keep'(el) {
-    const id = el.dataset.id, l = derive().locks.find(x => x.id === id); if (!l || !canApproveBr(l.car_br)) return;
+    const id = el.dataset.id, l = derive().locks.find(x => x.id === id); if (!l || !canLockMgr(l)) return;
     const x = await claimFresh('locks', id, () => true); if (!x) return;
     x.ids_keep = { no: (l.idsInfo || {}).no || null, ...actor() };
     if (await saveLock(id, x, 'คงล็อกไว้ (IDS จัดสรรเป็น advanced invoice)', (l.idsInfo || {}).cust || '')) { toast('คงล็อกไว้แล้ว'); render(); }
