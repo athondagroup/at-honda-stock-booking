@@ -135,7 +135,11 @@ const MGR_OF = { aum: ['PSC', 'ATE'], nuch: ['SPH', 'KPA'] };
 const MGR_NAME = { PSC: 'พี่อั้ม', ATE: 'พี่อั้ม', SPH: 'นุช', KPA: 'นุช' };
 const mgrBranches = () => S.role.role === 'exec' ? BRS : MGR_OF[S.role.role] || [];
 const mgrRoleOf = br => Object.keys(MGR_OF).find(k => MGR_OF[k].includes(br)) || null;
-const canApproveBr = br => perms().approve && !!br && mgrBranches().includes(br);
+// every manager (and the executive) can approve, allocate and edit for ANY branch (ตกลง 26/10);
+// the manager who looks after the branch (mgrBranches) is told about it, and keeps the branch's work in the inbox
+const isMgrRole = () => S.role.role === 'exec' || !!MGR_OF[S.role.role];
+const canApproveBr = br => perms().approve && !!br && isMgrRole();
+const inChargeBr = br => perms().approve && !!br && mgrBranches().includes(br);
 // allocating a car: the branch admin, or the manager of that branch
 const canAllocBr = br => (S.role.role === 'admin' && br === S.role.branch) || canApproveBr(br);
 function custCell(name, sales, o = {}) {

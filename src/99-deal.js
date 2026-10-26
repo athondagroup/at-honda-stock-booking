@@ -35,7 +35,8 @@ function dealRows(d, cash) {
   if (!cash) r.push(['เงินดาวน์', money(d.down)], ['ส่วนลดดาวน์', money(d.down_disc)], ['ยอดจัด', money(d.fin_amount)], ['ดอกเบี้ย', d.rate !== null && d.rate !== undefined ? d.rate + ' %' : '–'], ['จำนวนงวด', d.term ? d.term + ' งวด' : '–']);
   const mo = cash ? null : dealMonthly(d); if (mo) r.push(['ค่างวดโดยประมาณ', `${money(mo)} บาท / เดือน`]);
   if (d.paint) r.push(['ค่าสี', money(d.paint)]);
-  r.push(['แคมเปญ Honda', d.campaign || '–'], ['Margin รถ', money(d.margin_car)]);
+  if (d.sales_camp && d.sales_camp_id !== d.campaign_id) r.push(['เซลล์เลือกแคมเปญ', d.sales_camp]);
+  r.push([d.sales_camp && d.sales_camp_id !== d.campaign_id ? 'แคมเปญ Honda (แอดมินเลือก)' : 'แคมเปญ Honda', d.campaign || '–'], ['Margin รถ', money(d.margin_car)]);
   if (!cash) r.push([`AT แคมเปญ${d.at_step ? ` (Step ช่อง ${d.at_step})` : ''}`, money(d.margin_at)]);
   r.push(['Honda แคมเปญ', money(d.margin_honda)]);
   if (d.privileges) r.push(['สิทธิพิเศษ Honda', d.privileges]);
@@ -59,7 +60,7 @@ function dealBoxIn(a, m, D) {
     const note = m.dealMode === 'first' ? 'บันทึกแล้ว เซลล์ขอแก้ได้อีก 1 ครั้งตอนไฟแนนซ์ผ่าน (แอดมินสาขาหรือผู้จัดการอนุมัติ)'
       : m.dealMode === 'req' ? 'ขอแก้ได้ครั้งเดียว · ส่งแล้วรอแอดมินสาขาหรือผู้จัดการอนุมัติ ตัวเลขเดิมยังใช้อยู่จนกว่าจะอนุมัติ' : 'แอดมินขึ้นไปแก้ได้เลย ระบบเก็บตัวเลขเดิมไว้ในประวัติ';
     return `<div class="mt-2 p-3 rounded-lg border border-line" style="background:var(--surface-2)">${title}<div class="mt-2">
-      ${termsFields(x, v, { attr: 'data-modal', pre: 'deal', idp: 'dl', paint, priceDisc: true, lockPrice, priceNote })}</div>
+      ${termsFields(x, v, { attr: 'data-modal', pre: 'deal', idp: 'dl', paint, priceDisc: true, lockPrice, priceNote, adm: st.admin && m.dealMode !== 'req' })}</div>
       ${m.dealMode === 'req' ? `<div class="field mt-2"><label for="dl-why" class="req">เหตุผลที่ขอแก้</label><input id="dl-why" data-modal="dealWhy" value="${esc(m.dealWhy || '')}" autocomplete="off" placeholder="เช่น ไฟแนนซ์อนุมัติดาวน์ 25%"></div>` : ''}
       <div class="text-xs text-muted mt-2">${note}</div>
       <div class="flex gap-2 mt-2"><button class="btn btn-dark btn-sm" data-act="deal-save" data-id="${esc(a.id)}">${m.dealMode === 'req' ? 'ส่งขอแก้ไข' : 'บันทึก'}</button><button class="btn btn-ghost btn-sm" data-act="deal-close">ยกเลิก</button></div></div>`;
@@ -93,6 +94,11 @@ Object.assign(ACTIONS, {
     const keep = ['price', 'disc', 'down', 'down_disc', 'rate', 'term', 'campaign_id', 'campaign_text', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'priv_gtg', 'priv_ln', 'priv_hk', 'margin_priv'];
     // a first entry starts from what the booking or the old commission data already has
     S.modal.deal = d.at ? Object.fromEntries(keep.map(k => [k, d[k] ?? ''])) : { price: (web && web.price) || num(cm.price) || num(r.price) || '', disc: num(r.discount) || num(cm.discount) || '', down: num(cm.down) || '', down_disc: num(cm.down_disc) || '', rate: cm.rate ?? '', term: cm.term ?? '', campaign_id: '', at_step: '' };
+    // the sales' own campaign pick is kept; the admin decides the one that counts (same as the sales / own pick / uploaded sheet)
+    const dd = S.modal.deal; dd.sales_camp_id = d.sales_camp_id ?? (d.at && !/แอดมิน/.test(String(d.how || '')) ? d.campaign_id || '' : ''); dd.sales_camp = d.sales_camp ?? (dd.sales_camp_id && d.campaign ? d.campaign : '');
+    dd.adm_mode = d.adm_mode || (dd.sales_camp_id && (!dd.campaign_id || dd.campaign_id === dd.sales_camp_id) ? 'same' : 'own');
+    if (dd.adm_mode === 'same' && dd.sales_camp_id) dd.campaign_id = dd.sales_camp_id;
+    S.modal.campMatch = null;
     S.modal.dealMode = el.dataset.mode || 'first'; S.modal.dealWhy = ''; render();
   },
   'deal-close'() { S.modal.deal = null; S.modal.dealMode = null; render(); },
@@ -105,6 +111,9 @@ Object.assign(ACTIONS, {
     const ck = termsCheck(x, v); if (ck.err) { toast(ck.err, 'bad'); $('#dl-' + ck.id)?.focus(); return; }
     const paint = web && num(v.price) === web.price ? web.paint : 0;
     const vals = { ...termsRecord(x, v, paint), price_src: web && num(v.price) === web.price ? web.src : 'ใส่เอง', cash: isCash(a.rec) };
+    // sales' pick vs the admin's: the sales' own choice is kept, the admin's is the one that counts
+    if (!st.admin) { vals.sales_camp_id = vals.campaign_id; vals.sales_camp = vals.campaign; }
+    else { vals.sales_camp_id = v.sales_camp_id || (prev.sales_camp_id ?? null) || null; vals.sales_camp = v.sales_camp || prev.sales_camp || null; vals.adm_mode = v.adm_mode || 'own'; vals.adm_file = v.adm_mode === 'own' ? v.adm_file || null : null; vals.adm_camp_by = vals.sales_camp_id && vals.campaign_id !== vals.sales_camp_id ? actor() : null; }
     if (mode === 'req') {
       const why = String(S.modal.dealWhy || '').trim(); if (!why) { toast('ใส่เหตุผลที่ขอแก้', 'bad'); $('#dl-why')?.focus(); return; }
       if (await saveFlow(a, { deal: { ...prev, req: { vals, why, ...actor() } } }, 'ส่งขอแก้ไขแล้ว รอแอดมินสาขาหรือผู้จัดการอนุมัติ')) { S.modal.deal = null; S.modal.dealMode = null; render(); }

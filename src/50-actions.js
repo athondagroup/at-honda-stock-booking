@@ -6,6 +6,7 @@ function renderModal(D) {
   if (m.kind === 'lock') body = lockModal(m, D);
   else if (m.kind === 'remove') body = removeModal(m, D);
   else if (m.kind === 'special') body = spModal(m, D);
+  else if (m.kind === 'quota') body = quotaModal(m, D);
   else if (m.kind === 'tgtadj') body = tgtAdjModal(m);
   else if (m.kind === 'note') body = noteModal(m);
   else if (m.kind === 'at') { body = atModal(m, D); wide = true; }

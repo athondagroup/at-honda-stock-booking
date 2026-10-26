@@ -488,6 +488,16 @@ function buildAlerts(D) {
     if (l.status === 'approved') add('swapa:' + l.id, { br: sw.to_br, roles: ['admin'] }, 'warn', 'เปลี่ยนคันแล้ว จัดสรรคันใหม่ใน IDS', txt, go);
     if (['allocated', 'assigned'].includes(sw.was) && sw.from_br) add('swapo:' + l.id, { br: sw.from_br, roles: ['admin'] }, 'warn', 'เปลี่ยนคันแล้ว ยกเลิกการจัดสรรคันเดิมใน IDS', txt, go);
   }
+  // a manager (or the executive) acted on a lock of a branch another manager looks after: tell that manager (3 days)
+  for (const l of D.locks) {
+    const own = mgrRoleOf(l.car_br); if (!own) continue;
+    (l.history || []).forEach((h, i) => {
+      if (!h.rk || h.rk === own || !(h.rk === 'exec' || MGR_OF[h.rk]) || !h.at || daysBetween(h.at.slice(0, 10), today) > 3 || /^ขอ|^ถอน/.test(h.act || '')) return;
+      const cust = l.booking ? l.booking.cust || '' : l.prospect || '';
+      add('xmgr:' + l.id + ':' + i, { br: l.car_br, roles: ['manager'] }, 'warn', `${h.act} ล็อกสาขา ${l.car_br} โดย ${h.role} (แจ้งให้ทราบ)`,
+        `${l.vin || 'Quota ' + l.ref} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''}${h.note ? ' · ' + h.note : ''}`, { act: 'go', view: 'lock', sub: 'active' });
+    });
+  }
   for (const r of D.receipts) if (r.status === 'pending') add('recv:' + r.id, { br: r.br, roles: ['admin', 'manager'] }, 'warn', 'รับรถเข้า รอยืนยัน', `${r.doc_no || ''} · ${(r.cars || []).length} คัน`, { act: 'recv-open', id: r.id });
   for (const a of D.at) {
     if (a.cancelled || a.demo) continue;
@@ -613,7 +623,7 @@ document.addEventListener('focusout', () => setTimeout(() => {
   if (S.pendingRender && !(document.activeElement && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))) { S.pendingRender = false; render(); }
 }, 0));
 
-function actor() { return { by: S.me.id || null, role: roleLabel(), at: new Date().toISOString() }; }
+function actor() { return { by: S.me.id || null, role: roleLabel(), rk: S.role.role, at: new Date().toISOString() }; }
 async function names(ids) {
   const want = [...new Set(ids.filter(Boolean))].filter(id => !(id in S.profiles));
   if (!USER || !want.length) return;

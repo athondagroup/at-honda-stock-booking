@@ -6,12 +6,12 @@ function inboxItems(D) {
   for (const a of D.at) {
     if (a.demo) continue;
     if (a.change && canDecideBooking(a)) out.push({ kind: a.change.type === 'cancel' ? 'cancel' : 'edit', a, at: a.change.at });
-    if (a.ownerCheck === 'disputed' && canApproveBr(a.br)) out.push({ kind: 'owner', a, at: a.rec.owner_dispute.at });
-    if (!a.cancelled && a.flow.next === 'confirmed' && canApproveBr(a.br)) out.push({ kind: 'confirm', a, at: (a.rec.flow && a.rec.flow.delivered && a.rec.flow.delivered.at) || a.date });
+    if (a.ownerCheck === 'disputed' && inChargeBr(a.br)) out.push({ kind: 'owner', a, at: a.rec.owner_dispute.at });
+    if (!a.cancelled && a.flow.next === 'confirmed' && inChargeBr(a.br)) out.push({ kind: 'confirm', a, at: (a.rec.flow && a.rec.flow.delivered && a.rec.flow.delivered.at) || a.date });
   }
   for (const l of D.locks) {
-    if (l.status === 'pending' && (l.type === 'dealer' ? p.approveDealer : canApproveBr(l.car_br))) out.push({ kind: 'lock', l, at: l.requested_at });
-    else if (l.needExt && canApproveBr(l.car_br)) out.push({ kind: 'ext', l, at: l.end });
+    if (l.status === 'pending' && (l.type === 'dealer' ? p.approveDealer : inChargeBr(l.car_br))) out.push({ kind: 'lock', l, at: l.requested_at });
+    else if (l.needExt && inChargeBr(l.car_br)) out.push({ kind: 'ext', l, at: l.end });
   }
   return out.sort((x, y) => (x.at || '').localeCompare(y.at || ''));
 }
