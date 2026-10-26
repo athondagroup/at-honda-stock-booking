@@ -109,6 +109,7 @@ function render() {
   if (rendering) { setTimeout(render, 0); return; }
   rendering = true;
   try { renderNow(); renderFail = 0; } catch (e) { showRenderError(e); } finally { rendering = false; }
+  try { if (typeof vinMark === 'function') vinMark(); } catch (e) { /* the links are a convenience */ }
 }
 // a drawing error must never leave a blank or frozen page: show what broke and a way back
 let renderFail = 0;

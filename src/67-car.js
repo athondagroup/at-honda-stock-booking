@@ -7,7 +7,7 @@ function carHist(vin, D) {
   const o = S.vehicles.get(vin);
   if (o) {
     if (o.added) ev.push({ ...o.added, act: o.added.receipt ? 'รับรถเข้า (ยืนยันจากรูป)' : 'รับรถเข้า', what: 'รถ' });
-    if (o.moved) ev.push({ ...o.moved, act: `ย้ายไป ${o.branch}`, what: 'รถ' });
+    if (o.moved) ev.push({ ...o.moved, act: `ย้ายไป ${o.moved.to || o.branch || '?'}`, note: o.moved.from ? `จาก ${o.moved.from}${o.moved.from_upload ? ' · ตามการอัปโหลด Stock' : ''}` : '', what: 'รถ' });
     if (o.removed) ev.push({ ...o.removed, act: 'นำรถออก', note: o.removed.dealer || o.removed.note, what: 'รถ' });
     (o.special && o.special.hist || []).forEach(h => ev.push({ ...h, what: 'Stock พิเศษ', note: [h.note, h.price ? 'ราคา ' + fmtN(h.price) : ''].filter(Boolean).join(' · ') }));
     (o.special_log || []).forEach(h => ev.push({ ...h, what: 'Stock พิเศษ' }));
@@ -24,8 +24,42 @@ function carAny(vin, D) {
   return { vin, br: i.br, model: i.model, grade: i.grade, color: i.color, spec: specKey(i.model, i.grade, i.color), ref: q ? q.ref : null, status: i.company ? 'company' : i.ddate ? 'delivered' : 'invoiced',
     src: 'DL (ไม่อยู่ในไฟล์ Stock IDS)', age: null, lock: null, temps: [], cust: i.cust, bkno: i.no, fromInv: true };
 }
+// the car window's own lookup (13/10 → 26/10): cars IDS has dropped (delivered, taken out) never went through the status/age pass in derive,
+// so they are completed here; a VIN known only from a booking or a keyed record still gets a window instead of "not found"
+function carFull(vin, D) {
+  const kind = D.cars.has(vin) ? '' : D.deliveredOut.some(x => x.vin === vin) ? 'delivered' : D.removed.some(x => x.vin === vin) ? 'removed' : '';
+  const c0 = carAny(vin, D);
+  if (c0 && !kind) return c0;
+  const inv = D.invByVin.get(vin);
+  const fill = o => {
+    o.spec = o.spec || (o.model ? specKey(o.model, o.grade, o.color) : '');
+    o.temps = o.temps || []; o.lock = o.lock || null;
+    const basis = o.prod || o.consign || o.stockin;
+    if (o.age === undefined || o.age === null) { o.age = basis ? daysBetween(basis, D.today) : null; o.ageFrom = o.prod ? 'prod' : o.consign ? 'consign' : o.stockin ? 'stockin' : null; }
+    return o;
+  };
+  if (c0) { const o = fill({ ...c0 }); o.status = kind === 'removed' ? 'removed' : (inv && inv.company ? 'company' : 'delivered'); o.out = kind; return o; }
+  // not in stock, not in DL: look for any record that names the car
+  const a = D.at.find(x => !x.cancelled && atVin(x) === vin), ib = D.idsB.find(b => b.vin === vin), o = S.vehicles.get(vin);
+  if (!a && !ib && !o) return null;
+  const src = a || ib || {};
+  return fill({ vin, br: (o && (o.branch || (o.moved && o.moved.to))) || src.br || null, model: src.model || null, grade: src.grade || null, color: src.color || null,
+    status: 'unknown', out: 'unknown', src: 'ไม่อยู่ในไฟล์ Stock และ DL · ข้อมูลจากใบจอง', cust: src.cust || null, bkno: ib ? ib.no : null, fromInv: true });
+}
+function carStChip(c) { return CAR_STATUS[c.status] ? statusChip(CAR_STATUS, c.status) : chip({ removed: 'นำออกจาก Stock', unknown: 'ไม่อยู่ใน Stock' }[c.status] || c.status || '–', 'muted'); }
+// where the car went / came from: taken out, moved between branches, handed over (data kept in vehicles/<vin> and the DL file)
+function carOutRows(c, D, row) {
+  const o = S.vehicles.get(c.vin) || {}, r = o.removed, mv = o.moved, by = x => x && x.by && S.profiles && S.profiles[x.by] ? (S.profiles[x.by].name || '') : '';
+  const who = x => [x && x.role, by(x)].filter(Boolean).join(' ');
+  return [
+    r ? row('นำออกจาก Stock', `${r.at ? fmtDT(r.at) + ' · ' : ''}${esc(r.reason && typeof outFixWhy === 'function' ? outFixWhy({ reason: r.reason, text: r.dealer || r.note }) : (r.dealer || r.note || ''))}${who(r) ? ' · โดย ' + esc(who(r)) : ''}`) : '',
+    mv ? row('ย้ายสาขา', `${esc(mv.from || '?')} → ${esc(mv.to || o.branch || '?')}${mv.at ? ' · ' + fmtDT(mv.at) : ''}${mv.from_upload ? ' · จากการอัปโหลด Stock' : ''}${who(mv) ? ' · โดย ' + esc(who(mv)) : ''}`) : '',
+    c.fromBr && !mv ? row('โอนจากสาขา', esc(c.fromBr)) : '',
+    c.handed ? row('ส่งมอบ (บันทึกในเว็บ)', `${fmtD(c.handed.date)}${c.handed.note ? ' · ' + esc(c.handed.note) : ''}`) : ''
+  ].join('');
+}
 function carModal(m, D) {
-  const c = carAny(m.vin, D);
+  const c = carFull(m.vin, D);
   if (!c) return `<p>ไม่พบรถคันนี้แล้ว</p><div class="flex justify-end mt-3"><button class="btn btn-ghost" data-act="close">ปิด</button></div>`;
   const p = perms(), inv = D.invByVin.get(c.vin), hideCust = isSales() && !(c.lock && isMine(c.lock.owner));
   const q = c.ref ? D.quota.find(x => x.ref === c.ref) : null;
@@ -33,7 +67,7 @@ function carModal(m, D) {
   const row = (k, v) => v === null || v === undefined || v === '' ? '' : `<tr><td class="text-muted nowrap">${k}</td><td>${v}</td></tr>`;
   const ls = carLocks(c, D), hist = carHist(c.vin, D);
   return `<div class="flex items-start justify-between gap-3 mb-2"><div><h2 class="font-head text-xl font-semibold"><span class="code">${esc(c.vin)}</span></h2>
-      <div class="mt-1 flex flex-wrap gap-2">${c.status === 'temp' ? chip('ว่าง', 'good') : statusChip(CAR_STATUS, c.status)} ${c.fromInv ? '' : tempChip(c)} ${chip(`${c.br} ${BR[c.br]?.name || ''}`, 'neutral')}</div>${c.fromInv ? '<p class="text-xs text-muted mt-1">รถคันนี้ไม่อยู่ในไฟล์ Stock IDS แล้ว (ออกใบกำกับแล้ว) แสดงข้อมูลจากไฟล์ DL</p>' : ''}</div>
+      <div class="mt-1 flex flex-wrap gap-2">${c.status === 'temp' ? chip('ว่าง', 'good') : carStChip(c)} ${c.fromInv ? '' : tempChip(c)} ${chip(`${c.br} ${BR[c.br]?.name || ''}`, 'neutral')}</div>${c.fromInv ? '<p class="text-xs text-muted mt-1">รถคันนี้ไม่อยู่ในไฟล์ Stock IDS แล้ว (ออกใบกำกับแล้ว) แสดงข้อมูลจากไฟล์ DL</p>' : ''}</div>
     ${m.back ? '<button class="btn btn-dark btn-sm" data-act="car-back">← กลับ</button>' : '<button class="btn btn-ghost btn-sm" data-act="close">ปิด</button>'}</div>
   ${carWhyBox(c, D, inv, bk, hideCust)}
   ${spBox(c, D)}${rptBox(c)}
@@ -52,6 +86,7 @@ function carModal(m, D) {
       ${!isSales() ? row('ข้อความในชีต', c.bknote ? `"${esc(c.bknote)}"` : '') : ''}
       ${row('ใบจองใน IDS', c.bkno ? `<span class="code">${esc(c.bkno)}</span>${c.bkdate ? ` · จอง ${fmtD(c.bkdate)}` : ''}${c.cust && !hideCust ? ` · ${esc(c.cust)}` : c.cust ? ' · ลูกค้าของเซลล์อื่น' : ''}` : '')}
       ${row('วันที่จัดสรร', c.alloc ? fmtD(c.alloc) : '')}
+      ${carOutRows(c, D, row)}
       ${inv ? row('ใบกำกับ (DL)', `${esc(inv.inv || '')} · ${fmtD(inv.idate)}${inv.ddate ? ` · ส่งมอบ ${fmtD(inv.ddate)}` : ' · ยังไม่ส่งมอบ'}${inv.company ? ' · รถบริษัท' : ''}${inv.sales && !isSales() ? ` · ${esc(inv.sales)}` : ''}`) : ''}
     </tbody></table>
     ${bk && (!isSales() || isMine(bk.sales)) ? `<div class="mt-3 p-3 rounded-lg text-sm" style="background:var(--surface-2)">ใบจอง AT Honda ที่ได้รถคันนี้: <b>${esc(bk.cust || '')}</b> · ${esc(bk.sales || '')} · ${bk.flow && bk.flow.next ? `ขั้นถัดไป ${FLOW_LABEL[bk.flow.next]}` : 'ส่งมอบแล้ว'} <button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(bk.id)}">เปิดใบจอง</button></div>` : ''}</div>

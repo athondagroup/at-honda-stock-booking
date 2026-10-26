@@ -15,6 +15,9 @@ function carWhyBox(c, D, inv, bk, hideCust) {
     pending: `มีคำขอล็อกรออนุมัติ${l ? ` · ${l.type === 'dealer' ? 'ดีลเลอร์ ' + esc(l.dealer_name || '') : 'ให้ ' + name(l.owner || l.sales_nick)}` : ''}`,
     locked: `ล็อกในเว็บนี้แล้ว${l ? ` · ${l.type === 'dealer' ? 'ดีลเลอร์ ' + esc(l.dealer_name || '') : l.type === 'temp' ? 'ชั่วคราว ' + name(l.owner || l.sales_nick) : 'ใบจองของ ' + name(l.owner)}${l.hold ? ' · ถือไว้จนส่งมอบ' : l.end ? ` · หมด ${fmtD(l.end)}` : ''}` : ''} · IDS ยังไม่จัดสรร`,
     allocated: 'แอดมินแจ้งว่าจัดสรรใน IDS แล้ว รอไฟล์ IDS รอบหน้ายืนยัน',
+    delivered: `ส่งมอบแล้ว${inv && inv.ddate ? ` เมื่อ ${fmtD(inv.ddate)}` : c.handed ? ` เมื่อ ${fmtD(c.handed.date)}` : ''}${inv && inv.cust ? ` · ลูกค้า ${name(inv.cust)}` : c.cust ? ` · ลูกค้า ${name(c.cust)}` : ''}${inv && inv.inv ? ` · ใบกำกับ ${esc(inv.inv)}` : ''} · ไม่อยู่ใน Stock แล้ว`,
+    removed: `นำออกจาก Stock แล้ว${c.removed && (c.removed.dealer || c.removed.note) ? ` · ${esc(c.removed.dealer || c.removed.note)}` : ''}`,
+    unknown: 'ไม่พบรถคันนี้ในไฟล์ Stock หรือ DL · แสดงเท่าที่มีจากใบจอง',
     assigned: `จัดสรรให้ใบจอง AT แล้ว${bk ? ` · ${name(bk.cust)} (${esc(bk.sales || '')})` : ''} รอส่งมอบ`
   }[c.status] || (CAR_STATUS[c.status] || [c.status])[0];
   const advT = c.advance ? ` · ${esc(advLabel(c.advance))}${c.advance.cust ? ` (ชื่อในใบกำกับ ${name(c.advance.cust)})` : ''}` : '';
