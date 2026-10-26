@@ -101,7 +101,7 @@ Object.assign(ACTIONS, {
     if (dd.adm_mode === 'same' && dd.sales_camp_id) dd.campaign_id = dd.sales_camp_id;
     // a campaign picked in the campaign report is already there: no need to choose it again (the money follows the campaign table)
     const pk = (((S.ref.get('honda_pay') || {}).picks || {})[String(atVin(a) || '').toUpperCase()]) || null;
-    if (pk && (!dd.campaign_id || dd.campaign_id === 'pending') && campOptions(termsCtxAt(a, derive())).opts.some(y => y.ok && y.value === pk.cid)) { dd.campaign_id = pk.cid; dd.margin_honda = ''; dd.margin_priv = ''; dd.adm_mode = 'own'; dd.adm_file = 'รายงานสรุปแคมเปญ'; }
+    if (pk && dealState(a).admin && (!dd.campaign_id || dd.campaign_id === 'pending') && campOptions(termsCtxAt(a, derive())).opts.some(y => y.ok && y.value === pk.cid)) { dd.campaign_id = pk.cid; dd.margin_honda = ''; dd.margin_priv = ''; dd.adm_mode = 'own'; dd.adm_file = 'รายงานสรุปแคมเปญ'; }
     S.modal.campMatch = null;
     S.modal.dealMode = el.dataset.mode || 'first'; S.modal.dealWhy = ''; render();
   },
