@@ -156,5 +156,8 @@ tr.low td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 .viz-mark:hover, .viz-mark:focus-visible { opacity: .8; outline: none; }
 #viz-tip { position: fixed; z-index: 80; display: none; pointer-events: none; background: var(--fg); color: var(--bg); font-size: 12px; line-height: 1.4; padding: 6px 8px; border-radius: 6px; max-width: 260px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+/* date inputs on phones: stay inside the box, text on the left */
+.field input[type=date],.field input[type=month]{-webkit-appearance:none;appearance:none;display:block;width:100%;min-width:0;max-width:100%;min-height:2.75rem;text-align:left}
+.field input[type=date]::-webkit-date-and-time-value,.field input[type=month]::-webkit-date-and-time-value{text-align:left}
 </style>
 

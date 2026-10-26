@@ -75,6 +75,7 @@ function dashSalesTarget(D) {
   const pctCell = (i, t) => t ? `<span style="color:var(--${i >= t ? 'good' : 'bad'})">${pctOf(i, t)}%</span>` : '–';
   return `${pageHead('ยอดขายและเป้า', `ใบกำกับภาษี = ยอดที่แจ้งขายกับฮอนด้า (ใช้คิดเงินรางวัล) · ส่งมอบ = รถที่ปล่อยให้ลูกค้าจริง · ${fmtD(E.from)} – ${fmtD(E.to)}`, tgtCanEdit() ? '<button class="btn btn-red" data-act="tgt-open">ใส่ / แก้เป้า</button>' : '')}
   ${dashTabs()}${periodBar(E)}
+  ${tgtAdjCard(D)}
   ${tiles([
     tile(`เป้าเดือนนี้ (${monLabel(P.m)})`, P.t ? fmtN(P.t) : '–', { sub2: P.t ? 'คัน ใบกำกับภาษี' : 'ยังไม่ได้ใส่เป้า' }),
     tile('ใบกำกับเดือนนี้', fmtN(P.inv), { drill: { m: 'invoiced', from: P.m + '-01', to: D.today }, tone: P.t ? (P.inv >= P.t ? 'good' : '') : '', sub2: P.t ? `ทำได้ ${pctOf(P.inv, P.t)}% · ขาด ${fmtN(Math.max(0, P.t - P.inv))} คัน` : (P.asof ? `DL ถึง ${fmtD(P.asof)}` : 'ยังไม่มี DL ของเดือนนี้') }),

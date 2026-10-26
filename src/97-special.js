@@ -5,6 +5,7 @@
 // sellable = true  -> the car is a normal free car with a special price (shows in stock, can be locked / allocated)
 // sellable = false / not decided -> stays a company car in stock, cannot be sold
 // Only function declarations at the top level: the first render runs before this file.
+const SP_INS_TYPES = ['ชั้น 1', 'ชั้น 2+', 'ชั้น 3+', 'ชั้น 2', 'ชั้น 3', 'พ.ร.บ. อย่างเดียว', 'อื่น ๆ'];
 const SP_REASONS = [['adv', 'รถบริษัท Advance (ออกใบกำกับไว้ก่อน)'], ['demo', 'รถบริษัท Demon'], ['returned', 'ลูกค้าคืนรถ'], ['other', 'อื่น ๆ']];
 function spStatus(sp) { return sp && sp.sellable === true ? 'free' : 'company'; }
 function spReasonText(sp) {
@@ -48,9 +49,14 @@ function spDetail(c, D, edit) {
         <button class="btn btn-ghost btn-sm" data-act="sp-open" data-vin="${vin}">แก้ข้อมูล</button>` : ''}</span></div>
     <table class="tbl text-sm"><tbody>
       ${row('เหตุผล', esc(spReasonText(sp)))}
-      ${sell ? row('ราคาขาย', `<b class="num">${fmtN(sp.price)}</b> บาท`) : ''}
+      ${sell ? row('ราคาเต็ม', sp.fullPrice != null ? `<span class="num">${fmtN(sp.fullPrice)}</span> บาท` : '') : ''}
+      ${sell ? row('ราคาตั้งขาย', `<b class="num">${fmtN(sp.price)}</b> บาท`) : ''}
+      ${sell ? row('ยอดจัด มือ 2', sp.finMax != null ? `<span class="num">${fmtN(sp.finMax)}</span> บาท` : '') : ''}
+      ${sell ? row('Margin แคมเปญ', sp.margin != null ? `<span class="num">${fmtN(sp.margin)}</span> บาท` : '') : ''}
       ${sell ? row('เลขไมล์', sp.km !== '' && sp.km != null ? `<span class="num">${fmtN(sp.km)}</span> กม.` : '') : ''}
-      ${sell ? row('ประกันหมดอายุ', sp.ins ? `${fmtD(sp.ins)} ${spInsChip(sp.ins)}` : '') : ''}
+      ${sell ? row('ประกันภัย', sp.insNone ? chip('ยังไม่แจ้งประกัน', 'warn') : [sp.insType, sp.insCo].filter(Boolean).map(esc).join(' · ')) : ''}
+      ${sell && !sp.insNone ? row('ประกันหมดอายุ', sp.ins ? `${fmtD(sp.ins)} ${spInsChip(sp.ins)}` : '') : ''}
+      ${sell ? row('ป้ายภาษีหมดอายุ', sp.taxExp ? `${fmtD(sp.taxExp)} ${spInsChip(sp.taxExp)}` : '') : ''}
       ${sell ? row('ทะเบียน', esc(sp.plate || '')) : ''}
       ${sell ? row('สภาพรถ / อุปกรณ์', esc(sp.cond || '')) : ''}
       ${row('ใบกำกับ', sp.invNo || sp.invDate ? `${esc(sp.invNo || '')} ${sp.invDate ? '· ' + fmtD(sp.invDate) : ''}` : '')}
@@ -75,10 +81,19 @@ function spModal(m, D) {
       <p class="text-xs text-muted mt-1">${d.sellable === true ? 'ขายได้ = เป็นรถพิเศษที่ขายได้ อยู่ในแท็บ "รถพิเศษ" แยกจาก Stock ปกติ มีราคาและข้อมูลรถกำกับ ล็อก จัดสรร ส่งมอบได้ตามปกติ' : d.sellable === false ? 'ขายไม่ได้ = อยู่ในแท็บ "รถพิเศษ" เป็นรถบริษัท ล็อกและขายไม่ได้' : 'ยังไม่ตัดสินใจ = อยู่ในแท็บ "รถพิเศษ" เป็นรถบริษัทไว้ก่อน แก้เป็นขายได้ทีหลังได้'}</p></div>
     ${d.sellable === true ? `<div class="p-3 rounded-lg border border-line flex flex-col gap-3" style="background:var(--surface-2)"><b class="text-sm">ข้อมูลรถพิเศษสำหรับขาย</b>
       <div class="grid sm:grid-cols-2 gap-3">
-        ${f('sp-price', 'ราคาขาย (บาท)', 'price', 'number', 'inputmode="numeric" min="0" step="1000"', true)}
+        ${f('sp-full', 'ราคาเต็ม (บาท)', 'fullPrice', 'number', 'inputmode="numeric" min="0" step="1000"')}
+        ${f('sp-price', 'ราคาตั้งขาย (บาท)', 'price', 'number', 'inputmode="numeric" min="0" step="1000"', true)}
+        ${f('sp-fin', 'ยอดจัด มือ 2 (บาท)', 'finMax', 'number', 'inputmode="numeric" min="0" step="1000"')}
+        ${f('sp-mg', 'Margin แคมเปญ (บาท)', 'margin', 'number', 'inputmode="numeric" step="1000"')}
         ${f('sp-km', 'เลขไมล์ (กม.)', 'km', 'number', 'inputmode="numeric" min="0"', true)}
-        ${f('sp-ins', 'ประกันหมดอายุ', 'ins', 'date', '', true)}
-        ${f('sp-plate', 'ทะเบียน (ถ้ามี)', 'plate', '', '')}</div>
+        ${f('sp-plate', 'ทะเบียน (ถ้ามี)', 'plate', '', '')}
+        ${f('sp-tax', 'วันหมดอายุป้ายภาษี', 'taxExp', 'date', '')}</div>
+      <div class="p-3 rounded-lg border border-line flex flex-col gap-3"><b class="text-sm">ประกันภัย</b>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-5 h-5" data-modal="d.insNone" ${d.insNone ? 'checked' : ''}> ยังไม่แจ้งประกัน</label>
+        ${d.insNone ? '' : `<div class="grid sm:grid-cols-2 gap-3">
+          <div class="field min-w-0"><label for="sp-instype">ประเภทประกัน</label><select id="sp-instype" data-modal="d.insType"><option value="">เลือก</option>${SP_INS_TYPES.map(t => `<option ${d.insType === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
+          ${f('sp-insco', 'บริษัทประกัน', 'insCo', '', '')}
+          ${f('sp-ins', 'ประกันหมดอายุ', 'ins', 'date', '', true)}</div>`}</div>
       ${f('sp-cond', 'สภาพรถ / อุปกรณ์ติดรถ / ของแถม', 'cond', '', 'placeholder="เช่น ฟิล์ม พรมปู กรอบป้าย ใช้งานมาแล้ว..."')}</div>` : ''}
     <div class="grid sm:grid-cols-3 gap-3">
       ${f('sp-invno', 'เลขที่ใบกำกับ', 'invNo', '', '')}
@@ -125,14 +140,18 @@ Object.assign(ACTIONS, {
     if (d.reason === 'demo' && d.test === null) { toast('เลือกว่ารถ Demon คันนี้เปิดทดลองขับหรือไม่', 'bad'); return; }
     if (d.sellable === true && !(Number(d.price) > 0)) { toast('ใส่ราคาขาย', 'bad'); return; }
     if (d.sellable === true && (d.km === '' || d.km == null)) { toast('ใส่เลขไมล์', 'bad'); return; }
-    if (d.sellable === true && !d.ins) { toast('ใส่วันที่ประกันหมดอายุ', 'bad'); return; }
+    if (d.sellable === true && !d.insNone && !d.ins) { toast('ใส่วันที่ประกันหมดอายุ หรือติ๊ก "ยังไม่แจ้งประกัน"', 'bad'); return; }
     if (d.sellable === false && !(d.note || '').trim()) { toast('เขียนเหตุผลที่ขายไม่ได้', 'bad'); return; }
     const cur = S.vehicles.get(m.vin) || { added: null, removed: null, branch: null }, prev = cur.special;
     const act = !prev ? `ดึงกลับเข้า Stock พิเศษ (${SP_REASONS.find(x => x[0] === d.reason)[1].replace(/ \(.*\)$/, '')})`
       : prev.sellable !== d.sellable ? (d.sellable === true ? 'ตั้งเป็นขายได้' : d.sellable === false ? 'ตั้งเป็นขายไม่ได้' : 'ตั้งเป็นยังไม่ตัดสินใจ') : 'แก้ข้อมูลรถพิเศษ';
     const sp = {
       reason: d.reason, test: d.reason === 'demo' ? d.test : null, sellable: d.sellable,
-      price: d.sellable === true ? Number(d.price) : null, km: d.sellable === true ? Number(d.km) : null, ins: d.sellable === true ? d.ins : null,
+      price: d.sellable === true ? Number(d.price) : null, km: d.sellable === true ? Number(d.km) : null,
+      ins: d.sellable === true && !d.insNone ? d.ins : null, insNone: d.sellable === true && !!d.insNone,
+      insType: d.sellable === true && !d.insNone ? d.insType || null : null, insCo: d.sellable === true && !d.insNone ? (d.insCo || '').trim() || null : null,
+      fullPrice: d.sellable === true && d.fullPrice !== '' && d.fullPrice != null ? Number(d.fullPrice) : null, finMax: d.sellable === true && d.finMax !== '' && d.finMax != null ? Number(d.finMax) : null,
+      margin: d.sellable === true && d.margin !== '' && d.margin != null ? Number(d.margin) : null, taxExp: d.sellable === true ? d.taxExp || null : null,
       plate: d.sellable === true ? (d.plate || '').trim() || null : null, cond: d.sellable === true ? (d.cond || '').trim() || null : null,
       note: (d.note || '').trim() || null, invNo: String(d.invNo || '').trim() || null, invDate: d.invDate || null, delivDate: d.delivDate || null, br: d.br,
       ...actor(), hist: [...((prev && prev.hist) || []), { act, note: (d.note || '').trim() || null, price: d.sellable === true ? Number(d.price) : null, ...actor() }]
@@ -157,7 +176,7 @@ function spView(D) {
       <td class="nowrap text-sm">${esc(spReasonText(sp))}</td>
       <td class="nowrap">${sp.sellable === true ? chip('ขายได้', 'good') : sp.sellable === false ? chip('ขายไม่ได้', 'bad') : chip('รอตัดสิน', 'muted')}</td>
       <td class="nowrap num text-right">${sp.price ? fmtN(sp.price) : '–'}</td><td class="nowrap num text-right">${sp.km != null && sp.km !== '' ? fmtN(sp.km) : '–'}</td>
-      <td class="nowrap text-sm">${sp.ins ? fmtD(sp.ins) + ' ' + spInsChip(sp.ins) : '–'}</td>
+      <td class="nowrap text-sm">${sp.insNone ? chip('ยังไม่แจ้งประกัน', 'warn') : sp.ins ? fmtD(sp.ins) + ' ' + spInsChip(sp.ins) : '–'}</td>
       <td class="nowrap text-sm">${esc(sp.invNo || '')}${sp.invDate ? ' · ' + fmtD(sp.invDate) : ''}</td>
       <td class="nowrap">${carStatusCell(c, D)}</td>
       <td><div class="flex gap-2">${sp.sellable === true ? stockActions(c, p, D) : ''}</div></td></tr>`; }).join('')}</tbody></table></div>`
