@@ -23,7 +23,12 @@ function rptCompare(D, rep, rows) {
     delHonda: H.del.length, delWeb: w.del.size, advHonda: H.adv.length,
     notInWeb: H.del.filter(r => !w.del.has(r.vin)),                                  // Honda says delivered, the web has no delivery in that month
     notInHonda: [...w.del.entries()].filter(([v]) => withDeal.has(v) && !hd.has(v) && !H.adv.some(r => r.vin === v)).map(([vin, d]) => ({ vin, d })),   // delivered in the web, not reported
-    advNoWeb: H.adv.filter(r => !w.adv(r.vin)).map(r => { const i = D.invByVin.get(r.vin); return { ...r, web: i && i.ddate ? 'IDS ส่งมอบแล้ว ' + fmtD(i.ddate) : i && i.idate ? 'ออกใบกำกับ ' + fmtD(i.idate) + ' ยังไม่ส่งมอบ ยังไม่ได้ตั้ง Advance ในเว็บ' : 'ไม่พบใบกำกับในเว็บ' }; })
+    // ALLOCATED = Advance = invoiced, not handed over: with a customer (waiting to deliver / delivered next month) or without a customer
+    adv: H.adv.map(r => {
+      const i = D.invByVin.get(r.vin), cust = i && i.cust ? i.cust : '', dd = i && i.ddate ? String(i.ddate).slice(0, 10) : '', next = dd && dd.slice(0, 7) > ym;
+      const kind = !i ? 'miss' : dd && !next ? 'early' : cust ? (next ? 'next' : 'wait') : 'free';
+      return { ...r, cust, dd, kind, web: w.adv(r.vin) };
+    })
   };
 }
 function rptGroups(rows) {
@@ -36,7 +41,7 @@ function rptSheet(rep, rows, cmp) {
   return `<div class="sheet"><h1>สรุปแคมเปญ Honda ${esc(rep)}</h1><p class="sub">AT Honda ${rptBr() ? esc(BR[rptBr()].name) : 'ทุกสาขา'} · ยอดแจ้งขาย ${rows.length} คัน (ส่งมอบ ${rows.filter(r => rptKind(r.st) === 'del').length} · ALLOCATED/Advance ${rows.filter(r => rptKind(r.st) === 'adv').length})</p>
   <h2>สรุปตามแคมเปญและทางเลือก</h2><table><thead><tr><th>แคมเปญ</th><th>ทางเลือก</th><th>รวม</th><th>ส่งมอบ</th><th>Advance</th></tr></thead><tbody>${gs.map(g => `<tr><td>${esc(g.camp)}</td><td>${esc(g.opt)}</td><td>${g.n}</td><td>${g.del}</td><td>${g.adv}</td></tr>`).join('')}</tbody></table>
   <h2>รายคัน</h2><table><thead><tr><th>#</th><th>รุ่น</th><th>เลขตัวถัง</th><th>สาขา</th><th>ส่งมอบ</th><th>ทางเลือก</th><th>สถานะ</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.name)}</td><td>${esc(r.vin)}</td><td>${esc(r.br || '')}</td><td>${esc(fmtD(rptIso(r.date)))}</td><td>${esc(r.opt)}</td><td>${esc(rptKind(r.st) === 'adv' ? 'ALLOCATED (Advance)' : r.st)}</td></tr>`).join('')}</tbody></table>
-  ${cmp ? `<h2>เทียบกับยอดจริงในเว็บ</h2><table><tbody><tr><th>Honda แจ้งส่งมอบ</th><td>${cmp.delHonda}</td><th>เว็บส่งมอบในเดือน</th><td>${cmp.delWeb}</td></tr><tr><th>Honda แจ้งแต่เว็บไม่มี</th><td>${cmp.notInWeb.length}</td><th>เว็บเลือกแคมเปญแต่ไม่อยู่ในไฟล์</th><td>${cmp.notInHonda.length}</td></tr></tbody></table>` : ''}</div>`;
+  ${cmp ? `<h2>เทียบกับยอดจริงในเว็บ</h2><table><tbody><tr><th>Honda แจ้งส่งมอบ</th><td>${cmp.delHonda}</td><th>เว็บส่งมอบในเดือน</th><td>${cmp.delWeb}</td></tr><tr><th>ALLOCATED: มีลูกค้ารอส่งมอบ / ส่งมอบเดือนถัดไป / ไม่มีลูกค้า</th><td>${cmp.adv.filter(r => r.kind === 'wait').length} / ${cmp.adv.filter(r => r.kind === 'next').length} / ${cmp.adv.filter(r => r.kind === 'free').length}</td><th>Honda แจ้งแต่เว็บไม่มี</th><td>${cmp.notInWeb.length}</td></tr><tr><th></th><td></td><th>เว็บเลือกแคมเปญแต่ไม่อยู่ในไฟล์</th><td>${cmp.notInHonda.length}</td></tr></tbody></table>` : ''}</div>`;
 }
 // cars whose campaign is not chosen: "รอเลือกแคมเปญ", no campaign at all on the terms, or delivered this month with no terms keyed
 function campNoneRows(D, rep) {
@@ -71,7 +76,8 @@ function viewCampSum(D) {
   <p class="text-sm text-muted mb-2">ไฟล์นี้คือแคมเปญที่ขอเบิก ไม่ใช่ใบส่งมอบ จึงเทียบเฉพาะคันที่เกี่ยวกับแคมเปญ · Honda ระบุส่งมอบ ${cmp.delHonda} คัน · เว็บมีส่งมอบทุกคันในเดือน ${cmp.delWeb} คัน</p>
   ${list('Honda แจ้งส่งมอบ แต่เว็บไม่มีส่งมอบในเดือนนี้', cmp.notInWeb, r => `<div>${vinLink({ vin: r.vin })} <span class="text-xs text-muted">${esc(r.name)} · Honda ส่งมอบ ${esc(fmtD(rptIso(r.date)))}</span></div>`)}
   ${list('เว็บเลือกแคมเปญไว้และส่งมอบเดือนนี้ แต่ไม่อยู่ในไฟล์แคมเปญ', cmp.notInHonda, r => `<div>${vinLink({ vin: r.vin })} <span class="text-xs text-muted">เว็บส่งมอบ ${esc(fmtD(r.d))}</span></div>`)}
-  ${list('Honda แจ้ง ALLOCATED แต่เว็บไม่มีข้อมูล Advance', cmp.advNoWeb, r => `<div>${vinLink({ vin: r.vin })} <span class="text-xs text-muted">${esc(r.name)} · เว็บ: ${esc(r.web)}</span></div>`)}
+  <h4 class="font-medium text-sm mt-3 mb-1">ALLOCATED = Advance (ออกใบกำกับแล้ว ยังไม่ส่งมอบ) ${cmp.adv.length} คัน</h4>
+  ${[['wait', 'มีลูกค้า รอกดส่งมอบ', 'warn'], ['next', 'มีลูกค้า ส่งมอบเดือนถัดไปแล้ว', 'good'], ['free', 'ไม่มีลูกค้า (Advance ลอย)', 'muted'], ['early', 'ส่งมอบในเดือนเดียวกัน แต่ Honda ยังแจ้ง ALLOCATED', 'bad'], ['miss', 'ไม่พบใบกำกับของ VIN นี้ในเว็บ', 'bad']].map(([k, t, tone]) => { const arr = cmp.adv.filter(r => r.kind === k); return arr.length ? `<details class="mb-2 bg-surface border border-line rounded-lg p-3" open><summary class="text-sm cursor-pointer"><b>${t}</b> ${chip(String(arr.length), tone)}</summary><div class="mt-2 flex flex-col gap-1 text-sm">${arr.map(r => `<div>${vinLink({ vin: r.vin })} <span class="text-xs text-muted">${esc(r.name)}${r.cust ? ' · ' + esc(r.cust) : ''}${r.dd ? ' · ส่งมอบ ' + esc(fmtD(r.dd)) : ''}</span></div>`).join('')}</div></details>` : ''; }).join('')}
   ${campNoneBox(D, rep)}
   <h3 class="font-head font-semibold mt-4 mb-2">สรุปตามแคมเปญและทางเลือก</h3>
   <div class="bg-surface border border-line rounded-lg overflow-x-auto"><table class="tbl"><thead><tr><th>แคมเปญ</th><th>ทางเลือก</th><th class="text-right">รวม</th><th class="text-right">ส่งมอบ</th><th class="text-right">Advance</th></tr></thead><tbody>${gs.map(g => `<tr><td class="text-xs">${esc(g.camp)}</td><td>${esc(g.opt)}<div class="text-xs text-muted">${[...g.models].map(([k, v]) => esc(k) + ' ' + v).join(' · ')}</div></td><td class="text-right num">${g.n}</td><td class="text-right num">${g.del}</td><td class="text-right num">${g.adv}</td></tr>`).join('')}</tbody></table></div>
