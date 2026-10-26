@@ -247,6 +247,8 @@ function stockCars(D) {
   const f = S.filters;
   let cars = [...D.cars.values()].filter(inBr).filter(carVisible);
   if (f.model) cars = cars.filter(c => c.model === f.model);
+  if (f.sGrade) cars = cars.filter(c => c.grade === f.sGrade);
+  if (f.sColor) cars = cars.filter(c => c.color === f.sColor);
   if (f.noProd) cars = cars.filter(c => !c.prod);
   if (f.q) {
     const n = f.q.trim().toUpperCase();
@@ -260,8 +262,13 @@ function viewStock(D) {
   const all = stockCars(D);
   const counts = {}; all.forEach(c => { counts[c.status] = (counts[c.status] || 0) + 1; });
   const models = [...new Set([...D.cars.values()].map(c => c.model).filter(Boolean))].sort();
+  const base = [...D.cars.values()].filter(c => !f.model || c.model === f.model);
+  const grades = [...new Set(base.map(c => c.grade).filter(Boolean))].sort();
+  const colors = [...new Set(base.filter(c => !f.sGrade || c.grade === f.sGrade).map(c => c.color).filter(Boolean))].sort();
   const filters = `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
     <div class="field"><label for="f-model">รุ่น</label><select id="f-model" data-filter="model"><option value="">ทุกรุ่น</option>${models.map(m => `<option ${f.model === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
+    <div class="field"><label for="f-sg">เกรด</label><select id="f-sg" data-filter="sGrade"><option value="">ทุกเกรด</option>${grades.map(g => `<option value="${esc(g)}" ${f.sGrade === g ? 'selected' : ''}>${esc(gradeShort(f.model || '', g) || g)}</option>`).join('')}</select></div>
+    <div class="field"><label for="f-sc">สี</label><select id="f-sc" data-filter="sColor"><option value="">ทุกสี</option>${colors.map(c => `<option ${f.sColor === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
     ${isSales() ? '' : `<div class="field"><label for="f-status">สถานะ</label><select id="f-status" data-filter="status"><option value="">ทุกสถานะ</option>
       ${mode === 'spec' ? `<option value="low" ${f.status === 'low' ? 'selected' : ''}>สเปกที่ไม่พอ (แดง)</option>` : ''}
       ${Object.entries(CAR_STATUS).map(([k, v]) => `<option value="${k}" ${f.status === k ? 'selected' : ''}>${v[0]} (${counts[k] || 0})</option>`).join('')}</select></div>`}
@@ -269,7 +276,7 @@ function viewStock(D) {
     ${mode === 'list' ? `<div class="field"><label for="f-ssort">เรียง</label><select id="f-ssort" data-filter="sSort">${[['', 'สาขา → สเปก → อายุ'], ['old', 'เก่าสุดทุกสาขา'], ['free', 'รถว่างพร้อมจัดสรร']].map(([k, t]) => `<option value="${k}" ${(f.sSort || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
     <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-q">ค้นหา VIN / Ref${isSales() ? '' : ' / เลขใบจอง / ชื่อลูกค้า'} · ${S.br ? 'ในสาขา ' + S.br : 'ทุกสาขา'}</label><input id="f-q" type="search" data-filter="q" value="${esc(f.q)}" placeholder="เช่น MRHGN36"></div>
   </div>`;
-  const heldN = [...D.cars.values()].filter(inBr).filter(c => (!f.model || c.model === f.model) && !['free', 'temp', 'company'].includes(c.status)).length;
+  const heldN = [...D.cars.values()].filter(inBr).filter(c => (!f.model || c.model === f.model) && (!f.sGrade || c.grade === f.sGrade) && (!f.sColor || c.color === f.sColor) && !['free', 'temp', 'company'].includes(c.status)).length;
   const line = isSales() ? `<p class="text-sm mb-2">รถที่ขายได้ <b class="num" style="color:var(--good)">${(counts.free || 0) + (counts.temp || 0)}</b> คัน${counts.temp ? ` (มีคนล็อกชั่วคราวรอลูกค้าอยู่ ${counts.temp} คัน ยังจองแข่งได้)` : ''}${counts.pending ? ` · มีคำขอล็อกรออนุมัติ ${counts.pending} คัน (ขอคิวต่อได้)` : ''} · ติดจองแล้ว <b class="num">${heldN}</b> คัน (ไม่แสดงชื่อ)</p>`
     : `<p class="text-sm mb-2">ทั้งหมด <b class="num">${all.length}</b> คัน · ว่าง <b class="num" style="color:var(--good)">${(counts.free || 0) + (counts.temp || 0)}</b> · ติดจอง/มีชื่อ <b class="num">${(counts.booked || 0) + (counts.noted || 0)}</b> · ล็อก <b class="num">${(counts.locked || 0) + (counts.pending || 0) + (counts.allocated || 0)}</b> · ขาย/ออกใบกำกับ <b class="num">${(counts.sold || 0) + (counts.invoiced || 0) + (counts.delivered || 0)}</b> · รถบริษัท <b class="num">${counts.company || 0}</b> · <span class="text-muted">ส่งมอบแล้ว (มีใบกำกับและวันที่ส่งมอบ) ตัดออกจากสต็อก ${D.deliveredOut.filter(inBr).length} คัน</span>${(() => { const n = [...D.cars.values()].filter(inBr).filter(c => !c.prod).length; return n || f.noProd ? ` · <button class="underline" style="color:var(--warn)" data-act="noprod" aria-pressed="${!!f.noProd}">${f.noProd ? 'แสดงรถทุกคัน' : `ยังไม่มีวันผลิต ${n} คัน`}</button>` : ''; })()}</p>
     ${f.noProd ? `<p class="text-sm mb-2">${chip('แสดงเฉพาะรถที่ยังไม่มีวันผลิต', 'warn')} <span class="text-muted">อายุรถของคันเหล่านี้ยังนับจากวันที่รถฝากศูนย์ กด "ใส่วันผลิต" แล้วดูจากป้ายที่ตัวรถ</span></p>` : ''}`;
@@ -297,7 +304,7 @@ const SPEC_CAT = { free: 'ว่าง', held: 'ติดจอง (IDS จั�
 function specTable(cars, D) {
   const f = S.filters, p = perms();
   const brs = S.br ? [S.br] : BRS;
-  const pool = isSales() ? [...D.cars.values()].filter(inBr).filter(c => !f.model || c.model === f.model) : cars;
+  const pool = isSales() ? [...D.cars.values()].filter(inBr).filter(c => (!f.model || c.model === f.model) && (!f.sGrade || c.grade === f.sGrade) && (!f.sColor || c.color === f.sColor)) : cars;
   let specs = [...new Set(pool.map(c => c.spec))].map(k => D.specs[k]);
   if (f.status === 'low') specs = specs.filter(s => s.low);
   else if (f.status) { const ks = new Set(cars.filter(c => c.status === f.status).map(c => c.spec)); specs = specs.filter(s => ks.has(s.key)); }

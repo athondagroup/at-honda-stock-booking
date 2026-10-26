@@ -968,6 +968,8 @@ document.addEventListener('input', ev => {
     if (t.dataset.filter !== 'bPage') S.filters.bPage = 1;
     if (t.dataset.filter === 'qModel') { S.filters.bGrade = ''; S.filters.bColor = ''; }
     if (t.dataset.filter === 'bGrade') S.filters.bColor = '';
+    if (t.dataset.filter === 'model') { S.filters.sGrade = ''; S.filters.sColor = ''; }
+    if (t.dataset.filter === 'sGrade') S.filters.sColor = '';
     if (t.dataset.filter === 'chModel') { S.filters.chGrade = ''; S.filters.chColor = ''; }
     if (t.dataset.filter === 'chGrade') S.filters.chColor = '';
     // a picker that redraws itself while its own drop-down is still open can crash a phone browser: let it close first
