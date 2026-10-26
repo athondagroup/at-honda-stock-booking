@@ -3,12 +3,46 @@
 // Upload the campaign file (photo / Excel / CSV). The file is read to text, compared with the campaign each booking already
 // chose, and shows ตรง / ไม่ตรง / ไม่พบ. Nothing is changed by itself: the person picks which campaign a booking uses.
 const campUpCan = () => perms().write && (perms().upload || perms().approve);
+// the parts of an option that decide it: interest, Exclusive Care years, Ultimate Care, free insurance, support baht, e-coupon
+function campFeats(t) {
+  t = String(t || '');
+  const f = [], m = (re, k) => { const r = t.match(re); if (r) f.push(k + (r[1] ? r[1] : '')); };
+  m(/ดอกเบี้ยพิเศษ ?([\d.]+) ?%/, 'rate'); m(/Exclusive Care ?(\d+)/i, 'exc'); if (/Ultimate Care/i.test(t)) f.push('ult');
+  if (/ประกัน/.test(t)) f.push('ins'); if (/ค่าช่วยเหลือ/.test(t)) f.push('help'); if (/e-?coupon/i.test(t)) f.push('cpn');
+  return f.sort().join(',');
+}
+const campNo = t => { const r = String(t || '').match(/ทางเลือก(?:ที่)? ?(\d+)/); return r ? r[1] : ''; };
+// the Honda "Dealer Incentive Report": one row per VIN with the campaign, the option, delivery date and status
+function campParseDIR(X, wb) {
+  for (const n of wb.SheetNames) {
+    const rows = X.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: false, defval: '' });
+    const hi = rows.findIndex(r => r.some(c => String(c).includes('หมายเลขตัวถัง')));
+    if (hi < 0) continue;
+    const h = rows[hi].map(c => String(c).trim()), ix = k => h.findIndex(c => c.includes(k));
+    const iV = ix('หมายเลขตัวถัง'), iC = ix('เคมเปญ') >= 0 ? ix('เคมเปญ') : ix('แคมเปญ'), iO = ix('ทางเลือก'), iD = ix('วันที่ส่งมอบ'), iN = ix('ชื่อ MTOC'), iS = ix('สถานะ');
+    const items = new Map();
+    for (const r of rows.slice(hi + 1)) {
+      const vin = String(r[iV] || '').trim().toUpperCase(); if (!/^[A-Z0-9]{17}$/.test(vin)) continue;
+      items.set(vin, { vin, camp: String(r[iC] || '').trim(), opt: String(r[iO] || '').replace(/\s+/g, ' ').trim(), date: String(r[iD] || '').trim(), name: String(r[iN] || '').trim(), st: String(r[iS] || '').trim() });
+    }
+    if (items.size) { const rep = rows.slice(0, hi).map(r => r.join(' ')).join(' ').match(/(\d{2}\/\d{4})/); return { items, report: rep ? rep[1] : '' }; }
+  }
+  return null;
+}
 function campUpRows(D) {
   const U = S.campUp || {}, out = [];
   for (const a of D.at) {
     const d = a.rec && a.rec.deal; if (!d || !d.at || a.cancelled) continue;
     const x = termsCtxAt(a, D), opts = campOptions(x).opts.filter(y => y.ok && y.value !== 'other');
     if (S.br && a.br !== S.br) continue;
+    if (U.items) {
+      const vin = atVin(a), it = vin ? U.items.get(String(vin).toUpperCase()) : null;
+      if (!it) { out.push({ a, d, opts, found: [], state: 'miss', why: vin ? 'ไม่มี VIN นี้ในไฟล์' : 'ใบจองยังไม่มี VIN' }); continue; }
+      const ff = campFeats(it.opt), same = ff && ff === campFeats(d.campaign);
+      const found = same ? [] : opts.filter(y => ff && campFeats(y.name) === ff && (!campNo(it.opt) || campNo(y.name) === campNo(it.opt))).map(y => ({ opt: y, pct: 100, why: 'ตรงกับไฟล์' }));
+      out.push({ a, d, opts, found, state: same ? 'ok' : 'diff', it });
+      continue;
+    }
     const found = U.text ? campMatchText(opts, U.text) : [], top = found[0];
     const mine = found.find(h => h.opt.value === d.campaign_id);
     const state = !U.text ? 'none' : !top ? 'miss' : (top.opt.value === d.campaign_id || (mine && mine.pct >= top.pct)) ? 'ok' : 'diff';
@@ -18,7 +52,7 @@ function campUpRows(D) {
   return out.sort((p, q) => ord[p.state] - ord[q.state] || (p.a.br || '').localeCompare(q.a.br || ''));
 }
 function campUpRow(r) {
-  const { a, d, opts, found, state } = r, U = S.campUp, pick = (U.pick || {})[a.id] || '';
+  const { a, d, opts, found, state, it, why } = r, U = S.campUp, pick = (U.pick || {})[a.id] || '';
   const can = dealAdmin(a) && !poLocked(a);
   const tone = state === 'ok' ? 'good' : state === 'diff' ? 'warn' : state === 'miss' ? 'bad' : 'muted';
   const label = state === 'ok' ? 'ตรง' : state === 'diff' ? 'ไม่ตรง' : state === 'miss' ? 'ไม่พบในไฟล์' : 'ยังไม่เทียบ';
@@ -29,13 +63,20 @@ function campUpRow(r) {
         <button type="button" class="btn btn-ghost btn-sm" data-act="campup-use" data-id="${esc(a.id)}" data-cid="${esc(pick)}" ${pick ? '' : 'disabled'}>ใช้ตัวที่เลือก</button></div></div>`;
   return `<div class="p-3 rounded-lg border border-line bg-surface flex flex-col gap-2">
     <div class="flex flex-wrap items-center gap-2"><b>${esc(a.cust)}</b><span class="text-xs text-muted">${esc(a.br)} · ${esc(a.model)} ${esc(gradeShort(a.model, a.grade))} ${esc(a.color || '')}${a.rec.sales ? ' · ' + esc(a.rec.sales) : ''}</span><span class="ml-auto">${chip(label, tone)}</span></div>
+    ${it ? `<div class="text-sm p-2 rounded-lg" style="background:var(--surface-2)">ในไฟล์ Honda: <b>${esc(it.opt || '–')}</b><div class="text-xs text-muted">${esc(it.camp)}${it.date ? ' · ส่งมอบ ' + esc(it.date) : ''}${it.st ? ' · ' + esc(it.st) : ''}</div></div>` : why ? `<div class="text-xs text-muted">${esc(why)}</div>` : ''}
     <div class="text-sm">แคมเปญที่เลือกไว้: <b>${esc(d.campaign || '–')}</b>${d.adm_file ? ` <span class="text-xs text-muted">(ไฟล์ ${esc(d.adm_file)})</span>` : ''}</div>
     ${act}</div>`;
+}
+function campUpExtra(rows) {
+  const have = new Set(rows.map(r => String(atVin(r.a) || '').toUpperCase())), U = S.campUp;
+  const left = [...U.items.values()].filter(i => !have.has(i.vin));
+  if (!left.length) return '';
+  return `<details class="mb-4 bg-surface border border-line rounded-lg p-3"><summary class="text-sm cursor-pointer">VIN ในไฟล์ที่ไม่มีเงื่อนไขการขายในเว็บ (${left.length})</summary><div class="mt-2 flex flex-col gap-1 text-sm">${left.map(i => `<div><span class="code">${esc(i.vin)}</span> <span class="text-xs text-muted">${esc(i.name)} · ${esc(i.opt)}</span></div>`).join('')}</div></details>`;
 }
 function viewCampUp(D) {
   const U = S.campUp || (S.campUp = { text: '', file: '', busy: false, msg: '', pick: {} }), can = campUpCan();
   const rows = campUpRows(D), n = s => rows.filter(r => r.state === s).length;
-  return `${pageHead('อัปเดตข้อมูลแคมเปญ', 'อัปโหลดไฟล์แคมเปญของ Honda (รูป, Excel หรือ CSV) ระบบเทียบกับแคมเปญที่เลือกไว้ในแต่ละใบจอง ถ้าไม่ตรงหรือไม่พบ กดเลือกเองว่าใบนั้นใช้แคมเปญอะไร')}
+  return `${pageHead('อัปเดตข้อมูลแคมเปญ', 'อัปโหลดรายงาน Dealer Incentive Report ของ Honda (.xlsx) ระบบเทียบรายคันตามเลข VIN กับแคมเปญที่เลือกไว้ในแต่ละใบจอง (รูปหรือไฟล์อื่นเทียบจากข้อความ) ถ้าไม่ตรงหรือไม่พบ กดเลือกเองว่าใบนั้นใช้แคมเปญอะไร')}
   <section class="bg-surface border border-line rounded-lg p-4 md:p-5 mb-5">
     <label class="drop relative ${can && !U.busy ? '' : 'opacity-50'}">
       <input type="file" accept="image/*,.xlsx,.xls,.csv,.txt" data-campup-file ${can && !U.busy ? '' : 'disabled'} class="absolute inset-0 opacity-0 cursor-pointer">
@@ -44,8 +85,9 @@ function viewCampUp(D) {
       <span class="text-xs text-muted">${can ? 'อ่านในเครื่อง ไม่เก็บไฟล์ในระบบ · ระบบเทียบกับแคมเปญของเดือนที่ใบจองนั้นใช้' : 'เฉพาะแอดมินและผู้จัดการ'}</span>
     </label>
     ${U.msg ? `<p class="mt-3 text-sm" style="color:var(--bad)">${esc(U.msg)}</p>` : ''}
-    ${U.text ? `<div class="mt-3 flex flex-wrap items-center gap-2 text-sm">ไฟล์ <b>${esc(U.file)}</b> ${chip('ตรง ' + n('ok'), 'good')}${chip('ไม่ตรง ' + n('diff'), 'warn')}${chip('ไม่พบ ' + n('miss'), 'bad')}<button class="btn btn-ghost btn-sm ml-auto" data-act="campup-clear">ล้างไฟล์</button></div>` : ''}
+    ${U.text || U.items ? `<div class="mt-3 flex flex-wrap items-center gap-2 text-sm">ไฟล์ <b>${esc(U.file)}</b>${U.report ? ` (รายงาน ${esc(U.report)})` : ''} ${chip('ตรง ' + n('ok'), 'good')}${chip('ไม่ตรง ' + n('diff'), 'warn')}${chip('ไม่พบ/ไม่มี VIN ' + n('miss'), 'bad')}<button class="btn btn-ghost btn-sm ml-auto" data-act="campup-clear">ล้างไฟล์</button></div>` : ''}
   </section>
+  ${U.items ? campUpExtra(rows) : ''}
   <h3 class="font-head font-semibold mb-2">ใบจองที่ลงเงื่อนไขการขายแล้ว (${rows.length})</h3>
   <div class="flex flex-col gap-2">${rows.map(campUpRow).join('') || emptyBox('ยังไม่มีใบจองที่ลงเงื่อนไขการขาย', 'ใบจองที่ผ่านขั้นไฟแนนซ์และลงเงื่อนไขแล้วจะขึ้นที่นี่')}</div>`;
 }
@@ -58,10 +100,12 @@ async function campUpRead(file) {
       text = String(res && res.text || '');
     } else {
       const X = await loadXLSX(), wb = /\.(csv|txt)$/i.test(file.name) ? X.read(await file.text(), { type: 'string' }) : X.read(await file.arrayBuffer(), { type: 'array' });
+      const dir = campParseDIR(X, wb);
+      if (dir) { Object.assign(U, { items: dir.items, report: dir.report, text: '', file: file.name, pick: {} }); U.busy = false; render(); return; }
       text = wb.SheetNames.map(n => X.utils.sheet_to_csv(wb.Sheets[n])).join(' ');
     }
     if (!text.trim()) U.msg = 'อ่านข้อความจากไฟล์ไม่ได้ ลองไฟล์อื่น';
-    else { U.text = text; U.file = file.name; U.pick = {}; }
+    else { U.text = text; U.items = null; U.report = ''; U.file = file.name; U.pick = {}; }
   } catch (e) { U.msg = 'อ่านไฟล์ไม่ได้ ลองไฟล์อื่น'; }
   U.busy = false; render();
 }
@@ -71,7 +115,7 @@ document.addEventListener('change', ev => {
   else if (t.dataset.campupPick !== undefined) { const U = S.campUp; U.pick[t.dataset.campupPick] = t.value; render(); }
 });
 Object.assign(ACTIONS, {
-  'campup-clear'() { S.campUp = { text: '', file: '', busy: false, msg: '', pick: {} }; render(); },
+  'campup-clear'() { S.campUp = { items: null, text: '', file: '', busy: false, msg: '', pick: {} }; render(); },
   async 'campup-use'(el) {
     const a = atById(el.dataset.id), cid = el.dataset.cid, U = S.campUp; if (!a || !cid) return;
     const D = derive(), d = a.rec.deal;
