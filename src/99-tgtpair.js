@@ -6,6 +6,18 @@ function tgtTone(p) { return p === null ? 'muted' : p >= 100 ? 'good' : p >= 80 
 // the model order of the target file (27/10); anything else after them
 function tgtOrder() { return ['CITY', 'CITY E:HEV', 'CITY HATCHBACK', 'CITY HATCHBACK E:HEV', 'CIVIC E:HEV', 'ACCORD E:HEV', 'HR-V E:HEV', 'CR-V E:HEV', 'E:N1', 'E:N2', 'STEP WGN E:HEV']; }
 function tgtRank(m) { const i = tgtOrder().indexOf(String(m || '').toUpperCase().replace(/\s+/g, ' ').trim()); return i < 0 ? 999 : i; }
+// invoices for the target comparison (27/10): the car is credited to the branch that SOLD it (its booking), not the branch of the DL file it came
+// through: ATE's retail invoices are issued under PSC's DL file, so by file ATE showed almost nothing. A re-issued invoice counts once (the newest).
+function tgtInvList(D, from, to) {
+  const out = [], advs = new Map(); for (const [vin] of S.vehicles) { const a = advRec(vin); if (a) advs.set(vin, a); }
+  D.X.inv.forEach(i => {
+    if (i.company || !i.idate || i.idate < from || i.idate > to || (i.vin && advs.has(i.vin)) || (i.vin && D.invByVin.get(i.vin) !== i)) return;
+    const a = i.vin ? carBookingOf(i.vin, D) : null, br = a && BR[a.br] ? a.br : i.br;
+    out.push({ date: i.idate, br, model: i.model, fin: i.fin || null, grade: i.grade, color: i.color, vin: i.vin, cust: i.cust, sales: i.sales, inv: i.inv, idate: i.idate, ddate: i.ddate, src: 'DL', extra: i.br !== br ? `ใบกำกับอยู่ในไฟล์ ${i.br}` : '' });
+  });
+  for (const [vin, a] of advs) { const br = advBr(vin, a, D), c = carAny(vin, D) || {}; if (br && a.idate >= from && a.idate <= to) out.push({ date: a.idate, br, model: c.model, grade: c.grade, color: c.color, vin, cust: a.cust, sales: null, inv: a.inv, idate: a.idate, ddate: null, fin: null, src: 'ใบ Advance', extra: 'ADV' }); }
+  return out;
+}
 function tgtPct(a, t) { return t > 0 ? Math.round(a / t * 100) : null; }
 function tgtPace(m, D) {   // share of the month gone: only the month in progress, from the DL file date when it is in that month
   const cur = D.today.slice(0, 7); if (m !== cur) return null;
@@ -27,7 +39,7 @@ function tgtBlock(lab, t, a, o) {   // t, a: numbers; o: { chips: html, pace, to
 function tgtChip(top, sub, d, p) { const tn = tgtTone(p); return `<div class="text-center text-xs text-muted min-w-0"><div class="rounded font-bold mb-0.5" style="padding:2px 0;background:var(--${tn === 'muted' ? 'surface-2' : tn + '-soft'});color:var(--${tn === 'muted' ? 'muted' : tn})">${top}</div>${sub}</div>`; }
 function tgtBranchView(E) {
   const D = derive(), ms = monthsIn(E.from, E.to), PAIRS = [['PSC', 'ATE'], ['KPA', 'SPH']];
-  const inv = E.invoiced, one = ms.length === 1, paceOf = m => tgtPace(m, D);
+  const inv = tgtInvList(D, E.from, E.to), one = ms.length === 1, paceOf = m => tgtPace(m, D);
   const cell = (b, m) => ({ t: tgtOf(m, b), a: inv.filter(s => s.br === b && s.date.slice(0, 7) === m).length });
   let models = [];
   if (one) models = [...new Set([...tgtRows().filter(r => r.m === ms[0]).map(r => r.model), ...inv.map(s => s.model || 'ไม่ระบุ')])];
@@ -37,7 +49,7 @@ function tgtBranchView(E) {
     if (one) {
       const mo = models.map(md => ({ md, ...modelOf(brs, md) })).filter(x => x.t || x.a).sort((x, y) => tgtRank(x.md) - tgtRank(y.md) || y.t - x.t || y.a - x.a || x.md.localeCompare(y.md));
       return `<div class="grid gap-1.5 mt-2" style="grid-template-columns:repeat(auto-fill,minmax(165px,1fr))">${mo.map(x => { const need = pace ? Math.round(x.t * pace) : x.t, p = tgtPct(x.a, need), tn = tgtTone(p), d = x.a - need;
-        const n = brs.length === 1 ? drillNum(x.a, { m: 'invoiced', from: E.from, to: E.to, br: brs[0], model: x.md, label: x.md }) : fmtN(x.a);
+        const n = brs.length === 1 ? drillNum(x.a, { m: 'tinv', from: E.from, to: E.to, br: brs[0], model: x.md, label: x.md }) : fmtN(x.a);
         return `<div class="rounded-md p-1.5 text-xs" style="border:1px solid var(--line);background:var(--surface)"><div class="text-muted truncate" title="${esc(x.md)}">${esc(x.md)}</div><div class="flex justify-between items-baseline"><b style="font-size:15px">${n}<span class="text-muted font-normal" style="font-size:11px">/${x.t ? fmtN(x.t) : '–'}</span></b>${x.t ? `<b class="rounded px-1" style="background:var(--${tn}-soft);color:var(--${tn})">${d > 0 ? '+' : ''}${d}</b>` : ''}</div><div style="height:4px;background:var(--surface-2);border-radius:2px;margin-top:3px"><div style="width:${x.t ? Math.min(100, x.a * 100 / x.t) : 0}%;height:4px;background:var(--${tn === 'muted' ? 'line' : tn});border-radius:2px"></div></div></div>`; }).join('')}</div>`;
     }
     return `<div class="grid gap-1 mt-2" style="grid-template-columns:repeat(${ms.length},minmax(0,1fr))">${ms.map(m => { const t = brs.reduce((n, b) => n + tgtOf(m, b), 0), a = brs.reduce((n, b) => n + cell(b, m).a, 0), pc = paceOf(m), need = pc ? Math.round(t * pc) : t;
@@ -47,7 +59,7 @@ function tgtBranchView(E) {
   const pace1 = one ? paceOf(ms[0]) : null;
   const blocks = PAIRS.map(pr => {
     const vis = pr.filter(b => inBr({ br: b })); if (!vis.length) return '';
-    const row = (brs, lab, tot) => tgtBlock(lab, sum(brs, 't'), sum(brs, 'a'), { chips: detail(brs), pace: pace1, tot, drill: brs.length === 1 ? { m: 'invoiced', from: E.from, to: E.to, br: brs[0], label: 'ใบกำกับ' } : null });
+    const row = (brs, lab, tot) => tgtBlock(lab, sum(brs, 't'), sum(brs, 'a'), { chips: detail(brs), pace: pace1, tot, drill: brs.length === 1 ? { m: 'tinv', from: E.from, to: E.to, br: brs[0], label: 'ใบกำกับ' } : null });
     return `<div class="mb-3"><div class="font-semibold text-sm mb-1.5" style="color:var(--ink)">คู่ ${pr.join(' + ')}</div>${vis.map(b => row([b], `<b>${b}</b> <span class="text-xs text-muted">${esc(BR[b].name)}</span>`, false)).join('')}${vis.length > 1 ? row(vis, `<b>รวม ${vis.join(' + ')}</b>`, true) : ''}</div>`;
   }).join('');
   const lg = `<div class="flex flex-wrap gap-3 text-xs text-muted mb-2"><span><i class="inline-block rounded-sm" style="width:10px;height:10px;background:var(--bad)"></i> ต่ำกว่า 80%</span><span><i class="inline-block rounded-sm" style="width:10px;height:10px;background:var(--warn)"></i> 80–99%</span><span><i class="inline-block rounded-sm" style="width:10px;height:10px;background:var(--good)"></i> 100% ขึ้นไป</span><span>${one ? 'ช่องล่าง = ขาย/เป้า ต่อรุ่น (ป้าย = ขาย − เป้า)' : 'ช่องล่าง = ขาย − เป้า ต่อเดือน (สีตาม % ของเดือนนั้น)'}</span>${pace1 ? '<span>เส้นประแดง = แนวที่ควรได้ถึงวันนี้ · สีวัดเทียบแนวนี้</span>' : ''}</div>`;
