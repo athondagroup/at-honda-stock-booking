@@ -40,6 +40,7 @@ function tgtModal(m) {
     <label class="btn btn-ghost btn-sm relative">อัปโหลด Excel<input type="file" accept=".xlsx,.xls,.csv" data-tgt-xlsx class="absolute w-px h-px opacity-0"></label>
     <label class="btn btn-ghost btn-sm relative">${ai.busy ? '<span class="spin"></span> AI กำลังอ่านรูป…' : 'อัปโหลดรูปตารางเป้า (AI อ่าน)'}<input type="file" accept="image/*" data-tgt-img class="absolute w-px h-px opacity-0" ${ai.busy ? 'disabled' : ''}></label>
   </div>
+  ${m.bulk ? tgtBulkBox(m.bulk) : ''}
   ${m.note ? `<div class="p-3 rounded-lg text-sm mb-3" style="background:var(--surface-2)">${m.note}</div>` : ''}
   <div class="bg-surface border border-line rounded-lg scroll-x max-h-[55vh] overflow-auto"><table class="tbl text-sm"><thead><tr><th>รุ่น</th>${brs.map(b => `<th class="text-right">${b}</th>`).join('')}<th class="text-right">รวม</th></tr></thead><tbody>
     ${models.map((md, i) => `<tr><td class="nowrap">${esc(md)}</td>${brs.map(b => `<td class="text-right"><input type="number" min="0" step="1" inputmode="numeric" aria-label="เป้า ${esc(md)} สาขา ${b}" data-modal="grid.${b}.${i}" data-tgt-cell value="${esc(g[b][i] ?? '')}" class="w-16 text-right num" style="background:${m.changed && m.changed[b + '|' + i] ? 'var(--warn-soft, #fff3cd)' : 'transparent'};border-bottom:1px solid var(--line)"></td>`).join('')}
@@ -78,10 +79,65 @@ function tgtMonthOf(v) {
   mm = s.match(/^(\d{1,2})\/(\d{4})$/); if (mm) { let y = Number(mm[2]); if (y > 2400) y -= 543; return `${y}-${mm[1].padStart(2, '0')}`; }
   const d = adDate(s); return /^\d{4}-\d{2}/.test(d) ? d.slice(0, 7) : null;
 }
+
+// the company's target sheet (TG 103Ki): a block per month (label like APR'26), then one row per branch, one column per model, Total at the end.
+// Months run in order from April (Ki starts in April), so a mistyped year in a label (JUL'27 inside Ki 103) is read by its place in the sequence.
+function tgtBlocks(aoa) {
+  const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  const cell = (r, c) => String((aoa[r] || [])[c] ?? '').trim();
+  let hr = -1, totC = -1;
+  for (let r = 0; r < aoa.length && hr < 0; r++) (aoa[r] || []).forEach((v, c) => { if (hr < 0 && /^total$/i.test(String(v).trim())) { hr = r; totC = c; } });
+  const lab = r => { for (const v of aoa[r] || []) { const mm = String(v ?? '').trim().toUpperCase().match(/^([A-Z]{3})['’]?\s*(\d{2})$/); if (mm && MON.includes(mm[1])) return { mon: MON.indexOf(mm[1]) + 1, yy: 2000 + Number(mm[2]) }; } return null; };
+  if (hr < 0) return null;
+  const heads = []; (aoa[hr] || []).forEach((v, c) => { const t = String(v ?? '').trim(); if (t && c < totC && !/^total$/i.test(t)) heads.push([c, t]); });
+  const blocks = []; let cur = null;
+  for (let r = Math.max(0, hr - 2); r < aoa.length; r++) {   // the first month label sits just above the header row
+    const l = lab(r); if (l) { cur = { ...l, rows: [] }; blocks.push(cur); continue; }
+    if (!cur) continue;
+    const brc = (aoa[r] || []).findIndex(v => tgtMatchBr(v) && String(v).trim().length <= 12); if (brc < 0) continue;
+    cur.rows.push({ br: tgtMatchBr(aoa[r][brc]), vals: heads.map(([c, h]) => [h, Number(aoa[r][c]) || 0]), total: Number(aoa[r][totC]) });
+  }
+  if (!blocks.length) return null;
+  let title = ''; for (let r = 0; r < hr && !title; r++) { const t = (aoa[r] || []).map(v => String(v ?? '')).join(' '); if (/\d+\s*Ki/i.test(t)) title = t; }
+  const ki = (title.match(/(\d+)\s*Ki/i) || [])[1], sy = ki ? 1923 + Number(ki) : blocks[0].yy;
+  const warn = [], out = [];
+  blocks.forEach((b, i) => {
+    const mi = 3 + i, y = sy + Math.floor(mi / 12), mo = mi % 12 + 1;   // APR (index 3) of the start year, then in order
+    if (b.mon !== mo) warn.push(`ป้ายเดือนลำดับที่ ${i + 1} คือ ${MON[b.mon - 1]}'${String(b.yy).slice(2)} แต่ตามลำดับ Ki ควรเป็น ${MON[mo - 1]}`);
+    else if (b.yy !== y) warn.push(`ป้าย ${MON[b.mon - 1]}'${String(b.yy).slice(2)} อ่านเป็น ${MON[mo - 1]} ${y} ตามลำดับ Ki`);
+    out.push({ m: `${y}-${String(mo).padStart(2, '0')}`, rows: b.rows });
+  });
+  return { ki: ki ? Number(ki) : null, months: out, warn };
+}
+function tgtModelOf(h) {
+  const t = String(h).trim().replace(/5D/i, ' HATCHBACK').replace(/\s+/g, ' ');
+  const ex = tgtModels().find(m => norm(m) === norm(t));
+  return ex || t.split(' ').map(w => /^e:/i.test(w) ? 'e:' + w.slice(2).toUpperCase() : w.toUpperCase()).join(' ');   // a model not in the catalog keeps the sheet's own name
+}
+// a whole Ki at once: show the months × branches totals next to the sheet's own Total column, then save all months together
+function tgtBulk(file, blk) {
+  const brs = tgtEditBrs(), rows = [], skip = [], chk = [];
+  blk.months.forEach(mo => mo.rows.forEach(r => {
+    if (!brs.includes(r.br)) { skip.push(r.br); return; }
+    let sum = 0; r.vals.forEach(([h, n]) => { sum += n; if (n > 0) { const key = `${mo.m}|${r.br}|${tgtModelOf(h)}`, ex = rows.find(x => x.k === key); if (ex) ex.n += n; else rows.push({ k: key, m: mo.m, br: r.br, model: tgtModelOf(h), n }); } });
+    if (Number.isFinite(r.total) && r.total !== sum) chk.push(`${fmtM(mo.m)} ${r.br}: รวมรุ่น ${sum} ≠ Total ในไฟล์ ${r.total}`);
+  }));
+  S.modal.bulk = { name: file.name, ki: blk.ki, rows: rows.map(({ k, ...r }) => r), months: blk.months.map(x => x.m), warn: blk.warn, chk, skip: [...new Set(skip)] };
+  render();
+}
+function tgtBulkBox(b) {
+  const brs = tgtEditBrs(), tot = (m, br) => b.rows.filter(r => r.m === m && r.br === br).reduce((n, r) => n + r.n, 0);
+  return `<div class="p-3 rounded-lg border border-line mb-3"><div class="font-semibold">อ่านเป้า${b.ki ? ` ${b.ki}Ki` : ''}จากไฟล์ ${esc(b.name)}: ${b.months.length} เดือน · ${fmtN(b.rows.reduce((n, r) => n + r.n, 0))} คัน (ยังไม่บันทึก)</div>
+    ${b.warn.length ? `<div class="text-xs mt-1" style="color:var(--warn)">${b.warn.map(esc).join('<br>')}</div>` : ''}${b.chk.length ? `<div class="text-xs mt-1" style="color:var(--bad)">${b.chk.map(esc).join('<br>')}</div>` : ''}${b.skip.length ? `<div class="text-xs mt-1 text-muted">ข้ามสาขาที่คุณแก้ไม่ได้: ${b.skip.join(', ')}</div>` : ''}
+    <div class="scroll-x mt-2"><table class="tbl text-sm"><thead><tr><th>เดือน</th>${brs.map(x => `<th class="text-right">${x}</th>`).join('')}<th class="text-right">รวม</th></tr></thead><tbody>${b.months.map(m => `<tr><td>${fmtM(m)}</td>${brs.map(x => `<td class="num text-right">${fmtN(tot(m, x))}</td>`).join('')}<td class="num text-right font-semibold">${fmtN(brs.reduce((n, x) => n + tot(m, x), 0))}</td></tr>`).join('')}</tbody></table></div>
+    <div class="flex justify-end gap-2 mt-2"><button class="btn btn-ghost btn-sm" data-act="tgt-bulk-cancel">ไม่ใช้ไฟล์นี้</button><button class="btn btn-red btn-sm" data-act="tgt-bulk-save">บันทึกเป้าทั้ง ${b.months.length} เดือน</button></div></div>`;
+}
 async function tgtXlsxUp(file) {
   let X; try { X = await loadXLSX(); } catch (e) { toast('โหลดตัวอ่านไฟล์ Excel ไม่สำเร็จ', 'bad'); return; }
   let wb; try { wb = X.read(await file.arrayBuffer(), { type: 'array', cellDates: true }); } catch (e) { toast('อ่านไฟล์ไม่ได้', 'bad'); return; }
   const ws = wb.Sheets['เป้า'] || wb.Sheets[wb.SheetNames[0]];
+  const raw = X.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }), blk = tgtBlocks(raw);
+  if (blk) { tgtBulk(file, blk); return; }
   const aoa = X.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '', dateNF: 'yyyy-mm' });
   const rows = aoa.slice(1).filter(r => String(r[2] || '').trim() && String(r[3] ?? '').trim() !== '').map(r => ({ m: tgtMonthOf(r[0]), br: tgtMatchBr(r[1]), model: String(r[2]).trim(), n: Number(String(r[3]).replace(/,/g, '')) }));
   if (!rows.length) { toast('ไม่พบแถวเป้าในไฟล์ ใช้แบบฟอร์มที่ดาวน์โหลดจากหน้านี้', 'bad'); return; }
@@ -116,6 +172,14 @@ document.addEventListener('change', ev => {
 Object.assign(ACTIONS, {
   'tgt-open'() { if (!tgtCanEdit()) return; const m = todayISO().slice(0, 7), models = tgtModels(); S.modal = { kind: 'tgt', m, models, grid: tgtGrid(m, models), note: '', changed: {} }; render(); },
   'tgt-xlsx-down'() { tgtXlsxDown(); },
+  'tgt-bulk-cancel'() { if (S.modal) { S.modal.bulk = null; render(); } },
+  async 'tgt-bulk-save'() {
+    const m = S.modal, b = m && m.bulk; if (!b) return;
+    const brs = tgtEditBrs(), cur = S.ref.get('targets') || { rows: [] }, ms = new Set(b.months);
+    const keep = (cur.rows || []).filter(r => !(ms.has(r.m) && brs.includes(r.br)));
+    const ok = await write('ref', 'targets', { rows: [...keep, ...b.rows], at: new Date().toISOString(), log: [...(cur.log || []), { ...actor(), act: `ตั้งเป้า${b.ki ? ` ${b.ki}Ki` : ''} จากไฟล์ ${b.months.length} เดือน`, note: `${brs.join(', ')} รวม ${b.rows.reduce((n, r) => n + r.n, 0)} คัน` }].slice(-60) });
+    if (ok) { toast(`บันทึกเป้า ${b.months.length} เดือนแล้ว`); S.modal = null; render(); }
+  },
   async 'tgt-save'() {
     const m = S.modal;
     const brs = tgtEditBrs(), cur = S.ref.get('targets') || { rows: [] };
