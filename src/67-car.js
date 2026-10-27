@@ -106,13 +106,13 @@ function carModal(m, D) {
 // the frame number in a list, clickable
 // the campaign option chosen for this frame number (in the booking's terms, or picked in the campaign report)
 function carCampBox(c, bk) {
-  if (isSales() && !(bk && isMine(bk.sales))) return '';
-  const vin = String(c.vin || '').toUpperCase(), d = bk && bk.rec && bk.rec.deal, pk = (((S.ref.get('honda_pay') || {}).picks || {})[vin]) || null;
-  const dc = d && d.at && d.campaign_id && d.campaign_id !== 'pending' ? d : null;
-  if (!dc && !(pk && pk.cid)) return '';
-  const name = dc ? (d.campaign || d.campaign_text || d.campaign_id) : pk.name, by = dc ? (d.adm_mode === 'own' ? 'แอดมินเลือก' : 'ตามที่เซลล์เลือก') : (pk.auto ? 'ระบบจับคู่ตามไฟล์ Honda' : 'เลือกในรายงานแคมเปญ');
-  const money = dc ? num(d.margin_honda) : Number(pk.sup) || 0;
-  return `<div class="p-3 rounded-lg border border-line text-sm" style="background:var(--surface-2)"><b>แคมเปญที่เลือก</b>: ${esc(name || '–')}<div class="text-xs text-muted">${esc(by)}${money ? ' · เงิน Honda ' + fmtN(money) : ''}${dc ? '' : ' · ยังไม่ได้ใส่ในใบจอง'}</div></div>`;
+  const vin = String(c.vin || '').toUpperCase(), d = bk && bk.rec && bk.rec.deal, adm = !isSales();
+  const box = (name, by, money, note) => `<div class="p-3 rounded-lg border border-line text-sm" style="background:var(--surface-2)"><b>แคมเปญที่เลือก</b>: ${esc(name || '–')}<div class="text-xs text-muted">${esc(by)}${money ? ' · เงิน Honda ' + fmtN(money) : ''}${note || ''}</div></div>`;
+  // the sales see only the campaign they chose themselves; the admin's choice and Honda's money are for admin and up
+  if (!adm) return bk && isMine(bk.sales) && d && d.at && d.sales_camp_id ? box(d.sales_camp || d.sales_camp_id, 'ที่คุณเลือก') : '';
+  const pk = (((S.ref.get('honda_pay') || {}).picks || {})[vin]) || null, dc = d && d.at && d.campaign_id && d.campaign_id !== 'pending' ? d : null;
+  if (dc) return box(d.campaign || d.campaign_text || d.campaign_id, d.adm_mode === 'own' ? 'แอดมินเลือก' : 'ตามที่เซลล์เลือก', num(d.margin_honda), d.sales_camp_id && d.sales_camp_id !== d.campaign_id ? ` · เซลล์เลือก: ${esc(d.sales_camp || d.sales_camp_id)}` : '');
+  return pk && pk.cid ? box(pk.name, pk.auto ? 'ระบบจับคู่ตามไฟล์ Honda' : 'เลือกในรายงานแคมเปญ', Number(pk.sup) || 0, ' · ยังไม่ได้ใส่ในใบจอง') : '';
 }
 function vinLink(c) { return `<button class="code font-medium underline decoration-dotted text-left" data-act="car-open" data-vin="${esc(c.vin)}" title="ดูรายละเอียดรถ">${esc(c.vin)}</button>`; }
 // the bookings waiting for one spec, in queue order (from the "รอรถ" number in สต็อก)
