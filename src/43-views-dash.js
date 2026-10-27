@@ -264,7 +264,7 @@ function dashExec(D) {
   ], 'lg:grid-cols-6')}
   ${waitN || advInv.length ? `<div class="-mt-2 mb-5 text-sm"><button class="underline decoration-dotted" data-act="adv-sum">ดูรถออกใบกำกับแล้ว ยังไม่ส่งมอบ ${fmtN(waitN)} คัน และสรุปรถ Advance ›</button></div>` : ''}
   <div class="grid lg:grid-cols-2 gap-5 mb-5">
-    ${card('เป้า เทียบ ยอดขาย (ใบกำกับภาษี)', tgtChart(E, 'c1t'), 'ใบกำกับภาษี = ยอดที่แจ้งขายกับฮอนด้า นับตามวันที่ออกใบกำกับใน DL (ไม่รวมรถบริษัท) · เป้าใส่ที่แท็บ ยอดขายและเป้า')}
+    <div class="lg:col-span-2">${card('เป้า เทียบ ยอดขาย (ใบกำกับภาษี)', tgtChart(E, 'c1t'), 'ใบกำกับภาษี = ยอดที่แจ้งขายกับฮอนด้า นับตามวันที่ออกใบกำกับใน DL (ไม่รวมรถบริษัท) · เป้าใส่ที่แท็บ ยอดขายและเป้า')}</div>
     ${card('ยอดจอง เทียบ ยอดขาย (ส่งมอบ)', bookDelivChart(E, 'c1'), `ส่งมอบ = รถที่ปล่อยให้ลูกค้าจริง นับตามวันที่ส่งมอบ${E.dlAsof ? ` · ข้อมูล DL ถึง ${fmtD(E.dlAsof)} หลังจากนั้นนับจากที่เซลล์บันทึกในระบบนี้` : ''}`)}
     ${card('ยอดขาย แยกไฟแนนซ์ / สด', colChart('c2', E.buckets, series2, { range: [E.from, E.to], stacked: true, label: 'ยอดขายแยกไฟแนนซ์และสด' }))}
     ${card(`แยกบริษัทไฟแนนซ์ <span class="text-muted text-sm font-normal">${fmtN(finN)} คัน</span>`, barList(finRows, '--viz-1'))}

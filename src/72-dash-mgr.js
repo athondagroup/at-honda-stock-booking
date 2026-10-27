@@ -43,6 +43,7 @@ function tgtSeries(E) {
   return { ms, bk, tv, iv };
 }
 function tgtChart(E, id) {
+  if (E.invoiced) return tgtBranchView(E);
   const T = tgtSeries(E), has = T.tv.some(Boolean);
   const chart = colChart(id, T.bk, [{ name: 'เป้า (ใบกำกับ)', color: '--viz-1', values: T.tv }, { name: 'ยอดขาย (ใบกำกับภาษี)', color: '--viz-3', values: T.iv, drill: { m: 'invoiced' } }], { range: [E.from, E.to], label: 'เป้าเทียบยอดใบกำกับภาษี' });
   const pr = `<div class="scroll-x"><table class="tbl text-sm mt-2"><thead><tr><th></th>${T.bk.map(b => `<th class="text-right">${esc(b.label)}</th>`).join('')}</tr></thead><tbody><tr><td class="nowrap">% ทำได้</td>${T.tv.map((t, i) => `<td class="num text-right" ${t && T.iv[i] < t ? 'style="color:var(--bad)"' : t ? 'style="color:var(--good)"' : ''}>${t ? pctOf(T.iv[i], t) + '%' : '–'}</td>`).join('')}</tr></tbody></table></div>`;
@@ -92,7 +93,7 @@ function dashSalesTarget(D) {
     tile('ออกใบกำกับแล้ว ยังไม่ส่งมอบ', fmtN(W.length), { tone: W.some(w => w.age > 14) ? 'warn' : '', sub2: `เกิน 14 วัน ${fmtN(W.filter(w => w.age > 14).length)} คัน` })
   ], 'lg:grid-cols-5')}
   <div class="grid lg:grid-cols-2 gap-5 mb-5">
-    ${dCard('เป้า เทียบ ยอดขาย (ใบกำกับภาษี)', tgtChart(E, 'tg1'), 'ใบกำกับนับตามวันที่ออกใบกำกับในไฟล์ DL ไม่รวมรถบริษัท')}
+    <div class="lg:col-span-2">${dCard('เป้า เทียบ ยอดขาย (ใบกำกับภาษี)', tgtChart(E, 'tg1'), 'ใบกำกับนับตามวันที่ออกใบกำกับในไฟล์ DL ไม่รวมรถบริษัท')}</div>
     ${dCard('ยอดจอง เทียบ ยอดขาย (ส่งมอบ)', bookDelivChart(E, 'tg2'), `ยอดจองนับจากฟอร์ม AT ตามวันที่จอง · ส่งมอบนับตามวันที่ส่งมอบ${E.dlAsof ? ` · DL ถึง ${fmtD(E.dlAsof)}` : ''}`)}
   </div>
   <div class="grid lg:grid-cols-2 gap-5 mb-5">
