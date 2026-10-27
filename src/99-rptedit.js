@@ -65,11 +65,11 @@ function rptDraftBox(a, r, opts, pr) {
   const dr = (S.filters.rptDraft || {})[r.vin] || '', dy = dr && opts.find(y => y.value === dr);
   return `<div class="flex flex-wrap items-center gap-1 mt-1"><select class="text-xs min-w-0" data-rpt-draft="${esc(r.vin)}" aria-label="เลือกแคมเปญ"><option value="">เลือกแคมเปญเอง…</option>${rptOptHtml(opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)), dr)}</select><button type="button" class="btn btn-dark btn-sm" data-act="rpt-confirm" data-id="${esc(a.id)}" data-cid="${esc(dr)}" ${dr ? '' : 'disabled'}>ใช้ตัวที่เลือก</button></div>${dy ? `<div class="text-xs mt-1">เงินทางเลือกตามตารางแคมเปญ <b>${money(Number(dy.sup) || 0)}</b>${hasPayNow(r) ? (Math.abs(r.pay - (Number(dy.sup) || 0)) < 1 ? ' ' + chip('ตรงไฟล์เงิน', 'good') : ' ' + chip('ไฟล์เงิน ' + money(r.pay), 'warn')) : ''}</div>` : ''}`;
 }
-function rptEditBtn(r, a) {
-  if (!rptEditCan(r.br || (a && a.br))) return '';
+function rptEditBtn(r, a, pre) {
+  if (!rptEditCan(r.br || (a && a.br))) return pre ? `<div class="mt-1">${pre}</div>` : '';
   const sm = 'style="padding:1px 8px;min-height:0;font-size:12px;line-height:1.6"';
   const money_ = `<button type="button" class="btn btn-ghost btn-sm" ${sm} data-act="rpt-edit" data-vin="${esc(r.vin)}">${a ? 'เงิน Honda' : 'แก้ไข'}</button>`;
-  return a ? `<div class="flex flex-wrap items-center gap-1 mt-1"><button type="button" class="btn btn-dark btn-sm" ${sm} data-act="rpt-terms" data-id="${esc(a.id)}" title="เปิดใบจองที่ช่องเงื่อนไขการขาย">แก้ไข</button>${money_}</div>` : `<div class="mt-1">${money_}</div>`;
+  return a ? `<div class="flex flex-wrap items-center gap-1 mt-1">${pre || ''}<button type="button" class="btn btn-dark btn-sm" ${sm} data-act="rpt-terms" data-id="${esc(a.id)}" title="เปิดใบจองที่ช่องเงื่อนไขการขาย">แก้ไข</button>${money_}</div>` : `<div class="flex flex-wrap items-center gap-1 mt-1">${pre || ''}${money_}</div>`;
 }
 // ---- pick a campaign for a car whose sale terms the web does not have yet
 function rptOptHtml(list, sel) {

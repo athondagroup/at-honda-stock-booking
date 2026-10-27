@@ -74,13 +74,16 @@ function ccCarsTable(C, D) {
   const base = F === 'extra' ? C.extra : F === '' ? [...L, ...C.extra] : L.filter(x => F === 'chosen' ? !!x.src : F === 'pend' ? x.pend : F === 'nochoose' ? x.nochoose : F === 'adv' ? x.adv : x.mism);
   const show = base, canSug = show.filter(x => x.sug), nSel = Object.keys(sel).filter(v => sel[v] && L.some(x => x.vin === v && x.sug)).length;
   const srcChip = x => x.extra ? chip('มีในไฟล์ ไม่มีใบกำกับในช่วงนี้', 'warn') : x.mism ? chip('เว็บไม่ตรงไฟล์', 'bad') : x.src === 'admin' ? chip('แอดมินเลือก', 'neutral') : x.src === 'file' ? chip('จับคู่จากไฟล์', 'good') : x.pend ? chip('รอเลือกแคมเปญ', 'warn') : chip('ยังไม่เลือก', 'muted');
+  const SUG = /<button[^>]*data-act="(?:rpt-pick-use|rpt-confirm)"[^>]*>[^<]*<\/button>/;
   const body = show.map(x => { const r = x.row;
+    // the "use the suggested" button goes on the same line as แก้ไข / เงิน Honda
+    const mm = String(x.money.html).match(SUG), sugBtn = mm ? mm[0].replace('<button ', '<button style="padding:1px 8px;min-height:0;font-size:12px;line-height:1.6" ') : '', mhtml = String(x.money.html).replace(SUG, '');
     return `<tr${x.extra ? ' style="background:var(--surface-2)"' : x.mism ? ' style="box-shadow:inset 4px 0 0 var(--bad)"' : ''}><td class="w-8">${x.sug ? `<input type="checkbox" data-cc-sel="${esc(x.vin)}" ${sel[x.vin] ? 'checked' : ''} aria-label="เลือก ${esc(x.vin)} ใช้ตามที่แนะนำ" title="ติ๊กเพื่อใช้ตามที่แนะนำ">` : ''}</td>
-      <td><span class="vin-auto font-mono text-xs">${esc(x.vin)}</span><div class="text-xs text-muted">${esc(x.br || '')} ${esc(x.cust)}${r && r.name ? ' · ' + esc(r.name) : ''}</div></td>
+      <td>${vinLink({ vin: x.vin })}<div class="text-xs text-muted">${esc(x.br || '')} ${esc(x.cust)}${r && r.name ? ' · ' + esc(r.name) : ''}</div></td>
       <td class="text-xs nowrap">${x.inv && x.inv.idate ? esc(fmtD(String(x.inv.idate).slice(0, 10))) : '–'}</td>
       <td class="nowrap">${x.extra ? chip('อยู่ในไฟล์เท่านั้น', 'muted') : x.adv ? chip('Advanced', 'warn') : chip('ส่งมอบ', 'good')}${r && r.toDel ? ' ' + chip('ปรับจาก Allocated', 'good') : ''}${x.extra ? `<div class="text-xs text-muted">${x.webInv ? 'เว็บลงใบกำกับ ' + esc(fmtD(x.webInv)) + ' (นอกช่วง)' : 'เว็บไม่มีใบกำกับ'}</div>` : ''}</td>
       <td>${r && r.opt ? optTip(r.opt, false) : '<span class="text-muted">–</span>'}</td>
-      <td class="text-xs">${x.mism ? `<div class="px-2 py-1 mb-1 rounded text-xs font-semibold" style="background:var(--bad);color:#fff">แคมเปญที่แอดมินเลือกไม่ตรงกับไฟล์</div>` : ''}${x.money.html}${r ? rptEditBtn(r, x.a) : ''}</td><td class="nowrap">${srcChip(x)}</td>
+      <td class="text-xs">${x.mism ? `<div class="px-2 py-1 mb-1 rounded text-xs font-semibold" style="background:var(--bad);color:#fff">แคมเปญที่แอดมินเลือกไม่ตรงกับไฟล์</div>` : ''}${mhtml}${r ? rptEditBtn(r, x.a, sugBtn) : ''}</td><td class="nowrap">${srcChip(x)}</td>
       <td class="text-right num">${r ? (r.pay ? money(r.pay) : r.est ? money(r.est) + '<div class="text-xs text-muted">ตามแคมเปญ</div>' : '–') : '–'}</td>
       <td class="text-xs">${r && r.acts.length ? r.acts.map(y => esc(String(y.name).replace(/^SP\d+\/\d+ ?: ?/, '').slice(0, 40)) + ' ' + money(y.amt)).join('<br>') : '–'}</td>
       <td class="text-right num"><b>${r && r.tot ? money(r.tot) : '–'}</b></td></tr>`; }).join('');
