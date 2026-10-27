@@ -32,7 +32,7 @@ function viewBook(D) {
   const active = bookRows(D).filter(r => rowState(r, D, 'active')).length;
   return `
   ${pageHead('Booking', 'ใบจอง AT Honda กับ Booking IDS อยู่ในรายการเดียว ระบบจับคู่ด้วยชื่อลูกค้า รุ่น และวันที่ เจ้าของเคสตามฟอร์ม AT Honda รุ่น เกรด สี ตาม IDS',
-    sub === 'new' || !p.book ? '' : `<button class="btn btn-red" data-act="sub" data-key="book" data-sub="new">+ ใบจอง AT Honda</button>`)}
+    (sub === 'new' ? '' : `<div class="flex flex-wrap gap-2">${tgtCanEdit() ? `<button class="btn btn-ghost" data-act="tgt-open">ใส่/แก้เป้า</button>` : ''}${p.book ? `<button class="btn btn-red" data-act="sub" data-key="book" data-sub="new">+ ใบจอง AT Honda</button>` : ''}</div>`))}
   ${tabs('book', [['list', 'ใบจอง', String(active)], ['steps', 'ตามขั้นตอนส่งมอบ'], ['queue', 'คิวรอรถ'], ['sold', 'ส่งมอบ / แจ้งขาย'], ['summary', 'สรุปจอง'], ['cancels', 'ประวัติยกเลิก'], ...(p.book ? [['new', '+ ใบจองใหม่']] : [])])}
   ${sub === 'new' ? '' : brSeg()}${body}`;
 }
