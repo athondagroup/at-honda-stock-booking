@@ -3,6 +3,9 @@
 // Colour: under 80% red · 80–99% yellow · 100% and over green. The month in progress is measured against the pace to today.
 // Only function declarations here: the first render runs before this part of the file.
 function tgtTone(p) { return p === null ? 'muted' : p >= 100 ? 'good' : p >= 80 ? 'warn' : 'bad'; }
+// the model order of the target file (27/10); anything else after them
+function tgtOrder() { return ['CITY', 'CITY E:HEV', 'CITY HATCHBACK', 'CITY HATCHBACK E:HEV', 'CIVIC E:HEV', 'ACCORD E:HEV', 'HR-V E:HEV', 'CR-V E:HEV', 'E:N1', 'E:N2', 'STEP WGN E:HEV']; }
+function tgtRank(m) { const i = tgtOrder().indexOf(String(m || '').toUpperCase().replace(/\s+/g, ' ').trim()); return i < 0 ? 999 : i; }
 function tgtPct(a, t) { return t > 0 ? Math.round(a / t * 100) : null; }
 function tgtPace(m, D) {   // share of the month gone: only the month in progress, from the DL file date when it is in that month
   const cur = D.today.slice(0, 7); if (m !== cur) return null;
@@ -32,8 +35,8 @@ function tgtBranchView(E) {
   const detail = brs => {
     const pace = paceOf(ms[0]);
     if (one) {
-      const mo = models.map(md => ({ md, ...modelOf(brs, md) })).filter(x => x.t || x.a).sort((x, y) => y.t - x.t || y.a - x.a);
-      return `<div class="grid gap-1.5 mt-2" style="grid-template-columns:repeat(auto-fill,minmax(125px,1fr))">${mo.map(x => { const need = pace ? Math.round(x.t * pace) : x.t, p = tgtPct(x.a, need), tn = tgtTone(p), d = x.a - need;
+      const mo = models.map(md => ({ md, ...modelOf(brs, md) })).filter(x => x.t || x.a).sort((x, y) => tgtRank(x.md) - tgtRank(y.md) || y.t - x.t || y.a - x.a || x.md.localeCompare(y.md));
+      return `<div class="grid gap-1.5 mt-2" style="grid-template-columns:repeat(auto-fill,minmax(165px,1fr))">${mo.map(x => { const need = pace ? Math.round(x.t * pace) : x.t, p = tgtPct(x.a, need), tn = tgtTone(p), d = x.a - need;
         const n = brs.length === 1 ? drillNum(x.a, { m: 'invoiced', from: E.from, to: E.to, br: brs[0], model: x.md, label: x.md }) : fmtN(x.a);
         return `<div class="rounded-md p-1.5 text-xs" style="border:1px solid var(--line);background:var(--surface)"><div class="text-muted truncate" title="${esc(x.md)}">${esc(x.md)}</div><div class="flex justify-between items-baseline"><b style="font-size:15px">${n}<span class="text-muted font-normal" style="font-size:11px">/${x.t ? fmtN(x.t) : '–'}</span></b>${x.t ? `<b class="rounded px-1" style="background:var(--${tn}-soft);color:var(--${tn})">${d > 0 ? '+' : ''}${d}</b>` : ''}</div><div style="height:4px;background:var(--surface-2);border-radius:2px;margin-top:3px"><div style="width:${x.t ? Math.min(100, x.a * 100 / x.t) : 0}%;height:4px;background:var(--${tn === 'muted' ? 'line' : tn});border-radius:2px"></div></div></div>`; }).join('')}</div>`;
     }

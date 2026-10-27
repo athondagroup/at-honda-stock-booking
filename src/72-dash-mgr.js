@@ -77,7 +77,7 @@ function dashSalesTarget(D) {
   // % of target only counts invoices in the months that have a target for that row
   const inTm = (s, f) => tgtOf(s.date.slice(0, 7), f.br, f.model) > 0;
   const mrow = models.map(md => ({ md, t: ms.reduce((n, m) => n + tgtOf(m, null, md), 0), i: E.invoiced.filter(s => s.model === md).length, it: E.invoiced.filter(s => s.model === md && inTm(s, { model: md })).length, d: E.sales.filter(s => s.model === md).length, b: E.booked.filter(a => a.model === md).length }))
-    .sort((a, b) => b.t - a.t || b.i - a.i);
+    .sort((a, b) => tgtRank(a.md) - tgtRank(b.md) || b.t - a.t || b.i - a.i);
   const brRows = BRS.filter(b => inBr({ br: b })).map(b => ({ b, t: ms.reduce((n, m) => n + tgtOf(m, b), 0), i: E.invoiced.filter(s => s.br === b).length, it: E.invoiced.filter(s => s.br === b && inTm(s, { br: b })).length, d: E.sales.filter(s => s.br === b).length, bk: E.booked.filter(a => a.br === b).length }));
   const ageB = [[0, 7], [8, 14], [15, 30], [31, 9999]].map(([a, z]) => ({ l: z > 999 ? 'เกิน 30 วัน' : `${a}–${z} วัน`, n: W.filter(w => w.age >= a && w.age <= z).length, bad: a > 14 }));
   const tT = mrow.reduce((n, r) => n + r.t, 0), tI = E.invoiced.length, tIt = E.invoiced.filter(s => inTm(s, {})).length;
