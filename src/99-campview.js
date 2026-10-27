@@ -16,9 +16,9 @@ function ccData(D) {
     const real = d && d.at && d.campaign_id && !['pending', 'none'].includes(d.campaign_id);
     if (!row.pay && !row.est && real) row.est = Number(d.margin_honda) || 0;      // the admin's campaign: its money from the sale terms
     row.tot = row.pay + row.est + row.actAmt;
-    const src = real ? 'admin' : pk && pk.cid ? 'file' : '';
+    const src = real ? 'admin' : pk && pk.cid ? 'file' : '', pend = !src && !!d && d.campaign_id === 'pending';
     const mc = rptMoneyCheck(row, a, D, false), mism = !!(f && f.opt && real && campFeats(d.campaign) !== campFeats(f.opt));
-    list.push({ vin, br: i.br, row, a, inv: i, delivered, adv: !delivered, src, nochoose: !src, mism, money: mc, cust: a ? a.cust : i.cust || '' });
+    list.push({ vin, br: i.br, row, a, inv: i, delivered, adv: !delivered, src, pend, nochoose: !src && !pend, mism, money: mc, cust: a ? a.cust : i.cust || '' });
   });
   const extra = fileRows.filter(r => r.hasDir && !inv.has(r.vin) && !(D.invByVin.get(r.vin) && D.invByVin.get(r.vin).idate)).map(r => { const a = at.get(r.vin); return { vin: r.vin, br: r.br, row: r, a, inv: null, extra: true, delivered: false, adv: false, src: '', cust: a ? a.cust : '', money: rptMoneyCheck(r, a, D, false) }; });
   return { from, to, months, fileRows, list, extra, rows: list.map(x => x.row) };
@@ -33,9 +33,9 @@ function ccCountTable(C) {
 }
 function ccCarsTable(C, D) {
   const F = S.filters.ccF || '', L = C.list, n = f => L.filter(f).length;
-  const chips = [['', 'ทั้งหมด', L.length], ['nochoose', 'ยังไม่เลือกแคมเปญ', n(x => x.nochoose)], ['adv', 'Advanced', n(x => x.adv)], ['mism', 'เว็บไม่ตรงไฟล์', n(x => x.mism)], ['extra', 'มีในไฟล์ ยังไม่ออกใบกำกับ', C.extra.length]];
-  const show = F === 'extra' ? C.extra : L.filter(x => !F || (F === 'nochoose' ? x.nochoose : F === 'adv' ? x.adv : x.mism));
-  const srcChip = x => x.extra ? chip('มีในไฟล์ ยังไม่ออกใบกำกับ', 'warn') : x.mism ? chip('เว็บไม่ตรงไฟล์', 'warn') : x.src === 'admin' ? chip('แอดมินเลือก', 'neutral') : x.src === 'file' ? chip('จับคู่จากไฟล์', 'good') : chip('ยังไม่เลือก', 'muted');
+  const chips = [['', 'ทั้งหมด', L.length], ['chosen', 'เลือกแคมเปญแล้ว', n(x => !!x.src)], ['pend', 'รอเลือกแคมเปญ', n(x => x.pend)], ['nochoose', 'ยังไม่เลือกแคมเปญ', n(x => x.nochoose)], ['adv', 'Advanced', n(x => x.adv)], ['mism', 'เว็บไม่ตรงไฟล์', n(x => x.mism)], ['extra', 'มีในไฟล์ ยังไม่ออกใบกำกับ', C.extra.length]];
+  const show = F === 'extra' ? C.extra : L.filter(x => !F || (F === 'chosen' ? !!x.src : F === 'pend' ? x.pend : F === 'nochoose' ? x.nochoose : F === 'adv' ? x.adv : x.mism));
+  const srcChip = x => x.extra ? chip('มีในไฟล์ ยังไม่ออกใบกำกับ', 'warn') : x.mism ? chip('เว็บไม่ตรงไฟล์', 'warn') : x.src === 'admin' ? chip('แอดมินเลือก', 'neutral') : x.src === 'file' ? chip('จับคู่จากไฟล์', 'good') : x.pend ? chip('รอเลือกแคมเปญ', 'warn') : chip('ยังไม่เลือก', 'muted');
   const body = show.map(x => { const r = x.row;
     return `<tr${x.extra ? ' style="background:var(--surface-2)"' : ''}><td><span class="vin-auto font-mono text-xs">${esc(x.vin)}</span><div class="text-xs text-muted">${esc(x.br || '')} ${esc(x.cust)}${r && r.name ? ' · ' + esc(r.name) : ''}</div></td>
       <td class="text-xs nowrap">${x.inv && x.inv.idate ? esc(fmtD(String(x.inv.idate).slice(0, 10))) : '–'}</td>
@@ -52,7 +52,7 @@ function ccCarsTable(C, D) {
 }
 function viewCampSum(D) {
   if (!campUpCan()) return `${pageHead('รายงานสรุปแคมเปญ', '')}<p class="text-sm text-muted">เฉพาะแอดมินขึ้นไป</p>`;
-  const C = ccData(D), rows = C.rows, nAdv = C.list.filter(x => x.adv).length, nSrc = s => C.list.filter(x => x.src === s).length, nNone = C.list.filter(x => x.nochoose).length;
+  const C = ccData(D), rows = C.rows, nAdv = C.list.filter(x => x.adv).length, nSrc = s => C.list.filter(x => x.src === s).length, nNone = C.list.filter(x => x.nochoose).length, nPend = C.list.filter(x => x.pend).length;
   // once per period / branch / file content: match the file to the campaigns by itself (never inside the draw)
   const ak = [C.from, C.to, rptBr(), C.fileRows.length, Object.keys(rptAll()).length].join('|');
   if (S.rptAutoKey !== ak) { S.rptAutoKey = ak; setTimeout(async () => { for (const m of C.months.filter(m => C.fileRows.some(r => rptMonth(r.rep) === m))) { try { await rptAutoRun(fmtM(m)); } catch (e) { /* the chooser stays */ } } }, 0); }
@@ -67,12 +67,12 @@ function viewCampSum(D) {
   return `${pageHead('รายงานสรุปแคมเปญ', `ใบกำกับภาษีที่เว็บลงไว้ ${fmtD(C.from)} – ${fmtD(C.to)} เทียบไฟล์ Honda · เงินรางวัลจ่ายตามเดือนที่ออกใบกำกับ`)}${ctl}
   <div class="grid lg:grid-cols-3 gap-4 mb-4">
     ${box('1. ใบกำกับภาษี: ไฟล์ Honda vs เว็บ', ccCountTable(C))}
-    ${box('2. เงินรางวัลรวม', `<div class="num text-3xl font-semibold">${money(sumBy(rows, r => r.tot))} <span class="text-sm font-normal text-muted">บาท</span></div><div class="text-xs text-muted mt-1">ทางเลือก ${money(sumBy(rows, r => r.pay + r.est))} · พิเศษ ${money(sumBy(rows, r => r.actAmt))}</div><div class="text-xs mt-2">แอดมินเลือก ${nSrc('admin')} · จับคู่จากไฟล์ ${nSrc('file')} · <button type="button" class="underline" style="color:var(--bad)" data-act="cc-f" data-f="nochoose" data-t="rpt-cars">ยังไม่เลือก ${nNone}</button></div>${C.extra.length ? `<div class="text-xs text-muted mt-1">ไม่รวมคันที่อยู่ในไฟล์แต่ยังไม่ออกใบกำกับ ${C.extra.length} คัน (${money(exMoney)})</div>` : ''}`)}
+    ${box('2. เงินรางวัลรวม', `<div class="num text-3xl font-semibold">${money(sumBy(rows, r => r.tot))} <span class="text-sm font-normal text-muted">บาท</span></div><div class="text-xs text-muted mt-1">ทางเลือก ${money(sumBy(rows, r => r.pay + r.est))} · พิเศษ ${money(sumBy(rows, r => r.actAmt))}</div><div class="text-xs mt-2">แอดมินเลือก ${nSrc('admin')} · จับคู่จากไฟล์ ${nSrc('file')} · <button type="button" class="underline" style="color:var(--bad)" data-act="cc-f" data-f="nochoose" data-t="rpt-cars">${nPend ? `รอเลือก ${nPend} · ` : ''}ยังไม่เลือก ${nNone}</button></div>${C.extra.length ? `<div class="text-xs text-muted mt-1">ไม่รวมคันที่อยู่ในไฟล์แต่ยังไม่ออกใบกำกับ ${C.extra.length} คัน (${money(exMoney)})</div>` : ''}`)}
     ${box('3. Advance', `<div class="flex gap-3"><div><div class="text-xs text-muted">ส่งมอบแล้ว</div><div class="num text-3xl font-semibold">${advDone}</div></div><button type="button" class="text-left" data-act="cc-f" data-f="adv" data-t="rpt-cars"><div class="text-xs text-muted">ยังไม่ส่งมอบ</div><div class="num text-3xl font-semibold">${nAdv}</div></button></div><div class="text-xs text-muted mt-1">Advance = ออกใบกำกับแล้วแต่ยังไม่ส่งมอบ (ไฟล์ Honda เรียก ALLOCATED)</div>`)}
   </div>
   <section class="mb-6">${rptCharts(rows, D)}${rptStatusNote(rows, D)}</section>
   <section class="mb-6" id="rpt-model" style="scroll-margin-top:72px"><h3 class="font-head font-semibold">5. เงินรางวัลแยกรุ่น</h3><p class="text-xs text-muted mb-2">กดที่รุ่นเพื่อดูแต่ละคัน · กราฟด้านบน (4) แยกสาขา</p>${rptModelTable(rows, D, false)}</section>
-  <section class="mb-6" id="rpt-cars" style="scroll-margin-top:72px"><h3 class="font-head font-semibold">รายคัน — ทุกคันที่เว็บลงว่าออกใบกำกับ</h3><p class="text-xs text-muted mb-2">ยังไม่ได้เลือกแคมเปญเลือกได้ในแถวเลย · "ส่งออก Excel" / "พิมพ์รายงาน" ส่งบัญชีได้</p>${ccCarsTable(C, D)}${C.months.length === 1 ? `<div class="mt-3">${rptLetterBox(C.fileRows, fmtM(C.months[0]))}</div>` : ''}</section>`;
+  <section class="mb-6" id="rpt-cars" style="scroll-margin-top:72px"><h3 class="font-head font-semibold">รายคัน — ออกใบกำกับ ${esc(fmtD(C.from))} – ${esc(fmtD(C.to))}</h3><p class="text-xs text-muted mb-2">ยังไม่ได้เลือกแคมเปญเลือกได้ในแถวเลย · "ส่งออก Excel" / "พิมพ์รายงาน" ส่งบัญชีได้</p>${ccCarsTable(C, D)}${C.months.length === 1 ? `<div class="mt-3">${rptLetterBox(C.fileRows, fmtM(C.months[0]))}</div>` : ''}</section>`;
 }
 function ccSheet(D, C) {
   const k = [['ใบกำกับ (เว็บ)', C.list.length], ['เงินรางวัลรวม', money(sumBy(C.rows, r => r.tot))], ['Advance (ยังไม่ส่งมอบ)', C.list.filter(x => x.adv).length], ['ยังไม่เลือกแคมเปญ', C.list.filter(x => x.nochoose).length]];
@@ -93,7 +93,7 @@ Object.assign(ACTIONS, {
   async 'rpt-export'() {
     const D = derive(), C = ccData(D); if (!C.list.length) return;
     const aoa = [['สาขา', 'รุ่น', 'เลขตัวถัง', 'ลูกค้า', 'วันที่ใบกำกับ (เว็บ)', 'สถานะ', 'แคมเปญ (ไฟล์)', 'ทางเลือก (ไฟล์)', 'ที่มาของแคมเปญ', 'เงินตามทางเลือก', 'แคมเปญพิเศษ', 'เงินแคมเปญพิเศษ', 'รวมเงิน']];
-    C.list.forEach(x => { const r = x.row; aoa.push([x.br || '', r.name, x.vin, x.cust, x.inv ? String(x.inv.idate).slice(0, 10) : '', x.adv ? 'Advance' : 'ส่งมอบ', r.camp, fixTh(r.opt), x.src === 'admin' ? 'แอดมินเลือก' : x.src === 'file' ? 'จับคู่จากไฟล์' : 'ยังไม่เลือก', r.pay + r.est, r.acts.map(y => y.name).join(' / '), r.actAmt, r.tot]); });
+    C.list.forEach(x => { const r = x.row; aoa.push([x.br || '', r.name, x.vin, x.cust, x.inv ? String(x.inv.idate).slice(0, 10) : '', x.adv ? 'Advance' : 'ส่งมอบ', r.camp, fixTh(r.opt), x.src === 'admin' ? 'แอดมินเลือก' : x.src === 'file' ? 'จับคู่จากไฟล์' : x.pend ? 'รอเลือกแคมเปญ' : 'ยังไม่เลือก', r.pay + r.est, r.acts.map(y => y.name).join(' / '), r.actAmt, r.tot]); });
     aoa.push(['รวม', '', '', '', '', '', '', '', '', sumBy(C.rows, r => r.pay + r.est), '', sumBy(C.rows, r => r.actAmt), sumBy(C.rows, r => r.tot)]);
     try {
       const X = await loadXLSX(), wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(aoa), 'สรุปแคมเปญ');

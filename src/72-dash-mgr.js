@@ -8,10 +8,10 @@ function dashTabs() {
   if (!exec && !MGR_OF[r] && !(admin && campCan())) return '';
   const cur = dashSub();
   // two levels (27/10): สรุปผู้บริหาร · ภาพรวมขาย (ยอดจอง / ยอดขาย / รายบุคคล / คิวรถ) · บัญชี (FOC/ส่วนลด / รายงานสรุปแคมเปญ)
-  const groups = admin ? [['ov', 'ภาพรวม', [['exec', 'ภาพรวม']]], ['ac', 'บัญชี', [['camp', 'รายงานสรุปแคมเปญ']]]] : [
-    ...(exec ? [['ex', 'สรุปผู้บริหาร', [['exec', 'สรุปผู้บริหาร']]]] : []),
-    ['ov', 'ภาพรวมขาย', [['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล'], ['ops', 'คิวรถ']]],
-    ['ac', 'บัญชี', [['acct', 'FOC / ส่วนลด'], ...(campCan() ? [['camp', 'รายงานสรุปแคมเปญ']] : [])]]];
+  const ac = ['ac', 'บัญชี', [['acct', 'FOC / ส่วนลด'], ...(campCan() ? [['camp', 'รายงานสรุปแคมเปญ']] : [])]];
+  const groups = admin ? [['ov', 'ภาพรวม', [['exec', 'ภาพรวม']]], ['ac', 'รายงานสรุปแคมเปญ', [['camp', 'รายงานสรุปแคมเปญ']]]]
+    : exec ? [['ex', 'สรุปผู้บริหาร', [['exec', 'สรุปผู้บริหาร']]], ['ov', 'ภาพรวมขาย', [['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล'], ['ops', 'คิวรถ']]], ac]
+    : [['ops', 'คิวรถและภาพรวมสาขา', [['ops', 'คิวรถและภาพรวมสาขา']]], ['ov', 'ภาพรวมขาย', [['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล']]], ac];   // a manager still lands on คิวรถและภาพรวมสาขา
   const act = groups.find(g => g[2].some(x => x[0] === cur)) || groups[0], btn = (k, t, on) => `<button data-act="sub" data-key="dash" data-sub="${k}" aria-pressed="${on}">${t}</button>`;
   return `<div class="flex flex-wrap items-center justify-between gap-2 mb-4"><div class="flex flex-col gap-2"><div class="seg" role="group" aria-label="หัวข้อ">${groups.map(g => btn(g[2][0][0], g[1], g === act)).join('')}</div>${act[2].length > 1 ? `<div class="seg" role="group" aria-label="มุมมอง">${act[2].map(([k, t]) => btn(k, t, cur === k)).join('')}</div>` : ''}</div>${admin ? '' : dioBtn()}</div>`;
 }
