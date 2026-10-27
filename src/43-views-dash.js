@@ -17,8 +17,9 @@ const listBox = (rows, empty) => `<div class="bg-surface border border-line roun
 function viewDash(D) {
   const r = S.role.role;
   if (r === 'sales') return dashSales(D) + salesMonthly(D);
-  if (r === 'admin') return dashAdmin(D);
   const sub = dashSub();
+  if (sub === 'camp' && campCan()) return dashTabs() + viewCampSum(D);
+  if (r === 'admin') return (campCan() ? dashTabs() : '') + dashAdmin(D);
   if ((sub === 'sales' || sub === 'book' || sub === 'acct' || sub === 'person') && (r === 'exec' || MGR_OF[r])) return (sub === 'sales' ? dataFreshBox(D) : '') + dashScoped(D, sub);
   if (r === 'exec' && sub === 'exec') return dataFreshBox(D) + dashExec(D);
   return dataFreshBox(D) + dashManager(D);
@@ -133,18 +134,10 @@ function dashManager(D) {
 
 // ---- executive: sales (deliveries) vs bookings, cash vs finance, finance companies, with an AI read-out
 const EXEC_PERIODS = [['ytd', 'ปีนี้ (ม.ค.–ปัจจุบัน)'], ['q', 'ไตรมาสนี้'], ['m', 'เดือนนี้'], ['pm', 'เดือนก่อน'], ['custom', 'เลือกช่วงวันที่']];
-function execRange(today, key) {
-  // a chosen date range (13/10): both ends needed, start not after end; otherwise this year so far
-  if (key === 'custom') { const f = S.filters.eFrom, t = S.filters.eTo; if (validDate(f) && validDate(t) && f <= t) return [f, t]; return [`${today.slice(0, 4)}-01-01`, today]; }
-  const y = today.slice(0, 4), m = Number(today.slice(5, 7));
-  if (key === 'm') return [today.slice(0, 8) + '01', today];
-  if (key === 'pm') { const d = new Date(Date.UTC(Number(y), m - 2, 1)); const s = d.toISOString().slice(0, 10); const e = new Date(Date.UTC(Number(y), m - 1, 0)).toISOString().slice(0, 10); return [s, e]; }
-  if (key === 'q') { const qm = Math.floor((m - 1) / 3) * 3 + 1; return [`${y}-${String(qm).padStart(2, '0')}-01`, today]; }
-  return [`${y}-01-01`, today];
-}
+function execRange(today, key) { return periodRange(today); }
 function execData(D, rng) {
   // rng: worked out for other dates (a click on a column opens its cars, 85-drill.js)
-  const key = rng ? 'custom' : S.filters.ePeriod || 'ytd';
+  const key = rng ? 'custom' : pState().kind;
   const [from, to] = rng ? [rng[0] || '2000-01-01', rng[1] || D.today] : execRange(D.today, key);
   const inR = d => !!d && d >= from && d <= to;
   // sales = deliveries: the IDS delivery list (DL) plus deliveries recorded here that are not in DL yet
@@ -258,8 +251,7 @@ function dashExec(D) {
   return `${pageHead('สรุปผู้บริหาร', `ยอดขายนับจากการส่งมอบ (ใบกำกับใน DL และที่บันทึกส่งมอบในระบบนี้) แยกจากยอดจอง · ${fmtD(E.from)} – ${fmtD(E.to)}`)}
   ${execSeg()}
   <div class="flex flex-wrap gap-3 items-end mb-4">
-    <div class="seg" role="group" aria-label="ช่วงเวลา">${EXEC_PERIODS.map(([k, t]) => `<button data-act="exec-period" data-k="${k}" aria-pressed="${E.key === k}">${t}</button>`).join('')}</div>
-    ${rangeInputs(E)}
+    ${periodPicker()}
   </div>
   ${brSeg()}
   ${tiles([

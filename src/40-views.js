@@ -16,7 +16,7 @@ const ICON = {
 const NAV = [
   { id: 'dash', label: 'ภาพรวม' }, { id: 'alerts', label: 'แจ้งเตือน' }, { id: 'inbox', get label() { return perms().approve ? 'รออนุมัติ' : 'คำขอของฉัน'; } }, { id: 'stock', label: 'สต็อก' }, { id: 'book', label: 'Booking' },
   { id: 'quota', label: 'Quota' }, { id: 'lock', label: 'ล็อกรถ' }, { id: 'flow', label: 'ขั้นตอนส่งมอบ' }, { id: 'receive', label: 'รับรถเข้า' },
-  { id: 'upload', label: 'อัปเดตข้อมูล IDS' }, { id: 'campup', label: 'อัปเดตแคมเปญ' }, { id: 'campdb', label: 'ตารางแคมเปญรายเดือน' }, { id: 'campsum', label: 'รายงานสรุปแคมเปญ' }, { id: 'admin', label: 'หลังบ้าน' }, { id: 'datafix', label: 'ข้อมูลผิด/ขาด' }
+  { id: 'upload', label: 'อัปเดตข้อมูล IDS' }, { id: 'campup', label: 'อัปเดตแคมเปญ' }, { id: 'campdb', label: 'ตารางแคมเปญรายเดือน' }, { id: 'admin', label: 'หลังบ้าน' }, { id: 'datafix', label: 'ข้อมูลผิด/ขาด' }
 ];
 const svg = (id, n = 20) => `<svg width="${n}" height="${n}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${ICON[id]}</svg>`;
 const isSales = () => S.role.role === 'sales';
@@ -34,14 +34,14 @@ function badgeCounts(D) {
   };
 }
 // each role sees only the pages it works with: sales do not receive cars or upload IDS files
-const navFor = () => NAV.filter(n => !(isSales() && (n.id === 'receive' || n.id === 'upload' || n.id === 'campup' || n.id === 'campdb' || n.id === 'campsum' || n.id === 'datafix')) && !(n.id === 'admin' && !adminCan()));
+const navFor = () => NAV.filter(n => !(isSales() && (n.id === 'receive' || n.id === 'upload' || n.id === 'campup' || n.id === 'campdb' || n.id === 'datafix')) && !(n.id === 'admin' && !adminCan()));
 // the menu shows 6 groups (ตกลง 13/10 แบบ ค); pages of one group switch with the tabs at the top of the page
 // ปรับตามบทวิเคราะห์ 19/10 (ตัวอย่างใน artifact): งานวันนี้ / ใบจอง / รถ / รายงาน + เพิ่มเติม (เครื่องมือแอดมิน/ผู้จัดการ)
 const GROUPS = [
   { id: 'work', label: 'งานวันนี้', get views() { return perms().approve ? ['inbox', 'alerts'] : ['alerts', 'inbox']; }, icon: 'alerts' },
   { id: 'bookg', label: 'ใบจอง', views: ['book'], icon: 'book' },
   { id: 'stockg', label: 'รถ', views: ['stock', 'quota', 'lock', 'receive'], icon: 'stock' },
-  { id: 'dash', get label() { return isSales() || S.role.role === 'admin' ? 'สรุป' : 'รายงาน'; }, views: ['dash', 'campsum'] },
+  { id: 'dash', get label() { return isSales() || S.role.role === 'admin' ? 'สรุป' : 'รายงาน'; }, views: ['dash'] },
   { id: 'tools', label: 'เพิ่มเติม', views: ['datafix', 'upload', 'campup', 'campdb', 'admin'], icon: 'upload' }
 ];
 const groupsFor = () => { const ok = new Set(navFor().map(n => n.id)); return GROUPS.map(g => ({ ...g, views: g.views.filter(v => ok.has(v)) })).filter(g => g.views.length); };

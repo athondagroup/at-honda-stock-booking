@@ -2,10 +2,18 @@
 // ยอดขายและเป้า: target vs invoices (Honda's reward counts invoices), bookings vs deliveries (cars actually handed over),
 // invoiced but not yet delivered. วิเคราะห์: booking mix and trend, sales ranking, cancellations, finance, stock age, trade-ins.
 // Only function declarations here: the first render runs before this part of the file.
+function campCan() { try { return campUpCan(); } catch (e) { return false; } }   // campUpCan is a const defined later: the first draw runs before it
 function dashTabs() {
-  const r = S.role.role; if (r !== 'exec' && !MGR_OF[r]) return '';
-  const cur = dashSub(), tabs = r === 'exec' ? [['exec', 'สรุปผู้บริหาร'], ['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล'], ['acct', 'บัญชี'], ['ops', 'คิวรถและภาพรวมสาขา']] : [['ops', 'คิวรถและภาพรวมสาขา'], ['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล'], ['acct', 'บัญชี']];
-  return `<div class="flex flex-wrap items-center justify-between gap-2 mb-4"><div class="seg" role="group" aria-label="มุมมอง">${tabs.map(([k, t]) => `<button data-act="sub" data-key="dash" data-sub="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>${dioBtn()}</div>`;
+  const r = S.role.role, admin = r === 'admin', exec = r === 'exec';
+  if (!exec && !MGR_OF[r] && !(admin && campCan())) return '';
+  const cur = dashSub();
+  // two levels (27/10): สรุปผู้บริหาร · ภาพรวมขาย (ยอดจอง / ยอดขาย / รายบุคคล / คิวรถ) · บัญชี (FOC/ส่วนลด / รายงานสรุปแคมเปญ)
+  const groups = admin ? [['ov', 'ภาพรวม', [['exec', 'ภาพรวม']]], ['ac', 'บัญชี', [['camp', 'รายงานสรุปแคมเปญ']]]] : [
+    ...(exec ? [['ex', 'สรุปผู้บริหาร', [['exec', 'สรุปผู้บริหาร']]]] : []),
+    ['ov', 'ภาพรวมขาย', [['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล'], ['ops', 'คิวรถ']]],
+    ['ac', 'บัญชี', [['acct', 'FOC / ส่วนลด'], ...(campCan() ? [['camp', 'รายงานสรุปแคมเปญ']] : [])]]];
+  const act = groups.find(g => g[2].some(x => x[0] === cur)) || groups[0], btn = (k, t, on) => `<button data-act="sub" data-key="dash" data-sub="${k}" aria-pressed="${on}">${t}</button>`;
+  return `<div class="flex flex-wrap items-center justify-between gap-2 mb-4"><div class="flex flex-col gap-2"><div class="seg" role="group" aria-label="หัวข้อ">${groups.map(g => btn(g[2][0][0], g[1], g === act)).join('')}</div>${act[2].length > 1 ? `<div class="seg" role="group" aria-label="มุมมอง">${act[2].map(([k, t]) => btn(k, t, cur === k)).join('')}</div>` : ''}</div>${admin ? '' : dioBtn()}</div>`;
 }
 // a manager sees sales, targets and analysis only for the branches they look after; the executive sees all
 function dashScoped(D, sub) {
@@ -14,11 +22,11 @@ function dashScoped(D, sub) {
   try { return sub === 'sales' ? dashSalesTarget(D) : sub === 'acct' ? dashAcct(D) : sub === 'person' ? dashPerson(D) : dashBook(D); } finally { S.brScope = null; if (own && keep && !own.includes(keep)) S.br = keep; }
 }
 // วิเคราะห์ was spread over ยอดจอง and ยอดขาย (14/10): a saved 'ana' opens ยอดจอง
-function dashSub() { let s = S.sub.dash || 'exec'; if (s === 'ana') s = 'book'; if (S.role.role === 'exec') return s; return ['sales', 'book', 'acct', 'person'].includes(s) ? s : 'ops'; }
+function dashSub() { let s = S.sub.dash || 'exec'; if (s === 'ana') s = 'book'; if (s === 'camp' && !campCan()) s = 'exec'; if (S.role.role === 'exec' || S.role.role === 'admin') return s; return ['sales', 'book', 'acct', 'person', 'camp'].includes(s) ? s : 'ops'; }
 function monthsIn(from, to) { const out = []; let d = from.slice(0, 7); while (d <= to.slice(0, 7)) { out.push(d); const [y, m] = d.split('-').map(Number); d = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`; } return out; }
 function dCard(title, body, note) { return `<section class="bg-surface border border-line rounded-lg p-4 min-w-0"><h2 class="font-head font-semibold mb-2">${title}</h2>${body}${note ? `<p class="text-xs text-muted mt-2">${note}</p>` : ''}</section>`; }
 function pctOf(a, b) { return b ? Math.round(a / b * 100) : 0; }
-function periodBar(E) { const [pf, pt] = prevRange(E.from, E.to); return `<div class="flex flex-wrap gap-3 items-end mb-4"><div class="seg" role="group" aria-label="ช่วงเวลา">${EXEC_PERIODS.map(([k, t]) => `<button data-act="exec-period" data-k="${k}" aria-pressed="${E.key === k}">${t}</button>`).join('')}</div>${rangeInputs(E)}${cmpSel()}<span class="text-sm text-muted pb-2">${fmtD(E.from)} – ${fmtD(E.to)} เทียบ ${fmtD(pf)} – ${fmtD(pt)}</span></div>${brSeg()}`; }
+function periodBar(E) { const [pf, pt] = prevRange(E.from, E.to); return `<div class="flex flex-wrap gap-3 items-end mb-4">${periodPicker()}${cmpSel()}<span class="text-sm text-muted pb-2">${fmtD(E.from)} – ${fmtD(E.to)} เทียบ ${fmtD(pf)} – ${fmtD(pt)}</span></div>${brSeg()}`; }
 function rangeInputs(E) {
   if (E.key !== 'custom') return '';
   const f = S.filters.eFrom || '', t = S.filters.eTo || '', bad = f && t && f > t;
@@ -110,7 +118,7 @@ function prevRange(from, to) {
   const shift = (d, months) => { const [y, m, dd] = d.split('-').map(Number), t = new Date(Date.UTC(y, m - 1 + months, 1)), last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate(); return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(Math.min(dd, last)).padStart(2, '0')}`; };
   const monthEnd = d => { const [y, m] = d.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
   if (S.filters.cmp === 'yoy') return [shift(from, -12), to === monthEnd(to) ? monthEnd(shift(to, -12)) : shift(to, -12)];
-  const key = S.filters.ePeriod || 'ytd', span = key === 'ytd' ? 12 : key === 'q' ? 3 : (key === 'm' || key === 'pm') ? 1 : 0;
+  const span = pSpan();
   if (span) return [shift(from, -span), to === monthEnd(to) ? monthEnd(shift(to, -span)) : shift(to, -span)];
   const n = daysBetween(from, to) + 1; const e = new Date(Date.parse(from + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10); const st = new Date(Date.parse(e + 'T00:00:00Z') - (n - 1) * 864e5).toISOString().slice(0, 10); return [st, e];
 }
