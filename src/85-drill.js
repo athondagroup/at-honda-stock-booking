@@ -21,7 +21,7 @@ function drillSpecOf(base, b, i, range) {
   const r = drillRange(b, range); if (!r) return null;
   return { ...base, from: r[0], to: r[1], label: b.label };
 }
-const DRILL_M = { tinv: 'ใบกำกับภาษี (ตามสาขาที่ขาย)', sales: 'ยอดขาย (ส่งมอบ)', invoiced: 'ยอดขาย (ใบกำกับภาษี)', trades: 'รถเก่าเทิร์น', dv: 'ส่งมอบ', inv: 'ใบกำกับภาษี', bk: 'ยอดจองสุทธิ', cx: 'ยกเลิก', bkall: 'ใบจองทั้งหมด',
+const DRILL_M = { tinv: 'ใบกำกับภาษี (ตามสาขาที่ออกใบ)', sales: 'ยอดขาย (ส่งมอบ)', invoiced: 'ยอดขาย (ใบกำกับภาษี)', trades: 'รถเก่าเทิร์น', dv: 'ส่งมอบ', inv: 'ใบกำกับภาษี', bk: 'ยอดจองสุทธิ', cx: 'ยกเลิก', bkall: 'ใบจองทั้งหมด',
   finbk: 'ใบจองไฟแนนซ์', cashbk: 'ใบจองซื้อสด', tr: 'รถเก่าเทิร์น', wait: 'ใบจองรอรถตอนนี้', free: 'รถว่างขายได้ตอนนี้', target: 'เป้า' };
 // the rows behind one spec, in one shape: date, branch, model, grade, colour, VIN, customer, sales, finance, invoice, source, booking id
 function drillRows(D, sp) {

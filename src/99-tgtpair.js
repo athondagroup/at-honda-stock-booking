@@ -6,14 +6,14 @@ function tgtTone(p) { return p === null ? 'muted' : p >= 100 ? 'good' : p >= 80 
 // the model order of the target file (27/10); anything else after them
 function tgtOrder() { return ['CITY', 'CITY E:HEV', 'CITY HATCHBACK', 'CITY HATCHBACK E:HEV', 'CIVIC E:HEV', 'ACCORD E:HEV', 'HR-V E:HEV', 'CR-V E:HEV', 'E:N1', 'E:N2', 'STEP WGN E:HEV']; }
 function tgtRank(m) { const i = tgtOrder().indexOf(String(m || '').toUpperCase().replace(/\s+/g, ' ').trim()); return i < 0 ? 999 : i; }
-// invoices for the target comparison (27/10): the car is credited to the branch that SOLD it (its booking), not the branch of the DL file it came
-// through: ATE's retail invoices are issued under PSC's DL file, so by file ATE showed almost nothing. A re-issued invoice counts once (the newest).
+// invoices for the target comparison (27/10): by the branch that issued the invoice in the DL file, whoever sold the car
+// (ATE's customers are invoiced under PSC's file, so they count for PSC). A re-issued invoice counts once (the newest).
 function tgtInvList(D, from, to) {
   const out = [], advs = new Map(); for (const [vin] of S.vehicles) { const a = advRec(vin); if (a) advs.set(vin, a); }
   D.X.inv.forEach(i => {
     if (i.company || !i.idate || i.idate < from || i.idate > to || (i.vin && advs.has(i.vin)) || (i.vin && D.invByVin.get(i.vin) !== i)) return;
-    const a = i.vin ? carBookingOf(i.vin, D) : null, br = a && BR[a.br] ? a.br : i.br;
-    out.push({ date: i.idate, br, model: i.model, fin: i.fin || null, grade: i.grade, color: i.color, vin: i.vin, cust: i.cust, sales: i.sales, inv: i.inv, idate: i.idate, ddate: i.ddate, src: 'DL', extra: i.br !== br ? `ใบกำกับอยู่ในไฟล์ ${i.br}` : '' });
+    const br = i.br;
+    out.push({ date: i.idate, br, model: i.model, fin: i.fin || null, grade: i.grade, color: i.color, vin: i.vin, cust: i.cust, sales: i.sales, inv: i.inv, idate: i.idate, ddate: i.ddate, src: 'DL', extra: '' });
   });
   for (const [vin, a] of advs) { const br = advBr(vin, a, D), c = carAny(vin, D) || {}; if (br && a.idate >= from && a.idate <= to) out.push({ date: a.idate, br, model: c.model, grade: c.grade, color: c.color, vin, cust: a.cust, sales: null, inv: a.inv, idate: a.idate, ddate: null, fin: null, src: 'ใบ Advance', extra: 'ADV' }); }
   return out;

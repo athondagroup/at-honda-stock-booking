@@ -4,9 +4,9 @@ const SOLD_DV = [['', 'ทุกรายการ'], ['webonly', 'ส่งม�
 function soldSt() { return [['', 'ทั้งหมด'], ['none', 'ยังไม่ใส่เงื่อนไข'], ['nocamp', 'ยังไม่เลือกแคมเปญ'], ['req', 'มีคำขอแก้รออนุมัติ'], ['wait', 'รอผู้จัดการยืนยัน'], ['done', 'ยืนยันแล้ว']]; }
 function soldInv(a, D) {
   const vin = atVin(a); if (!vin) return null;
-  const adv = advRec(vin); if (adv) return { idate: adv.idate, inv: adv.inv, adv: true };
+  const adv = advRec(vin); if (adv) return { idate: adv.idate, inv: adv.inv, adv: true, ibr: advBr(vin, adv, D) || '' };
   const i = D.invByVin.get(vin);
-  return i && !i.company ? { idate: i.idate, inv: i.inv, ddate: i.ddate } : null;
+  return i && !i.company ? { idate: i.idate, inv: i.inv, ddate: i.ddate, ibr: i.br || '' } : null;
 }
 function soldStatus(a) {
   const d = a.rec.deal || {}, fl = a.flow || {};
@@ -25,7 +25,7 @@ function soldRows(D) {
     // delivery as the web and IDS tell it (26/10): web recorded by hand, IDS (DL) delivery date, or a delivered car with no date at all
     const rec = fl.done && fl.done.delivered, recDate = a.rec.flow && a.rec.flow.delivered && a.rec.flow.delivered.date, idsDd = inv && !inv.adv ? inv.ddate : null;
     const dv = (rec && !(a.rec.flow.delivered.src === 'IDS') && !idsDd) ? 'webonly' : (idsDd && !recDate && !fl.history) ? 'idsonly' : (a.done && !dd) ? 'nodate' : '';
-    out.push({ a, idate: inv ? inv.idate : null, adv: !!(inv && inv.adv), ddate: dd, st: soldStatus(a), dv, vin: atVin(a) || '' });
+    out.push({ a, ibr: inv ? inv.ibr : '', idate: inv ? inv.idate : null, adv: !!(inv && inv.adv), ddate: dd, st: soldStatus(a), dv, vin: atVin(a) || '' });
   }
   return out;
 }
@@ -58,9 +58,9 @@ function soldList(D) {
   ${f.soDv === 'idsonly' && typeof delivSyncBox === 'function' ? delivSyncBox(D) : ''}
   ${f.soDv ? `<p class="text-sm text-muted mb-2">${{ webonly: 'ในเว็บบันทึกส่งมอบเองแล้ว แต่ไฟล์ IDS (DL) ยังไม่มีวันที่ส่งมอบ ตรวจว่ารถส่งมอบจริงหรือยัง', idsonly: 'IDS (DL) ลงวันที่ส่งมอบแล้ว แต่ในเว็บยังไม่ได้บันทึก · ปุ่ม "บันทึกส่งมอบจาก DL" บันทึกให้เฉพาะรายการของเดือนนี้ และบันทึกเมื่อกดปุ่มเท่านั้น', nodate: 'ส่งมอบแล้ว แต่ไม่มีวันที่ส่งมอบทั้งในเว็บและ IDS · เปิดใบจองแล้วใส่วันส่งมอบ' }[f.soDv]}</p>` : ''}
   ${list.length ? `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl">
-    <thead><tr><th>ออกใบกำกับ</th><th>ส่งมอบ</th><th>ลูกค้า</th><th>รุ่น / เกรด / สี</th><th>เลขตัวถัง</th><th>เซลล์</th><th>แคมเปญ</th><th class="text-right">Margin รวม</th><th>สถานะ</th></tr></thead>
+    <thead><tr><th>ออกใบกำกับ</th><th>สาขาที่ออกใบ</th><th>ส่งมอบ</th><th>ลูกค้า</th><th>รุ่น / เกรด / สี</th><th>เลขตัวถัง</th><th>เซลล์</th><th>แคมเปญ</th><th class="text-right">Margin รวม</th><th>สถานะ</th></tr></thead>
     <tbody>${list.slice(0, 400).map(r => { const a = r.a, d = a.rec.deal || {}; return `<tr class="cursor-pointer hover:bg-surface2" data-act="so-open" data-id="${esc(a.id)}" tabindex="0">
-      <td class="num nowrap">${fmtD(r.idate)}${r.adv ? ' <span class="text-xs text-muted">Advance</span>' : ''}</td><td class="num nowrap">${fmtD(r.ddate)}</td>
+      <td class="num nowrap">${fmtD(r.idate)}${r.adv ? ' <span class="text-xs text-muted">Advance</span>' : ''}</td><td class="nowrap">${r.ibr ? `<b>${esc(r.ibr)}</b>${a.br && r.ibr !== a.br ? ` <span class="text-xs" style="color:var(--warn)" title="เซลล์สาขา ${esc(a.br)} แต่ใบกำกับออกที่ ${esc(r.ibr)}">(ขาย ${esc(a.br)})</span>` : ''}` : '–'}</td><td class="num nowrap">${fmtD(r.ddate)}</td>
       <td style="min-width:140px">${esc(a.cust || '')}<div class="text-xs text-muted">${isCash(a.rec) ? 'ซื้อสด' : esc(a.rec.finance || 'ไฟแนนซ์')}</div></td>
       <td class="nowrap">${specLabel(a.spec)}</td><td class="code nowrap">${esc(r.vin)}</td>
       <td class="nowrap">${esc(a.sales || '')}<div class="text-xs text-muted">${esc(a.br || '')}</div></td>
