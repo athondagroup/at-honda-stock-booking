@@ -117,50 +117,59 @@ function priceMerge(cur, add) {
 
 // ---- the accounts tab: list price, the discount the sales gave, FOC, per booking / sales / model
 function acctRows(D, E) {
-  const inR = d => !!d && d >= E.from && d <= E.to;
-  return D.at.filter(a => !a.demo && !a.cancelled && inBr(a) && inR(a.date)).map(a => {
-    const p = bookPrice(a, D), disc = bookDiscount(a), foc = a.rec.foc_total === null || a.rec.foc_total === undefined || a.rec.foc_total === '' ? null : Number(a.rec.foc_total);
+  // by TAX INVOICE (27/10): the cars invoiced in the period (DL file, not company cars, a re-issued invoice once = the newest), branch = the
+  // branch that issued the invoice; joined by frame number with the booking for the sales' discount and FOC and the campaign money
+  const advs = new Map(); for (const [vin] of S.vehicles) { const a = advRec(vin); if (a) advs.set(vin, a); }
+  const pay = (S.ref.get('honda_pay') || {}), picks = pay.picks || {}, pv = pay.v || {};
+  return D.X.inv.filter(i => !i.company && i.idate && i.idate >= E.from && i.idate <= E.to && inBr(i) && !(i.vin && advs.has(i.vin)) && !(i.vin && D.invByVin.get(i.vin) !== i)).map(i => {
+    const a = i.vin ? carBookingOf(i.vin, D) : null, deal = a && a.rec && a.rec.deal, vin = String(i.vin || '').toUpperCase();
+    const p = a ? bookPrice(a, D) : (priceOf(i.model, i.grade, i.color, null) ? { ...priceOf(i.model, i.grade, i.color, null), src: 'ใบราคาปัจจุบัน' } : null);
+    const disc = a ? bookDiscount(a) : null, foc = a && !(a.rec.foc_total === null || a.rec.foc_total === undefined || a.rec.foc_total === '') ? Number(a.rec.foc_total) : null;
+    const real = deal && deal.at && deal.campaign_id && !['pending', 'none'].includes(deal.campaign_id), pk = picks[vin];
+    // campaign money: what Honda's money file paid, else the admin's campaign in the sale terms, else the campaign picked in the report
+    const reward = pv[vin] && Number(pv[vin].amt) ? Number(pv[vin].amt) : real ? Number(deal.margin_honda) || 0 : pk && pk.cid ? Number(pk.sup) || 0 : null;
     const pct = p && disc !== null && p.price ? disc / p.price * 100 : null;
     // a discount above 30% of the price is almost always a typing slip (an extra 0): shown, but left out of the averages
-    return { a, price: p ? p.price : null, src: p ? p.src : null, disc, foc, net: p && disc !== null ? p.price - disc : null, pct, odd: pct !== null && pct > acctOddPct() };
+    return { a, i, vin, br: i.br, cust: (a && a.cust) || i.cust || '', sales: (a && a.sales) || i.sales || '', model: (a && a.model) || i.model || '', grade: (a && a.grade) || i.grade || '', color: (a && a.color) || i.color || '', date: i.idate,
+      price: p ? p.price : null, src: p ? p.src : null, disc, foc, reward, net: p && disc !== null ? p.price - disc : null, pct, odd: pct !== null && pct > acctOddPct() };
   });
 }
 function acctOddPct() { return 30; }
 function pct1(x) { return x === null || x === undefined || isNaN(x) ? '–' : (Math.round(x * 100) / 100).toFixed(2) + '%'; }
 function acctGroup(rows, key) {
   const g = {};
-  rows.forEach(r => { const k = key(r) || 'ไม่ระบุ', x = (g[k] ||= { k, n: 0, np: 0, price: 0, disc: 0, foc: 0, max: 0 }); x.n++; if (r.price !== null && r.disc !== null && !r.odd) { x.np++; x.price += r.price; x.disc += r.disc; x.max = Math.max(x.max, r.disc); } x.foc += r.foc || 0; });
+  rows.forEach(r => { const k = key(r) || 'ไม่ระบุ', x = (g[k] ||= { k, n: 0, np: 0, price: 0, disc: 0, foc: 0, max: 0, rew: 0 }); x.n++; x.rew += r.reward || 0; if (r.price !== null && r.disc !== null && !r.odd) { x.np++; x.price += r.price; x.disc += r.disc; x.max = Math.max(x.max, r.disc); } x.foc += r.foc || 0; });
   return Object.values(g).map(x => ({ ...x, avg: x.np ? x.disc / x.np : null, pct: x.price ? x.disc / x.price * 100 : null, focAvg: x.n ? x.foc / x.n : 0 })).sort((a, b) => b.n - a.n);
 }
 function dashAcct(D) {
   const E = execData(D), rows = acctRows(D, E), ok = rows.filter(r => r.price !== null && r.disc !== null && !r.odd), odd = rows.filter(r => r.odd);
-  const sumP = ok.reduce((n, r) => n + r.price, 0), sumD = ok.reduce((n, r) => n + r.disc, 0), sumF = rows.reduce((n, r) => n + (r.foc || 0), 0);
+  const sumP = ok.reduce((n, r) => n + r.price, 0), sumD = ok.reduce((n, r) => n + r.disc, 0), sumF = rows.reduce((n, r) => n + (r.foc || 0), 0), sumR = rows.reduce((n, r) => n + (r.reward || 0), 0), nR = rows.filter(r => r.reward !== null).length, noBk = rows.filter(r => !r.a).length;
   const avgPct = sumP ? sumD / sumP * 100 : null, noPrice = rows.filter(r => r.price === null).length, iss = catIssue();
   const hi = r => r.pct !== null && avgPct && r.pct > avgPct * 1.5;
-  const gTable = (list, label) => `<div class="scroll-x max-h-96 overflow-auto"><table class="tbl text-sm"><thead><tr><th>${label}</th><th class="text-right">ใบจอง</th><th class="text-right">ราคารถรวม</th><th class="text-right">ส่วนลดเฉลี่ย/คัน</th><th class="text-right">% ส่วนลด</th><th class="text-right">ลดสูงสุด</th><th class="text-right">FOC เฉลี่ย/คัน</th></tr></thead><tbody>
-    ${list.map(x => `<tr><td class="nowrap">${label === 'เซลล์' ? salesName(x.k) : esc(x.k)}</td><td class="num text-right">${fmtN(x.n)}</td><td class="num text-right">${x.np ? money(x.price) : '–'}</td><td class="num text-right font-semibold">${x.avg === null ? '–' : money(Math.round(x.avg))}</td><td class="num text-right" ${x.pct !== null && avgPct && x.pct > avgPct * 1.5 ? 'style="color:var(--bad)"' : ''}>${pct1(x.pct)}</td><td class="num text-right">${x.np ? money(x.max) : '–'}</td><td class="num text-right">${money(Math.round(x.focAvg))}</td></tr>`).join('') || '<tr><td colspan="7" class="text-muted">ไม่มีข้อมูลในช่วงนี้</td></tr>'}</tbody></table></div>`;
+  const gTable = (list, label) => `<div class="scroll-x max-h-96 overflow-auto"><table class="tbl text-sm"><thead><tr><th>${label}</th><th class="text-right">ใบกำกับ</th><th class="text-right">ราคารถรวม</th><th class="text-right">เงินรางวัลแคมเปญ</th><th class="text-right">ส่วนลดเฉลี่ย/คัน</th><th class="text-right">% ส่วนลด</th><th class="text-right">ลดสูงสุด</th><th class="text-right">FOC เฉลี่ย/คัน</th></tr></thead><tbody>
+    ${list.map(x => `<tr><td class="nowrap">${label === 'เซลล์' ? salesName(x.k) : esc(x.k)}</td><td class="num text-right">${fmtN(x.n)}</td><td class="num text-right">${x.np ? money(x.price) : '–'}</td><td class="num text-right">${x.rew ? money(x.rew) : '–'}</td><td class="num text-right font-semibold">${x.avg === null ? '–' : money(Math.round(x.avg))}</td><td class="num text-right" ${x.pct !== null && avgPct && x.pct > avgPct * 1.5 ? 'style="color:var(--bad)"' : ''}>${pct1(x.pct)}</td><td class="num text-right">${x.np ? money(x.max) : '–'}</td><td class="num text-right">${money(Math.round(x.focAvg))}</td></tr>`).join('') || '<tr><td colspan="8" class="text-muted">ไม่มีข้อมูลในช่วงนี้</td></tr>'}</tbody></table></div>`;
   const list = rows.slice().sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
-  const oddBox = odd.length ? `<p class="mb-4 p-3 rounded-lg text-sm" style="background:var(--surface-2)"><b style="color:var(--bad)">ส่วนลดเกิน ${acctOddPct()}% ของราคารถ ${fmtN(odd.length)} ใบ</b> น่าจะพิมพ์ตัวเลขผิด (เช่น เกิน 0 ไป 1 ตัว) ระบบไม่นับใบเหล่านี้ในยอดรวมและค่าเฉลี่ย แก้ส่วนลดได้ที่ใบจอง (ปุ่ม "แก้ไขใบจอง") · ${odd.slice(0, 6).map(r => `${esc(r.a.cust && !isSales() ? r.a.cust : r.a.sales || '')} ลด ${money(r.disc)}`).join(' · ')}${odd.length > 6 ? ' …' : ''}</p>` : '';
-  return `${pageHead('บัญชี', `ราคารถตามใบราคา Honda (ราคาขายปลีกรวม VAT) เทียบส่วนลดที่เซลล์ลงในใบจอง · ใบจองตามวันที่จอง ${fmtD(E.from)} – ${fmtD(E.to)} · ไม่นับใบที่ยกเลิก`)}
+  const oddBox = odd.length ? `<p class="mb-4 p-3 rounded-lg text-sm" style="background:var(--surface-2)"><b style="color:var(--bad)">ส่วนลดเกิน ${acctOddPct()}% ของราคารถ ${fmtN(odd.length)} ใบ</b> น่าจะพิมพ์ตัวเลขผิด (เช่น เกิน 0 ไป 1 ตัว) ระบบไม่นับใบเหล่านี้ในยอดรวมและค่าเฉลี่ย แก้ส่วนลดได้ที่ใบจอง (ปุ่ม "แก้ไขใบจอง") · ${odd.slice(0, 6).map(r => `${esc(r.cust && !isSales() ? r.cust : r.sales || '')} ลด ${money(r.disc)}`).join(' · ')}${odd.length > 6 ? ' …' : ''}</p>` : '';
+  return `${pageHead('บัญชี', `รถที่ออกใบกำกับภาษีในช่วงนี้ (${fmtD(E.from)} – ${fmtD(E.to)}) · ราคาเต็มตามใบราคา Honda (รวม VAT) เทียบเงินรางวัลแคมเปญ ส่วนลด และ FOC ของใบจองคันนั้น · ไม่รวมรถบริษัท ใบกำกับที่ออกซ้ำนับครั้งเดียว`)}
   ${dashTabs()}${periodBar(E)}
   ${catPrices().length ? '' : `<p class="mb-4 p-3 rounded-lg text-sm" style="background:var(--surface-2);color:var(--warn)">ยังไม่มีราคารถ ไปที่ หลังบ้าน → รุ่น เกรด สี แล้วเลือกไฟล์ PDF ใบราคา Honda</p>`}
   ${tiles([
-    tile('ใบจองในช่วงนี้', fmtN(rows.length), { tone: odd.length ? 'warn' : '', sub2: [noPrice ? `ไม่มีราคา ${fmtN(noPrice)} ใบ` : 'มีราคาครบ', odd.length ? `ส่วนลดน่าจะกรอกผิด ${fmtN(odd.length)} ใบ` : ''].filter(Boolean).join(' · ') }),
-    tile('ราคารถรวม', ok.length ? money(sumP) : '–', { sub2: `${fmtN(ok.length)} ใบที่มีทั้งราคาและส่วนลด` }),
-    tile('ส่วนลดรวม', ok.length ? money(sumD) : '–', { sub2: ok.length ? `เฉลี่ย ${money(Math.round(sumD / ok.length))} บาท/คัน` : '' }),
-    tile('% ส่วนลดเฉลี่ย', pct1(avgPct), { sub2: 'ส่วนลดรวม ÷ ราคารถรวม' }),
-    tile('FOC ที่ใช้รวม', money(sumF), { sub2: rows.length ? `เฉลี่ย ${money(Math.round(sumF / rows.length))} บาท/คัน` : '' })
+    tile('ใบกำกับในช่วงนี้', fmtN(rows.length), { tone: odd.length ? 'warn' : '', sub2: [noPrice ? `ไม่มีราคา ${fmtN(noPrice)} คัน` : 'มีราคาครบ', noBk ? `ไม่พบใบจอง ${fmtN(noBk)} คัน` : '', odd.length ? `ส่วนลดน่าจะกรอกผิด ${fmtN(odd.length)} คัน` : ''].filter(Boolean).join(' · ') }),
+    tile('ราคารถยนต์ (ราคาเต็ม)', rows.some(r => r.price !== null) ? money(rows.reduce((n, r) => n + (r.price || 0), 0)) : '–', { sub2: `${fmtN(rows.length - noPrice)} คันที่มีราคา` }),
+    tile('เงินรางวัลแคมเปญ', nR ? money(sumR) : '–', { sub2: nR ? `${fmtN(nR)} คัน · ยังไม่มีเงิน ${fmtN(rows.length - nR)} คัน` : 'ยังไม่มีข้อมูลเงินรางวัล' }),
+    tile('ส่วนลดรวม', ok.length ? money(sumD) : '–', { sub2: ok.length ? `เฉลี่ย ${money(Math.round(sumD / ok.length))} บาท/คัน · ${pct1(avgPct)} ของราคา` : 'ยังไม่มีส่วนลดในใบจอง' }),
+    tile('FOC รวม', money(sumF), { sub2: rows.length ? `เฉลี่ย ${money(Math.round(sumF / rows.length))} บาท/คัน` : '' })
   ], 'lg:grid-cols-5')}
   ${oddBox}
-  ${dCard('เปรียบเทียบสาขา', gTable(acctGroup(rows, r => r.a.delivBr || r.a.br), 'สาขา'), 'สาขาที่ออกรถ · ตัวแดง = % ส่วนลดสูงกว่าค่าเฉลี่ยเกิน 1.5 เท่า')}
+  ${dCard('เปรียบเทียบสาขา', gTable(acctGroup(rows, r => r.br), 'สาขา'), 'สาขาที่ออกรถ · ตัวแดง = % ส่วนลดสูงกว่าค่าเฉลี่ยเกิน 1.5 เท่า')}
   <div class="grid lg:grid-cols-2 gap-5 my-5">
-    ${dCard('แยกเซลล์', gTable(acctGroup(rows, r => r.a.sales), 'เซลล์'), `ตัวแดง = % ส่วนลดสูงกว่าค่าเฉลี่ยเกิน 1.5 เท่า · ไม่นับใบที่ส่วนลดเกิน ${acctOddPct()}%`)}
-    ${dCard('แยกรุ่น เกรด', gTable(acctGroup(rows, r => `${r.a.model || ''} ${gradeShort(r.a.model, r.a.grade) || r.a.grade || ''}`.trim()), 'รุ่น เกรด'))}
+    ${dCard('แยกเซลล์', gTable(acctGroup(rows, r => r.sales), 'เซลล์'), `ตัวแดง = % ส่วนลดสูงกว่าค่าเฉลี่ยเกิน 1.5 เท่า · ไม่นับใบที่ส่วนลดเกิน ${acctOddPct()}%`)}
+    ${dCard('แยกรุ่น เกรด', gTable(acctGroup(rows, r => `${r.model || ''} ${gradeShort(r.model, r.grade) || r.grade || ''}`.trim()), 'รุ่น เกรด'))}
   </div>
-  ${dCard(`รายใบจอง <span class="text-muted text-sm font-normal">เรียงจาก % ส่วนลดมากไปน้อย · กดแถวเพื่อเปิดใบจอง</span>`, `<div class="scroll-x max-h-96 overflow-auto"><table class="tbl text-sm"><thead><tr><th>วันที่จอง</th><th>สาขา</th><th>เซลล์</th>${isSales() ? '' : '<th>ลูกค้า</th>'}<th>รุ่น เกรด สี</th><th class="text-right">ราคารถ</th><th class="text-right">ส่วนลด</th><th class="text-right">%</th><th class="text-right">ราคาหลังลด</th><th class="text-right">FOC</th></tr></thead><tbody>
-    ${list.slice(0, 1500).map(r => `<tr class="cursor-pointer" data-act="at-open" data-id="${esc(r.a.id)}"><td class="nowrap">${fmtD(r.a.date)}</td><td>${esc(r.a.br || '')}</td><td class="nowrap">${salesName(r.a.sales || '')}</td>${isSales() ? '' : `<td class="truncate" style="max-width:160px">${esc(r.a.cust || '')}</td>`}<td class="nowrap">${esc(r.a.model || '')} ${esc(gradeShort(r.a.model, r.a.grade) || r.a.grade || '')} ${esc(r.a.color || '')}</td>
-      <td class="num text-right" title="${esc(r.src || '')}">${r.price === null ? '<span class="text-muted">ไม่มีราคา</span>' : money(r.price)}</td><td class="num text-right nowrap">${r.disc === null ? '–' : money(r.disc)}${r.odd ? ' ' + chip('ตรวจ', 'bad') : ''}</td><td class="num text-right font-semibold" ${hi(r) ? 'style="color:var(--bad)"' : ''}>${pct1(r.pct)}</td><td class="num text-right">${r.net === null ? '–' : money(r.net)}</td><td class="num text-right">${r.foc === null ? '–' : money(r.foc)}</td></tr>`).join('') || '<tr><td colspan="10" class="text-muted">ไม่มีใบจองในช่วงนี้</td></tr>'}</tbody></table></div>`,
-    `ราคารถ: ใบจองใหม่เก็บราคาตอนจองไว้ · ใบจองเดิมใช้ใบราคาตามปีรุ่นของรถที่จัดสรร (ยังไม่จัดสรรใช้ปีล่าสุด)${iss && iss.no ? ` · ใบราคาที่ใช้ Issued No. ${esc(iss.no)}${iss.date ? ' (' + esc(iss.date) + ')' : ''}` : ''} · ส่วนลดใช้ตัวเลขในข้อมูลค่าคอมถ้ากรอกแล้ว ไม่งั้นใช้ตามใบจอง · ขั้นต่อไป: ใส่ต้นทุนของแถม (FOC) แต่ละรายการ`)}`;
+  ${dCard(`รายคัน <span class="text-muted text-sm font-normal">เรียงจาก % ส่วนลดมากไปน้อย · กดแถวเพื่อเปิดใบจอง กดเลขตัวถังเพื่อดูรถ</span>`, `<div class="scroll-x max-h-96 overflow-auto"><table class="tbl text-sm"><thead><tr><th>ออกใบกำกับ</th><th>สาขา</th><th>เลขตัวถัง</th><th>เซลล์</th>${isSales() ? '' : '<th>ลูกค้า</th>'}<th>รุ่น เกรด สี</th><th class="text-right">ราคาเต็ม</th><th class="text-right">เงินรางวัลแคมเปญ</th><th class="text-right">ส่วนลด</th><th class="text-right">%</th><th class="text-right">ราคาหลังลด</th><th class="text-right">FOC</th></tr></thead><tbody>
+    ${list.slice(0, 1500).map(r => `<tr ${r.a ? `class="cursor-pointer" data-act="at-open" data-id="${esc(r.a.id)}"` : ''}><td class="num nowrap">${fmtD(r.date)}</td><td>${esc(r.br || '')}</td><td class="nowrap">${r.vin ? vinLink({ vin: r.vin }) : ''}</td><td class="nowrap">${salesName(r.sales || '')}${r.a ? '' : ' <span class="text-xs text-muted">ไม่พบใบจอง</span>'}</td>${isSales() ? '' : `<td class="truncate" style="max-width:160px">${esc(r.cust || '')}</td>`}<td class="nowrap">${esc(r.model || '')} ${esc(gradeShort(r.model, r.grade) || r.grade || '')} ${esc(r.color || '')}</td>
+      <td class="num text-right" title="${esc(r.src || '')}">${r.price === null ? '<span class="text-muted">ไม่มีราคา</span>' : money(r.price)}</td><td class="num text-right">${r.reward === null ? '–' : money(r.reward)}</td><td class="num text-right nowrap">${r.disc === null ? '–' : money(r.disc)}${r.odd ? ' ' + chip('ตรวจ', 'bad') : ''}</td><td class="num text-right font-semibold" ${hi(r) ? 'style="color:var(--bad)"' : ''}>${pct1(r.pct)}</td><td class="num text-right">${r.net === null ? '–' : money(r.net)}</td><td class="num text-right">${r.foc === null ? '–' : money(r.foc)}</td></tr>`).join('') || '<tr><td colspan="12" class="text-muted">ไม่มีใบกำกับในช่วงนี้</td></tr>'}</tbody></table></div>`,
+    `ราคาเต็ม: ใบจองใหม่เก็บราคาตอนจองไว้ (คันที่ไม่พบใบจองใช้ใบราคาปัจจุบัน) · เงินรางวัลแคมเปญ: ตามไฟล์เงิน Honda ถ้ามี ไม่งั้นตามแคมเปญที่เลือกไว้ · ราคารถ · ใบจองเดิมใช้ใบราคาตามปีรุ่นของรถที่จัดสรร (ยังไม่จัดสรรใช้ปีล่าสุด)${iss && iss.no ? ` · ใบราคาที่ใช้ Issued No. ${esc(iss.no)}${iss.date ? ' (' + esc(iss.date) + ')' : ''}` : ''} · ส่วนลดใช้ตัวเลขในข้อมูลค่าคอมถ้ากรอกแล้ว ไม่งั้นใช้ตามใบจอง · ขั้นต่อไป: ใส่ต้นทุนของแถม (FOC) แต่ละรายการ`)}`;
 }
 
 // ---- editing one model + grade by hand (ตกลง 14/10): name, colours, current price and ราคาเดิม per colour
