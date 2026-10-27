@@ -67,8 +67,9 @@ function rptDraftBox(a, r, opts, pr) {
 }
 function rptEditBtn(r, a) {
   if (!rptEditCan(r.br || (a && a.br))) return '';
-  const money_ = `<button type="button" class="btn btn-ghost btn-sm" data-act="rpt-edit" data-vin="${esc(r.vin)}">${a ? 'เงิน Honda' : 'แก้ไข'}</button>`;
-  return a ? `<div class="flex flex-col gap-1"><button type="button" class="btn btn-dark btn-sm" data-act="rpt-terms" data-id="${esc(a.id)}" title="เปิดใบจองที่ช่องเงื่อนไขการขาย">แก้ไข</button>${money_}</div>` : money_;
+  const sm = 'style="padding:1px 8px;min-height:0;font-size:12px;line-height:1.6"';
+  const money_ = `<button type="button" class="btn btn-ghost btn-sm" ${sm} data-act="rpt-edit" data-vin="${esc(r.vin)}">${a ? 'เงิน Honda' : 'แก้ไข'}</button>`;
+  return a ? `<div class="flex flex-wrap items-center gap-1 mt-1"><button type="button" class="btn btn-dark btn-sm" ${sm} data-act="rpt-terms" data-id="${esc(a.id)}" title="เปิดใบจองที่ช่องเงื่อนไขการขาย">แก้ไข</button>${money_}</div>` : `<div class="mt-1">${money_}</div>`;
 }
 // ---- pick a campaign for a car whose sale terms the web does not have yet
 function rptOptHtml(list, sel) {

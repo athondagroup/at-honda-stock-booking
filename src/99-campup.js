@@ -120,6 +120,7 @@ function campUpVinRow(r, D) {
   return `<div class="p-3 rounded-lg border border-line bg-surface flex flex-col gap-2">
     <div class="flex flex-wrap items-center gap-2">${tick}${vinLink({ vin: it.vin })}<span class="text-xs text-muted">${esc(it.name)}${a ? ' · ' + esc(a.cust) + ' · ' + esc(a.br) : ' · ไม่พบใบจองที่ผูกกับ VIN นี้'}</span>${a ? `<button type="button" class="text-xs underline" data-act="at-open" data-id="${esc(a.id)}">เปิดใบจอง</button>` : ''}<span class="ml-auto flex gap-1">${done ? chip('บันทึกแล้ว', 'good') : ''}${chip(label, tone)}</span></div>
     <div class="text-sm p-2 rounded-lg" style="background:var(--surface-2)">ในไฟล์ Honda: <b>${esc(it.opt || '–')}</b><div class="text-xs text-muted">${esc(it.camp)}${it.date ? ' · ส่งมอบ ' + esc(it.date) : ''}${it.st ? ' · ' + esc(it.st) : ''}</div></div>
+    ${state === 'diff' ? ccRedBar(d.campaign, it.opt) : ''}
     ${d ? `<div class="text-sm">เงื่อนไขขายในเว็บ: <b>${esc(d.campaign || '–')}</b></div>` : ''}
     ${chgBox}${fix}${sv}${state === 'new' && a ? (() => { const pb = rptPickBox(it.vin, a, D, it.opt, it.camp, (rptPayAll()[it.vin] || {}).amt || 0, false); return `<div class="text-sm p-2 rounded-lg border border-line"><div class="text-xs text-muted mb-1">เลือกแคมเปญที่ตรงกับไฟล์ (เก็บในรายงาน ยังไม่แก้ใบจอง)</div>${pb.html}<div class="mt-1"><button type="button" class="btn btn-ghost btn-sm" data-act="rpt-terms" data-id="${esc(a.id)}">ใส่เงื่อนไขการขายในใบจอง</button></div></div>`; })() : ''}</div>`;
 }
@@ -130,7 +131,7 @@ function campUpRptBox(vr) {
   return `<section class="bg-surface border border-line rounded-lg p-4 mb-4"><div class="flex flex-wrap items-center gap-2"><h3 class="font-head font-semibold">ยอดแจ้งขาย Honda${U.br ? ' สาขา ' + esc(U.br) : ''}${U.report ? ' ' + esc(U.report) : ''}: ${vr.length} คัน</h3>
     <span class="text-sm text-muted">${Object.entries(st).map(([k, v]) => esc(k) + ' ' + v).join(' · ')}</span>
     ${campUpCan() ? `<span class="ml-auto flex flex-wrap gap-2"><button class="btn btn-ghost btn-sm" data-act="campup-selall" ${todo ? '' : 'disabled'}>เลือกทั้งหมด (${todo})</button><button class="btn btn-ghost btn-sm" data-act="campup-selnone">ไม่เลือก</button><button class="btn btn-red btn-sm" data-act="campup-save" ${nSel && U.br ? '' : 'disabled'}>${todo ? `บันทึกที่เลือก (${nSel} คัน)` : 'บันทึกครบแล้ว'}</button></span>` : ''}</div>
-    ${nChg ? `<div class="text-sm mt-2" style="color:var(--warn)">มี ${nChg} คันที่ทางเลือกเปลี่ยนจากที่บันทึกไว้ ตรวจแล้วติ๊กเลือกเองก่อนบันทึก</div>` : ''}<div class="text-xs text-muted mt-1">รุ่น: ${Object.entries(by).map(([k, v]) => esc(k) + ' ' + v).join(' · ')} · บันทึกแล้วเก็บไว้ที่ VIN แต่ละคัน (เห็นเฉพาะแอดมินขึ้นไป) ไม่เปลี่ยนเงื่อนไขขายในใบจอง · ดูสรุปที่ รายงาน › รายงานสรุปแคมเปญ</div></section>`;
+    ${vr.filter(r => r.state === 'diff').length ? `<div class="mt-2 px-3 py-2 rounded text-sm font-semibold" style="background:var(--bad);color:#fff">แคมเปญในไฟล์ไม่ตรงกับที่แอดมินเลือก ${vr.filter(r => r.state === 'diff').length} คัน — ตรวจแถวที่มีแถบแดง แล้วเลือก "ใช้แคมเปญตามไฟล์" หรือเลือกใหม่</div>` : ''}${nChg ? `<div class="text-sm mt-2" style="color:var(--warn)">มี ${nChg} คันที่ทางเลือกเปลี่ยนจากที่บันทึกไว้ ตรวจแล้วติ๊กเลือกเองก่อนบันทึก</div>` : ''}<div class="text-xs text-muted mt-1">รุ่น: ${Object.entries(by).map(([k, v]) => esc(k) + ' ' + v).join(' · ')} · บันทึกแล้วเก็บไว้ที่ VIN แต่ละคัน (เห็นเฉพาะแอดมินขึ้นไป) ไม่เปลี่ยนเงื่อนไขขายในใบจอง · ดูสรุปที่ รายงาน › รายงานสรุปแคมเปญ</div></section>`;
 }
 function campUpRow(r) {
   const { a, d, opts, found, state, it, why } = r, U = S.campUp, pick = (U.pick || {})[a.id] || '';
@@ -145,6 +146,7 @@ function campUpRow(r) {
   return `<div class="p-3 rounded-lg border border-line bg-surface flex flex-col gap-2">
     <div class="flex flex-wrap items-center gap-2"><b>${esc(a.cust)}</b><span class="text-xs text-muted">${esc(a.br)} · ${esc(a.model)} ${esc(gradeShort(a.model, a.grade))} ${esc(a.color || '')}${a.rec.sales ? ' · ' + esc(a.rec.sales) : ''}</span><span class="ml-auto">${chip(label, tone)}</span></div>
     ${it ? `<div class="text-sm p-2 rounded-lg" style="background:var(--surface-2)">ในไฟล์ Honda: <b>${esc(it.opt || '–')}</b><div class="text-xs text-muted">${esc(it.camp)}${it.date ? ' · ส่งมอบ ' + esc(it.date) : ''}${it.st ? ' · ' + esc(it.st) : ''}</div></div>` : why ? `<div class="text-xs text-muted">${esc(why)}</div>` : ''}
+    ${state === 'diff' && it ? ccRedBar(d.campaign, it.opt) : ''}
     <div class="text-sm">แคมเปญที่เลือกไว้: <b>${esc(d.campaign || '–')}</b>${d.adm_file ? ` <span class="text-xs text-muted">(ไฟล์ ${esc(d.adm_file)})</span>` : ''}</div>
     ${act}</div>`;
 }
