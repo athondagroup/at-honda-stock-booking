@@ -10,8 +10,8 @@ function dashTabs() {
   // two levels (27/10): สรุปผู้บริหาร · ภาพรวมขาย (ยอดจอง / ยอดขาย / รายบุคคล / คิวรถ) · บัญชี (FOC/ส่วนลด / รายงานสรุปแคมเปญ)
   const ac = ['ac', 'บัญชี', [['acct', 'FOC / ส่วนลด'], ...(campCan() ? [['camp', 'รายงานสรุปแคมเปญ']] : [])]];
   const groups = admin ? [['ov', 'ภาพรวม', [['exec', 'ภาพรวม']]], ['ac', 'รายงานสรุปแคมเปญ', [['camp', 'รายงานสรุปแคมเปญ']]]]
-    : exec ? [['ex', 'สรุปผู้บริหาร', [['exec', 'สรุปผู้บริหาร']]], ['ov', 'ภาพรวมขาย', [['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล'], ['ops', 'คิวรถ']]], ac]
-    : [['ops', 'คิวรถและภาพรวมสาขา', [['ops', 'คิวรถและภาพรวมสาขา']]], ['ov', 'ภาพรวมขาย', [['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล']]], ac];   // a manager still lands on คิวรถและภาพรวมสาขา
+    : exec ? [['ex', 'สรุปผู้บริหาร', [['exec', 'สรุปผู้บริหาร']]], ['ov', 'ภาพรวมขาย', [['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล'], ['ops', 'คิวรถ'], ['cars', 'รถยนต์']]], ac]
+    : [['ops', 'คิวรถและภาพรวมสาขา', [['ops', 'คิวรถและภาพรวมสาขา']]], ['cr', 'รถยนต์', [['cars', 'รถยนต์']]], ['ov', 'ภาพรวมขาย', [['book', 'ยอดจอง'], ['sales', 'ยอดขาย'], ['person', 'รายบุคคล']]], ac];   // a manager still lands on คิวรถและภาพรวมสาขา
   const act = groups.find(g => g[2].some(x => x[0] === cur)) || groups[0], btn = (k, t, on) => `<button data-act="sub" data-key="dash" data-sub="${k}" aria-pressed="${on}">${t}</button>`;
   return `<div class="flex flex-wrap items-center justify-between gap-2 mb-4"><div class="flex flex-col items-start gap-2"><div class="seg" role="group" aria-label="หัวข้อ">${groups.map(g => btn(g[2][0][0], g[1], g === act)).join('')}</div>${act[2].length > 1 ? `<div class="seg" role="group" aria-label="มุมมอง">${act[2].map(([k, t]) => btn(k, t, cur === k)).join('')}</div>` : ''}</div>${admin ? '' : dioBtn()}</div>`;
 }
@@ -19,10 +19,10 @@ function dashTabs() {
 function dashScoped(D, sub) {
   const own = MGR_OF[S.role.role], keep = S.br;
   if (own) { S.brScope = own; if (S.br && !own.includes(S.br)) S.br = ''; }
-  try { return sub === 'sales' ? dashSalesTarget(D) : sub === 'acct' ? dashAcct(D) : sub === 'person' ? dashPerson(D) : dashBook(D); } finally { S.brScope = null; if (own && keep && !own.includes(keep)) S.br = keep; }
+  try { return sub === 'sales' ? dashSalesTarget(D) : sub === 'acct' ? dashAcct(D) : sub === 'person' ? dashPerson(D) : sub === 'cars' ? dashCars(D) : dashBook(D); } finally { S.brScope = null; if (own && keep && !own.includes(keep)) S.br = keep; }
 }
 // วิเคราะห์ was spread over ยอดจอง and ยอดขาย (14/10): a saved 'ana' opens ยอดจอง
-function dashSub() { let s = S.sub.dash || 'exec'; if (s === 'ana') s = 'book'; if (s === 'camp' && !campCan()) s = 'exec'; if (S.role.role === 'exec' || S.role.role === 'admin') return s; return ['sales', 'book', 'acct', 'person', 'camp'].includes(s) ? s : 'ops'; }
+function dashSub() { let s = S.sub.dash || 'exec'; if (s === 'ana') s = 'book'; if (s === 'camp' && !campCan()) s = 'exec'; if (S.role.role === 'exec' || S.role.role === 'admin') return s; return ['sales', 'book', 'acct', 'person', 'camp', 'cars'].includes(s) ? s : 'ops'; }
 function monthsIn(from, to) { const out = []; let d = from.slice(0, 7); while (d <= to.slice(0, 7)) { out.push(d); const [y, m] = d.split('-').map(Number); d = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`; } return out; }
 function dCard(title, body, note) { return `<section class="bg-surface border border-line rounded-lg p-4 min-w-0"><h2 class="font-head font-semibold mb-2">${title}</h2>${body}${note ? `<p class="text-xs text-muted mt-2">${note}</p>` : ''}</section>`; }
 function pctOf(a, b) { return b ? Math.round(a / b * 100) : 0; }
@@ -106,7 +106,7 @@ function dashSalesTarget(D) {
     ${mrow.map(r => `<tr><td class="nowrap">${esc(r.md)}</td><td class="num text-right">${r.t ? fmtN(r.t) : '–'}</td><td class="num text-right font-semibold">${drillNum(r.i, { m: 'invoiced', model: r.md, from: E.from, to: E.to })}</td><td class="num text-right">${pctCell(r.it, r.t)}</td><td class="num text-right">${drillNum(r.d, { m: 'sales', model: r.md, from: E.from, to: E.to })}</td><td class="num text-right">${drillNum(r.b, { m: 'bk', model: r.md, from: E.from, to: E.to })}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ไม่มีข้อมูลในช่วงนี้</td></tr>'}</tbody></table></div>`)}
   ${salesCompare(D, E)}
   ${carListCard(D, E)}
-  ${(A => `<div class="grid lg:grid-cols-2 gap-5 my-5">${A.lead}${A.old}${A.idle}</div>${A.trade}`)(dashAna(D, true))}`;
+  ${(A => `<div class="grid lg:grid-cols-2 gap-5 my-5">${A.lead}</div>${A.trade}`)(dashAna(D, true))}`;
 }
 
 // ---- analysis: what customers book, who sells, what falls through, what sits in stock
@@ -137,6 +137,19 @@ function mixOf(cur, prev, key) {
 function finKey(a, D) { if (isCash(a.rec)) return 'ซื้อสด'; const k0 = finKey0(a, D); return k0 === 'HLTC' && a.rec.dsp ? 'HLTC · DSP' : k0; }
 function finKey0(a, D) { const v = atVin(a), i = v && D && D.invByVin.get(v); return String((a.rec.flow && a.rec.flow.fin && a.rec.flow.fin.company) || a.rec.finance || (i && i.fin) || 'ไฟแนนซ์ (ยังไม่ระบุบริษัท)').toUpperCase(); }
 function atVin(a) { return (a.match && a.match.vin) || (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || null; }
+// รถยนต์ (28/10): what the stock tells about the cars, moved here from ยอดขาย
+function dashCars(D) {
+  const A = dashAna(D, true), cars = [...D.cars.values()].filter(c => inBr(c) && !c.company);
+  const o60 = cars.filter(c => (c.age ?? 0) > 60).length, o90 = cars.filter(c => (c.age ?? 0) > 90).length, free = cars.filter(c => c.status === 'free' || c.status === 'temp').length;
+  return `${pageHead('รถยนต์', 'รถในสต็อกตอนนี้ · อายุรถนับจากวันผลิต (ถ้าไม่มี นับจากวันฝากศูนย์หรือวันเข้าสต็อก) · ไม่นับรถบริษัท')}
+  ${dashTabs()}${brSeg()}
+  ${tiles([
+    tile('รถในสต็อก', fmtN(cars.length), { view: 'stock', sub2: `ว่างขายได้ ${fmtN(free)} คัน` }),
+    tile('รถเกิน 60 วัน', fmtN(o60), { tone: o60 ? 'warn' : '', view: 'stock' }),
+    tile('รถเกิน 90 วัน', fmtN(o90), { tone: o90 ? 'bad' : '', view: 'stock' })
+  ], 'sm:grid-cols-3')}
+  <div class="grid lg:grid-cols-2 gap-5 my-5">${A.old}${A.idle}</div>`;
+}
 function dashAna(D, part) {
   const E = execData(D), [pf, pt] = prevRange(E.from, E.to), inR = d => !!d && d >= E.from && d <= E.to;
   const all = D.at.filter(a => !a.demo && inBr(a));

@@ -20,7 +20,7 @@ function viewDash(D) {
   const sub = dashSub();
   if (sub === 'camp' && campCan()) return dashTabs() + viewCampSum(D);
   if (r === 'admin') return (campCan() ? dashTabs() : '') + dashAdmin(D);
-  if ((sub === 'sales' || sub === 'book' || sub === 'acct' || sub === 'person') && (r === 'exec' || MGR_OF[r])) return (sub === 'sales' ? dataFreshBox(D) : '') + dashScoped(D, sub);
+  if ((sub === 'sales' || sub === 'book' || sub === 'acct' || sub === 'person' || sub === 'cars') && (r === 'exec' || MGR_OF[r])) return (sub === 'sales' ? dataFreshBox(D) : '') + dashScoped(D, sub);
   if (r === 'exec' && sub === 'exec') return dataFreshBox(D) + dashExec(D);
   return dataFreshBox(D) + dashManager(D);
 }

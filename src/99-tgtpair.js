@@ -48,12 +48,12 @@ function tgtBranchView(E) {
     const pace = paceOf(ms[0]);
     if (one) {
       const mo = models.map(md => ({ md, ...modelOf(brs, md) })).filter(x => x.t || x.a).sort((x, y) => tgtRank(x.md) - tgtRank(y.md) || y.t - x.t || y.a - x.a || x.md.localeCompare(y.md));
-      return `<div class="grid gap-1.5 mt-2" style="grid-template-columns:repeat(auto-fill,minmax(165px,1fr))">${mo.map(x => { const need = pace ? Math.round(x.t * pace) : x.t, p = tgtPct(x.a, need), tn = tgtTone(p), d = x.a - need;
+      return `<div class="grid gap-1.5 mt-2" style="grid-template-columns:repeat(auto-fill,minmax(165px,1fr))">${mo.map(x => { const need = pace ? Math.round(x.t * pace) : x.t, p = tgtPct(x.a, need), tn = tgtTone(p), d = x.a - x.t;
         const n = brs.length === 1 ? drillNum(x.a, { m: 'tinv', from: E.from, to: E.to, br: brs[0], model: x.md, label: x.md }) : fmtN(x.a);
         return `<div class="rounded-md p-1.5 text-xs" style="border:1px solid var(--line);background:var(--surface)"><div class="text-muted truncate" title="${esc(x.md)}">${esc(x.md)}</div><div class="flex justify-between items-baseline"><b style="font-size:15px">${n}<span class="text-muted font-normal" style="font-size:11px">/${x.t ? fmtN(x.t) : '–'}</span></b>${x.t ? `<b class="rounded px-1" style="background:var(--${tn}-soft);color:var(--${tn})">${d > 0 ? '+' : ''}${d}</b>` : ''}</div><div style="height:4px;background:var(--surface-2);border-radius:2px;margin-top:3px"><div style="width:${x.t ? Math.min(100, x.a * 100 / x.t) : 0}%;height:4px;background:var(--${tn === 'muted' ? 'line' : tn});border-radius:2px"></div></div></div>`; }).join('')}</div>`;
     }
     return `<div class="grid gap-1 mt-2" style="grid-template-columns:repeat(${ms.length},minmax(0,1fr))">${ms.map(m => { const t = brs.reduce((n, b) => n + tgtOf(m, b), 0), a = brs.reduce((n, b) => n + cell(b, m).a, 0), pc = paceOf(m), need = pc ? Math.round(t * pc) : t;
-      return tgtChip(t ? (a - need > 0 ? '+' : '') + (a - need) : '–', `${a}/${t || '–'} · ${esc(monLabel(m))}`, a - need, tgtPct(a, need)); }).join('')}</div>`;
+      return tgtChip(t ? (a - t > 0 ? '+' : '') + (a - t) : '–', `${a}/${t || '–'} · ${esc(monLabel(m))}`, a - t, tgtPct(a, need)); }).join('')}</div>`;
   };
   const sum = (brs, f) => ms.reduce((n, m) => n + brs.reduce((k, b) => k + cell(b, m)[f], 0), 0);
   const pace1 = one ? paceOf(ms[0]) : null;
@@ -62,7 +62,7 @@ function tgtBranchView(E) {
     const row = (brs, lab, tot) => tgtBlock(lab, sum(brs, 't'), sum(brs, 'a'), { chips: detail(brs), pace: pace1, tot, drill: brs.length === 1 ? { m: 'tinv', from: E.from, to: E.to, br: brs[0], label: 'ใบกำกับ' } : null });
     return `<div class="mb-3"><div class="font-semibold text-sm mb-1.5" style="color:var(--ink)">คู่ ${pr.join(' + ')}</div>${vis.map(b => row([b], `<b>${b}</b> <span class="text-xs text-muted">${esc(BR[b].name)}</span>`, false)).join('')}${vis.length > 1 ? row(vis, `<b>รวม ${vis.join(' + ')}</b>`, true) : ''}</div>`;
   }).join('');
-  const lg = `<div class="flex flex-wrap gap-3 text-xs text-muted mb-2"><span><i class="inline-block rounded-sm" style="width:10px;height:10px;background:var(--bad)"></i> ต่ำกว่า 80%</span><span><i class="inline-block rounded-sm" style="width:10px;height:10px;background:var(--warn)"></i> 80–99%</span><span><i class="inline-block rounded-sm" style="width:10px;height:10px;background:var(--good)"></i> 100% ขึ้นไป</span><span>${one ? 'ช่องล่าง = ขาย/เป้า ต่อรุ่น (ป้าย = ขาย − เป้า)' : 'ช่องล่าง = ขาย − เป้า ต่อเดือน (สีตาม % ของเดือนนั้น)'}</span>${pace1 ? '<span>เส้นประแดง = แนวที่ควรได้ถึงวันนี้ · สีวัดเทียบแนวนี้</span>' : ''}</div>`;
+  const lg = `<div class="flex flex-wrap gap-3 text-xs text-muted mb-2"><span><i class="inline-block rounded-sm" style="width:10px;height:10px;background:var(--bad)"></i> ต่ำกว่า 80%</span><span><i class="inline-block rounded-sm" style="width:10px;height:10px;background:var(--warn)"></i> 80–99%</span><span><i class="inline-block rounded-sm" style="width:10px;height:10px;background:var(--good)"></i> 100% ขึ้นไป</span><span>${one ? 'ช่องล่าง = ขาย/เป้า ต่อรุ่น (ป้าย = ขาย − เป้าเต็มเดือน)' : 'ช่องล่าง = ขาย − เป้าเต็มเดือน (สีตาม % ของเดือนนั้น เดือนที่ยังไม่จบวัดเทียบแนวที่ควรได้)'}</span>${pace1 ? '<span>เส้นประแดง = แนวที่ควรได้ถึงวันนี้ · สีวัดเทียบแนวนี้</span>' : ''}</div>`;
   const has = tgtRows().some(r => ms.includes(r.m));
   return lg + blocks + (has ? '' : `<p class="text-sm mt-2" style="color:var(--warn)">ยังไม่ได้ใส่เป้าของช่วงนี้${tgtCanEdit() ? ' กด "ใส่ / แก้เป้า" ที่หน้าใบจอง' : ''}</p>`);
 }
