@@ -144,9 +144,9 @@ function dashCars(D) {
   return `${pageHead('รถยนต์', 'รถในสต็อกตอนนี้ · อายุรถนับจากวันผลิต (ถ้าไม่มี นับจากวันฝากศูนย์หรือวันเข้าสต็อก) · ไม่นับรถบริษัท')}
   ${dashTabs()}${brSeg()}
   ${tiles([
-    tile('รถในสต็อก', fmtN(cars.length), { view: 'stock', sub2: `ว่างขายได้ ${fmtN(free)} คัน` }),
-    tile('รถเกิน 60 วัน', fmtN(o60), { tone: o60 ? 'warn' : '', view: 'stock' }),
-    tile('รถเกิน 90 วัน', fmtN(o90), { tone: o90 ? 'bad' : '', view: 'stock' })
+    tile('รถในสต็อก', fmtN(cars.length), { drill: { m: 'stk', label: 'ทั้งหมด' }, sub2: `ว่างขายได้ ${fmtN(free)} คัน` }),
+    tile('รถเกิน 60 วัน', fmtN(o60), { tone: o60 ? 'warn' : '', drill: { m: 'stk', min: 60, label: 'เกิน 60 วัน' } }),
+    tile('รถเกิน 90 วัน', fmtN(o90), { tone: o90 ? 'bad' : '', drill: { m: 'stk', min: 90, label: 'เกิน 90 วัน' } })
   ], 'sm:grid-cols-3')}
   <div class="grid lg:grid-cols-2 gap-5 my-5">${A.old}${A.idle}</div>`;
 }
@@ -207,9 +207,9 @@ function dashAna(D, part) {
     lead: `${dCard('จำนวนวันจากจองถึงส่งมอบ', `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>รุ่น</th><th class="text-right">ส่งมอบ</th><th class="text-right">เฉลี่ย (วัน)</th><th class="text-right">มัธยฐาน (วัน)</th></tr></thead><tbody>
       ${leadRows.map(r => `<tr><td>${esc(r.k)}</td><td class="num text-right">${fmtN(r.n)}</td><td class="num text-right">${r.avg}</td><td class="num text-right font-semibold">${r.med}</td></tr>`).join('') || '<tr><td colspan="4" class="text-muted">ไม่มีข้อมูล</td></tr>'}</tbody></table></div>`, 'นับใบจอง AT ที่ส่งมอบในช่วงนี้ · ใช้ตอบลูกค้าว่ารุ่นนี้รอรถประมาณกี่วัน')}`,
     old: `${dCard('รถค้างสต็อก (เกิน 60 วัน)', `<div class="scroll-x max-h-80 overflow-auto"><table class="tbl text-sm"><thead><tr><th>รุ่น เกรด สี</th><th class="text-right">เกิน 60</th><th class="text-right">เกิน 90</th><th class="text-right">เก่าสุด (วัน)</th><th class="text-right">ยังว่าง</th></tr></thead><tbody>
-      ${oldRows.map(r => `<tr><td class="nowrap">${specLabel(r.s)}</td><td class="num text-right">${r.n60}</td><td class="num text-right" ${r.n90 ? 'style="color:var(--bad)"' : ''}>${r.n90 || '–'}</td><td class="num text-right">${r.max}</td><td class="num text-right">${r.free || '–'}</td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">ไม่มีรถเกิน 60 วัน</td></tr>'}</tbody></table></div>`, 'อายุรถนับจากวันผลิต (ถ้าไม่มี นับจากวันฝากศูนย์หรือวันเข้าสต็อก) · ไม่นับรถบริษัท')}`,
+      ${oldRows.map(r => `<tr><td class="nowrap">${specLabel(r.s)}</td><td class="num text-right">${drillNum(r.n60, { m: 'stk', spec: r.s, min: 60, label: 'เกิน 60 วัน' })}</td><td class="num text-right" ${r.n90 ? 'style="color:var(--bad)"' : ''}>${r.n90 ? drillNum(r.n90, { m: 'stk', spec: r.s, min: 90, label: 'เกิน 90 วัน' }) : '–'}</td><td class="num text-right">${r.max}</td><td class="num text-right">${r.free ? drillNum(r.free, { m: 'stk', spec: r.s, min: 60, free: 1, label: 'เกิน 60 วัน ยังว่าง' }) : '–'}</td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">ไม่มีรถเกิน 60 วัน</td></tr>'}</tbody></table></div>`, 'อายุรถนับจากวันผลิต (ถ้าไม่มี นับจากวันฝากศูนย์หรือวันเข้าสต็อก) · ไม่นับรถบริษัท')}`,
     idle: `${dCard('สเปกที่มีรถว่าง แต่ไม่มีคนรอ', `<div class="scroll-x max-h-80 overflow-auto"><table class="tbl text-sm"><thead><tr><th>รุ่น เกรด สี</th><th class="text-right">รถว่าง</th><th class="text-right">เก่าสุด (วัน)</th></tr></thead><tbody>
-      ${idleRows.map(r => `<tr><td class="nowrap">${specLabel(r.s)}</td><td class="num text-right font-semibold">${r.n}</td><td class="num text-right" ${r.max > 90 ? 'style="color:var(--bad)"' : ''}>${r.max}</td></tr>`).join('') || '<tr><td colspan="3" class="text-muted">ทุกสเปกที่มีรถว่างมีคนรอ</td></tr>'}</tbody></table></div>`, 'ไม่มีใบจองรอสเปกนี้เลย เป็นสเปกที่ควรทำโปรหรือแนะนำลูกค้า')}`,
+      ${idleRows.map(r => `<tr><td class="nowrap">${specLabel(r.s)}</td><td class="num text-right font-semibold">${drillNum(r.n, { m: 'stk', spec: r.s, free: 1, label: 'ว่าง ไม่มีคนรอ' })}</td><td class="num text-right" ${r.max > 90 ? 'style="color:var(--bad)"' : ''}>${r.max}</td></tr>`).join('') || '<tr><td colspan="3" class="text-muted">ทุกสเปกที่มีรถว่างมีคนรอ</td></tr>'}</tbody></table></div>`, 'ไม่มีใบจองรอสเปกนี้เลย เป็นสเปกที่ควรทำโปรหรือแนะนำลูกค้า')}`,
     trade: tradeCard(E, dCard, pctOf) };
   if (part) return PARTS;
   return `${pageHead('วิเคราะห์', `ยอดจองตามวันที่จอง ${fmtD(E.from)} – ${fmtD(E.to)} เทียบช่วงก่อนหน้าที่ยาวเท่ากัน (${fmtD(pf)} – ${fmtD(pt)}) · ไม่นับใบที่ยกเลิก`)}

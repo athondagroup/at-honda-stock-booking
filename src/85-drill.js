@@ -21,7 +21,7 @@ function drillSpecOf(base, b, i, range) {
   const r = drillRange(b, range); if (!r) return null;
   return { ...base, from: r[0], to: r[1], label: b.label };
 }
-const DRILL_M = { tinv: 'ใบกำกับภาษี (ตามสาขาที่ออกใบ)', sales: 'ยอดขาย (ส่งมอบ)', invoiced: 'ยอดขาย (ใบกำกับภาษี)', trades: 'รถเก่าเทิร์น', dv: 'ส่งมอบ', inv: 'ใบกำกับภาษี', bk: 'ยอดจองสุทธิ', cx: 'ยกเลิก', bkall: 'ใบจองทั้งหมด',
+const DRILL_M = { stk: 'รถในสต็อก', tinv: 'ใบกำกับภาษี (ตามสาขาที่ออกใบ)', sales: 'ยอดขาย (ส่งมอบ)', invoiced: 'ยอดขาย (ใบกำกับภาษี)', trades: 'รถเก่าเทิร์น', dv: 'ส่งมอบ', inv: 'ใบกำกับภาษี', bk: 'ยอดจองสุทธิ', cx: 'ยกเลิก', bkall: 'ใบจองทั้งหมด',
   finbk: 'ใบจองไฟแนนซ์', cashbk: 'ใบจองซื้อสด', tr: 'รถเก่าเทิร์น', wait: 'ใบจองรอรถตอนนี้', free: 'รถว่างขายได้ตอนนี้', target: 'เป้า' };
 // the rows behind one spec, in one shape: date, branch, model, grade, colour, VIN, customer, sales, finance, invoice, source, booking id
 function drillRows(D, sp) {
@@ -36,7 +36,9 @@ function drillRows(D, sp) {
       const E = execData(D, [f, t]);
       rows = sp.m === 'trades' ? E.trades.map(x => ({ date: x.date, br: x.br, model: x.newModel, vin: '', cust: x.cust, sales: x.sales, fin: '', inv: '', src: `${x.brand || ''} ${x.model || ''} ${x.year || ''}`.trim(), id: x.id, extra: x.price ? money(x.price) + ' บาท' : '' }))
         : E[sp.m].map(x => ({ ...x, src: x.src || 'DL' }));
-    } else if (sp.m === 'tinv') rows = tgtInvList(D, f || '2000-01-01', t || '2999-12-31');
+    } else if (sp.m === 'stk') rows = [...D.cars.values()].filter(c => inBr(c) && !c.company && (!sp.min || (c.age ?? 0) > sp.min) && (!sp.spec || c.spec === sp.spec) && (!sp.free || c.status === 'free' || c.status === 'temp'))
+      .sort((x, y) => (y.age ?? 0) - (x.age ?? 0)).map(c => ({ date: c.stockin || c.consign || c.prod || '', br: c.br, model: c.model, grade: c.grade, color: c.color, vin: c.vin, cust: '', sales: '', fin: '', inv: '', src: `อายุ ${c.age ?? '–'} วัน${c.status === 'free' || c.status === 'temp' ? ' · ว่าง' : ''}` }));
+    else if (sp.m === 'tinv') rows = tgtInvList(D, f || '2000-01-01', t || '2999-12-31');
     else if (sp.m === 'dv' || sp.m === 'inv') rows = carListRows(D, { from: f || '2000-01-01', to: t || '2999-12-31' }, sp.m).map(r => ({ ...r, src: r.src || 'DL' }));
     else if (sp.m === 'bk') rows = bks().filter(a => !a.cancelled).map(bkRow);
     else if (sp.m === 'cx') rows = bks().filter(a => a.cancelled).map(bkRow);
