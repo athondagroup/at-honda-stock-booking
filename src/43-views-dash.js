@@ -22,7 +22,7 @@ function viewDash(D) {
   if (r === 'admin') return (campCan() ? dashTabs() : '') + dashAdmin(D);
   if ((sub === 'sales' || sub === 'book' || sub === 'acct' || sub === 'person' || sub === 'cars') && (r === 'exec' || MGR_OF[r])) return (sub === 'sales' ? dataFreshBox(D) : '') + dashScoped(D, sub);
   if (r === 'exec' && sub === 'exec') return dataFreshBox(D) + dashExec(D);
-  return dataFreshBox(D) + dashManager(D);
+  return dataFreshBox(D) + dashManager(D) + (MGR_OF[r] ? dashMgrCompare(D) : '');
 }
 const execSeg = () => dashTabs();
 const totFree = D => [...D.cars.values()].filter(c => c.status === 'free' || c.status === 'temp').length;
@@ -105,6 +105,13 @@ function dashAdmin(D) {
 }
 
 // ---- managers (and the executive's operations view): approvals, car queue, the four-branch picture
+// a manager's own branches side by side (28/10): the same cards the executive sees on สรุปผู้บริหาร, limited to the manager's branches
+function dashMgrCompare(D) {
+  const own = MGR_OF[S.role.role], keep = S.br; if (!own) return '';
+  S.brScope = own; if (S.br && !own.includes(S.br)) S.br = '';
+  try { const E = execData(D); return `<h2 class="font-head text-lg font-semibold mt-6 mb-3">เปรียบเทียบสาขา</h2>${periodBar(E)}<div class="flex flex-col gap-5 mb-5">${branchCompare(D, E, 'mgr', 'inv')}</div>`; }
+  finally { S.brScope = null; if (own && keep && !own.includes(keep)) S.br = keep; }
+}
 function dashManager(D) {
   const own = mgrBranches(), inOwn = x => own.includes(x.br);
   const tot = BRS.reduce((t, b) => { Object.keys(D.sum[b]).forEach(k => { t[k] = (t[k] || 0) + D.sum[b][k]; }); return t; }, {});
