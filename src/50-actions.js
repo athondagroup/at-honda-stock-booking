@@ -787,16 +787,24 @@ const ACTIONS = {
     const codes = [...(MODEL_CODES[a.model] || []), 'OT', 'ALL'];
     const x = focCatalog().find(i => i.name === el.dataset.name && codes.includes(i.model)) || focCatalog().find(i => i.name === el.dataset.name);
     if (!x) return;
+    // a package (DVP / special package S): one line per piece, ONE price for the whole set (on the first line) (ตกลง 30/10)
+    const pcs = String(x.pieces || '').split('|').filter(Boolean).map(t => { const [n, pt] = t.split('~'); return { name: n, part: pt || '' }; });
+    if (pcs.length) {
+      if (m.po.items.some(i => i.grp === x.name)) { toast('เลือกชุดนี้ไว้แล้ว', 'bad'); return; }
+      const tag = x.cat === 'DVP Package' ? '(DVP)' : '(แพ็คเกจ S)', gn = x.name.replace(/\s*[:(].*$/, '').trim();
+      pcs.forEach((q, i) => m.po.items.push({ name: `${q.name} ${tag}`, part: q.part || '', vendor: x.vendor || '', cat: x.cat || '', cost: i ? 0 : Number(x.cost) || 0, sale: i ? 0 : Number(x.sale) || 0, qty: 1, grp: x.name, ...(i ? { note: `รวมในราคาชุด ${gn}` } : { gp: true, note: `ราคาเดียวทั้งชุด ${gn}` }) }));
+      const dup = m.po.items.filter(i => !i.grp && i.part && pcs.some(q => q.part && q.part === i.part));
+      if (dup.length) toast(`ซ้ำกับชิ้นที่ลงไว้: ${dup.map(i => i.name).join(', ')} · ลบชิ้นเดี่ยวออกเพื่อไม่ให้นับทุนซ้ำ`, 'bad');
+      render(); return;
+    }
     const same = m.po.items.find(i => i.name === x.name);
-    // a DVP package already holds these pieces: warn before the same part is counted twice (FOC is the package's cost)
-    const pcs = s => String(s || '').split('|').filter(Boolean), have = m.po.items;
-    const dupe = x.pieces ? have.filter(i => i.part && pcs(x.pieces).includes(i.part)) : have.filter(i => i.pieces && pcs(i.pieces).includes(x.part));
-    if (dupe.length && !same) toast(`ซ้ำกับชุดแพ็คเกจ: ${dupe.map(i => i.name).join(', ')} · ตรวจก่อนบันทึก ไม่ให้นับทุนซ้ำ`, 'bad');
+    const inPkg = x.part ? m.po.items.filter(i => i.grp && i.part === x.part) : [];
+    if (inPkg.length && !same) toast(`ชิ้นนี้อยู่ในชุดที่เลือกแล้ว: ${inPkg[0].grp} · ตรวจก่อนบันทึก ไม่ให้นับทุนซ้ำ`, 'bad');
     if (same) same.qty = (Number(same.qty) || 1) + 1;
-    else m.po.items.push({ name: x.name, part: x.part || '', vendor: x.vendor || '', cat: x.cat || '', cost: Number(x.cost) || 0, sale: Number(x.sale) || 0, qty: 1, ...(x.pieces ? { pieces: x.pieces } : {}) });
+    else m.po.items.push({ name: x.name, part: x.part || '', vendor: x.vendor || '', cat: x.cat || '', cost: Number(x.cost) || 0, sale: Number(x.sale) || 0, qty: 1 });
     render();
   },
-  'po-del'(el) { S.modal.po.items.splice(Number(el.dataset.i), 1); render(); },
+  'po-del'(el) { const it = S.modal.po.items, x = it[Number(el.dataset.i)]; if (x && x.grp) S.modal.po.items = it.filter(i => i.grp !== x.grp); else it.splice(Number(el.dataset.i), 1); render(); },
   'po-custom'() { S.modal.po.items.push({ name: '', part: '', vendor: '', cat: 'เพิ่มเอง', cost: 0, sale: 0, qty: 1, custom: true }); render(); },
   async 'po-save'(el) {
     const a = atById(el.dataset.id), po = S.modal.po;

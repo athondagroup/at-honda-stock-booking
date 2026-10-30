@@ -205,7 +205,7 @@ function poEditor(m, a, D) {
   const po = m.po, codes = [...(MODEL_CODES[a.model] || []), 'OT', 'ALL'];
   const cat = focCatalog();
   const q = (m.poq || '').trim().toLowerCase();
-  const hits = cat.filter(x => codes.includes(x.model) && (!q || x.name.toLowerCase().includes(q) || (x.part || '').toLowerCase().includes(q) || (x.cat || '').toLowerCase().includes(q))).sort((x, y) => (y.cat === 'DVP Package') - (x.cat === 'DVP Package')).slice(0, 60);
+  const hits = cat.filter(x => codes.includes(x.model) && (!q || x.name.toLowerCase().includes(q) || (x.part || '').toLowerCase().includes(q) || (x.cat || '').toLowerCase().includes(q))).sort((x, y) => (/^(DVP|แพ็คเกจ)/.test(y.cat || '')) - (/^(DVP|แพ็คเกจ)/.test(x.cat || ''))).slice(0, 60);
   const cost = po.items.reduce((n, x) => n + (Number(x.cost) || 0) * (Number(x.qty) || 1), 0);
   const sale = po.items.reduce((n, x) => n + (Number(x.sale) || 0) * (Number(x.qty) || 1), 0);
   const focBudget = Number(a.rec.foc_total) || 0;
@@ -223,11 +223,11 @@ function poEditor(m, a, D) {
         <div class="field"><label for="po-dt">เวลา</label><input id="po-dt" type="time" data-modal="po.dtime" value="${esc(po.dtime)}" ${ro ? 'disabled' : ''}></div>
       </div>
       <table class="tbl text-sm"><thead><tr><th>ลำดับ</th><th>ชื่ออุปกรณ์อะไหล่</th><th>หมายเลขอะไหล่ / ผู้ขาย</th><th class="text-right">จำนวน</th><th class="text-right">ทุน FOC</th><th></th></tr></thead>
-        <tbody>${po.items.map((x, i) => `<tr><td class="num">${i + 1}</td><td style="min-width:160px">${ro ? esc(x.name) : `<input data-modal="po.items.${i}.name" value="${esc(x.name)}" class="w-full" style="background:transparent;border-bottom:1px solid var(--line)">`}</td>
+        <tbody>${po.items.map((x, i) => `<tr><td class="num">${i + 1}</td><td style="min-width:160px">${ro || x.grp ? esc(x.name) : `<input data-modal="po.items.${i}.name" value="${esc(x.name)}" class="w-full" style="background:transparent;border-bottom:1px solid var(--line)">`}</td>
           <td class="code text-xs">${esc(x.part || x.vendor || '–')}</td>
-          <td class="text-right">${ro ? esc(x.qty) : `<input type="number" min="1" data-modal="po.items.${i}.qty" value="${esc(x.qty)}" class="w-12 text-right" style="background:transparent;border-bottom:1px solid var(--line)">`}</td>
-          <td class="num text-right">${money((Number(x.cost) || 0) * (Number(x.qty) || 1))}</td>
-          <td>${ro ? '' : `<button class="btn btn-ghost btn-sm" data-act="po-del" data-i="${i}" aria-label="ลบรายการ ${i + 1}">×</button>`}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ยังไม่มีรายการ เลือกจากรายการ FOC ทางขวา หรือเพิ่มเอง</td></tr>'}</tbody></table>
+          <td class="text-right">${ro || x.grp ? esc(x.qty) : `<input type="number" min="1" data-modal="po.items.${i}.qty" value="${esc(x.qty)}" class="w-12 text-right" style="background:transparent;border-bottom:1px solid var(--line)">`}</td>
+          <td class="num text-right">${x.grp && !x.gp ? '<span class="text-muted text-xs">รวมในชุด</span>' : money((Number(x.cost) || 0) * (Number(x.qty) || 1))}</td>
+          <td>${ro ? '' : `<button class="btn btn-ghost btn-sm" data-act="po-del" data-i="${i}" aria-label="ลบรายการ ${i + 1}" ${x.grp ? 'title="ลบทั้งชุด"' : ''}>×</button>`}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ยังไม่มีรายการ เลือกจากรายการ FOC ทางขวา หรือเพิ่มเอง</td></tr>'}</tbody></table>
       <div class="text-sm p-3 rounded-lg" style="background:var(--surface-2)">ทุน FOC รวม <b class="num">${money(cost)}</b> บาท · ราคาขาย <b class="num">${money(sale)}</b> บาท
         ${focBudget ? ` · FOC ในใบจอง ${money(focBudget)} บาท → <b style="color:var(--${cost > focBudget ? 'bad' : 'good'})">${cost > focBudget ? 'เกิน' : 'เหลือ'} ${money(Math.abs(focBudget - cost))}</b>` : ''}</div>
       <div class="field"><label for="po-note">หมายเหตุ</label><input id="po-note" data-modal="po.note" value="${esc(po.note)}" ${ro ? 'disabled' : ''}></div>
