@@ -60,6 +60,8 @@ function carOutRows(c, D, row) {
 }
 function carModal(m, D) {
   const c = carFull(m.vin, D);
+  // a car that left the Stock file is still in the car log: show its history instead of "not found"
+  if (!c && !isSales() && typeof carlogAll === 'function' && carlogAll().has(m.vin)) return carHistModal(m, D);
   if (!c) return `<p>ไม่พบรถคันนี้แล้ว</p><div class="flex justify-end mt-3"><button class="btn btn-ghost" data-act="close">ปิด</button></div>`;
   const p = perms(), inv = D.invByVin.get(c.vin), hideCust = isSales() && !(c.lock && isMine(c.lock.owner));
   const q = c.ref ? D.quota.find(x => x.ref === c.ref) : null;

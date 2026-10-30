@@ -164,7 +164,9 @@ function gsearchResults(m, D) {
     [...D.cars.values(), ...D.deliveredOut, ...D.removed].forEach(c => { if (!seen.has(c.vin)) { seen.add(c.vin); pool.push(c); } });
     // cars only in the DL (invoiced, delivered, no longer in the Stock file)
     if (!isSales()) for (const [vin, i] of D.invByVin) if (vin && !seen.has(vin)) { seen.add(vin); pool.push({ vin, br: i.br, model: i.model, grade: i.grade, color: i.color, spec: specKey(i.model, i.grade, i.color), status: i.company ? 'company' : i.ddate ? 'delivered' : 'invoiced', inv: i, dlOnly: true }); }
-    const invTxt = c => { const i = c.inv || D.invByVin.get(c.vin); return i ? [i.inv, i.cust] : []; };
+    // cars that dropped out of a branch Stock file (kept in the car log): still searchable, with where they were and why they left
+    if (!isSales()) for (const [vin, { e }] of carlogAll()) if (vin && !seen.has(vin) && e.out) { seen.add(vin); pool.push({ vin, br: e.br, model: e.m, grade: e.g, color: e.c, spec: specKey(e.m, e.g, e.c), status: 'out', lgOut: e }); }
+    const invTxt = c => { const i = c.inv || D.invByVin.get(c.vin); return i ? [i.inv, i.cust] : c.lgOut ? (c.lgOut.al || []).map(a => a.cust) : []; };
     cars = pool.filter(c => inScope(c) && (vinHit(c.vin) || (c.ref && String(c.ref).toUpperCase().includes(up)) || (!isSales() && k.length >= 2 && invTxt(c).some(x => x && searchKey(x).includes(k))))).slice(0, 15);
     bks = bookRows(D).filter(r => rowVisible(r) && inScope(r) && ([r.no, r.owner, r.idsSales].some(x => x && searchKey(x).includes(k)) || vinHit(r.vin) || ((!isSales() || isMine(r.owner)) && [r.cust, r.b && r.b.cust, r.a && r.a.rec.customer].some(x => x && searchKey(x).includes(k))))).slice(0, 12);
     qs = D.quota.filter(x => inScope(x) && ((x.ref && String(x.ref).toUpperCase().includes(up)) || vinHit(x.vin))).slice(0, 8);
@@ -172,11 +174,11 @@ function gsearchResults(m, D) {
   const vinShow = v => { const s = String(v || ''), i = up ? s.toUpperCase().lastIndexOf(up) : -1; return i >= 0 ? `${esc(s.slice(0, i))}<b style="background:var(--warn-soft)">${esc(s.slice(i, i + up.length))}</b>${esc(s.slice(i + up.length))}` : esc(s); };
   const sec = (t, n, body) => n ? `<section class="mb-3"><h3 class="font-semibold text-sm mb-1">${t} ${n}</h3><div class="flex flex-col gap-1">${body}</div></section>` : '';
   const btn = (attrs, html) => `<button class="text-left p-2 rounded-lg border border-line bg-surface text-sm" ${attrs}>${html}</button>`;
-  const carSub = c => { const i = c.inv || (c.handed ? null : D.invByVin.get(c.vin)); const st = c.handed ? 'ส่งมอบแล้ว' : c.removed ? 'นำออกแล้ว' : esc((CAR_STATUS[c.status] || [c.status])[0] || '');
+  const carSub = c => { const i = c.inv || (c.handed ? null : D.invByVin.get(c.vin)); const st = c.handed ? 'ส่งมอบแล้ว' : c.removed ? 'นำออกแล้ว' : c.lgOut ? 'ออกจากไฟล์ Stock' : esc((CAR_STATUS[c.status] || [c.status])[0] || '');
     return `${specLabelText(c.spec || specKey(c.model, c.grade, c.color))} · ${esc(c.br || '')} · ${st}${!isSales() && i && (c.dlOnly || c.status === 'delivered' || c.status === 'invoiced') ? ` · ใบกำกับ ${esc(i.inv || '')} ${fmtD(i.idate)}${i.ddate ? ` ส่งมอบ ${fmtD(i.ddate)}` : ''}${i.cust ? ' · ' + esc(i.cust) : ''}` : ''}`; };
   return q.length < 2 ? '<p class="text-sm text-muted">พิมพ์อย่างน้อย 2 ตัว</p>' : !(cars.length + bks.length + qs.length) ? `<p class="text-sm text-muted">ไม่พบ "${esc(q)}" ใน${scope === 'all' ? 'ทุกสาขา' : ' ' + S.br}</p>`
     : `<p class="text-xs text-muted mb-2">ค้นใน${scope === 'all' ? 'ทุกสาขา' : ' ' + S.br} ตามสิทธิ์ที่เห็นได้${isSales() ? ' (เซลล์เห็นชื่อลูกค้าเฉพาะของตัวเอง)' : ''}</p>
-    ${sec('รถ', cars.length, cars.map(c => btn(`data-act="car-open" data-vin="${esc(c.vin)}"`, `<span class="code">${vinShow(c.vin)}</span><span class="block text-xs text-muted">${carSub(c)}</span>`)).join(''))}
+    ${sec('รถ', cars.length, cars.map(c => btn(`data-act="car-open" data-vin="${esc(c.vin)}"`, `<span class="code">${vinShow(c.vin)}</span><span class="block text-xs text-muted">${carSub(c)}</span>${!isSales() && (c.lgOut || c.removed || c.dlOnly) ? stockOutWhere(c.vin, D) : ''}`)).join(''))}
     ${sec('ใบจอง', bks.length, bks.map(r => btn(r.a ? `data-act="at-open" data-id="${esc(r.a.id)}"` : `data-act="go" data-view="book" data-q="${esc(r.no || '')}"`, `<b>${(!isSales() || isMine(r.owner)) ? esc(r.cust || '') : 'ลูกค้าของเซลล์อื่น'}</b><span class="block text-xs text-muted">${esc(r.no || 'ยังไม่อยู่ใน IDS')} · ${esc(r.br || '')} · ${esc(r.owner || '')} · ${specLabelText(r.spec)}${r.vin ? ` · VIN …${esc(String(r.vin).slice(-6))}` : ''}</span>`)).join(''))}
     ${sec('Quota', qs.length, qs.map(x => btn(`data-act="go" data-view="quota"`, `<b>Ref ${esc(x.ref || '')}</b><span class="block text-xs text-muted">${specLabelText(x.spec)} · ${esc(x.br || '')}${x.vin ? ` · VIN …${esc(String(x.vin).slice(-6))}` : ''}</span>`)).join(''))}`;
 }
