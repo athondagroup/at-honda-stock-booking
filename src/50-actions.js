@@ -852,7 +852,9 @@ const ACTIONS = {
     if (m.reason === 'dealer' && !(m.dealer || '').trim()) { toast('ใส่ชื่อดีลเลอร์', 'bad'); return; }
     if (m.reason === 'other' && !(m.note || '').trim()) { toast('เขียนหมายเหตุว่ารถไปไหน', 'bad'); return; }
     let doc;
-    if (m.reason === 'move') { const to = m.to || BRS.find(b => b !== car.br); doc = { ...cur, branch: to, moved: { ...actor(), from: car.br } }; }
+    if (m.reason === 'move') { const to = m.to || BRS.find(b => b !== car.br); // keep the car's spec: a car that only exists through an earlier move has nothing else to show its model, grade and colour
+      const spec = (car.model || car.grade || car.color) ? [car.model || '?', car.grade || '?', car.color || '?'].join('|') : (cur.moved && cur.moved.spec) || null;
+      doc = { ...cur, branch: to, moved: { ...(cur.moved || {}), ...actor(), from: car.br, to, spec } }; }
     else doc = { ...cur, removed: { reason: m.reason, dealer: (m.dealer || '').trim() || null, note: (m.note || '').trim() || null, ...actor() } };
     if (await write('vehicles', m.vin, doc)) { S.modal = null; toast(m.reason === 'move' ? `ย้ายไปสาขา ${doc.branch} แล้ว` : 'นำรถออกแล้ว'); render(); }
   },
