@@ -104,7 +104,7 @@ function flowPanel(m, a, D) {
     const cur = fl.next === k;
     const skip = k === 'po' && fl.poSkip && !done;
     const icon = skip ? `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:var(--warn-soft, #fde9c8);color:var(--warn)" title="ข้ามไว้ก่อน">–</span>` : done ? `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:var(--good);color:#fff">✓</span>` : `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:${cur ? 'var(--warn)' : 'var(--surface-2)'};color:${cur ? '#fff' : 'var(--muted)'}">${FLOW.indexOf(k) + 1}</span>`;
-    return `<div class="flex gap-3"><div class="pt-0.5">${icon}</div><div class="flex-1 min-w-0 pb-3 border-b border-line"><div class="font-medium ${cur ? '' : done ? '' : 'text-muted'}">${FLOW_LABEL[k]}</div>${body || ''}</div></div>`;
+    return `<div class="flex gap-3"><div class="pt-0.5">${icon}</div><div class="flex-1 min-w-0 pb-3 border-b border-line"><div class="font-medium ${cur ? '' : done ? '' : 'text-muted'}">${FLOW_LABEL[k]}</div>${body || ''}${stepEditUI(a, m, k)}</div></div>`;
   };
   const can = k => stepAllowed(a, k) && fl.next === k;
   const bookedBody = () => {
