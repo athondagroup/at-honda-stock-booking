@@ -163,9 +163,9 @@ function flowPanel(m, a, D) {
     if (fl.done.po) return `<div class="text-sm text-muted">สั่งแต่ง ${(f.po.items || []).length} รายการ ${fmtD(f.po.date)} · ${who(f.po)}${(f.po.hist || []).length ? ` · แก้ไขแล้ว ${f.po.hist.length} ครั้ง` : ''}</div>
       <div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-ghost btn-sm" data-act="po-open" data-id="${esc(a.id)}">${locked || !stepAllowed(a, 'po') ? 'ดูใบแต่งรถ' : 'แก้ใบแต่งรถ'}</button><button class="btn btn-ghost btn-sm" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button>${discBtn(a, 'po')}</div>${locked ? '<div class="text-xs text-muted mt-1">ส่งมอบแล้ว แก้ใบแต่งรถไม่ได้</div>' : ''}${discBox(a, m, D, 'po')}`;
     if (fl.poSkip) return `<div class="text-sm" style="color:var(--warn)">ข้ามใบสั่งแต่ง (PO) ไว้ก่อน · ${who(f.po_skip)} ${fmtDT(f.po_skip.at)} · ยังไม่ได้ทำใบสั่งแต่ง (PO)</div>
-      ${stepAllowed(a, 'po') && !locked ? `<div class="mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่ง (PO)</button></div>` : ''}`;
-    return can('po') ? `<div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่ง (PO)</button><button class="btn btn-ghost btn-sm" data-act="po-skip" data-id="${esc(a.id)}">ข้ามใบสั่งแต่ง (PO) ไปก่อน</button></div>
-      <div class="text-xs text-muted mt-1">ยังไม่รู้รายการแต่ง กด "ข้ามใบสั่งแต่ง (PO) ไปก่อน" แล้วทำขั้นถัดไปได้ · ทำใบสั่งแต่ง (PO) ภายหลังได้จนถึงก่อนส่งมอบ</div>` : '';
+      ${stepAllowed(a, 'po') && !locked ? `<div class="mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่งรถ</button></div>` : ''}`;
+    return can('po') ? `<div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่งรถ</button><button class="btn btn-ghost btn-sm" data-act="po-skip" data-id="${esc(a.id)}">ข้ามใบสั่งแต่งรถไปก่อน</button></div>
+      <div class="text-xs text-muted mt-1">ยังไม่รู้รายการแต่ง กด "ข้ามใบสั่งแต่งรถไปก่อน" แล้วทำขั้นถัดไปได้ · ทำใบสั่งแต่งรถ ภายหลังได้จนถึงก่อนส่งมอบ</div>` : '';
   };
   const delivBody = () => {
     const dv = f.delivered || {};
