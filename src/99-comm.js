@@ -146,7 +146,7 @@ function termsFields(x, v, f) {
   const step = x.cash ? '' : `<div class="field"><label for="${f.idp}-step">AT แคมเปญ (ช่อง Step)</label><select id="${f.idp}-step" ${f.attr}="${f.pre}.at_step" ${dis}>
     <option value="" ${!o.at_step ? 'selected' : ''}>ไม่มี</option><option value="1" ${o.at_step === '1' ? 'selected' : ''}>Step ช่อง 1 · +${money(st.step1)}</option><option value="2" ${o.at_step === '2' ? 'selected' : ''}>Step ช่อง 2 · +${money(st.step2)}</option></select></div>`;
   const WHO = [['', 'ไม่มี'], ['AT แถม', 'AT แถม'], ['Honda แถม', 'Honda แถม'], ['ลูกค้าซื้อ', 'ลูกค้าซื้อ']], WHO_REG = WHO.filter(y => y[0] !== 'Honda แถม'), REG_TYPES = [['บุคคลธรรมดา', 'บุคคลธรรมดา'], ['นิติบุคคล', 'นิติบุคคล']];
-  const insBox = `<div class="mt-3 p-3 rounded-lg border border-line"><div class="font-medium text-sm mb-2">ประกันภัยและทะเบียน (ไปขึ้นในใบสั่งแต่งรถ)</div><div class="grid sm:grid-cols-3 gap-3">
+  const insBox = `<div class="mt-3 p-3 rounded-lg border border-line"><div class="font-medium text-sm mb-2">ประกันภัยและทะเบียน (ไปขึ้นในใบสั่งแต่งรถ)</div><div class="grid grid-cols-2 gap-3">
     ${f.noIns1 ? '' : S2('ins1_by', 'ประกันภัยชั้น 1 + พ.ร.บ. ปีที่ 1', WHO) + S2('ins1_kind', 'บริษัทประกัน ปีที่ 1', INS_KINDS)}${S2('ins2_by', 'ประกันภัยชั้น 1 + พ.ร.บ. ปีที่ 2', WHO)}${S2('ins2_kind', 'บริษัทประกัน ปีที่ 2', INS_KINDS)}${S2('ins3_by', 'ประกันภัยชั้น 1 + พ.ร.บ. ปีที่ 3', WHO)}${S2('ins3_kind', 'บริษัทประกัน ปีที่ 3', INS_KINDS)}${S2('reg_by', 'ค่าจดทะเบียน', WHO_REG)}${S2('reg_type', 'ค่าจดทะเบียนของ', REG_TYPES)}</div></div>`;
   return `<div class="grid sm:grid-cols-3 gap-3">${price}${fin}${f.adm ? campAdminBox(f, o, v, sel, opts) : sel}</div>
     ${insBox}
