@@ -168,6 +168,7 @@ function deriveNow() {
   for (const a of at) {
     a.match = M.result.get(a.key) || null;
     a.near = M.near.get(a.key) || null;
+    a.dupAsk = M.dupAsk.get(a.key) || null;
     a.idsLeft = a.idsLeftKey ? idsByKey.get(a.idsLeftKey) || null : null;
     const bk = a.match && a.match.recs.find(r => r.kind === 'booking');
     a.ids = bk ? idsByKey.get(bk.key) : null;
@@ -204,6 +205,14 @@ function deriveNow() {
     a.delivBr = (dlRec && dlRec.br) || a.br;
     a.cross = !!(a.salesBr && a.delivBr && a.salesBr !== a.delivBr);
   }
+  // two live AT bookings with the same customer and the same model / grade / colour: a duplicate to check (or a real second car)
+  { const live = at.filter(x => !x.cancelled && !x.demo && !x.done), byK = new Map();
+    for (const x of live) { const k = nameKey(x.cust).n + '|' + (x.spec || ''); (byK.get(k) || byK.set(k, []).get(k)).push(x); }
+    for (const g of byK.values()) if (g.length > 1) for (const x of g) {
+      const no = new Set(x.rec.dup_no || []);
+      const o = g.filter(y => y !== x && !no.has('at:' + y.id) && !(x.rec.multi && (x.rec.multi.with || []).includes(y.id)) && !(y.rec.multi && (y.rec.multi.with || []).includes(x.id)));
+      if (o.length) x.dupAt = o;
+    } }
   // a car handed over in the delivery step here (date + red plate) also leaves stock, before DL catches up
   for (const a of at) {
     const f = a.rec.flow || {}, vin = f.assign && f.assign.vin;
@@ -445,7 +454,12 @@ function buildAlerts(D) {
   for (const a of D.at) if (a.cancelled && !a.demo && a.rec.cancel && a.rec.cancel.refund === 'transfer' && !a.rec.cancel.to)
     add('trheld:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin', 'manager'] }, 'warn', 'มัดจำรอโอนไปใบจองใหม่',
       `${a.cust} · ${specLabelText(a.spec)} · ${money((a.rec.cancel.transfer || {}).amount ?? a.deposit)} บาท · ลงใบจองใหม่ของลูกค้าแล้วกดผูก`, { act: 'tr-open', id: a.id, label: 'ผูกกับใบจองใหม่' });
+  for (const a of D.at) if (a.dupAsk && a.active) add('dupids:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin', 'manager'] }, 'warn', 'ใบจอง IDS ซ้ำ ชื่อ รุ่น เกรด สีตรงกัน',
+    `${a.cust} · ${specLabelText(a.spec)} · IDS ${a.dupAsk.bk.no} กับ ${a.dupAsk.y.no} · เป็นใบเดียวกัน (IDS ออกเลขใหม่) หรือจอง 2 คัน`, { act: 'at-open', id: a.id, label: 'ตรวจ' });
+  for (const a of D.at) if (a.dupAt && a.active) add('dupat:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin', 'manager'] }, 'warn', 'ใบจองซ้ำ ชื่อ รุ่น เกรด สีตรงกัน',
+    `${a.cust} · ${specLabelText(a.spec)} · จอง ${fmtD(a.date)} ซ้ำกับ ${a.dupAt.map(o => fmtD(o.date)).join(', ')} · ตรวจว่าคีย์ซ้ำหรือจอง 2 คัน`, { act: 'at-open', id: a.id, label: 'ตรวจ' });
   for (const b of D.idsOnly) {
+    if (b.dupOf) continue;
     add('idsat:' + b.no, { sales: b.sales, br: b.br, roles: ['sales', 'admin', 'manager'] }, 'bad', 'มีใน IDS แต่ยังไม่ลงฟอร์ม AT Honda',
       `ใบจอง ${b.no} · ${b.cust || ''} · ${b.model} ${gradeShort(b.model, b.grade)} ${b.color || ''} · ชื่อใน IDS: ${b.sales || '–'} กรุณาลงใบจอง AT Honda พร้อมแนบใบจอง หรือจับคู่กับฟอร์มที่ลงไว้แล้ว (ถ้าไม่ใช่ลูกค้าของคุณ แจ้งผู้จัดการ)`, { act: 'ids-claim', id: b.no, more: [{ act: 'idspair-open', id: b.key, label: 'จับคู่กับฟอร์มที่มี' }, { act: 'idsfix-open', id: b.no, label: 'แก้ไข / ไม่ต้องมีฟอร์ม' }, { act: 'go', view: 'book', label: 'ดูใบจอง', q: b.no }] });
   }

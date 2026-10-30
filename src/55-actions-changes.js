@@ -103,6 +103,28 @@ Object.assign(ACTIONS, {
     const r = await saveBk(a.id, 'ยืนยันจับคู่กับ IDS', key, x => { x.match_pick = { key, ...actor() }; x.match_skip = (x.match_skip || []).filter(k => k !== key); });
     if (r) toast('ยืนยันแล้ว ใช้รุ่น เกรด สี ตาม IDS คิวเดิม');
   },
+  // same booking, IDS re-issued the number: the live one (has a car / not postponed, else the newer) stays as the match, the other becomes its old number
+  async 'dup-same'(el) {
+    const a = atById(el.dataset.id), ka = el.dataset.a, kb = el.dataset.b; if (!a || !canEditBooking(a)) return;
+    const D = derive(), g = k => D.idsB.find(x => x.key === k) || {};
+    const sc = r => (r.vin ? 2 : 0) + (r.ids && r.ids !== 'เลื่อนการรับรถ' ? 1 : 0), ra = g(ka), rb = g(kb);
+    const primary = sc(rb) > sc(ra) || (sc(rb) === sc(ra) && (rb.date || '') > (ra.date || '')) ? kb : ka, other = primary === ka ? kb : ka;
+    const r = await saveBk(a.id, 'ใบเดียวกัน IDS ออกเลขใหม่', `ใช้ ${primary.replace('ids:', '')} · เลขเดิม ${other.replace('ids:', '')}`, x => {
+      x.match_pick = { key: primary, ...actor() }; x.ids_alt = [...new Set([...(x.ids_alt || []), other])]; x.dup_no = (x.dup_no || []).filter(k => k !== other);
+    });
+    if (r) toast('ผูกแล้ว ใช้เลข ' + primary.replace('ids:', '') + ' เป็นหลัก เลขเดิมเก็บไว้');
+  },
+  async 'dup-no'(el) {
+    const a = atById(el.dataset.id), key = el.dataset.key; if (!a || !canEditBooking(a)) return;
+    const r = await saveBk(a.id, 'ไม่ซ้ำ คนละใบใน IDS', key.replace('ids:', ''), x => { x.dup_no = [...new Set([...(x.dup_no || []), key])]; });
+    if (r) toast('บันทึกแล้ว ระบบจะไม่เตือนซ้ำคู่นี้อีก');
+  },
+  async 'dup-at-no'(el) {
+    const a = atById(el.dataset.id); if (!a || !canEditBooking(a)) return;
+    const ks = (a.dupAt || []).map(o => 'at:' + o.id);
+    const r = await saveBk(a.id, 'ไม่ซ้ำ ลูกค้าจอง 2 คัน', '', x => { x.dup_no = [...new Set([...(x.dup_no || []), ...ks])]; });
+    if (r) toast('บันทึกแล้ว ระบบจะไม่เตือนซ้ำอีก');
+  },
   async 'match-no'(el) {
     const a = atById(el.dataset.id), key = el.dataset.key; if (!a || !canEditBooking(a)) return;
     // "not this customer" drops every IDS record of that other deal (booking, stock, DL)

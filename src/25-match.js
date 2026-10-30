@@ -62,13 +62,16 @@ function matchForms(at, idsB, cars, inv) {
   // every AT booking is compared with every record: a name typed with a rank or a typo at the start must still be found
   recs.forEach(r => { r.k = nameKey(r.name); r.n = r.k.n; });
   const pairs = [];
+  // IDS booking numbers a person marked as 'the old number of this same booking' (IDS re-issued it): they belong to that booking, never to a second one
+  const altOf = new Map();
+  at.forEach(a => ((a.rec && a.rec.ids_alt) || []).forEach(k => altOf.set(k, a.key)));
   for (const a of at) {
     if (a.cancelled || a.demo) continue;
     const ak = nameKey(a.cust);
     // a person confirmed the pairing (or said "not this one") on the booking itself
     const pick = a.rec.match_pick && a.rec.match_pick.key, skip = new Set(a.rec.match_skip || []);
     for (const r of recs) {
-      if (skip.has(r.key)) continue;
+      if (skip.has(r.key) || altOf.has(r.key)) continue;
       if (pick && r.key === pick) { pairs.push({ a, r, score: 1000, same: true, manual: true }); continue; }
       if (a.no && r.no && a.no === r.no) { pairs.push({ a, r, score: 100, same: true }); continue; }
       const ns = keyScore(ak, r.k);
@@ -108,6 +111,7 @@ function matchForms(at, idsB, cars, inv) {
   }
   const matchedIds = new Set();
   for (const v of result.values()) v.recs.forEach(r => { if (r.kind === 'booking') matchedIds.add(r.row.key); });
+  altOf.forEach((ak, k) => { matchedIds.add(k); const res = result.get(ak), r = recs.find(x => x.key === k); if (res && r) (res.alt = res.alt || []).push(r); });
   let idsOnly = idsB.filter(b => !b.seed && !b.skip && b.match !== 'cancel' && (b.date || '') >= MATCH_FROM && !matchedIds.has(b.key));
   // a booking cancelled in the web whose IDS booking is still open (ตกลง 22/10): the IDS booking belongs to it — it is not a
   // booking without a form, it is waiting to be cancelled in IDS
@@ -120,6 +124,17 @@ function matchForms(at, idsB, cars, inv) {
     if (b) idsCx.set(b.key, a);
   }
   idsOnly = idsOnly.filter(b => !idsCx.has(b.key));
+  // the same customer, model, grade, colour and branch twice in IDS: usually IDS re-issued the booking (e.g. 'postponed' then a new number
+  // when the car came). A person confirms: same booking (old number kept as an alias) or two different bookings.
+  const dupAsk = new Map();
+  for (const a of at) {
+    if (a.cancelled || a.demo) continue;
+    const res = result.get(a.key), bk = res && res.recs.find(x => x.kind === 'booking'); if (!bk) continue;
+    const no = new Set(a.rec.dup_no || []), ak = nameKey(bk.name || a.cust);
+    const y = idsOnly.find(x => x.key !== bk.key && !no.has(x.key) && x.cust && keyScore(ak, nameKey(x.cust)) >= 2 && x.model === bk.model && x.grade === bk.grade
+      && String(x.color || '').toUpperCase() === String(bk.color || '').toUpperCase() && x.br === bk.br);
+    if (y) { dupAsk.set(a.key, { bk, y }); y.dupOf = a; }
+  }
   // unmatched AT bookings: records anywhere in IDS (any branch, model or date) with the same or a contained name,
   // so the admin can see e.g. the customer already took a different car on another booking
   const claimedBy = new Map();
@@ -131,5 +146,5 @@ function matchForms(at, idsB, cars, inv) {
     for (const r of recs) { if (skip.has(r.key)) continue; const ns = keyScore(ak, r.k); if (ns >= 2) hits.push({ key: r.key, ns, kind: r.kind, br: r.br, no: r.no, inv: r.kind === 'dl' ? r.row.inv : null, date: r.date, ddate: r.ddate || null, name: r.name, model: r.model, grade: r.grade, usedBy: claimedBy.get(r.key) || null }); }
     if (hits.length) near.set(a.key, hits.sort((x, y) => y.ns - x.ns || (y.kind === 'dl') - (x.kind === 'dl')).slice(0, 3));
   }
-  return { result, idsOnly, near, idsCx };
+  return { result, idsOnly, near, idsCx, dupAsk };
 }
