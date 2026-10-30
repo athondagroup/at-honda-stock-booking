@@ -1,9 +1,10 @@
 // ---------- edit a flow step after it was saved (receipt, finance, down payment, delivery); old values go to the step's hist
+// admin and above only (sales never); after the manager confirms the commission, only the branch manager / executive
 // Only function declarations at the top level: the first render runs before this file.
 const SE_STEPS = ['booked', 'fin', 'down', 'delivered'];
 function stepEditOk(a, k) {
   const fl = a.flow;
-  if (!fl || fl.history || !perms().write || a.cancelled || !stepAllowed(a, k)) return false;
+  if (!fl || fl.history || isSales() || !perms().write || a.cancelled || !stepAllowed(a, k)) return false;
   return !(fl.done.confirmed && !canApproveBr(a.br));
 }
 function seHistOf(a, k) {
