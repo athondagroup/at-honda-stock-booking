@@ -338,6 +338,16 @@ function deriveNow() {
   }
   // special cars (รถพิเศษ) are kept apart from stock: looping over the stock skips them, get/has still find them
   cars.values = function* () { for (const c of Map.prototype.values.call(this)) if (!c.special) yield c; };
+  // an IDS booking whose file row has no frame number yet, but the IDS stock already lists a car under its number (or its form
+  // matched that car): IDS has allocated it, so it is not waiting for a car (ตกลง 30/10)
+  const carByBk = new Map();
+  for (const c of cars.values()) if (c.bk && !c.advFake && ['booked', 'invoiced', 'sold'].includes(c.st)) carByBk.set(String(c.bk), c);
+  for (const b of bookings) {
+    if (b.match !== 'waiting' || b.vin) continue;
+    const am = b.app && b.app.match, mc = (b.no && carByBk.get(String(b.no))) || (b.app && b.app.no && carByBk.get(String(b.app.no)))
+      || (am && am.status !== 'possible' && (am.kind === 'stock' || am.kind === 'dl') && am.vin ? cars.get(am.vin) : null);
+    if (mc && !(mc.fromBr && b.br && mc.br !== b.br)) { b.vin = mc.vin; b.match = 'car'; }
+  }
   for (const b of bookings) {
     const l = locks.find(x => x.live && x.type === 'booking' && (x.bkref === b.key || (b.app && x.bkref === b.app.key)));
     b.lock = l || null;
