@@ -136,7 +136,7 @@ function termsFields(x, v, f) {
   const price = f.priceDisc ? `<div class="field"><label for="${f.idp}-price" class="req">ราคารถ (ราคาเต็ม)</label><input id="${f.idp}-price" type="number" min="0" step="100" inputmode="decimal" ${f.attr}="${f.pre}.price" value="${esc(o.price ?? '')}" ${f.lockPrice || f.ro ? 'readonly style="background:var(--surface-2)"' : ''}>${f.priceNote ? `<span class="text-xs text-muted">${f.priceNote}</span>` : ''}</div>` + N('disc', 'ส่วนลดราคารถ', 'step="100"') : '';
   const fin = x.cash ? '' : N('down', 'เงินดาวน์', 'step="100"') + N('down_disc', 'ส่วนลดดาวน์', 'step="100"') + RO('ยอดจัด', o.fin_amount, 'ราคารถ − ส่วนลด − ดาวน์ (คิดให้เอง)') + N('rate', 'ดอกเบี้ย (% ต่อปี)', 'step="0.01" max="30"') + N('term', 'จำนวนงวด (เดือน)', 'step="1" max="120"');
   const groups = [...new Set(opts.map(y => y.group))];
-  const sel = `<div class="field sm:col-span-3"><label for="${f.idp}-camp" class="req">แคมเปญ Honda</label><select id="${f.idp}-camp" ${f.attr}="${f.pre}.campaign_id" ${dis}><option value="">เลือกแคมเปญ</option>${groups.map(gname => {
+  const sel = `<div class="field sm:col-span-3"><label for="${f.idp}-camp">แคมเปญ Honda <span class="text-xs text-muted">(ยังไม่เลือกได้)</span></label><select id="${f.idp}-camp" ${f.attr}="${f.pre}.campaign_id" ${dis}><option value="">เลือกแคมเปญ</option>${groups.map(gname => {
     const os = opts.filter(y => y.group === gname).map(y => `<option value="${esc(y.value)}" ${o.campaign_id === y.value ? 'selected' : ''} ${y.ok ? '' : 'disabled'}>${esc(y.name)}${y.ok ? '' : ` · ใช้ไม่ได้: ${esc(y.why)}`}</option>`).join('');
     return gname ? `<optgroup label="${esc(gname)}">${os}</optgroup>` : os; }).join('')}</select>
     ${warns.map(w => `<span class="text-xs" style="color:var(--warn)">${esc(w)}</span>`).join('')}
@@ -172,7 +172,8 @@ function termsCheck(x, v) {
   }
   if (num(v.priv_hk) && (num(v.priv_hk) < 25000 || num(v.priv_hk) > 70000)) return { err: 'ฮอนด้าเคียงข้างคุณ 25,000–70,000 บาท', id: 'priv_hk' };
   if (num(v.priv_hk) && (v.priv_gtg || v.priv_ln)) return { err: 'ฮอนด้าเคียงข้างคุณ ใช้ร่วมกับ Gen to Gen / Local Native ไม่ได้', id: 'priv_hk' };
-  if (!v.campaign_id) return { err: 'เลือกแคมเปญ Honda (ไม่มีให้เลือก "ไม่ใช้แคมเปญ Honda")', id: 'camp' };
+  // not chosen yet is allowed (ตกลง 30/10): it is kept as "รอเลือกแคมเปญ" and the admin picks it later
+  if (!v.campaign_id) v.campaign_id = 'pending';
   if (v.campaign_id === 'other' && !String(v.campaign_text || '').trim()) return { err: 'พิมพ์ชื่อแคมเปญ', id: 'ct' };
   const c = campOptions(x).opts.find(y => y.value === v.campaign_id);
   if (!c) return { err: 'แคมเปญที่เลือกไว้ไม่อยู่ในเดือนที่ใช้ได้แล้ว เลือกใหม่', id: 'camp' };
