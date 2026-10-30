@@ -1,8 +1,15 @@
 // ---------- one AT Honda booking: documents, IDS match, and the ordered delivery steps
 const FIN_STATUS = ['รอยื่น', 'รอผล', 'ผ่าน', 'ไม่ผ่าน'];
 const MODEL_CODES = { 'CITY': ['CT'], 'CITY e:HEV': ['CT'], 'CITY HATCHBACK': ['CH'], 'CITY HATCHBACK e:HEV': ['CH'], 'CIVIC e:HEV': ['CV'], 'HR-V e:HEV': ['HR'], 'CR-V e:HEV': ['CR'], 'ACCORD e:HEV': ['AC', 'AH'], 'e:N2': ['EN', 'E2'], 'STEP WGN e:HEV': ['SW', 'SP'], 'BR-V': ['BR'] };
+// the FOC list and the fee tables: the database copy when there is one, otherwise the file shipped with the site (foc.json / fees.json)
+function refStatic(k) {
+  const d = S.ref.get(k); if (d) return d;
+  refStatic.p = refStatic.p || {}; refStatic.v = refStatic.v || {};
+  if (!refStatic.p[k]) { refStatic.p[k] = 1; fetch(k + '.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(j => { if (j) { refStatic.v[k] = j; render(); } }).catch(() => {}); }
+  return refStatic.v[k] || null;
+}
 function focCatalog() {
-  const d = S.ref.get('foc');
+  const d = refStatic('foc');
   if (!d || !d.cols) return [];
   if (focCatalog.cache && focCatalog.cache.src === d) return focCatalog.cache.rows;
   const rows = d.rows.map(r => { const o = {}; d.cols.forEach((c, i) => { o[c] = r[i]; }); const m = /^ATG\s+(ATG-\S+)/.exec(o.src || ''); if (m && !o.part) o.part = m[1]; return o; });
@@ -212,9 +219,9 @@ function feeGrp(a, what) {
   if (m.startsWith('WR-V')) return 'wrv';
   return '';
 }
-function feeReg(a, type) { const f = S.ref.get('fees'), r = f && f.reg && f.reg[feeGrp(a, 'reg')]; return r ? r[type === 'นิติบุคคล' ? 1 : 0] : 0; }
+function feeReg(a, type) { const f = refStatic('fees'), r = f && f.reg && f.reg[feeGrp(a, 'reg')]; return r ? r[type === 'นิติบุคคล' ? 1 : 0] : 0; }
 function feeIns(a, yr, d) {
-  const f = S.ref.get('fees'), t = f && f.ins && f.ins[feeGrp(a, 'ins')], plan = d.ins3_by ? 3 : d.ins2_by ? 2 : 1;
+  const f = refStatic('fees'), t = f && f.ins && f.ins[feeGrp(a, 'ins')], plan = d.ins3_by ? 3 : d.ins2_by ? 2 : 1;
   const r = t && t[plan]; return r && r[yr - 1] ? Math.round(r[yr - 1]) : 0;
 }
 // the insurance / registration / discount lines come from the sale terms (and the booking), first rows of the PO
