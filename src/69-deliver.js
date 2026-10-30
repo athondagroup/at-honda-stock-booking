@@ -46,7 +46,7 @@ function cdelivModal(m, D) {
       <div class="text-xs text-muted mt-1">ออกใบกำกับแล้ว ถือว่าไฟแนนซ์ผ่าน แต่ต้องแนบใบอนุมัติก่อนส่งมอบ · ได้</div>`),
     sec('assign', true, done(`รถ <span class="code">${esc(c.vin)}</span>${linked ? '' : ' · จะบันทึกการจัดสรรให้ใบจองนี้'}`)),
     sec('po', fl.done.po, fl.done.po ? done(`สั่งแต่ง ${(f.po.items || []).length} รายการ`) : `<label class="flex items-center gap-2 text-sm mt-1"><input type="checkbox" data-modal="v.po_none" ${v.po_none ? 'checked' : ''}> ไม่มีแต่งรถ (บันทึกเป็น "ไม่มีรายการแต่ง")</label>
-      <button class="btn btn-ghost btn-sm mt-1" data-act="cdeliv-po" data-id="${esc(a.id)}">ทำใบสั่งแต่ง (PO)</button>`),
+      <button class="btn btn-ghost btn-sm mt-1" data-act="cdeliv-po" data-id="${esc(a.id)}">ทำใบสั่งแต่งรถ</button>`),
     sec('down', fl.done.down, fl.done.down ? done(`ใบเสร็จ ${esc(f.down.receipt_no)}`) : `<div class="grid sm:grid-cols-3 gap-3 mt-1">${F('cd-dn', `เลขที่ใบเสร็จ${isCash(r) ? 'ชำระครบ' : 'เงินดาวน์'}`, 'down_no', '')}${F('cd-da', 'ยอดเงิน (บาท)', 'down_amount', '', 'type="number" min="0" inputmode="numeric"')}${F('cd-dd2', 'วันที่ชำระ', 'down_date', todayISO(), `type="date" max="${todayISO()}"`)}</div>`),
     sec('delivered', false, `<div class="grid sm:grid-cols-3 gap-3 mt-1">${F('cd-dd', 'วันที่ส่งมอบรถ (ลูกค้ารับรถจริง) *', 'date', '', `type="date" max="${todayISO()}"`)}${F('cd-pl', 'เลขทะเบียนป้ายแดง', 'plate', (f.delivered && f.delivered.plate) || '', 'placeholder="เช่น ป-1234 นครปฐม"')}
       <div class="field"><label for="cd-in">บริษัทประกันที่ทำ</label><input id="cd-in" list="cd-ins" data-modal="v.insurer" value="${esc(v.insurer ?? (f.delivered && f.delivered.insurer) ?? '')}" placeholder="เลือกหรือพิมพ์"><datalist id="cd-ins">${INSURERS.map(x => `<option value="${esc(x)}">`).join('')}</datalist></div></div>
@@ -89,7 +89,7 @@ Object.assign(ACTIONS, {
       patch.flow.assign = { ...actor(), vin: c.vin, sales: a.sales, spec_differs: c.spec !== a.spec || null, via: 'invoice' };
     }
     if (!fl.done.po) {
-      if (!v.po_none) return bad('ทำใบสั่งแต่ง (PO) หรือติ๊ก "ไม่มีแต่งรถ"');
+      if (!v.po_none) return bad('ทำใบสั่งแต่งรถ หรือติ๊ก "ไม่มีแต่งรถ"');
       patch.flow.po = { ...actor(), items: [{ name: 'ไม่มีรายการแต่ง', qty: 1, cost: 0, sale: 0, custom: true }], date: t, by_name: a.sales, none: true };
     }
     if (!fl.done.down) {

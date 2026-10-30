@@ -137,7 +137,7 @@ function bookingForm(D) {
       </fieldset>
       ${multiBlock(d, D)}
       ${checks.length ? `<div class="p-3 rounded-lg text-sm flex flex-col gap-1" style="background:var(--surface-2)"><b>ผลตรวจ</b>${checks.map(c => `<div style="color:var(--${c.bad ? 'warn' : 'good'})">${c.bad ? '⚠' : '✓'} ${esc(c.t)}</div>`).join('')}</div>` : ''}
-      <p class="text-xs text-muted">ของแถมรายชิ้นใส่ทีหลังในใบสั่งแต่ง (PO)</p>
+      <p class="text-xs text-muted">ของแถมรายชิ้นใส่ทีหลังในใบสั่งแต่งรถ</p>
       <div class="flex flex-wrap gap-3 items-center">
         <button type="submit" class="btn btn-red" ${p.write && !running && !S.saving ? '' : 'disabled'}>${S.saving ? '<span class="spin"></span> กำลังบันทึก…' : 'บันทึกใบจองเข้าคิว'}</button>
         <button type="button" class="btn btn-ghost" data-act="booking-reset">ล้างฟอร์ม</button>

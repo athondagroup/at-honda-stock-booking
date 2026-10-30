@@ -126,7 +126,7 @@ Object.assign(ACTIONS, {
   }
 });
 // ---- booking detail: who has to do what next, by when, on top (บทวิเคราะห์ 19/10)
-function nextStepWho(k) { return { booked: 'เซลล์ / แอดมินสาขา ใส่เลขที่ใบเสร็จมัดจำ', fin: 'เซลล์ อัปเดตไฟแนนซ์', assign: 'แอดมิน / ผู้จัดการ จัดสรรรถ', po: 'เซลล์ ทำ ใบสั่งแต่ง (PO)', down: 'เซลล์ บันทึกการชำระ', delivered: 'เซลล์ / แอดมิน บันทึกส่งมอบ', confirmed: 'ผู้จัดการ ยืนยันส่งมอบ' }[k] || ''; }
+function nextStepWho(k) { return { booked: 'เซลล์ / แอดมินสาขา ใส่เลขที่ใบเสร็จมัดจำ', fin: 'เซลล์ อัปเดตไฟแนนซ์', assign: 'แอดมิน / ผู้จัดการ จัดสรรรถ', po: 'เซลล์ ทำ ใบสั่งแต่งรถ', down: 'เซลล์ บันทึกการชำระ', delivered: 'เซลล์ / แอดมิน บันทึกส่งมอบ', confirmed: 'ผู้จัดการ ยืนยันส่งมอบ' }[k] || ''; }
 function nextStepBox(a, D, mine) {
   const r = a.rec, n = a.flow && a.flow.next;
   const vin = (a.match && a.match.vin) || (r.flow && r.flow.assign && r.flow.assign.vin) || null;

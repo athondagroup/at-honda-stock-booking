@@ -162,7 +162,7 @@ function flowPanel(m, a, D) {
     const locked = poLocked(a);
     if (fl.done.po) return `<div class="text-sm text-muted">สั่งแต่ง ${(f.po.items || []).length} รายการ ${fmtD(f.po.date)} · ${who(f.po)}${(f.po.hist || []).length ? ` · แก้ไขแล้ว ${f.po.hist.length} ครั้ง` : ''}</div>
       <div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-ghost btn-sm" data-act="po-open" data-id="${esc(a.id)}">${locked || !stepAllowed(a, 'po') ? 'ดูใบแต่งรถ' : 'แก้ใบแต่งรถ'}</button><button class="btn btn-ghost btn-sm" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button>${discBtn(a, 'po')}</div>${locked ? '<div class="text-xs text-muted mt-1">ส่งมอบแล้ว แก้ใบแต่งรถไม่ได้</div>' : ''}${discBox(a, m, D, 'po')}`;
-    if (fl.poSkip) return `<div class="text-sm" style="color:var(--warn)">ข้ามใบสั่งแต่ง (PO) ไว้ก่อน · ${who(f.po_skip)} ${fmtDT(f.po_skip.at)} · ยังไม่ได้ทำใบสั่งแต่ง (PO)</div>
+    if (fl.poSkip) return `<div class="text-sm" style="color:var(--warn)">ข้ามใบสั่งแต่งรถ ไว้ก่อน · ${who(f.po_skip)} ${fmtDT(f.po_skip.at)} · ยังไม่ได้ทำใบสั่งแต่งรถ</div>
       ${stepAllowed(a, 'po') && !locked ? `<div class="mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่งรถ</button></div>` : ''}`;
     return can('po') ? `<div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่งรถ</button><button class="btn btn-ghost btn-sm" data-act="po-skip" data-id="${esc(a.id)}">ข้ามใบสั่งแต่งรถไปก่อน</button></div>
       <div class="text-xs text-muted mt-1">ยังไม่รู้รายการแต่ง กด "ข้ามใบสั่งแต่งรถไปก่อน" แล้วทำขั้นถัดไปได้ · ทำใบสั่งแต่งรถ ภายหลังได้จนถึงก่อนส่งมอบ</div>` : '';
@@ -211,7 +211,7 @@ function poEditor(m, a, D) {
   const focBudget = Number(a.rec.foc_total) || 0;
   const ro = poLocked(a) || !stepAllowed(a, 'po');
   const vin = atVin(a), car = vin ? (carAny(vin, D) || {}) : {};
-  return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">ใบสั่งแต่ง (PO)</h2><p class="text-sm text-muted">${esc(a.cust)} · ${esc(a.model)} ${esc(a.grade)} ${esc(a.color)} · รหัสรุ่นในรายการ FOC: ${codes.slice(0, -2).join(', ') || '–'}</p>
+  return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">ใบสั่งแต่งรถ</h2><p class="text-sm text-muted">${esc(a.cust)} · ${esc(a.model)} ${esc(a.grade)} ${esc(a.color)} · รหัสรุ่นในรายการ FOC: ${codes.slice(0, -2).join(', ') || '–'}</p>
       <p class="text-sm mt-1">หมายเลขตัวถัง <span class="code">${esc(vin || 'ยังไม่จัดสรรรถ')}</span> · หมายเลขเครื่องยนต์ <span class="code">${esc(car.engine || '–')}</span></p>${ro && poLocked(a) ? '<p class="text-xs mt-1" style="color:var(--warn)">ส่งมอบแล้ว แก้ใบแต่งรถไม่ได้ ดูและพิมพ์ได้อย่างเดียว</p>' : ''}</div>
     <button class="btn btn-ghost btn-sm" data-act="po-back">กลับ</button></div>
   <div class="grid md:grid-cols-[1.1fr_1fr] gap-5">
@@ -231,7 +231,7 @@ function poEditor(m, a, D) {
       <div class="text-sm p-3 rounded-lg" style="background:var(--surface-2)">ทุน FOC รวม <b class="num">${money(cost)}</b> บาท · ราคาขาย <b class="num">${money(sale)}</b> บาท
         ${focBudget ? ` · FOC ในใบจอง ${money(focBudget)} บาท → <b style="color:var(--${cost > focBudget ? 'bad' : 'good'})">${cost > focBudget ? 'เกิน' : 'เหลือ'} ${money(Math.abs(focBudget - cost))}</b>` : ''}</div>
       <div class="field"><label for="po-note">หมายเหตุ</label><input id="po-note" data-modal="po.note" value="${esc(po.note)}" ${ro ? 'disabled' : ''}></div>
-      <div class="flex flex-wrap gap-2">${ro ? '' : `<button class="btn btn-red" data-act="po-save" data-id="${esc(a.id)}">บันทึกใบสั่งแต่ง (PO)</button><button class="btn btn-ghost" data-act="po-custom">+ เพิ่มรายการเอง</button>`}<button class="btn btn-ghost" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button></div>
+      <div class="flex flex-wrap gap-2">${ro ? '' : `<button class="btn btn-red" data-act="po-save" data-id="${esc(a.id)}">บันทึกใบสั่งแต่งรถ</button><button class="btn btn-ghost" data-act="po-custom">+ เพิ่มรายการเอง</button>`}<button class="btn btn-ghost" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button></div>
     </div>
     <div class="flex flex-col gap-2">
       <div class="field"><label for="po-q">ค้นหาในรายการ FOC (${cat.length ? cat.length + ' รายการ' : 'ยังไม่มีรายการ'})</label><input id="po-q" type="search" data-modal="poq" value="${esc(m.poq || '')}" placeholder="เช่น ฟิล์ม, พรม, 08P"></div>

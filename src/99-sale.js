@@ -7,7 +7,7 @@ function saleDates(a, D) {
 function saleFoc(a) {
   const po = (a.rec.flow && a.rec.flow.po) || {}, items = po.items || [];
   const cost = items.reduce((n, x) => n + (Number(x.cost) || 0) * (Number(x.qty) || 1), 0);
-  if (po.at && cost) return { v: cost, src: 'ตามใบสั่งแต่ง (PO)' };
+  if (po.at && cost) return { v: cost, src: 'ตามใบสั่งแต่งรถ' };
   const f = a.rec.foc_total;
   return f === null || f === undefined || f === '' ? { v: null, src: '' } : { v: Number(f) || 0, src: 'ตามใบจอง' };
 }
@@ -71,7 +71,7 @@ function printSaleApp(a, D) {
     { h: 'เงื่อนไขการขาย' }, { items: { cols: ['รายการ', 'บาท'], widths: [0.7, 0.3], rows: terms } },
     { h: 'ของแถม (ตามใบสั่งแต่ง PO)' },
     pit.length ? { items: { cols: ['รายการของแถม', 'จำนวน', 'มูลค่า (ราคาขาย)', 'ทุน FOC'], widths: [0.5, 0.1, 0.2, 0.2], rows: gifts } }
-      : { note: r.foc_total ? `ยังไม่มีใบสั่งแต่ง (PO) · FOC ตามใบจอง ${money(r.foc_total)} บาท` : 'ไม่มีของแถม / ยังไม่มีใบสั่งแต่ง (PO)' },
+      : { note: r.foc_total ? `ยังไม่มีใบสั่งแต่งรถ · FOC ตามใบจอง ${money(r.foc_total)} บาท` : 'ไม่มีของแถม / ยังไม่มีใบสั่งแต่งรถ' },
     { h: 'Margin และยอดคงเหลือ' }, { items: { cols: ['รายการ', 'บาท'], widths: [0.7, 0.3], rows: mg } },
     ...(s.has ? [] : [{ note: 'หมายเหตุ: ใบจองนี้ยังไม่ได้ใส่เงื่อนไขการขาย ตัวเลขยังไม่ครบ' }]),
     { sign: ['พนักงานขาย', 'ผู้จัดการฝ่ายขาย', 'ฝ่ายบัญชี'] }

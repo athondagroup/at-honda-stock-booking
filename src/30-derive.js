@@ -23,7 +23,7 @@ function carStatus(c, inv, bkByVin) {
   return 'free';
 }
 const FLOW = ['booked', 'fin', 'assign', 'po', 'down', 'delivered', 'confirmed'];
-const FLOW_LABEL = { booked: 'จอง (เลขที่ใบเสร็จมัดจำ)', fin: 'ไฟแนนซ์ผ่าน', assign: 'จัดสรรรถ', po: 'ใบสั่งแต่ง (PO)', down: 'ชำระดาวน์ / ชำระครบ (หลังแต่งรถ)', delivered: 'ส่งมอบ (ป้ายแดง + ประกัน)', confirmed: 'ผู้จัดการยืนยัน' };
+const FLOW_LABEL = { booked: 'จอง (เลขที่ใบเสร็จมัดจำ)', fin: 'ไฟแนนซ์ผ่าน', assign: 'จัดสรรรถ', po: 'ใบสั่งแต่งรถ', down: 'ชำระดาวน์ / ชำระครบ (หลังแต่งรถ)', delivered: 'ส่งมอบ (ป้ายแดง + ประกัน)', confirmed: 'ผู้จัดการยืนยัน' };
 const isCash = r => r.purchase === 'ซื้อสด';
 function flowOf(a, today) {
   const f = a.rec.flow || {}, m = a.match;

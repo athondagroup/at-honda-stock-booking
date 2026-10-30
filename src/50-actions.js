@@ -743,7 +743,7 @@ const ACTIONS = {
   },
   async 'flow-down'(el) {
     const a = atById(el.dataset.id);
-    if (!a || !stepOpen(a, 'down') || !stepAllowed(a, 'down')) { toast('บันทึกการชำระได้หลังทำ ใบสั่งแต่ง (PO)แล้ว', 'bad'); return; }
+    if (!a || !stepOpen(a, 'down') || !stepAllowed(a, 'down')) { toast('บันทึกการชำระได้หลังทำ ใบสั่งแต่งรถแล้ว', 'bad'); return; }
     const d = S.modal.down || {}, no = String(d.receipt_no || '').trim(), date = d.date || todayISO();
     if (!no) { toast('ใส่เลขที่ใบเสร็จ', 'bad'); $('#fl-dn')?.focus(); return; }
     if (!validDate(date) || date > todayISO()) { toast('วันที่ชำระต้องไม่เกินวันนี้', 'bad'); return; }
@@ -797,14 +797,14 @@ const ACTIONS = {
   async 'po-save'(el) {
     const a = atById(el.dataset.id), po = S.modal.po;
     if (!a || !po) return;
-    if (!stepAllowed(a, 'po') || poLocked(a) || !(stepOpen(a, 'po') || a.flow.done.po || a.flow.poSkip || S.modal.ret)) { toast('ทำใบสั่งแต่ง (PO) ได้หลังจัดสรรรถ และก่อนส่งมอบ', 'bad'); return; }
+    if (!stepAllowed(a, 'po') || poLocked(a) || !(stepOpen(a, 'po') || a.flow.done.po || a.flow.poSkip || S.modal.ret)) { toast('ทำใบสั่งแต่งรถ ได้หลังจัดสรรรถ และก่อนส่งมอบ', 'bad'); return; }
     const items = po.items.map(x => ({ ...x, name: String(x.name || '').trim(), qty: Math.max(1, parseInt(x.qty, 10) || 1) })).filter(x => x.name);
     if (!items.length) { toast('ใส่รายการแต่งอย่างน้อย 1 รายการ (ถ้าไม่มีแต่ง ใส่ "ไม่มีรายการแต่ง")', 'bad'); return; }
     const prev = a.rec.flow && a.rec.flow.po;
     // an edit keeps the earlier version's summary (who, when, items) as history
     const hist = prev && prev.at ? [...(prev.hist || []), { at: prev.at, by: prev.by, role: prev.role, items: (prev.items || []).map(x => `${x.name} ×${x.qty}`) }] : undefined;
     const rec = { ...actor(), items, date: po.date || todayISO(), ddate: po.ddate || null, dtime: po.dtime || null, by_name: po.by || a.sales, note: (po.note || '').trim() || null, ...(hist ? { hist } : {}) };
-    if (await saveFlow(a, { flow: { po: rec } }, prev && prev.at ? 'แก้ใบแต่งรถแล้ว' : 'บันทึกใบสั่งแต่ง (PO) แล้ว')) { if (S.modal.ret) S.modal = S.modal.ret; else S.modal.po = null; render(); }
+    if (await saveFlow(a, { flow: { po: rec } }, prev && prev.at ? 'แก้ใบแต่งรถแล้ว' : 'บันทึกใบสั่งแต่งรถ แล้ว')) { if (S.modal.ret) S.modal = S.modal.ret; else S.modal.po = null; render(); }
   },
   'po-print'(el) { const a = atById(el.dataset.id); if (a) printPO(a); },
   async 'flow-deliver'(el) {
