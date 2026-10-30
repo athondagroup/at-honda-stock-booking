@@ -34,7 +34,7 @@ function flowOf(a, today) {
     assign: !!(f.assign && f.assign.vin) || !!(m && m.vin),
     po: !!(f.po && f.po.at),
     down: !!(f.down && f.down.receipt_no),
-    delivered: !!(f.delivered && f.delivered.date && ((f.delivered.plate && f.delivered.insurer) || f.delivered.src === 'IDS')),
+    delivered: !!(f.delivered && f.delivered.date && (f.delivered.plate || f.delivered.src === 'IDS')),
     confirmed: !!(f.confirm && f.confirm.at)
   };
   const idsDate = (m && m.ddate) || null;

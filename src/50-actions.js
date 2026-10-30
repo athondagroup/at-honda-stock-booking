@@ -435,7 +435,7 @@ async function saveBooking() {
     booking_no: d.booking_no.trim() || null, booking_date: d.booking_date, br: myBranch() || d.br || salesBranch(d.sales), sales: d.sales, customer: d.customer.trim(), source: d.source === 'อื่น ๆ' ? `อื่น ๆ: ${String(d.source_other || '').trim()}` : d.source,
     model: d.model, grade: d.grade, color: d.color, model_text: d.model_text || null, purchase: d.purchase, finance: fin ? d.finance : null,
     fin_status: fin ? 'รอผล' : null, dsp: fin && /HLTC/i.test(d.finance || '') ? !!d.dsp : false, deposit: num(d.deposit) || 0, receipt_no: (d.receipt_no || '').trim() || null, paper_no: (d.paper_no || '').trim() || null, discount: num(d.discount), foc_total: num(d.foc_total), insurance: d.insurance,
-    ...bookPriceSnap(d), deal: bookTermsRec(d),
+    insurance_kind: d.insurance_kind || null, ...bookPriceSnap(d), deal: bookTermsRec(d),
     trade: bookTradeRec(d),
     delivery_plan: validDate(d.delivery_plan), lead_id: d.lead_id || null, note: d.note || null, ids_claim: d.ids_claim || null,
     doc_imgs, slip_imgs, img_missing: imgMissing, slip: S.files.slip.length > 0, flow: {},
@@ -792,7 +792,7 @@ const ACTIONS = {
     if (pcs.length) {
       if (m.po.items.some(i => i.grp === x.name)) { toast('เลือกชุดนี้ไว้แล้ว', 'bad'); return; }
       const tag = x.cat === 'DVP Package' ? '(DVP)' : '(แพ็คเกจ S)', gn = x.name.replace(/\s*[:(].*$/, '').trim();
-      pcs.forEach((q, i) => m.po.items.push({ name: `${q.name} ${tag}`, part: q.part || '', vendor: x.vendor || '', cat: x.cat || '', cost: i ? 0 : Number(x.cost) || 0, sale: i ? 0 : Number(x.sale) || 0, qty: 1, grp: x.name, ...(i ? { note: `รวมในราคาชุด ${gn}` } : { gp: true, note: `ราคาเดียวทั้งชุด ${gn}` }) }));
+      pcs.forEach((q, i) => m.po.items.push({ name: q.name, ptag: tag, part: q.part || '', vendor: x.vendor || '', cat: x.cat || '', cost: i ? 0 : Number(x.cost) || 0, sale: i ? 0 : Number(x.sale) || 0, qty: 1, grp: x.name, ...(i ? { note: `รวมในราคาชุด ${gn}` } : { gp: true, note: `ราคาเดียวทั้งชุด ${gn}` }) }));
       const dup = m.po.items.filter(i => !i.grp && i.part && pcs.some(q => q.part && q.part === i.part));
       if (dup.length) toast(`ซ้ำกับชิ้นที่ลงไว้: ${dup.map(i => i.name).join(', ')} · ลบชิ้นเดี่ยวออกเพื่อไม่ให้นับทุนซ้ำ`, 'bad');
       render(); return;
@@ -815,7 +815,7 @@ const ACTIONS = {
     const prev = a.rec.flow && a.rec.flow.po;
     // an edit keeps the earlier version's summary (who, when, items) as history
     const hist = prev && prev.at ? [...(prev.hist || []), { at: prev.at, by: prev.by, role: prev.role, items: (prev.items || []).map(x => `${x.name} ×${x.qty}`) }] : undefined;
-    const rec = { ...actor(), items, date: po.date || todayISO(), ddate: po.ddate || null, dtime: po.dtime || null, by_name: po.by || a.sales, note: (po.note || '').trim() || null, ...(hist ? { hist } : {}) };
+    const rec = { ...actor(), items, date: po.date || todayISO(), ddate: po.ddate || null, dtime: po.dtime || null, by_name: po.by || a.sales, note: (po.note || '').trim() || null, cp: po.cp && Object.keys(po.cp).some(k => po.cp[k]) ? po.cp : null, ucare: !!po.ucare, ...(hist ? { hist } : {}) };
     if (await saveFlow(a, { flow: { po: rec } }, prev && prev.at ? 'แก้ใบแต่งรถแล้ว' : 'บันทึกใบสั่งแต่งรถ แล้ว')) { if (S.modal.ret) S.modal = S.modal.ret; else S.modal.po = null; render(); }
   },
   'po-print'(el) { const a = atById(el.dataset.id); if (a) printPO(a); },
@@ -826,15 +826,14 @@ const ACTIONS = {
     const v = S.modal.deliv || {}, prev = (a.rec.flow && a.rec.flow.delivered) || {};
     const date = v.date ?? (a.flow.deliveredDate || '');
     if (!date) { toast('ใส่วันที่ส่งมอบรถ (วันที่ลูกค้ารับรถจริง)', 'bad'); $('#fl-dd')?.focus(); return; }
-    const plate = String(v.plate ?? prev.plate ?? '').trim(), insurer = String(v.insurer ?? prev.insurer ?? '').trim();
+    const plate = String(v.plate ?? prev.plate ?? '').trim();
     if (!plate) { toast('ใส่เลขทะเบียนป้ายแดง', 'bad'); $('#fl-pl')?.focus(); return; }
-    if (!insurer) { toast('เลือกบริษัทประกันที่ทำ', 'bad'); $('#fl-in')?.focus(); return; }
     if (!validDate(date) || date > todayISO()) { toast('วันที่ส่งมอบต้องไม่เกินวันนี้', 'bad'); return; }
     if (a.date && date < a.date) { toast('วันที่ส่งมอบต้องไม่ก่อนวันจอง', 'bad'); return; }
     if (!isCash(a.rec) && !finDocsN(a.rec)) { toast('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ (ที่ขั้น "ไฟแนนซ์ผ่าน")', 'bad'); return; }
     const tr = await tradeDelivOf(v, tradeCur(a.rec), 'fl', true); if (tr.err) { toast(tr.err, 'bad'); if (tr.id) $('#' + tr.id)?.focus(); return; }
     tradeFilesClear();
-    if (!await saveFlow(a, { trade: tr.rec, flow: { delivered: { ...actor(), date, plate, insurer } } }, 'บันทึกส่งมอบแล้ว กรอกข้อมูลค่าคอมแล้วรอผู้จัดการยืนยัน')) return;
+    if (!await saveFlow(a, { trade: tr.rec, flow: { delivered: { ...actor(), date, plate } } }, 'บันทึกส่งมอบแล้ว กรอกข้อมูลค่าคอมแล้วรอผู้จัดการยืนยัน')) return;
     for (const l of derive().locks.filter(x => x.live && x.type === 'booking' && (x.bkref === a.key || x.bkref === a.row?.key))) {
       const cur = findLock(l.id); if (!cur) continue;
       cur.status = 'done'; await saveLock(l.id, cur, 'ส่งมอบแล้ว', fmtD(date));
@@ -985,7 +984,7 @@ document.addEventListener('input', ev => {
     // the search window: only the results are redrawn, the box being typed in stays as it is (no jump, keyboard stays)
     if (path === 'q' && S.modal.kind === 'gsearch') { clearTimeout(poqTimer); poqTimer = setTimeout(() => { const r = document.getElementById('gs-res'); if (r && S.modal && S.modal.kind === 'gsearch') r.innerHTML = gsearchResults(S.modal, derive()); else render(); }, 200); return; }
     if (path === 'poq' || (path === 'q' && (S.modal.kind === 'idspair' || S.modal.kind === 'lockbk' || S.modal.kind === 'gsearch' || S.modal.kind === 'stassign' || S.modal.kind === 'idsview' || S.modal.kind === 'drill'))) { clearTimeout(poqTimer); poqTimer = setTimeout(render, 250); return; }
-    if (t.tagName === 'SELECT' || t.type === 'radio' || (path.endsWith('.vin') && val.length === 17)) render();
+    if (t.tagName === 'SELECT' || t.type === 'radio' || (t.type === 'checkbox' && path.startsWith('po.')) || (path.endsWith('.vin') && val.length === 17)) render();
   } else if (t.dataset.filter) {
     S.filters[t.dataset.filter] = t.type === 'checkbox' ? t.checked : t.value;
     if (t.dataset.filter !== 'bPage') S.filters.bPage = 1;

@@ -208,7 +208,7 @@ function inboxRowFor(x, D) {
   if (k === 'edit') return inboxRow(a, '', esc(changeText(ch)) + (ch.reason ? `<div>เหตุผล: ${esc(ch.reason)}</div>` : ''), `ขอโดย ${who(ch)} ${fmtDT(ch.at)}`, 'เปิดเพื่ออนุมัติ');
   if (k === 'owner') return inboxRow(a, '', `IDS คีย์ด้วย ID ${esc(a.idsSales)}${a.rec.owner_dispute.note ? ' · ' + esc(a.rec.owner_dispute.note) : ''}`, `แจ้งโดย ${who(a.rec.owner_dispute)} ${fmtDT(a.rec.owner_dispute.at)}`, 'เลือกเจ้าของเคส');
   const dv = (a.rec.flow && a.rec.flow.delivered) || {};
-  return inboxRow(a, '', `ส่งมอบ ${fmtD(dv.date)} · ป้ายแดง ${esc(dv.plate || '–')} · ประกัน ${esc(dv.insurer || '–')}`, dv.at ? `บันทึกโดย ${who(dv)} ${fmtDT(dv.at)}` : '', 'เปิดเพื่อยืนยัน');
+  return inboxRow(a, '', `ส่งมอบ ${fmtD(dv.date)} · ป้ายแดง ${esc(dv.plate || '–')}`, dv.at ? `บันทึกโดย ${who(dv)} ${fmtDT(dv.at)}` : '', 'เปิดเพื่อยืนยัน');
 }
 function viewInboxMgr(D) {
   const items = inboxItems(D), topics = inboxTopics();

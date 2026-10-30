@@ -5,7 +5,7 @@ function focCatalog() {
   const d = S.ref.get('foc');
   if (!d || !d.cols) return [];
   if (focCatalog.cache && focCatalog.cache.src === d) return focCatalog.cache.rows;
-  const rows = d.rows.map(r => { const o = {}; d.cols.forEach((c, i) => { o[c] = r[i]; }); return o; });
+  const rows = d.rows.map(r => { const o = {}; d.cols.forEach((c, i) => { o[c] = r[i]; }); const m = /^ATG\s+(ATG-\S+)/.exec(o.src || ''); if (m && !o.part) o.part = m[1]; return o; });
   focCatalog.cache = { src: d, rows };
   return rows;
 }
@@ -169,9 +169,9 @@ function flowPanel(m, a, D) {
   };
   const delivBody = () => {
     const dv = f.delivered || {};
-    if (fl.done.delivered && dv.src === 'IDS' && !(dv.plate && dv.insurer)) return `<div class="text-sm">ส่งมอบแล้วตาม IDS (DL) ${fmtD(dv.date)} · บันทึกเข้าระบบแล้ว</div>${stepAllowed(a, 'delivered') ? `<details class="mt-1"><summary class="text-sm cursor-pointer" style="color:var(--warn)">เพิ่มเลขทะเบียนป้ายแดงและบริษัทประกัน (ไม่บังคับ)</summary>${delivForm()}</details>` : ''}${commBody()}`;
-    if (fl.done.delivered) return `<div class="text-sm text-muted">ส่งมอบ ${fmtD(dv.date)} · ป้ายแดง <span class="code">${esc(dv.plate)}</span> · ประกัน ${esc(dv.insurer)} · ${who(dv)}</div><div class="text-sm text-muted">รถเก่าเทิร์น: ${esc(tradeLine(r))}</div>${commBody()}`;
-    if (fl.lateUpdate) return `<div class="text-sm">ส่งมอบแล้วตาม IDS (DL) ${fmtD(fl.deliveredDate)}</div>${stepAllowed(a, 'delivered') ? `<details class="mt-1"><summary class="text-sm cursor-pointer" style="color:var(--warn)">เพิ่มเลขทะเบียนป้ายแดงและบริษัทประกัน (ไม่บังคับ)</summary>${delivForm()}</details>` : ''}${commBody()}`;
+    if (fl.done.delivered && dv.src === 'IDS' && !dv.plate) return `<div class="text-sm">ส่งมอบแล้วตาม IDS (DL) ${fmtD(dv.date)} · บันทึกเข้าระบบแล้ว</div>${stepAllowed(a, 'delivered') ? `<details class="mt-1"><summary class="text-sm cursor-pointer" style="color:var(--warn)">เพิ่มเลขทะเบียนป้ายแดง (ไม่บังคับ)</summary>${delivForm()}</details>` : ''}${commBody()}`;
+    if (fl.done.delivered) return `<div class="text-sm text-muted">ส่งมอบ ${fmtD(dv.date)} · ป้ายแดง <span class="code">${esc(dv.plate)}</span> · ${who(dv)}</div><div class="text-sm text-muted">รถเก่าเทิร์น: ${esc(tradeLine(r))}</div>${commBody()}`;
+    if (fl.lateUpdate) return `<div class="text-sm">ส่งมอบแล้วตาม IDS (DL) ${fmtD(fl.deliveredDate)}</div>${stepAllowed(a, 'delivered') ? `<details class="mt-1"><summary class="text-sm cursor-pointer" style="color:var(--warn)">เพิ่มเลขทะเบียนป้ายแดง (ไม่บังคับ)</summary>${delivForm()}</details>` : ''}${commBody()}`;
     if (!can('delivered')) return fl.next === 'delivered' && !stepAllowed(a, 'delivered') ? '<div class="text-sm text-muted">รอเซลล์อัปเดตการส่งมอบ</div>' : '';
     return delivForm();
   };
@@ -180,8 +180,7 @@ function flowPanel(m, a, D) {
     return `      <div class="grid sm:grid-cols-3 gap-3 items-end mt-1">
       <div class="field"><label for="fl-dd" class="req">วันที่ส่งมอบรถ (ลูกค้ารับรถจริง)</label><input id="fl-dd" type="date" data-modal="deliv.date" value="${esc(v.date ?? (fl.deliveredDate || ''))}" max="${todayISO()}"></div>
       <div class="field"><label for="fl-pl" class="req">เลขทะเบียนป้ายแดง</label><input id="fl-pl" data-modal="deliv.plate" value="${esc(v.plate ?? dv.plate ?? '')}" placeholder="เช่น ป-1234 นครปฐม" autocomplete="off"></div>
-      <div class="field"><label for="fl-in" class="req">บริษัทประกันที่ทำ</label><input id="fl-in" list="fl-ins" data-modal="deliv.insurer" value="${esc(v.insurer ?? dv.insurer ?? '')}" placeholder="เลือกหรือพิมพ์"><datalist id="fl-ins">${INSURERS.map(x => `<option value="${esc(x)}">`).join('')}</datalist></div></div>
-      <div class="text-xs text-muted mt-1">ประกันในใบจอง: ${esc(r.insurance || '–')}</div>
+</div>
       ${tradeDelivFields('deliv', (m.deliv = m.deliv || tradePre(r)), 'fl', tradeCur(r), true)}
       <button class="btn btn-dark btn-sm mt-2" data-act="flow-deliver" data-id="${esc(a.id)}">บันทึกส่งมอบ</button>`;
   };
@@ -197,16 +196,31 @@ function flowPanel(m, a, D) {
 }
 
 // ---------- PO: accessories order (ใบแต่งรถ)
+// the insurance / registration / discount lines come from the sale terms (and the booking), first rows of the PO
+function poAuto(a) {
+  const d = a.rec.deal || {}, r = a.rec, out = [];
+  const by1 = d.ins1_by || (['AT แถม', 'Honda แถม', 'ลูกค้าซื้อ'].includes(r.insurance) ? r.insurance : ''), kind = d.ins1_kind || r.insurance_kind || 'ชั้น 1 + พ.ร.บ.';
+  const free = by => by && by !== 'ลูกค้าซื้อ';
+  if (by1) out.push({ key: 'ins1', by: by1, name: kind === 'ชั้น 1 + พ.ร.บ.' ? `${free(by1) ? 'ฟรี' : ''}ประกันภัยชั้น 1 + พ.ร.บ.` : kind === 'Honda' ? `${free(by1) ? 'ฟรี' : ''}ประกันภัย Honda` : `${kind}` });
+  if (d.ins2_by) out.push({ key: 'ins2', by: d.ins2_by, name: `${free(d.ins2_by) ? 'ฟรี' : ''}ประกันภัย ปีที่ 2` });
+  if (d.ins3_by) out.push({ key: 'ins3', by: d.ins3_by, name: `${free(d.ins3_by) ? 'ฟรี' : ''}ประกันภัย ปีที่ 3` });
+  if (d.reg_by) out.push({ key: 'reg', by: d.reg_by, name: `${free(d.reg_by) ? 'ฟรี' : ''}ค่าจดทะเบียน` });
+  const disc = num(d.disc) || num(r.discount); if (disc > 0) out.push({ key: 'disc', by: '', name: 'ส่วนลด', amt: disc });
+  return out;
+}
+const poPart = x => [x.part || x.vendor || '', x.ptag || ''].filter(Boolean).join(' ');
+const poStd = a => ['รับประกันคุณภาพรถ 3 ปี หรือ 100,000 กม.', 'บริการช่วยเหลือฉุกเฉิน 24 ชม. 3 ปี หรือ 100,000 กม.', 'ฟรีค่าแรงเช็คระยะ 10,000–20,000 กม.', ...(/e:HEV/i.test(a.model || '') ? ['รับประกันแบตเตอรี่ไฮบริด 10 ปี', 'รับประกันระบบไฮบริด 5 ปี'] : [])];
+const UCARE = 'Ultimate Care รับประกันคุณภาพเพิ่ม 2 ปี หรือ 40,000 กม.';
 function poDraft(a) {
   const po = (a.rec.flow && a.rec.flow.po) || {};
-  return { items: (po.items || []).map(x => ({ ...x })), date: po.date || todayISO(), ddate: po.ddate || a.rec.delivery_plan || '', dtime: po.dtime || '', by: po.by_name || a.sales || '', note: po.note || '' };
+  return { items: (po.items || []).map(x => ({ ...x })), date: po.date || todayISO(), ddate: po.ddate || a.rec.delivery_plan || '', dtime: po.dtime || '', by: po.by_name || a.sales || '', note: po.note || '', cp: { ...(po.cp || {}) }, ucare: !!po.ucare };
 }
 function poEditor(m, a, D) {
   const po = m.po, codes = [...(MODEL_CODES[a.model] || []), 'OT', 'ALL'];
   const cat = focCatalog();
   const q = (m.poq || '').trim().toLowerCase();
   const hits = cat.filter(x => codes.includes(x.model) && (!q || x.name.toLowerCase().includes(q) || (x.part || '').toLowerCase().includes(q) || (x.cat || '').toLowerCase().includes(q))).sort((x, y) => (/^(DVP|แพ็คเกจ)/.test(y.cat || '')) - (/^(DVP|แพ็คเกจ)/.test(x.cat || ''))).slice(0, 60);
-  const cost = po.items.reduce((n, x) => n + (Number(x.cost) || 0) * (Number(x.qty) || 1), 0);
+  const cost = po.items.reduce((n, x) => n + (x.cpay ? 0 : (Number(x.cost) || 0) * (Number(x.qty) || 1)), 0);
   const sale = po.items.reduce((n, x) => n + (Number(x.sale) || 0) * (Number(x.qty) || 1), 0);
   const focBudget = Number(a.rec.foc_total) || 0;
   const ro = poLocked(a) || !stepAllowed(a, 'po');
@@ -222,14 +236,17 @@ function poEditor(m, a, D) {
         <div class="field"><label for="po-dd">วันที่ส่งมอบ</label><input id="po-dd" type="date" data-modal="po.ddate" value="${esc(po.ddate)}" ${ro ? 'disabled' : ''}></div>
         <div class="field"><label for="po-dt">เวลา</label><input id="po-dt" type="time" data-modal="po.dtime" value="${esc(po.dtime)}" ${ro ? 'disabled' : ''}></div>
       </div>
-      <table class="tbl text-sm"><thead><tr><th>ลำดับ</th><th>ชื่ออุปกรณ์อะไหล่</th><th>หมายเลขอะไหล่ / ผู้ขาย</th><th class="text-right">จำนวน</th><th class="text-right">ทุน FOC</th><th></th></tr></thead>
-        <tbody>${po.items.map((x, i) => `<tr><td class="num">${i + 1}</td><td style="min-width:160px">${ro || x.grp ? esc(x.name) : `<input data-modal="po.items.${i}.name" value="${esc(x.name)}" class="w-full" style="background:transparent;border-bottom:1px solid var(--line)">`}</td>
-          <td class="code text-xs">${esc(x.part || x.vendor || '–')}</td>
+      <table class="tbl text-sm"><thead><tr><th>ลำดับ</th><th>ชื่ออุปกรณ์อะไหล่</th><th>หมายเลขอะไหล่ / ผู้ขาย</th><th class="text-right">จำนวน</th><th class="text-right">ทุน FOC</th><th>ลูกค้าจ่ายเพิ่ม</th><th></th></tr></thead>
+        <tbody>${poAuto(a).map(x => `<tr style="background:var(--surface-2)"><td class="text-muted">★</td><td>${esc(x.name)}${x.amt ? ` <b class="num">${money(x.amt)}</b>` : ''}</td><td class="text-xs">${esc(x.by || 'จากเงื่อนไขการขาย')}</td><td class="text-right">1</td><td class="text-muted text-xs text-right">${x.by === 'ลูกค้าซื้อ' ? 'ลูกค้าซื้อ' : 'ไม่คิดทุนที่นี่'}</td><td>${x.by === 'ลูกค้าซื้อ' ? `<label class="text-xs flex items-center gap-1"><input type="checkbox" data-modal="po.cp.${x.key}" ${po.cp && po.cp[x.key] ? 'checked' : ''} ${ro ? 'disabled' : ''}> ชำระเพิ่ม</label>` : ''}</td><td></td></tr>`).join('')}${po.items.map((x, i) => `<tr><td class="num">${i + 1}</td><td style="min-width:160px">${ro || x.grp ? esc(x.name) : `<input data-modal="po.items.${i}.name" value="${esc(x.name)}" class="w-full" style="background:transparent;border-bottom:1px solid var(--line)">`}</td>
+          <td class="code text-xs">${esc(poPart(x) || '–')}</td>
           <td class="text-right">${ro || x.grp ? esc(x.qty) : `<input type="number" min="1" data-modal="po.items.${i}.qty" value="${esc(x.qty)}" class="w-12 text-right" style="background:transparent;border-bottom:1px solid var(--line)">`}</td>
           <td class="num text-right">${x.grp && !x.gp ? '<span class="text-muted text-xs">รวมในชุด</span>' : money((Number(x.cost) || 0) * (Number(x.qty) || 1))}</td>
-          <td>${ro ? '' : `<button class="btn btn-ghost btn-sm" data-act="po-del" data-i="${i}" aria-label="ลบรายการ ${i + 1}" ${x.grp ? 'title="ลบทั้งชุด"' : ''}>×</button>`}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ยังไม่มีรายการ เลือกจากรายการ FOC ทางขวา หรือเพิ่มเอง</td></tr>'}</tbody></table>
+          <td>${x.grp && !x.gp ? '' : `<label class="text-xs flex items-center gap-1"><input type="checkbox" data-modal="po.items.${i}.cpay" ${x.cpay ? 'checked' : ''} ${ro ? 'disabled' : ''}> ชำระเพิ่ม</label>`}</td>
+          <td>${ro ? '' : `<button class="btn btn-ghost btn-sm" data-act="po-del" data-i="${i}" aria-label="ลบรายการ ${i + 1}" ${x.grp ? 'title="ลบทั้งชุด"' : ''}>×</button>`}</td></tr>`).join('') || '<tr><td colspan="7" class="text-muted">ยังไม่มีรายการ เลือกจากรายการ FOC ทางขวา หรือเพิ่มเอง</td></tr>'}</tbody></table>
       <div class="text-sm p-3 rounded-lg" style="background:var(--surface-2)">ทุน FOC รวม <b class="num">${money(cost)}</b> บาท · ราคาขาย <b class="num">${money(sale)}</b> บาท
         ${focBudget ? ` · FOC ในใบจอง ${money(focBudget)} บาท → <b style="color:var(--${cost > focBudget ? 'bad' : 'good'})">${cost > focBudget ? 'เกิน' : 'เหลือ'} ${money(Math.abs(focBudget - cost))}</b>` : ''}</div>
+      <div class="text-sm p-3 rounded-lg border border-line"><div class="font-medium mb-1">รายการมาตรฐานที่มากับตัวรถ</div><ul class="list-disc pl-5">${poStd(a).map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+        <label class="flex items-center gap-2 mt-2"><input type="checkbox" data-modal="po.ucare" ${po.ucare ? 'checked' : ''} ${ro ? 'disabled' : ''}> แคมเปญพิเศษ Honda: ${esc(UCARE)}</label></div>
       <div class="field"><label for="po-note">หมายเหตุ</label><input id="po-note" data-modal="po.note" value="${esc(po.note)}" ${ro ? 'disabled' : ''}></div>
       <div class="flex flex-wrap gap-2">${ro ? '' : `<button class="btn btn-red" data-act="po-save" data-id="${esc(a.id)}">บันทึกใบสั่งแต่งรถ</button><button class="btn btn-ghost" data-act="po-custom">+ เพิ่มรายการเอง</button>`}<button class="btn btn-ghost" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button></div>
     </div>
@@ -244,13 +261,16 @@ function poEditor(m, a, D) {
 function printPO(a) {
   const po = (S.modal && S.modal.po) || poDraft(a);
   const vin = atVin(a), car = vin ? (carAny(vin, derive()) || {}) : {};
-  const rows = [...po.items.map((x, i) => [String(i + 1), x.name, x.part || x.vendor || '', String(x.qty), x.note || '']),
-    ...Array.from({ length: Math.max(0, 15 - po.items.length) }, (_, i) => [String(po.items.length + i + 1), '', '', '', ''])];
+  const au = poAuto(a).map(x => [x.name + (x.amt ? ` ${money(x.amt)}` : ''), '', '1', [x.by, x.by === 'ลูกค้าซื้อ' && po.cp && po.cp[x.key] ? 'ลูกค้าชำระเพิ่ม' : ''].filter(Boolean).join(' · ')]);
+  const lines = [...au, ...po.items.map(x => [x.name, poPart(x), String(x.qty), [x.note, x.cpay ? 'ลูกค้าชำระเพิ่ม' : ''].filter(Boolean).join(' · ')])];
+  const rows = [...lines.map((l, i) => [String(i + 1), ...l]), ...Array.from({ length: Math.max(0, 15 - lines.length) }, (_, i) => [String(lines.length + i + 1), '', '', '', ''])];
   const spec = { title: 'ใบสั่งแต่งรถ', sub: `บริษัท เอที ฮอนด้า ออโตโมบิล จำกัด สาขา${BR[a.br]?.name || ''}`, blocks: [
     { kv: [['วันที่สั่งอุปกรณ์', fmtD(po.date), 'พนักงานขาย', a.sales || ''], ['เลขที่ใบจอง', a.no || '', 'ชื่อลูกค้า', a.cust || ''], ['รุ่นรถ', a.model || '', 'แบบรถ / สีรถ', `${a.grade || ''} / ${a.color || ''}`],
       ['วันที่ส่งมอบ', `${fmtD(po.ddate)} ${po.dtime || ''}`, 'ผู้สั่งอุปกรณ์', po.by || ''], ['หมายเลขตัวถัง', vin || '', 'หมายเลขเครื่องยนต์', car.engine || '']] },
     { h: 'รายการแต่งอุปกรณ์' },
     { items: { cols: ['ลำดับ', 'ชื่ออุปกรณ์อะไหล่', 'หมายเลขอะไหล่', 'จำนวน', 'หมายเหตุ'], widths: [0.08, 0.44, 0.24, 0.1, 0.14], rows } },
+    { h: 'รายการมาตรฐานที่มากับตัวรถ' }, { note: poStd(a).map(t => '• ' + t).join('\n') },
+    ...(po.ucare ? [{ note: '★ แคมเปญพิเศษ Honda: ' + UCARE }] : []),
     ...(po.note ? [{ note: `หมายเหตุ: ${po.note}` }] : []),
     { sign: ['ผู้สั่งอุปกรณ์', 'ผู้จัดการฝ่ายขาย', 'ฝ่ายอะไหล่ / ผู้ติดตั้ง'] }] };
   const back = S.modal && S.modal.kind === 'at' ? { ...S.modal } : { kind: 'at', id: a.id };

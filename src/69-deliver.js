@@ -49,8 +49,8 @@ function cdelivModal(m, D) {
       <button class="btn btn-ghost btn-sm mt-1" data-act="cdeliv-po" data-id="${esc(a.id)}">ทำใบสั่งแต่งรถ</button>`),
     sec('down', fl.done.down, fl.done.down ? done(`ใบเสร็จ ${esc(f.down.receipt_no)}`) : `<div class="grid sm:grid-cols-3 gap-3 mt-1">${F('cd-dn', `เลขที่ใบเสร็จ${isCash(r) ? 'ชำระครบ' : 'เงินดาวน์'}`, 'down_no', '')}${F('cd-da', 'ยอดเงิน (บาท)', 'down_amount', '', 'type="number" min="0" inputmode="numeric"')}${F('cd-dd2', 'วันที่ชำระ', 'down_date', todayISO(), `type="date" max="${todayISO()}"`)}</div>`),
     sec('delivered', false, `<div class="grid sm:grid-cols-3 gap-3 mt-1">${F('cd-dd', 'วันที่ส่งมอบรถ (ลูกค้ารับรถจริง) *', 'date', '', `type="date" max="${todayISO()}"`)}${F('cd-pl', 'เลขทะเบียนป้ายแดง', 'plate', (f.delivered && f.delivered.plate) || '', 'placeholder="เช่น ป-1234 นครปฐม"')}
-      <div class="field"><label for="cd-in">บริษัทประกันที่ทำ</label><input id="cd-in" list="cd-ins" data-modal="v.insurer" value="${esc(v.insurer ?? (f.delivered && f.delivered.insurer) ?? '')}" placeholder="เลือกหรือพิมพ์"><datalist id="cd-ins">${INSURERS.map(x => `<option value="${esc(x)}">`).join('')}</datalist></div></div>
-      <div class="text-xs text-muted mt-1">ประกันในใบจอง: ${esc(r.insurance || '–')}</div>${tradeDelivFields('v', v, 'cd', tradeCur(r), true)}`)
+</div>
+      ${tradeDelivFields('v', v, 'cd', tradeCur(r), true)}`)
   ];
   return head + `<div class="p-3 rounded-lg text-sm mb-2" style="background:var(--surface-2)">ใบจอง: <b>${esc(a.cust || '')}</b> · จอง ${fmtD(a.date)} · เซลล์ ${esc(a.sales || '')} ${linked ? '' : '<button class="btn btn-ghost btn-sm" data-act="cdeliv-pick" data-id="">เปลี่ยนใบจอง</button>'} <button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(a.id)}">เปิดใบจอง</button></div>
     <p class="text-sm mb-1">ใส่ข้อมูลที่ยังขาด แล้วกดบันทึกส่งมอบครั้งเดียว หลังจากนั้นกรอกข้อมูลค่าคอมในใบจองและรอผู้จัดการยืนยัน</p>
@@ -99,14 +99,13 @@ Object.assign(ACTIONS, {
       patch.flow.down = { ...actor(), receipt_no: no, amount: num(v.down_amount), date };
     }
     if (!v.date) return bad('ใส่วันที่ส่งมอบรถ (วันที่ลูกค้ารับรถจริง)', 'cd-dd');
-    const date = v.date, plate = String(v.plate ?? (f.delivered && f.delivered.plate) ?? '').trim(), insurer = String(v.insurer ?? (f.delivered && f.delivered.insurer) ?? '').trim();
+    const date = v.date, plate = String(v.plate ?? (f.delivered && f.delivered.plate) ?? '').trim();
     if (!plate) return bad('ใส่เลขทะเบียนป้ายแดง', 'cd-pl');
-    if (!insurer) return bad('เลือกบริษัทประกันที่ทำ', 'cd-in');
     if (!validDate(date) || date > t) return bad('วันที่ส่งมอบต้องไม่เกินวันนี้', 'cd-dd');
     if (a.date && date < a.date) return bad('วันที่ส่งมอบต้องไม่ก่อนวันจอง', 'cd-dd');
     const tr = await tradeDelivOf(v, tradeCur(r), 'cd', true); if (tr.err) return bad(tr.err, tr.id);
     tradeFilesClear(); patch.trade = tr.rec;
-    patch.flow.delivered = { ...actor(), date, plate, insurer, vin: c.vin, inv: (invWaiting(c, D) || {}).inv || null, from: 'stock' };
+    patch.flow.delivered = { ...actor(), date, plate, vin: c.vin, inv: (invWaiting(c, D) || {}).inv || null, from: 'stock' };
     if (!await saveFlow(a, patch, `บันทึกส่งมอบ ${c.vin} แล้ว กรอกข้อมูลค่าคอมในใบจอง แล้วรอผู้จัดการยืนยัน`)) return;
     for (const l of derive().locks.filter(x => x.live && x.type === 'booking' && (x.bkref === a.key || x.bkref === a.row?.key))) {
       const cur = findLock(l.id); if (!cur) continue;

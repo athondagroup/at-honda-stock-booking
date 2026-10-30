@@ -106,6 +106,7 @@ function privText(o) {
   return t.join(' · ');
 }
 function commFinAmount(c) { const n = num(c.price) - num(c.discount) - num(c.down); return num(c.price) && n > 0 ? n : null; }
+const INS_KINDS = [['', 'ไม่ระบุ'], ['ชั้น 1 + พ.ร.บ.', 'ประกันภัยชั้น 1 + พ.ร.บ.'], ['ซมโปะประกันภัย', 'ซมโปะประกันภัย'], ['Honda', 'ประกันภัย Honda']];
 function termEmpty(v) { return v === '' || v === null || v === undefined; }
 // fills the worked-out values (amount financed, default margins, total) without writing them into the draft
 function termsFill(x, v, paint) {
@@ -144,7 +145,11 @@ function termsFields(x, v, f) {
     ${o.campaign_id === 'other' ? `<div class="field sm:col-span-3"><label for="${f.idp}-ct">ชื่อแคมเปญ</label><input id="${f.idp}-ct" ${f.attr}="${f.pre}.campaign_text" value="${esc(o.campaign_text ?? '')}" ${dis} autocomplete="off"></div>` : ''}`;
   const step = x.cash ? '' : `<div class="field"><label for="${f.idp}-step">AT แคมเปญ (ช่อง Step)</label><select id="${f.idp}-step" ${f.attr}="${f.pre}.at_step" ${dis}>
     <option value="" ${!o.at_step ? 'selected' : ''}>ไม่มี</option><option value="1" ${o.at_step === '1' ? 'selected' : ''}>Step ช่อง 1 · +${money(st.step1)}</option><option value="2" ${o.at_step === '2' ? 'selected' : ''}>Step ช่อง 2 · +${money(st.step2)}</option></select></div>`;
+  const WHO = [['', 'ไม่มี'], ['AT แถม', 'AT แถม'], ['Honda แถม', 'Honda แถม'], ['ลูกค้าซื้อ', 'ลูกค้าซื้อ']];
+  const insBox = `<div class="mt-3 p-3 rounded-lg border border-line"><div class="font-medium text-sm mb-2">ประกันภัยและทะเบียน (ไปขึ้นในใบสั่งแต่งรถ)</div><div class="grid sm:grid-cols-3 gap-3">
+    ${f.noIns1 ? '' : S2('ins1_by', 'ประกันภัยชั้น 1 + พ.ร.บ. ปีที่ 1', WHO) + S2('ins1_kind', 'เป็นประกันของ', INS_KINDS)}${S2('ins2_by', 'ประกันภัย ปีที่ 2', WHO)}${S2('ins3_by', 'ประกันภัย ปีที่ 3', WHO)}${S2('reg_by', 'ค่าจดทะเบียน', WHO)}</div></div>`;
   return `<div class="grid sm:grid-cols-3 gap-3">${price}${fin}${f.adm ? campAdminBox(f, o, v, sel, opts) : sel}</div>
+    ${insBox}
     <div class="mt-3 p-3 rounded-lg border border-line" style="background:var(--surface)"><div class="font-medium text-sm mb-2">Margin (แก้ตัวเลขได้)</div>
       <div class="grid sm:grid-cols-3 gap-3">${N('margin_car', `1. Margin รถ ${Math.round(st.pct * 100)}%`)}${step}${x.cash ? '' : N('margin_at', '2. AT แคมเปญ (บาท)')}${N('margin_honda', `${x.cash ? '2' : '3'}. Honda แคมเปญ (บาท)`)}</div>
       <div class="text-xs text-muted mt-1">Margin รถ คิดจากราคาไม่รวมค่าสี ${base ? `${money(base)} บาท${f.paint ? ` (ค่าสี ${money(f.paint)})` : ''}` : '(ใส่ราคารถก่อน)'} · ตาราง Margin เดือน ${fmtM(st.month)}${x.cash ? ' · ซื้อสดไม่มี Step AT' : ''}</div>
@@ -159,7 +164,8 @@ function termsRecord(x, v, paint) {
     rate: x.cash || termEmpty(o.rate) ? null : Number(o.rate), term: x.cash || termEmpty(o.term) ? null : parseInt(o.term, 10),
     campaign_id: o.campaign_id || null, campaign: camp ? (camp.value === 'other' ? String(o.campaign_text || '').trim() || 'อื่น ๆ' : (camp.group ? camp.group + ' · ' : '') + camp.name) : null, campaign_text: o.campaign_id === 'other' ? String(o.campaign_text || '').trim() : null,
     camp_month: camp && camp.month ? camp.month : null, at_step: x.cash ? null : (o.at_step || null), margin_car: num(o.margin_car), margin_at: num(o.margin_at), margin_honda: num(o.margin_honda), margin: o.margin, paint: num(paint),
-    priv_gtg: pv.bl.gtg ? null : (o.priv_gtg || null), priv_ln: pv.bl.ln ? null : (o.priv_ln || null), priv_hk: n('priv_hk'), margin_priv: num(o.margin_priv), privileges: privText(o) || null };
+    priv_gtg: pv.bl.gtg ? null : (o.priv_gtg || null), priv_ln: pv.bl.ln ? null : (o.priv_ln || null), priv_hk: n('priv_hk'), margin_priv: num(o.margin_priv), privileges: privText(o) || null,
+    ins1_by: o.ins1_by || null, ins1_kind: o.ins1_kind || null, ins2_by: o.ins2_by || null, ins3_by: o.ins3_by || null, reg_by: o.reg_by || null };
 }
 function termsCheck(x, v) {
   if (termEmpty(v.price) || !num(v.price)) return { err: 'ใส่ราคารถ', id: 'price' };
@@ -192,23 +198,23 @@ function bookTermsBox(d) {
   if (!d.model || !d.grade || !d.color) return `<fieldset class="p-4 rounded-lg border border-line"><legend class="font-head font-semibold px-1">เงื่อนไขการขาย</legend><p class="text-sm text-muted">เลือกรุ่น เกรด สี ก่อน แล้วจะเลือกดาวน์ ผ่อน แคมเปญ และ Margin ได้</p></fieldset>`;
   d.deal = d.deal || {};
   const x = bookTermsCtx(d), p = bookTermsPrice(d);
-  const v = { ...d.deal, price: p ? p.price : d.deal.price, disc: d.discount };
+  const v = { ...d.deal, price: p ? p.price : d.deal.price, disc: d.discount, ins1_by: d.insurance, ins1_kind: d.insurance_kind };
   return `<fieldset class="p-4 rounded-lg border border-line"><legend class="font-head font-semibold px-1">เงื่อนไขการขาย (${x.cash ? 'ซื้อสด' : 'ไฟแนนซ์'})</legend>
     <p class="text-sm text-muted mb-2">ส่วนลดไม่มีเว้นว่างได้ · หลังบันทึก เซลล์ขอแก้ได้อีก 1 ครั้งตอนไฟแนนซ์ผ่าน (แอดมินอนุมัติ)</p>
     <div class="grid sm:grid-cols-3 gap-3 mb-3">
       ${p ? `<div class="field"><label>ราคารถ (ราคาเต็ม)</label><div class="num p-2 rounded-lg border border-line" style="background:var(--surface-2)">${money(p.price)}</div><span class="text-xs text-muted">ตามใบราคาในเว็บ${p.paint ? ` · รวมค่าสี ${money(p.paint)}` : ''}</span></div>`
         : `<div class="field"><label for="bt-price" class="req">ราคารถ (ราคาเต็ม)</label><input id="bt-price" type="number" min="0" step="100" inputmode="decimal" data-draft="booking.deal.price" value="${esc(d.deal.price ?? '')}"><span class="text-xs" style="color:var(--warn)">ยังไม่มีราคาสีนี้ในเว็บ ใส่เอง</span></div>`}
       <div class="field"><label for="b-discount">ส่วนลดราคารถ (บาท)</label><input id="b-discount" type="number" min="0" step="100" inputmode="numeric" data-draft="booking.discount" value="${esc(d.discount ?? '')}" placeholder="ไม่มีเว้นว่าง"></div></div>
-    ${termsFields(x, v, { attr: 'data-draft', pre: 'booking.deal', idp: 'bt', paint: p ? p.paint : 0, priceDisc: false })}</fieldset>`;
+    ${termsFields(x, v, { attr: 'data-draft', pre: 'booking.deal', idp: 'bt', paint: p ? p.paint : 0, priceDisc: false, noIns1: true })}</fieldset>`;
 }
 function bookTermsMissing(d) {
   if (!d.model || !d.grade || !d.color) return null;
-  const x = bookTermsCtx(d), p = bookTermsPrice(d), v = { ...(d.deal || {}), price: p ? p.price : (d.deal || {}).price, disc: d.discount };
+  const x = bookTermsCtx(d), p = bookTermsPrice(d), v = { ...(d.deal || {}), price: p ? p.price : (d.deal || {}).price, disc: d.discount, ins1_by: d.insurance, ins1_kind: d.insurance_kind };
   return termsCheck(x, v).err || null;
 }
 function bookTermsRec(d) {
   if (!d.model || !d.grade || !d.color) return null;
-  const x = bookTermsCtx(d), p = bookTermsPrice(d), v = { ...(d.deal || {}), price: p ? p.price : (d.deal || {}).price, disc: d.discount };
+  const x = bookTermsCtx(d), p = bookTermsPrice(d), v = { ...(d.deal || {}), price: p ? p.price : (d.deal || {}).price, disc: d.discount, ins1_by: d.insurance, ins1_kind: d.insurance_kind };
   return { ...termsRecord(x, v, p ? p.paint : 0), price_src: p ? 'ใบราคาในเว็บ' : 'ใส่เอง', cash: x.cash, ...actor(), first: actor(), hist: [], src: 'ใบจอง' };
 }
 // ---- after delivery: the commission data is the sale terms (changed in the finance step), shown here
