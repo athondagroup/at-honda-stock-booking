@@ -145,9 +145,9 @@ function termsFields(x, v, f) {
     ${o.campaign_id === 'other' ? `<div class="field sm:col-span-3"><label for="${f.idp}-ct">ชื่อแคมเปญ</label><input id="${f.idp}-ct" ${f.attr}="${f.pre}.campaign_text" value="${esc(o.campaign_text ?? '')}" ${dis} autocomplete="off"></div>` : ''}`;
   const step = x.cash ? '' : `<div class="field"><label for="${f.idp}-step">AT แคมเปญ (ช่อง Step)</label><select id="${f.idp}-step" ${f.attr}="${f.pre}.at_step" ${dis}>
     <option value="" ${!o.at_step ? 'selected' : ''}>ไม่มี</option><option value="1" ${o.at_step === '1' ? 'selected' : ''}>Step ช่อง 1 · +${money(st.step1)}</option><option value="2" ${o.at_step === '2' ? 'selected' : ''}>Step ช่อง 2 · +${money(st.step2)}</option></select></div>`;
-  const WHO = [['', 'ไม่มี'], ['AT แถม', 'AT แถม'], ['Honda แถม', 'Honda แถม'], ['ลูกค้าซื้อ', 'ลูกค้าซื้อ']], WHO_REG = WHO.filter(y => y[0] !== 'Honda แถม');
+  const WHO = [['', 'ไม่มี'], ['AT แถม', 'AT แถม'], ['Honda แถม', 'Honda แถม'], ['ลูกค้าซื้อ', 'ลูกค้าซื้อ']], WHO_REG = WHO.filter(y => y[0] !== 'Honda แถม'), REG_TYPES = [['บุคคลธรรมดา', 'บุคคลธรรมดา'], ['นิติบุคคล', 'นิติบุคคล']];
   const insBox = `<div class="mt-3 p-3 rounded-lg border border-line"><div class="font-medium text-sm mb-2">ประกันภัยและทะเบียน (ไปขึ้นในใบสั่งแต่งรถ)</div><div class="grid sm:grid-cols-3 gap-3">
-    ${f.noIns1 ? '' : S2('ins1_by', 'ประกันภัยชั้น 1 + พ.ร.บ. ปีที่ 1', WHO) + S2('ins1_kind', 'บริษัทประกัน', INS_KINDS)}${S2('ins2_by', 'ประกันภัย ปีที่ 2', WHO)}${S2('ins3_by', 'ประกันภัย ปีที่ 3', WHO)}${S2('reg_by', 'ค่าจดทะเบียน', WHO_REG)}</div></div>`;
+    ${f.noIns1 ? '' : S2('ins1_by', 'ประกันภัยชั้น 1 + พ.ร.บ. ปีที่ 1', WHO) + S2('ins1_kind', 'บริษัทประกัน ปีที่ 1', INS_KINDS)}${S2('ins2_by', 'ประกันภัยชั้น 1 + พ.ร.บ. ปีที่ 2', WHO)}${S2('ins2_kind', 'บริษัทประกัน ปีที่ 2', INS_KINDS)}${S2('ins3_by', 'ประกันภัยชั้น 1 + พ.ร.บ. ปีที่ 3', WHO)}${S2('ins3_kind', 'บริษัทประกัน ปีที่ 3', INS_KINDS)}${S2('reg_by', 'ค่าจดทะเบียน', WHO_REG)}${S2('reg_type', 'ค่าจดทะเบียนของ', REG_TYPES)}</div></div>`;
   return `<div class="grid sm:grid-cols-3 gap-3">${price}${fin}${f.adm ? campAdminBox(f, o, v, sel, opts) : sel}</div>
     ${insBox}
     <div class="mt-3 p-3 rounded-lg border border-line" style="background:var(--surface)"><div class="font-medium text-sm mb-2">Margin (แก้ตัวเลขได้)</div>
@@ -165,7 +165,7 @@ function termsRecord(x, v, paint) {
     campaign_id: o.campaign_id || null, campaign: camp ? (camp.value === 'other' ? String(o.campaign_text || '').trim() || 'อื่น ๆ' : (camp.group ? camp.group + ' · ' : '') + camp.name) : null, campaign_text: o.campaign_id === 'other' ? String(o.campaign_text || '').trim() : null,
     camp_month: camp && camp.month ? camp.month : null, at_step: x.cash ? null : (o.at_step || null), margin_car: num(o.margin_car), margin_at: num(o.margin_at), margin_honda: num(o.margin_honda), margin: o.margin, paint: num(paint),
     priv_gtg: pv.bl.gtg ? null : (o.priv_gtg || null), priv_ln: pv.bl.ln ? null : (o.priv_ln || null), priv_hk: n('priv_hk'), margin_priv: num(o.margin_priv), privileges: privText(o) || null,
-    ins1_by: o.ins1_by || null, ins1_kind: o.ins1_kind || null, ins2_by: o.ins2_by || null, ins3_by: o.ins3_by || null, reg_by: o.reg_by || null };
+    ins1_by: o.ins1_by || null, ins1_kind: o.ins1_kind || null, ins2_by: o.ins2_by || null, ins3_by: o.ins3_by || null, ins2_kind: o.ins2_kind || null, ins3_kind: o.ins3_kind || null, reg_by: o.reg_by || null, reg_type: o.reg_by ? (o.reg_type || 'บุคคลธรรมดา') : null };
 }
 function termsCheck(x, v) {
   if (termEmpty(v.price) || !num(v.price)) return { err: 'ใส่ราคารถ', id: 'price' };

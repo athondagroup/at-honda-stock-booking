@@ -65,7 +65,7 @@ function printSaleApp(a, D) {
   const po = (r.flow && r.flow.po) || {}, pit = po.items || [];
   const qn = x => Number(x.qty) || 1, gv = pit.reduce((n, x) => n + (Number(x.sale) || 0) * qn(x), 0), gc = poAutoCost(a, po) + pit.reduce((n, x) => n + (x.cpay ? 0 : (Number(x.cost) || 0) * qn(x)), 0);
   const gifts = pit.map((x, i) => [`${i + 1}. ${x.name || ''}`, String(qn(x)), M((Number(x.sale) || 0) * qn(x)), M((Number(x.cost) || 0) * qn(x))]);
-  poAuto(a).filter(x => x.fee && Number((po.ac || {})[x.key])).forEach(x => gifts.push([`${gifts.length + 1}. ${x.name}`, '1', '', M(Number(po.ac[x.key]))]));
+  poAuto(a, po).filter(x => x.fee && Number((po.ac || {})[x.key])).forEach(x => gifts.push([`${gifts.length + 1}. ${x.name}`, '1', '', M(Number(po.ac[x.key]))]));
   if (pit.length) gifts.push(['รวม', '', M(gv), M(gc)]);
   const blocks = [
     { h: 'ข้อมูลรถและลูกค้า' }, { kv },
