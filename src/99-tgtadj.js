@@ -57,43 +57,62 @@ function tgtAdjCard(D) {
       <div class="border border-line rounded-lg divide-y divide-line max-h-56 overflow-auto">${L.map(r => `<div class="p-2 px-3 text-sm flex flex-wrap gap-x-3 gap-y-1 items-center"><b>${esc(r.br)}</b><span class="nowrap">${monLabel(r.m)}</span>${r.model ? chip(esc(r.model), 'muted') : ''}${r.k === 'cut' ? chip('ลด ' + r.n, 'bad') : chip('เพิ่ม ' + r.n, 'good')}${r.k === 'cut' ? chip(r.carry ? 'เกลี่ยเดือนอื่น' : 'ลดจริง', 'muted') : chip(r.link ? 'หักค้างปรับ' : 'ไม่หักค้าง', 'muted')}<span class="text-muted">${esc(r.reason || '')}${r.note ? ' · ' + esc(r.note) : ''}</span><span class="ml-auto text-xs text-muted">${esc(r.role || '')} · ${fmtDT(r.at)}</span>${S.role.role === 'exec' ? `<button class="btn btn-ghost btn-sm" data-act="tgtadj-del" data-id="${esc(r.id)}">ลบ</button>` : ''}</div>`).join('') || '<div class="p-3 text-sm text-muted">ยังไม่มีการปรับเป้าใน Ki นี้</div>'}</div></div></div>
   <p class="text-xs text-muted mt-2">ลดเป้าแล้วเลือก "จะเกลี่ยไปเดือนอื่น" ยอดนั้นจะขึ้นเป็นค้างปรับ เมื่อเพิ่มเป้าเดือนอื่นและเลือก "เกลี่ยจากค้างปรับ" ระบบหักค้างปรับออกให้ · เป้าปัจจุบันใช้คำนวณ % เป้าในหน้ายอดขายและเป้าทั้งหมด · Ki ของฮอนด้าเริ่มเดือนเมษายน สิ้นสุดมีนาคม</p></section>`;
 }
+// the modal looks like "ใส่/แก้เป้า": a row per model, the current target, a box for the new target (empty = keep, 0 = target becomes 0)
+function tgtAdjModels() { return tgtModels().sort((x, y) => tgtRank(x) - tgtRank(y)); }
+function tgtAdjPlan(m) {
+  const rows = tgtAdjModels().map((md, i) => {
+    const cur = tgtBase(m.m, m.br, md) + tgtAdjNet(m.m, m.br, md), raw = String((m.grid || {})[i] ?? '').trim(), v = raw === '' ? null : Math.round(Number(raw));
+    const ok = v === null || (Number.isFinite(v) && v >= 0), nw = v === null || !ok ? cur : v, d = nw - cur;
+    return { md, i, cur, raw, ok, nw, d };
+  });
+  const cut = rows.filter(r => r.d < 0).reduce((n, r) => n - r.d, 0), add = rows.filter(r => r.d > 0).reduce((n, r) => n + r.d, 0);
+  return { rows, cut, add, cur: rows.reduce((n, r) => n + r.cur, 0), nw: rows.reduce((n, r) => n + r.nw, 0), bad: rows.some(r => !r.ok) };
+}
 function tgtAdjModal(m) {
-  const brs = tgtEditBrs(), cut = m.k === 'cut', n = Number(m.n) || 0, ki = kiOf(m.m);
-  const md = m.model || '', o = tgtBase(m.m, m.br, md), cur = o + tgtAdjNet(m.m, m.br, md), nw = cur + (cut ? -n : n), B = tgtBacklog(ki, m.br);
-  const after = B.left + (cut && m.carry ? n : 0) - (!cut && m.link ? n : 0);
-  const seg = (k, v, label, tone) => `<button type="button" class="btn btn-sm ${m[k] === v ? (tone || 'btn-dark') : 'btn-ghost'}" data-act="tgtadj-set" data-k="${k}" data-v="${v}">${label}</button>`;
+  const brs = tgtEditBrs(), ki = kiOf(m.m), P = tgtAdjPlan(m), B = tgtBacklog(ki, m.br);
+  const carry = m.carry !== false, link = m.link !== false;
+  const after = B.left + (carry ? P.cut : 0) - (link ? P.add : 0), sg = n => n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '–';
+  const chip2 = (t, v, c) => `<div class="p-2 px-3 rounded-lg text-sm" style="background:var(--surface-2)">${t}<b class="block text-xl num" ${c ? `style="color:var(--${c})"` : ''}>${v}</b></div>`;
   return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">ปรับเป้าการขาย</h2><p class="text-sm text-muted">${esc(kiLabel(ki))}</p></div><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
-  <div class="flex flex-col gap-4">
-    <div class="grid sm:grid-cols-2 gap-3"><div class="field min-w-0"><label for="ta-m" class="req">เดือนที่ปรับ</label><input id="ta-m" type="month" data-modal="m" value="${esc(m.m)}"></div>
-      <div class="field min-w-0"><label for="ta-br" class="req">สาขา</label><select id="ta-br" data-modal="br">${brs.map(b => `<option value="${b}" ${m.br === b ? 'selected' : ''}>${b} ${esc(BR[b].name)}</option>`).join('')}</select></div></div>
-    <div class="field"><label class="req">ปรับแบบไหน</label><div class="flex flex-wrap gap-2">${seg('k', 'cut', 'ลดเป้า', 'btn-red')}${seg('k', 'add', 'เพิ่มเป้า', 'btn-dark')}</div></div>
-    <div class="field"><label for="ta-md">รุ่นรถ</label><select id="ta-md" data-modal="model"><option value="">รวมทุกรุ่น (ไม่ระบุรุ่น)</option>${tgtModels().sort((a, b) => tgtRank(a) - tgtRank(b)).map(x => `<option value="${esc(x)}" ${md === x ? 'selected' : ''}>${esc(x)}${tgtBase(m.m, m.br, x) ? ' · เป้า ' + (tgtBase(m.m, m.br, x) + tgtAdjNet(m.m, m.br, x)) : ''}</option>`).join('')}</select></div>
-    <div class="field"><label for="ta-n" class="req">จำนวน (คัน)</label><input id="ta-n" type="number" min="1" step="1" inputmode="numeric" data-modal="n" value="${esc(m.n)}"></div>
-    <div class="field"><label for="ta-r" class="req">เหตุผล</label><select id="ta-r" data-modal="reason">${TGT_ADJ_REASONS.map(r => `<option ${m.reason === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></div>
-    ${cut ? `<label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-5 h-5" data-modal="carry" ${m.carry ? 'checked' : ''}> จะเกลี่ยไปเดือนอื่น (ขึ้นเป็น "ค้างปรับ")</label>`
-      : `<label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-5 h-5" data-modal="link" ${m.link ? 'checked' : ''}> เกลี่ยจากค้างปรับ (หักค้างปรับออก)</label>`}
-    <div class="field"><label for="ta-note">หมายเหตุ</label><input id="ta-note" data-modal="note" value="${esc(m.note || '')}" placeholder="เช่น ฮอนด้าส่งรถ Quota ช้า ${'' }"></div>
-    <div class="p-3 rounded-lg text-sm" style="background:var(--surface-2)">เป้า ${monLabel(m.m)} สาขา ${esc(m.br)}${md ? ' รุ่น ' + esc(md) : ' (รวมทุกรุ่น)'}: เดิม <b class="num">${o}</b> · ตอนนี้ <b class="num">${cur}</b> → หลังปรับ <b class="num">${nw}</b> คัน<br>ค้างปรับของสาขา ${esc(m.br)} ใน Ki นี้: <b class="num">${B.left}</b> → <b class="num" style="color:var(--${after > 0 ? 'bad' : 'good'})">${after}</b> คัน${after < 0 ? ' <span class="text-xs">(เพิ่มเกินที่ค้างอยู่)</span>' : ''}</div>
-    <div class="flex justify-end gap-2"><button class="btn btn-ghost" data-act="close">ยกเลิก</button><button class="btn btn-red" data-act="tgtadj-save">บันทึกการปรับเป้า</button></div>
-  </div>`;
+  <div class="flex flex-wrap gap-3 items-end mb-3">
+    <div class="field min-w-0"><label for="ta-m">เดือน</label><input id="ta-m" type="month" data-modal="m" value="${esc(m.m)}"></div>
+    <div class="field"><label>สาขา</label><div class="seg" role="group" aria-label="สาขา">${brs.map(b => `<button type="button" data-act="tgtadj-set" data-k="br" data-v="${b}" aria-pressed="${m.br === b}">${b}</button>`).join('')}</div></div>
+  </div>
+  <div class="bg-surface border border-line rounded-lg scroll-x max-h-[50vh] overflow-auto"><table class="tbl text-sm"><thead><tr><th>รุ่น</th><th class="text-right">เป้าเดิม</th><th class="text-right">เป้าใหม่</th><th class="text-right">ปรับ</th><th class="text-right">ค้างปรับ</th></tr></thead><tbody>
+    ${P.rows.map(r => `<tr><td class="nowrap">${esc(r.md)}</td><td class="num text-right">${r.cur}</td>
+      <td class="text-right"><input type="number" min="0" step="1" inputmode="numeric" placeholder="เดิม" aria-label="เป้าใหม่ ${esc(r.md)}" data-modal="grid.${r.i}" data-tgtadj-cell value="${esc(r.raw)}" class="w-16 text-right num" style="${r.raw !== '' ? 'background:#fff3c4;font-weight:600' : ''}${r.ok ? '' : ';border-color:var(--bad)'}"></td>
+      <td class="num text-right" style="${r.d ? `color:var(--${r.d < 0 ? 'bad' : 'good'});font-weight:600` : 'color:var(--muted)'}">${sg(r.d)}</td>
+      <td class="num text-right">${r.d < 0 && carry ? r.cur - r.nw : r.d > 0 && link ? -r.d : '–'}</td></tr>`).join('')}
+    <tr style="font-weight:600"><td>รวม</td><td class="num text-right">${P.cur}</td><td class="num text-right">${P.nw}</td><td class="num text-right">${sg(P.nw - P.cur)}</td><td class="num text-right">${(carry ? P.cut : 0) - (link ? P.add : 0)}</td></tr></tbody></table></div>
+  <p class="text-xs text-muted mt-2">ช่อง "เป้าใหม่" เว้นว่าง = ใช้เป้าเดิม · ใส่ 0 = เป้ารุ่นนั้นเป็น 0 · ช่องสีเหลือง = ที่แก้ ตรวจก่อนบันทึก</p>
+  <div class="flex flex-wrap gap-2 my-3">${chip2('ลดเป้า', P.cut ? '−' + P.cut : '–', P.cut ? 'bad' : '')}${chip2('เพิ่มเป้า', P.add ? '+' + P.add : '–', P.add ? 'good' : '')}${chip2('เป้าใหม่รวม', P.nw)}${chip2(`ค้างปรับของ ${esc(m.br)} ใน Ki นี้`, `${B.left} → ${after}`, after > 0 ? 'bad' : '')}</div>
+  <div class="flex flex-col gap-2 mb-3">
+    <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-5 h-5" data-modal="carry" ${carry ? 'checked' : ''}> ที่ลดไป จะเกลี่ยไปเดือนอื่น (ขึ้นเป็น "ค้างปรับ")</label>
+    <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-5 h-5" data-modal="link" ${link ? 'checked' : ''}> ที่เพิ่ม เกลี่ยมาจากค้างปรับ (หักค้างปรับออก)</label></div>
+  <div class="grid sm:grid-cols-2 gap-3 mb-3"><div class="field"><label for="ta-r" class="req">เหตุผล</label><select id="ta-r" data-modal="reason">${TGT_ADJ_REASONS.map(r => `<option ${m.reason === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></div>
+    <div class="field"><label for="ta-note">หมายเหตุ</label><input id="ta-note" data-modal="note" value="${esc(m.note || '')}" placeholder="เช่น ฮอนด้าส่งรถ Quota ช้า"></div></div>
+  <div class="flex justify-end gap-2"><button class="btn btn-ghost" data-act="close">ยกเลิก</button><button class="btn btn-red" data-act="tgtadj-save">บันทึกการปรับเป้า ${monLabel(m.m)} ${esc(m.br)}</button></div>`;
 }
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t || !S.modal || S.modal.kind !== 'tgtadj' || !t.dataset.modal) return;
-  if (['m', 'br', 'n', 'carry', 'link', 'model'].includes(t.dataset.modal)) render();
+  if (t.dataset.modal === 'm') S.modal.grid = {};
+  if (['m', 'carry', 'link'].includes(t.dataset.modal) || t.dataset.tgtadjCell !== undefined) render();
 });
 Object.assign(ACTIONS, {
-  'tgtadj-open'() { if (!tgtCanEdit()) return; S.modal = { kind: 'tgtadj', m: todayISO().slice(0, 7), br: tgtEditBrs()[0], k: 'cut', model: '', n: '', reason: TGT_ADJ_REASONS[0], carry: true, link: true, note: '' }; render(); },
-  'tgtadj-set'(el) { S.modal[el.dataset.k] = el.dataset.v; render(); },
+  'tgtadj-open'() { if (!tgtCanEdit()) return; S.modal = { kind: 'tgtadj', m: todayISO().slice(0, 7), br: tgtEditBrs()[0], grid: {}, reason: TGT_ADJ_REASONS[0], carry: true, link: true, note: '' }; render(); },
+  'tgtadj-set'(el) { S.modal[el.dataset.k] = el.dataset.v; if (el.dataset.k === 'br') S.modal.grid = {}; render(); },
   'tgtadj-toggle'() { S.filters.tgtAdjOpen = !S.filters.tgtAdjOpen; render(); },
   'ki-sel'(el) { S.filters.kiSel = Number(el.dataset.k); render(); },
   async 'tgtadj-save'() {
-    const m = S.modal, n = Math.round(Number(m.n));
-    if (!(n > 0)) { toast('ใส่จำนวนคันที่ปรับ', 'bad'); return; }
+    const m = S.modal, P = tgtAdjPlan(m);
     if (!tgtEditBrs().includes(m.br)) { toast('ปรับเป้าสาขานี้ไม่ได้', 'bad'); return; }
-    if (m.k === 'cut' && n > tgtBase(m.m, m.br, m.model || '') + tgtAdjNet(m.m, m.br, m.model || '')) { toast('ลดเกินเป้าที่มีอยู่ของเดือนนั้น', 'bad'); return; }
-    const cur = S.ref.get('targets_adj') || { rows: [] };
-    const row = { id: 'A' + Date.now().toString(36), m: m.m, br: m.br, model: m.model || null, k: m.k, n, carry: m.k === 'cut' ? !!m.carry : false, link: m.k === 'add' ? !!m.link : false, reason: m.reason, note: (m.note || '').trim() || null, ...actor() };
-    if (await write('ref', 'targets_adj', { rows: [...(cur.rows || []), row], at: row.at })) { S.modal = null; toast(`${m.k === 'cut' ? 'ลด' : 'เพิ่ม'}เป้า ${monLabel(m.m)} ${m.br} ${n} คัน แล้ว`); render(); }
+    if (P.bad) { toast('เป้าใหม่ต้องเป็นจำนวนเต็ม 0 ขึ้นไป', 'bad'); return; }
+    const ch = P.rows.filter(r => r.d !== 0);
+    if (!ch.length) { toast('ยังไม่ได้ใส่เป้าใหม่ของรุ่นไหนเลย', 'bad'); return; }
+    if (!m.reason) { toast('เลือกเหตุผล', 'bad'); return; }
+    const cur = S.ref.get('targets_adj') || { rows: [] }, at = actor(), gid = 'G' + Date.now().toString(36);
+    const rows = ch.map((r, j) => ({ id: 'A' + Date.now().toString(36) + j, grp: gid, m: m.m, br: m.br, model: r.md, k: r.d < 0 ? 'cut' : 'add', n: Math.abs(r.d), carry: r.d < 0 ? m.carry !== false : false, link: r.d > 0 ? m.link !== false : false, reason: m.reason, note: (m.note || '').trim() || null, ...at }));
+    if (await write('ref', 'targets_adj', { rows: [...(cur.rows || []), ...rows], at: at.at })) { S.modal = null; toast(`ปรับเป้า ${monLabel(m.m)} ${m.br} ${ch.length} รุ่นแล้ว`); render(); }
   },
   async 'tgtadj-del'(el) {
     if (S.role.role !== 'exec') return;
