@@ -431,6 +431,15 @@ function historyList(D) {
       if (o.removed) ev.push({ ...o.removed, act: 'นำรถออก', vin, note: o.removed.dealer || o.removed.note });
       if (o.moved) ev.push({ ...o.moved, act: `ย้ายไป ${o.branch}`, vin });
       if (o.prod_info) ev.push({ ...o.prod_info, act: 'ใส่วันผลิต', vin, note: fmtD(o.prod_info.date) });
+      // earlier values that were replaced or cleared later (kept in hist, never deleted)
+      for (const h of o.hist || []) {
+        const ov = h.old, by = `ถูกแทนที่ ${fmtDT(h.at)} โดย ${who(h)}`;
+        if (h.k === 'moved') ev.push({ ...ov, act: `ย้ายไป ${ov.to || ''}`.trim(), vin, note: [ov.from ? `จาก ${ov.from}` : '', by].filter(Boolean).join(' · ') });
+        else if (h.k === 'removed') ev.push({ ...ov, act: 'นำรถออก', vin, note: [ov.dealer || ov.note, by].filter(Boolean).join(' · ') });
+        else if (h.k === 'added') ev.push({ ...ov, act: 'รับรถเข้า', vin, note: by });
+        else if (h.k === 'prod_info') ev.push({ ...ov, act: 'ใส่วันผลิต', vin, note: [fmtD(ov.date), by].join(' · ') });
+        else ev.push({ at: h.at, by: h.by, role: h.role, act: `เปลี่ยน ${{ branch: 'สาขา', special: 'รถพิเศษ', advance: 'Advance' }[h.k] || h.k}`, vin, note: `ค่าเดิม ${typeof ov === 'object' ? JSON.stringify(ov) : ov}` });
+      }
     }
     for (const [, u] of S.uploads) ev.push({ at: u.at, by: u.by, role: u.role, act: `อัปโหลด ${SRC_LABEL[u.src]} ${u.br}`, note: `${u.n} แถว · ข้อมูล ณ ${fmtD(u.asof)}` });
   }

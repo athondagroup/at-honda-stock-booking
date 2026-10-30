@@ -544,6 +544,15 @@ const COLS = ['bookings', 'locks', 'vehicles', 'receipts', 'ids', 'uploads', 're
 async function write(col, id, data) {
   if (S.mode === 'readonly') { toast('บัญชีนี้ดูได้อย่างเดียว บันทึกไม่ได้', 'bad'); return false; }
   const body = plain(data);
+  // a vehicle record never loses what it held: every field that is replaced or cleared goes into hist first (who changed it, when)
+  if (col === 'vehicles') {
+    const prev = S.vehicles.get(id) || {}, hist = [...(body.hist || prev.hist || [])];
+    for (const k of new Set([...Object.keys(prev), ...Object.keys(body)])) {
+      if (k === 'hist' || prev[k] == null || JSON.stringify(prev[k]) === JSON.stringify(body[k] ?? null)) continue;
+      hist.push({ k, old: prev[k], ...actor() });
+    }
+    if (hist.length) body.hist = hist;
+  }
   if (DB) {
     try { await DB.collection(col).doc(id).set(body); }
     catch (e) {
