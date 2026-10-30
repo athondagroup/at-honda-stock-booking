@@ -465,13 +465,13 @@ function flowTab(a) {
   if (f.done.assign) return 'delivered';
   return f.next;
 }
-function flowMissing(a) { return ['booked', 'fin', 'po', 'down'].filter(k => !a.flow.done[k]).map(k => ({ booked: 'ใบเสร็จมัดจำ', fin: 'ไฟแนนซ์', po: 'PO แต่งรถ', down: 'ใบเสร็จดาวน์' })[k]); }
+function flowMissing(a) { return ['booked', 'fin', 'po', 'down'].filter(k => !a.flow.done[k]).map(k => ({ booked: 'ใบเสร็จมัดจำ', fin: 'ไฟแนนซ์', po: 'ใบสั่งแต่ง (PO)', down: 'ใบเสร็จดาวน์' })[k]); }
 function viewFlow(D) {
   const vis = D.at.filter(a => !a.cancelled && !a.demo && inBr(a) && atVisible(a));
   const inTab = (a, t) => flowTab(a) === t;
   const sub = FLOW_TABS.some(t => t[0] === S.sub.flow) ? S.sub.flow : 'booked';
   const list = vis.filter(a => inTab(a, sub)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  return `${pageHead('ขั้นตอนส่งมอบ', 'จอง (เลขที่ใบเสร็จมัดจำ) → ไฟแนนซ์ผ่าน (ยืนยันบริษัท + แนบใบอนุมัติ) → จัดสรรรถ → PO สั่งแต่ง → แต่งรถ → ชำระดาวน์ (เลขที่ใบเสร็จ) → ส่งมอบ (ป้ายแดง + ประกัน) → ผู้จัดการยืนยัน เพื่อไปขั้นตอนจ่ายค่าคอม ต้องทำตามลำดับ ข้ามขั้นไม่ได้')}
+  return `${pageHead('ขั้นตอนส่งมอบ', 'จอง (เลขที่ใบเสร็จมัดจำ) → ไฟแนนซ์ผ่าน (ยืนยันบริษัท + แนบใบอนุมัติ) → จัดสรรรถ → ใบสั่งแต่ง (PO) → แต่งรถ → ชำระดาวน์ (เลขที่ใบเสร็จ) → ส่งมอบ (ป้ายแดง + ประกัน) → ผู้จัดการยืนยัน เพื่อไปขั้นตอนจ่ายค่าคอม ต้องทำตามลำดับ ข้ามขั้นไม่ได้')}
   ${brSeg()}${flowBody(D)}`;
 }
 // the same list as a view of the booking page: one booking, seen by its step

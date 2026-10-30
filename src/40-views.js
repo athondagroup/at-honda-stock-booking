@@ -303,6 +303,21 @@ function viewStock(D) {
       ${p.remove && p.write ? `<button class="btn btn-ghost btn-sm ml-auto" data-act="restore" data-vin="${esc(c.vin)}">คืนเข้าสต็อก</button>` : ''}</div>`).join('')}</div></section>` : ''}`;
 }
 const SPEC_CAT = { free: 'ว่าง', held: 'ติดจอง (IDS จัดสรร / แจ้งขาย / ออกใบกำกับ)', lock: 'ล็อก (ในเว็บ / ชื่อในชีต)', company: 'รถบริษัท' };
+const netOf = s => s.free + s.incoming - s.waiting;
+function netTip(s) {
+  const l = (t, o) => { const e = Object.entries(o).filter(([, n]) => n); return e.length ? `${t}: ${e.map(([b, n]) => b + ' ' + n).join(', ')}` : `${t}: 0`; };
+  return [`ว่างสุทธิ ${netOf(s)} = Stock ว่าง ${s.free} + Quota ว่าง ${s.incoming} − รอรถ ${s.waiting}`, l('Stock ว่าง', s.freeBy), l('Quota ว่าง', s.incomingBy), l('รอรถ', s.waitingBy)].join('\n');
+}
+function specNetModal(m, D) {
+  const s = D.specs[m.key]; if (!s) return '';
+  const row = (t, o, n, sg) => `<tr><td>${t}</td><td class="num text-right font-semibold">${sg}${n}</td><td class="text-sm">${BRS.filter(b => o[b]).map(b => `${b} <b class="num">${o[b]}</b>`).join(' · ') || '<span class="text-muted">–</span>'}</td></tr>`;
+  const net = netOf(s);
+  return `<div class="flex items-start justify-between gap-3 mb-2"><h2 class="font-head text-xl font-semibold">ว่างสุทธิ · ${specLabel(m.key)}</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
+  <table><thead><tr><th>ประเภท</th><th class="text-right">จำนวน</th><th>แยกสาขา</th></tr></thead><tbody>
+  ${row('รถ Stock ว่าง (อยู่ในสต็อกสาขา)', s.freeBy, s.free, '+')}${row('Quota ว่าง (รถที่จะเข้า ยังไม่มีคนจอง)', s.incomingBy, s.incoming, '+')}${row('ใบจองรอรถ (หัก)', s.waitingBy, s.waiting, '−')}
+  <tr><td><b>ว่างสุทธิ</b></td><td class="num text-right font-semibold" style="color:var(--${net < 0 ? 'bad' : 'good'})">${net}</td><td class="text-xs text-muted">${net < 0 ? 'ติดลบ = ใบจองรอรถมากกว่ารถที่มี' : 'ขายต่อได้อีกจำนวนนี้'}</td></tr></tbody></table>
+  <div class="flex justify-end mt-3"><button class="btn btn-ghost" data-act="close">ปิด</button></div>`;
+}
 function specTable(cars, D) {
   const f = S.filters, p = perms();
   const brs = S.br ? [S.br] : BRS;
@@ -326,14 +341,15 @@ function specTable(cars, D) {
       <td class="num text-right">${cell(k.held, 'held', 'ดูรถที่ IDS จัดสรร / ขายแล้ว')}</td>
       <td class="num text-right">${cell(k.lock, 'lock', 'ดูรถที่ล็อกในเว็บ / มีชื่อในชีต')}</td>
       <td class="num text-right">${s.waiting ? `<button class="underline decoration-dotted font-medium" data-act="specq-open" data-key="${esc(s.key)}" title="ดูว่าใบจองไหนรอรถสเปกนี้">${s.waiting}</button>` : '–'}</td>
+      <td class="num text-right font-semibold"><button class="underline decoration-dotted" data-act="specnet" data-key="${esc(s.key)}" title="${esc(netTip(s))}" style="color:var(--${netOf(s) < 0 ? 'bad' : 'good'})">${netOf(s)}</button></td>
       <td class="num text-right">${s.incoming ? `<button class="underline decoration-dotted" data-act="specquota" data-key="${esc(s.key)}" title="ดู Quota ว่าง และขอล็อกคิว">${s.incoming}</button>` : '–'}</td>
     </tr>
-    ${open ? `<tr><td colspan="${brs.length + 6}" style="padding:0;background:var(--surface)">${cat ? `<div class="px-4 py-2 text-sm flex flex-wrap gap-2 items-center" style="background:var(--surface-2)">แสดงเฉพาะ <b>${SPEC_CAT[cat]}</b> ${list.length} คัน <button class="underline text-xs" data-act="speccat" data-key="${esc(s.key)}" data-cat="">แสดงทุกคัน</button></div>` : ''}<div class="divide-y divide-line">${list.map(c => carRow(c, D)).join('') || '<div class="p-3 text-muted">ไม่มีรถตามตัวกรองนี้</div>'}</div></td></tr>` : ''}`;
+    ${open ? `<tr><td colspan="${brs.length + 7}" style="padding:0;background:var(--surface)">${cat ? `<div class="px-4 py-2 text-sm flex flex-wrap gap-2 items-center" style="background:var(--surface-2)">แสดงเฉพาะ <b>${SPEC_CAT[cat]}</b> ${list.length} คัน <button class="underline text-xs" data-act="speccat" data-key="${esc(s.key)}" data-cat="">แสดงทุกคัน</button></div>` : ''}<div class="divide-y divide-line">${list.map(c => carRow(c, D)).join('') || '<div class="p-3 text-muted">ไม่มีรถตามตัวกรองนี้</div>'}</div></td></tr>` : ''}`;
   }).join('');
   return `<div class="bg-surface border border-line rounded-lg scroll-x">
     <table><thead><tr><th>รุ่น / เกรด / สี</th>${brs.map(b => `<th class="text-right ${S.br ? '' : 'hidden md:table-cell'}">${b} ${isSales() ? 'ว่าง' : 'ว่าง/มี'}</th>`).join('')}
-      <th class="text-right">ว่าง</th><th class="text-right">ติดจอง</th><th class="text-right">ล็อก</th><th class="text-right">รอรถ</th><th class="text-right">Quota ว่าง</th></tr></thead>
-    <tbody>${rows || `<tr><td colspan="${brs.length + 6}">${emptyBox('ไม่พบรถตามตัวกรองนี้', 'ลองล้างตัวกรองหรือค้นหาด้วยเลขอื่น')}</td></tr>`}</tbody></table></div>
+      <th class="text-right">ว่าง</th><th class="text-right">ติดจอง</th><th class="text-right">ล็อก</th><th class="text-right" title="Stock ว่าง + Quota ว่าง − รอรถ">ว่างสุทธิ</th><th class="text-right">รอรถ</th><th class="text-right">Quota ว่าง</th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="${brs.length + 7}">${emptyBox('ไม่พบรถตามตัวกรองนี้', 'ลองล้างตัวกรองหรือค้นหาด้วยเลขอื่น')}</td></tr>`}</tbody></table></div>
     <p class="text-xs text-muted mt-2">แต่ละคันอยู่ช่องเดียว: <b>ว่าง</b> = ขายได้ (รวมล็อกชั่วคราว) · <b>ติดจอง</b> = IDS จัดสรรให้ใบจองแล้ว หรือแจ้งขาย/ออกใบกำกับแล้ว · <b>ล็อก</b> = ล็อกในเว็บนี้ (อนุมัติแล้ว/รออนุมัติ) หรือมีชื่อพิมพ์ในชีตรอสร้างคำขอ · รถบริษัทไม่อยู่ในช่องไหน · <b>Quota ว่าง</b> = รถที่จะเข้า ยังไม่มีใบจองหรือล็อก · กดตัวเลขเพื่อดูรายคัน${isSales() ? ' (ไม่แสดงชื่อลูกค้า)' : ''}<br>แถวสีแดง = <b>รอรถ มากกว่า ว่าง + Quota ว่าง</b> ("ใบจองรอรถเกินรถที่มี N ใบ" = ลูกค้าท้ายคิว N คนยังไม่มีรถให้)</p>`;
 }
 function tempChip(c) { return c.temps && c.temps.length ? chip(`ล็อกชั่วคราว ${c.temps.length} คน`, 'warn') : ''; }

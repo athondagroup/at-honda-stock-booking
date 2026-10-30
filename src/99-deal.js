@@ -144,7 +144,7 @@ Object.assign(ACTIONS, {
   },
   async 'po-skip'(el) {
     const a = atById(el.dataset.id); if (!a) return;
-    if (!stepAllowed(a, 'po') || a.flow.next !== 'po' || poLocked(a)) { toast('ข้าม PO ได้ตอนที่ขั้นถัดไปคือ PO สั่งแต่ง', 'bad'); return; }
-    await saveFlow(a, { flow: { po_skip: { ...actor() } } }, 'ข้าม PO ไว้ก่อนแล้ว ทำ PO ภายหลังได้จนถึงก่อนส่งมอบ');
+    if (!stepAllowed(a, 'po') || a.flow.next !== 'po' || poLocked(a)) { toast('ข้ามใบสั่งแต่ง (PO) ได้ตอนที่ขั้นถัดไปคือ ใบสั่งแต่ง (PO)', 'bad'); return; }
+    await saveFlow(a, { flow: { po_skip: { ...actor() } } }, 'ข้ามใบสั่งแต่ง (PO) ไว้ก่อนแล้ว ทำใบสั่งแต่ง (PO) ภายหลังได้จนถึงก่อนส่งมอบ');
   }
 });

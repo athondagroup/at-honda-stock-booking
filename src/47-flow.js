@@ -162,10 +162,10 @@ function flowPanel(m, a, D) {
     const locked = poLocked(a);
     if (fl.done.po) return `<div class="text-sm text-muted">สั่งแต่ง ${(f.po.items || []).length} รายการ ${fmtD(f.po.date)} · ${who(f.po)}${(f.po.hist || []).length ? ` · แก้ไขแล้ว ${f.po.hist.length} ครั้ง` : ''}</div>
       <div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-ghost btn-sm" data-act="po-open" data-id="${esc(a.id)}">${locked || !stepAllowed(a, 'po') ? 'ดูใบแต่งรถ' : 'แก้ใบแต่งรถ'}</button><button class="btn btn-ghost btn-sm" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button>${discBtn(a, 'po')}</div>${locked ? '<div class="text-xs text-muted mt-1">ส่งมอบแล้ว แก้ใบแต่งรถไม่ได้</div>' : ''}${discBox(a, m, D, 'po')}`;
-    if (fl.poSkip) return `<div class="text-sm" style="color:var(--warn)">ข้าม PO ไว้ก่อน · ${who(f.po_skip)} ${fmtDT(f.po_skip.at)} · ยังไม่ได้ทำ PO</div>
+    if (fl.poSkip) return `<div class="text-sm" style="color:var(--warn)">ข้ามใบสั่งแต่ง (PO) ไว้ก่อน · ${who(f.po_skip)} ${fmtDT(f.po_skip.at)} · ยังไม่ได้ทำใบสั่งแต่ง (PO)</div>
       ${stepAllowed(a, 'po') && !locked ? `<div class="mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่ง (PO)</button></div>` : ''}`;
-    return can('po') ? `<div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่ง (PO)</button><button class="btn btn-ghost btn-sm" data-act="po-skip" data-id="${esc(a.id)}">ข้าม PO ไปก่อน</button></div>
-      <div class="text-xs text-muted mt-1">ยังไม่รู้รายการแต่ง กด "ข้าม PO ไปก่อน" แล้วทำขั้นถัดไปได้ · ทำ PO ภายหลังได้จนถึงก่อนส่งมอบ</div>` : '';
+    return can('po') ? `<div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่ง (PO)</button><button class="btn btn-ghost btn-sm" data-act="po-skip" data-id="${esc(a.id)}">ข้ามใบสั่งแต่ง (PO) ไปก่อน</button></div>
+      <div class="text-xs text-muted mt-1">ยังไม่รู้รายการแต่ง กด "ข้ามใบสั่งแต่ง (PO) ไปก่อน" แล้วทำขั้นถัดไปได้ · ทำใบสั่งแต่ง (PO) ภายหลังได้จนถึงก่อนส่งมอบ</div>` : '';
   };
   const delivBody = () => {
     const dv = f.delivered || {};
@@ -231,7 +231,7 @@ function poEditor(m, a, D) {
       <div class="text-sm p-3 rounded-lg" style="background:var(--surface-2)">ทุน FOC รวม <b class="num">${money(cost)}</b> บาท · ราคาขาย <b class="num">${money(sale)}</b> บาท
         ${focBudget ? ` · FOC ในใบจอง ${money(focBudget)} บาท → <b style="color:var(--${cost > focBudget ? 'bad' : 'good'})">${cost > focBudget ? 'เกิน' : 'เหลือ'} ${money(Math.abs(focBudget - cost))}</b>` : ''}</div>
       <div class="field"><label for="po-note">หมายเหตุ</label><input id="po-note" data-modal="po.note" value="${esc(po.note)}" ${ro ? 'disabled' : ''}></div>
-      <div class="flex flex-wrap gap-2">${ro ? '' : `<button class="btn btn-red" data-act="po-save" data-id="${esc(a.id)}">บันทึก PO</button><button class="btn btn-ghost" data-act="po-custom">+ เพิ่มรายการเอง</button>`}<button class="btn btn-ghost" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button></div>
+      <div class="flex flex-wrap gap-2">${ro ? '' : `<button class="btn btn-red" data-act="po-save" data-id="${esc(a.id)}">บันทึกใบสั่งแต่ง (PO)</button><button class="btn btn-ghost" data-act="po-custom">+ เพิ่มรายการเอง</button>`}<button class="btn btn-ghost" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button></div>
     </div>
     <div class="flex flex-col gap-2">
       <div class="field"><label for="po-q">ค้นหาในรายการ FOC (${cat.length ? cat.length + ' รายการ' : 'ยังไม่มีรายการ'})</label><input id="po-q" type="search" data-modal="poq" value="${esc(m.poq || '')}" placeholder="เช่น ฟิล์ม, พรม, 08P"></div>

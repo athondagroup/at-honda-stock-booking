@@ -118,16 +118,40 @@ function carCampBox(c, bk) {
 }
 function vinLink(c) { return `<button class="code font-medium underline decoration-dotted text-left" data-act="car-open" data-vin="${esc(c.vin)}" title="ดูรายละเอียดรถ">${esc(c.vin)}</button>`; }
 // the bookings waiting for one spec, in queue order (from the "รอรถ" number in สต็อก)
+const QCOLS = [['pos', 'คิว'], ['date', 'วันที่จอง'], ['cust', 'ลูกค้า'], ['sales', 'เซลล์'], ['br', 'สาขา'], ['no', 'เลขใบจอง'], ['dep', 'มัดจำ/ฟอร์ม']];
+function qRowVals(b) {
+  const p = !isSales() || isMine(b.owner);
+  const dep = b.app ? (b.app.rec.imported ? 'มีใบจองในฟอร์ม' : (b.app.deposit > 0 && b.app.slip ? 'มัดจำ ' + money(b.app.deposit) : 'ยังไม่มีมัดจำ/สลิป')) : (b.src === 'IDS' ? 'ยังไม่มีฟอร์ม AT' : '');
+  return { pos: b.state === 'waiting' ? b.pos || 0 : 0, date: b.date || '', cust: p ? (b.cust || '') : 'ลูกค้าของเซลล์อื่น', sales: (b.app ? b.app.sales : null) || (b.src === 'IDS' ? b.sales : b.idsSales) || '', br: b.br || '', no: b.no || '', dep };
+}
+function qTableBody(m, D) {
+  const f = m.qf || {}, so = m.qs || { c: 'pos', d: 1 };
+  let rows = D.bookings.filter(b => b.spec === m.key && b.state === 'waiting').map(b => ({ b, v: qRowVals(b) }));
+  rows = rows.filter(r => QCOLS.every(([k]) => !f[k] || String(k === 'date' ? fmtD(r.v.date) : r.v[k]).toLowerCase().includes(f[k].toLowerCase())));
+  rows.sort((x, y) => { const a = x.v[so.c], c = y.v[so.c]; return (typeof a === 'number' ? a - c : String(a).localeCompare(String(c))) * so.d || x.v.pos - y.v.pos; });
+  return `<tbody id="q-tb">${rows.map(({ b, v }) => `<tr><td>${chip('คิวที่ ' + v.pos, 'warn')}</td><td class="num">${fmtD(v.date)}</td><td>${custCell(b.cust, b.owner, { seed: b.seed })}</td><td>${esc(v.sales)}</td><td>${esc(v.br)}</td><td class="code">${esc(v.no) || '<span style="color:var(--warn)">ยังไม่มี</span>'}</td><td>${esc(v.dep)}${b.app && (!isSales() || isMine(b.owner)) ? ` <button class="underline text-xs" data-act="at-open" data-id="${esc(b.app.id)}">เปิดใบจอง</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="text-muted p-3">ไม่พบตามตัวกรอง</td></tr>'}</tbody>`;
+}
+function qCount(m, D) { const n = D.bookings.filter(b => b.spec === m.key && b.state === 'waiting').length; const t = (qTableBody(m, D).match(/<tr>/g) || []).length; return (m.qf && Object.values(m.qf).some(Boolean)) ? `แสดง ${t} จาก ${n} ใบ` : `${n} ใบ`; }
 function specQueueModal(m, D) {
-  const s = D.specs[m.key] || { waiting: 0, free: 0, incoming: 0 };
-  const list = D.bookings.filter(b => b.spec === m.key && b.state === 'waiting').sort((a, b) => (a.pos || 0) - (b.pos || 0) || (a.date || '').localeCompare(b.date || ''));
+  const s = D.specs[m.key] || { waiting: 0, free: 0, incoming: 0 }, so = m.qs || { c: 'pos', d: 1 }, f = m.qf || {};
   return `<div class="flex items-start justify-between gap-3 mb-2"><div><h2 class="font-head text-xl font-semibold">คิวรอรถ · ${specLabel(m.key)}</h2>
-    <p class="text-sm text-muted">รอรถ <b class="num">${list.length}</b> ใบ · ว่าง <b class="num">${s.free}</b> คัน · Quota ว่าง <b class="num">${s.incoming}</b> · เรียงตามคิว (วันที่จอง)${isSales() ? ' · เซลล์เห็นชื่อลูกค้าเฉพาะของตัวเอง' : ''}</p></div>
+    <p class="text-sm text-muted">รอรถ <b class="num" id="q-cnt">${qCount(m, D)}</b> · ว่าง <b class="num">${s.free}</b> คัน · Quota ว่าง <b class="num">${s.incoming}</b> · กดหัวคอลัมน์เพื่อเรียง พิมพ์ในช่องใต้หัวคอลัมน์เพื่อกรอง${isSales() ? ' · เซลล์เห็นชื่อลูกค้าเฉพาะของตัวเอง' : ''}</p></div>
     <button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
-  <div class="border border-line rounded-lg divide-y divide-line max-h-[60vh] overflow-auto">${list.map(b => queueCard(b, D)).join('') || '<div class="p-3 text-sm text-muted">ไม่มีใบจองรอรถสเปกนี้</div>'}</div>
+  <div class="border border-line rounded-lg max-h-[60vh] overflow-auto"><table id="q-tbl"><thead><tr>${QCOLS.map(([k, t]) => `<th><button data-act="qsort" data-c="${k}" class="font-semibold">${t}${so.c === k ? (so.d > 0 ? ' ▲' : ' ▼') : ''}</button></th>`).join('')}</tr>
+    <tr>${QCOLS.map(([k]) => `<th><input data-qf="${k}" value="${esc(f[k] || '')}" placeholder="กรอง" class="w-full text-xs" style="min-width:60px"></th>`).join('')}</tr></thead>
+    ${qTableBody(m, D)}</table></div>
   <div class="flex justify-end gap-2 mt-3"><button class="btn btn-ghost" data-act="close">ปิด</button></div>`;
 }
+document.addEventListener('input', e => {
+  const k = e.target && e.target.dataset && e.target.dataset.qf; if (!k || !S.modal || S.modal.kind !== 'specq') return;
+  e.stopPropagation(); const m = S.modal; (m.qf ||= {})[k] = e.target.value;
+  const D = derive(), tb = document.getElementById('q-tb'), c = document.getElementById('q-cnt');
+  if (tb) tb.outerHTML = qTableBody(m, D);
+  if (c) c.textContent = qCount(m, D);
+}, true);
 Object.assign(ACTIONS, {
+  'qsort'(el) { const m = S.modal; if (!m) return; const c = el.dataset.c, o = m.qs || { c: 'pos', d: 1 }; m.qs = { c, d: o.c === c ? -o.d : 1 }; render(); },
+  'specnet'(el) { S.modal = { kind: 'specnet', key: el.dataset.key }; render(); },
   'specq-open'(el) { S.modal = { kind: 'specq', key: el.dataset.key }; render(); },
   // opened from another window (e.g. checking a delivery note): keep that window to go back to
   'car-open'(el) { const back = S.modal && S.modal.kind !== 'car' ? S.modal : null; S.modal = { kind: 'car', vin: el.dataset.vin, back }; render(); },

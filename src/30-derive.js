@@ -23,7 +23,7 @@ function carStatus(c, inv, bkByVin) {
   return 'free';
 }
 const FLOW = ['booked', 'fin', 'assign', 'po', 'down', 'delivered', 'confirmed'];
-const FLOW_LABEL = { booked: 'จอง (เลขที่ใบเสร็จมัดจำ)', fin: 'ไฟแนนซ์ผ่าน', assign: 'จัดสรรรถ', po: 'PO สั่งแต่ง', down: 'ชำระดาวน์ / ชำระครบ (หลังแต่งรถ)', delivered: 'ส่งมอบ (ป้ายแดง + ประกัน)', confirmed: 'ผู้จัดการยืนยัน' };
+const FLOW_LABEL = { booked: 'จอง (เลขที่ใบเสร็จมัดจำ)', fin: 'ไฟแนนซ์ผ่าน', assign: 'จัดสรรรถ', po: 'ใบสั่งแต่ง (PO)', down: 'ชำระดาวน์ / ชำระครบ (หลังแต่งรถ)', delivered: 'ส่งมอบ (ป้ายแดง + ประกัน)', confirmed: 'ผู้จัดการยืนยัน' };
 const isCash = r => r.purchase === 'ซื้อสด';
 function flowOf(a, today) {
   const f = a.rec.flow || {}, m = a.match;
@@ -364,7 +364,7 @@ function deriveNow() {
 
   // per spec summary
   const specs = {};
-  const sp = k => (specs[k] ||= { key: k, total: 0, free: 0, temp: 0, locked: 0, pending: 0, held: 0, waiting: 0, incoming: 0, freeBy: {}, totalBy: {} });
+  const sp = k => (specs[k] ||= { key: k, total: 0, free: 0, temp: 0, locked: 0, pending: 0, held: 0, waiting: 0, incoming: 0, freeBy: {}, totalBy: {}, incomingBy: {}, waitingBy: {} });
   for (const car of cars.values()) {
     const s = sp(car.spec);
     s.total++; s.totalBy[car.br] = (s.totalBy[car.br] || 0) + 1;
@@ -378,8 +378,8 @@ function deriveNow() {
     const cat = specCat(car.status); s.cat = s.cat || { free: 0, held: 0, lock: 0, company: 0 }; s.cat[cat]++;
     if ((car.age ?? -1) > (s.maxAge ?? -1)) s.maxAge = car.age;
   }
-  bookings.filter(b => b.state === 'waiting').forEach(b => sp(b.spec).waiting++);
-  quota.forEach(q => { if (q.open) sp(q.spec).incoming += q.qty || 1; });
+  bookings.filter(b => b.state === 'waiting').forEach(b => { const s = sp(b.spec); s.waiting++; s.waitingBy[b.br] = (s.waitingBy[b.br] || 0) + 1; });
+  quota.forEach(q => { if (q.open) { const s = sp(q.spec), n = q.qty || 1; s.incoming += n; s.incomingBy[q.br] = (s.incomingBy[q.br] || 0) + n; } });
   for (const s of Object.values(specs)) {
     s.short = s.waiting > s.free + s.incoming;
     s.low = s.short;

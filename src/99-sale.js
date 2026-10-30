@@ -7,7 +7,7 @@ function saleDates(a, D) {
 function saleFoc(a) {
   const po = (a.rec.flow && a.rec.flow.po) || {}, items = po.items || [];
   const cost = items.reduce((n, x) => n + (Number(x.cost) || 0) * (Number(x.qty) || 1), 0);
-  if (po.at && cost) return { v: cost, src: 'ตาม PO' };
+  if (po.at && cost) return { v: cost, src: 'ตามใบสั่งแต่ง (PO)' };
   const f = a.rec.foc_total;
   return f === null || f === undefined || f === '' ? { v: null, src: '' } : { v: Number(f) || 0, src: 'ตามใบจอง' };
 }
