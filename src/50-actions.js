@@ -742,14 +742,14 @@ const ACTIONS = {
   },
   async 'flow-down'(el) {
     const a = atById(el.dataset.id);
-    if (!a || a.flow.next !== 'down' || !stepAllowed(a, 'down')) { toast('บันทึกการชำระได้หลังทำ PO สั่งแต่งแล้ว', 'bad'); return; }
+    if (!a || !stepOpen(a, 'down') || !stepAllowed(a, 'down')) { toast('บันทึกการชำระได้หลังทำ PO สั่งแต่งแล้ว', 'bad'); return; }
     const d = S.modal.down || {}, no = String(d.receipt_no || '').trim(), date = d.date || todayISO();
     if (!no) { toast('ใส่เลขที่ใบเสร็จ', 'bad'); $('#fl-dn')?.focus(); return; }
     if (!validDate(date) || date > todayISO()) { toast('วันที่ชำระต้องไม่เกินวันนี้', 'bad'); return; }
     if (await saveFlow(a, { flow: { down: { ...actor(), receipt_no: no, amount: num(d.amount), date } } }, isCash(a.rec) ? 'บันทึกชำระครบแล้ว' : 'บันทึกชำระดาวน์แล้ว')) { S.modal.down = null; render(); }
   },
   async 'flow-fin'(el) {
-    const a = atById(el.dataset.id); if (!a || a.flow.next !== 'fin' || !stepAllowed(a, 'fin')) { toast('ทำขั้นนี้ไม่ได้ตอนนี้', 'bad'); return; }
+    const a = atById(el.dataset.id); if (!a || !stepOpen(a, 'fin') || !stepAllowed(a, 'fin')) { toast('ทำขั้นนี้ไม่ได้ตอนนี้', 'bad'); return; }
     const r = a.rec, prev = (r.flow && r.flow.fin) || {};
     const status = S.modal.fin_status ?? r.fin_status ?? 'รอผล';
     const company = S.modal.fin_company ?? prev.company ?? r.finance ?? '';
@@ -767,7 +767,7 @@ const ACTIONS = {
   },
   async 'flow-assign'(el) {
     const D = derive(), a = D.at.find(x => x.id === el.dataset.id);
-    if (!a || !((a.flow.next === 'assign' && stepAllowed(a, 'assign')) || mgrAssign(a))) { toast('ทำขั้นนี้ไม่ได้ตอนนี้', 'bad'); return; }
+    if (!a || !((stepOpen(a, 'assign') && stepAllowed(a, 'assign')) || mgrAssign(a))) { toast('ทำขั้นนี้ไม่ได้ตอนนี้', 'bad'); return; }
     const vin = String(S.modal.assign_vin ?? assignDefault(a, D)).toUpperCase().trim();
     if (!VIN_RE.test(vin)) { toast('เลขตัวถังไม่ถูกต้อง', 'bad'); $('#fl-vin')?.focus(); return; }
     const car = D.cars.get(vin), own = car && car.lock && (car.lock.bkref === a.key || car.lock.bkref === a.row?.key);
@@ -796,7 +796,7 @@ const ACTIONS = {
   async 'po-save'(el) {
     const a = atById(el.dataset.id), po = S.modal.po;
     if (!a || !po) return;
-    if (!stepAllowed(a, 'po') || poLocked(a) || !(a.flow.next === 'po' || a.flow.done.po || a.flow.poSkip || S.modal.ret)) { toast('ทำ PO ได้หลังจัดสรรรถ และก่อนส่งมอบ', 'bad'); return; }
+    if (!stepAllowed(a, 'po') || poLocked(a) || !(stepOpen(a, 'po') || a.flow.done.po || a.flow.poSkip || S.modal.ret)) { toast('ทำ PO ได้หลังจัดสรรรถ และก่อนส่งมอบ', 'bad'); return; }
     const items = po.items.map(x => ({ ...x, name: String(x.name || '').trim(), qty: Math.max(1, parseInt(x.qty, 10) || 1) })).filter(x => x.name);
     if (!items.length) { toast('ใส่รายการแต่งอย่างน้อย 1 รายการ (ถ้าไม่มีแต่ง ใส่ "ไม่มีรายการแต่ง")', 'bad'); return; }
     const prev = a.rec.flow && a.rec.flow.po;

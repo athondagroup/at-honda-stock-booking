@@ -11,6 +11,9 @@ function focCatalog() {
 }
 // the owner sales, the branch admin, or the manager of the booking's branch (the executive: every branch)
 const canEditBooking = a => isMine(a.sales) || (S.role.role === 'admin' && a.br === S.role.branch) || canApproveBr(a.br);
+// a step can be done when it is the next one, or when IDS already delivered the car this month (late update) and the step is still missing:
+// the sales / admin must fill the earlier steps in, nothing else blocks them
+function stepOpen(a, k) { return a.flow.next === k || (!!a.flow.lateUpdate && !a.flow.done[k] && !a.flow.history && k !== 'delivered' && k !== 'confirmed'); }
 function stepAllowed(a, k) {
   const p = perms();
   if (!p.write || a.cancelled) return false;
@@ -107,7 +110,7 @@ function flowPanel(m, a, D) {
     const icon = skip ? `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:var(--warn-soft, #fde9c8);color:var(--warn)" title="ข้ามไว้ก่อน">–</span>` : done ? `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:var(--good);color:#fff">✓</span>` : `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:${cur ? 'var(--warn)' : 'var(--surface-2)'};color:${cur ? '#fff' : 'var(--muted)'}">${FLOW.indexOf(k) + 1}</span>`;
     return `<div class="flex gap-3"><div class="pt-0.5">${icon}</div><div class="flex-1 min-w-0 pb-3 border-b border-line"><div class="font-medium ${cur ? '' : done ? '' : 'text-muted'}">${FLOW_LABEL[k]}</div>${body || ''}${stepEditUI(a, m, k)}</div></div>`;
   };
-  const can = k => stepAllowed(a, k) && fl.next === k;
+  const can = k => stepAllowed(a, k) && stepOpen(a, k);
   const bookedBody = () => {
     if (fl.done.booked) return `<div class="text-sm text-muted">${fmtD(a.date)} · ใบเสร็จมัดจำ <span class="code">${esc(r.receipt_no)}</span>${r.deposit ? ` · ${money(r.deposit)} บาท` : ''}</div>`;
     return `<div class="text-sm text-muted">${fmtD(a.date)} · ยังไม่มีเลขที่ใบเสร็จมัดจำ ต้องใส่ก่อนไปขั้นถัดไป</div>
