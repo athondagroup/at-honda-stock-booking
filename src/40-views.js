@@ -341,14 +341,14 @@ function specTable(cars, D) {
       <td class="num text-right">${cell(k.held, 'held', 'ดูรถที่ IDS จัดสรร / ขายแล้ว')}</td>
       <td class="num text-right">${cell(k.lock, 'lock', 'ดูรถที่ล็อกในเว็บ / มีชื่อในชีต')}</td>
       <td class="num text-right">${s.waiting ? `<button class="underline decoration-dotted font-medium" data-act="specq-open" data-key="${esc(s.key)}" title="ดูว่าใบจองไหนรอรถสเปกนี้">${s.waiting}</button>` : '–'}</td>
-      <td class="num text-right font-semibold"><button class="underline decoration-dotted" data-act="specnet" data-key="${esc(s.key)}" title="${esc(netTip(s))}" style="color:var(--${netOf(s) < 0 ? 'bad' : 'good'})">${netOf(s)}</button></td>
       <td class="num text-right">${s.incoming ? `<button class="underline decoration-dotted" data-act="specquota" data-key="${esc(s.key)}" title="ดู Quota ว่าง และขอล็อกคิว">${s.incoming}</button>` : '–'}</td>
+      <td class="num text-right font-semibold"><button class="underline decoration-dotted" data-act="specnet" data-key="${esc(s.key)}" title="${esc(netTip(s))}" style="color:var(--${netOf(s) < 0 ? 'bad' : 'good'})">${netOf(s)}</button></td>
     </tr>
     ${open ? `<tr><td colspan="${brs.length + 7}" style="padding:0;background:var(--surface)">${cat ? `<div class="px-4 py-2 text-sm flex flex-wrap gap-2 items-center" style="background:var(--surface-2)">แสดงเฉพาะ <b>${SPEC_CAT[cat]}</b> ${list.length} คัน <button class="underline text-xs" data-act="speccat" data-key="${esc(s.key)}" data-cat="">แสดงทุกคัน</button></div>` : ''}<div class="divide-y divide-line">${list.map(c => carRow(c, D)).join('') || '<div class="p-3 text-muted">ไม่มีรถตามตัวกรองนี้</div>'}</div></td></tr>` : ''}`;
   }).join('');
   return `<div class="bg-surface border border-line rounded-lg scroll-x">
     <table><thead><tr><th>รุ่น / เกรด / สี</th>${brs.map(b => `<th class="text-right ${S.br ? '' : 'hidden md:table-cell'}">${b} ${isSales() ? 'ว่าง' : 'ว่าง/มี'}</th>`).join('')}
-      <th class="text-right">ว่าง</th><th class="text-right">ติดจอง</th><th class="text-right">ล็อก</th><th class="text-right" title="Stock ว่าง + Quota ว่าง − รอรถ">ว่างสุทธิ</th><th class="text-right">รอรถ</th><th class="text-right">Quota ว่าง</th></tr></thead>
+      <th class="text-right">ว่าง</th><th class="text-right">ติดจอง</th><th class="text-right">ล็อก</th><th class="text-right">รอรถ</th><th class="text-right">Quota ว่าง</th><th class="text-right" title="Stock ว่าง + Quota ว่าง − รอรถ">ว่างสุทธิ</th></tr></thead>
     <tbody>${rows || `<tr><td colspan="${brs.length + 7}">${emptyBox('ไม่พบรถตามตัวกรองนี้', 'ลองล้างตัวกรองหรือค้นหาด้วยเลขอื่น')}</td></tr>`}</tbody></table></div>
     <p class="text-xs text-muted mt-2">แต่ละคันอยู่ช่องเดียว: <b>ว่าง</b> = ขายได้ (รวมล็อกชั่วคราว) · <b>ติดจอง</b> = IDS จัดสรรให้ใบจองแล้ว หรือแจ้งขาย/ออกใบกำกับแล้ว · <b>ล็อก</b> = ล็อกในเว็บนี้ (อนุมัติแล้ว/รออนุมัติ) หรือมีชื่อพิมพ์ในชีตรอสร้างคำขอ · รถบริษัทไม่อยู่ในช่องไหน · <b>Quota ว่าง</b> = รถที่จะเข้า ยังไม่มีใบจองหรือล็อก · กดตัวเลขเพื่อดูรายคัน${isSales() ? ' (ไม่แสดงชื่อลูกค้า)' : ''}<br>แถวสีแดง = <b>รอรถ มากกว่า ว่าง + Quota ว่าง</b> ("ใบจองรอรถเกินรถที่มี N ใบ" = ลูกค้าท้ายคิว N คนยังไม่มีรถให้)</p>`;
 }
