@@ -5,7 +5,7 @@ const lockVisible = l => {
   if (r === 'admin') return l.car_br === S.role.branch || l.bk_br === S.role.branch;
   return true; // both managers and the executive see every branch
 };
-const atVisible = a => isSales() ? isMine(a.sales) : S.role.role === 'admin' ? a.br === S.role.branch : true;
+const atVisible = a => isSales() ? isMine(a.sales) : S.role.role === 'admin' ? adminOwns(a) : true;
 const monthStartISO = () => todayISO().slice(0, 8) + '01';
 function matchChip(a) {
   const m = a.match;
@@ -76,7 +76,8 @@ function rowState(r, D, st) {
   if (st === 'cxids') return !!(a && a.cancelled && a.idsLeft);
   return true;
 }
-const rowVisible = r => isSales() ? isMine(r.owner) : S.role.role === 'admin' ? r.br === S.role.branch : true;
+const rowVisible = r => isSales() ? isMine(r.owner) : S.role.role === 'admin' ? (r.a ? adminOwns(r.a) : r.br === S.role.branch) : true;
+const inBrRow = r => inBr(r) || (S.role.role === 'admin' && !!r.a && adminOwns(r.a));
 const searchKey = s => stripTitles(String(s || '')).toLowerCase().replace(/[\s.\-_'’(),]/g, '').replace(TONES, '');
 // the sale date is the delivery date: IDS DL (with a delivery date) or the delivery recorded here
 function saleDate(r, D) {
@@ -96,7 +97,7 @@ function bookList(D) {
   const q = searchKey(f.aq);
   // a search looks in every status and every branch this person can see: a delivered or cancelled booking is still found
   // a picked status still applies while searching (only the default "ยังไม่ส่งมอบ" widens to every status)
-  let list = bookRows(D).filter(r => rowVisible(r) && (q ? (st === 'active' || rowState(r, D, st)) : inBr(r) && rowState(r, D, st)));
+  let list = bookRows(D).filter(r => rowVisible(r) && (q ? (st === 'active' || rowState(r, D, st)) : inBrRow(r) && rowState(r, D, st)));
   if (f.qModel) list = list.filter(r => r.model === f.qModel);
   const sp = r => String(r.spec || '').split('|');
   if (f.bGrade) list = list.filter(r => sp(r)[1] === f.bGrade);
@@ -123,7 +124,7 @@ function bookList(D) {
     <div class="field"><label for="f-as">แสดง</label><select id="f-as" data-filter="aState">${BOOK_FILTERS.map(([k, t]) => `<option value="${k}" ${st === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
     <div class="field"><label for="f-bsort">เรียง</label><select id="f-bsort" data-filter="bSort">${[['', 'วันที่จองใหม่ก่อน'], ['work', 'งานค้างก่อน'], ['wait', 'รอนานก่อน'], ['new', 'บันทึกล่าสุด']].map(([k, t]) => `<option value="${k}" ${(f.bSort || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
   </div>${bkFilterBar(f, st, q)}`;
-  const all = bookRows(D).filter(r => inBr(r) && rowVisible(r) && (!dRange || bookDateOk(r, D)));
+  const all = bookRows(D).filter(r => inBrRow(r) && rowVisible(r) && (!dRange || bookDateOk(r, D)));
   const cnt = k => all.filter(r => rowState(r, D, k)).length;
   const quick = [['dtoday', 'neutral'], ['d7', 'neutral'], ['stuck', 'bad'], ['noids', 'bad'], ['noat', 'bad'], ['confirm', 'warn'], ['req', 'warn'], ['assign', 'neutral']].map(([k, t]) => { const n = cnt(k); return n ? `<button class="chip" data-act="book-filter" data-st="${k}" style="cursor:pointer;${t === 'bad' ? 'background:var(--bad-soft);color:var(--bad)' : t === 'warn' ? 'background:var(--warn-soft);color:var(--warn)' : 'background:var(--surface-2);color:var(--fg)'}">${BOOK_FILTERS.find(x => x[0] === k)[1]} ${n}</button>` : ''; }).join(' ');
   if (!list.length) return `${filt}${quick && !q ? `<div class="flex flex-wrap gap-2 mb-3">${quick}</div>` : ''}<div class="bg-surface border border-line rounded-lg">${q ? emptyBox(`ไม่พบ "${esc(f.aq.trim())}"`, `ค้นหาแล้วทุกสถานะและทุกสาขา${isSales() ? ' (เซลล์ค้นหาได้เฉพาะใบจองของตัวเอง)' : S.role.role === 'admin' ? ' ของสาขาตัวเอง' : ''} ลองพิมพ์แค่ชื่อหรือนามสกุล`) : emptyBox('ไม่มีใบจองตามตัวกรองนี้', st === 'dtoday' || st === 'd7' ? 'ยังไม่มีใบจองที่ใส่วันนัดรับรถในช่วงนี้ (ใส่ได้ในขั้น "นัดรับรถ" ของใบจอง)' : p.book && st === 'active' ? 'กด "+ ใบจอง AT Honda" แล้วแนบรูปใบจองและสลิป' : 'ลองเปลี่ยนตัวกรองหรือสาขา')}</div>`;
@@ -144,7 +145,7 @@ function bookRow(r, D, p) {
   if (p.write && p.request && row.state === 'waiting' && (!isSales() || isMine(r.owner)) && (a ? a.active : true)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="lock-open" data-bk="${esc(row.key || r.key)}">ขอล็อกรถ</button>`);
   // the booking's own locks are handled on this row: approve, allocate, extend, release, swap, undo (ตกลง 13/10)
   if (p.write) D.locks.filter(l => (l.bkref === r.key || (row.key && l.bkref === row.key) || (a && l.bkref === a.key)) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased).forEach(l => acts.push(...rowLockActs(l, D)));
-  if (p.write && a && a.active && ((a.flow.next === 'assign' && canAllocBr(a.br)) || mgrAssign(a))) acts.push(`<button class="btn btn-dark btn-sm" data-act="at-open" data-id="${esc(a.id)}">จัดสรรรถ</button>`);
+  if (p.write && a && a.active && ((a.flow.next === 'assign' && (canAllocBr(a.br) || adminOwns(a))) || mgrAssign(a))) acts.push(`<button class="btn btn-dark btn-sm" data-act="at-open" data-id="${esc(a.id)}">จัดสรรรถ</button>`);
   const idsCell = a ? `${matchChip(a)}${a.matchAsk ? `<div>${chip('รอยืนยันการจับคู่', 'warn')}</div>` : ''}${b && b.ids ? `<div class="text-xs text-muted">${esc(b.ids)}</div>` : ''}`
     : `${r.noForm ? chip('ยังไม่มีฟอร์ม AT', 'bad') : b.webCancel ? '' : b.match === 'cancel' ? chip('รอยกเลิกใน IDS', 'muted') : chip('ใน IDS', 'neutral')}<div class="text-xs text-muted">${esc(b.ids || '')}</div>${idsFixChip(b)}`;
   const stateCell = a && a.cancelled ? (a.rec.cancel && a.rec.cancel.refund === 'refund' ? chip(a.rec.refund && a.rec.refund.at ? 'ยกเลิก · ทำใบคืนเงินแล้ว' : 'ยกเลิก · รอทำใบคืนเงิน', a.rec.refund && a.rec.refund.at ? 'muted' : 'warn') : chip('ยกเลิก', 'muted'))

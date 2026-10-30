@@ -5,7 +5,7 @@
 // The PO cannot change once the car is delivered (in this web or in the IDS DL file).
 // Only function declarations here: the first render runs before this part of the file.
 function poLocked(a) { const fl = a.flow || {}; return !!(fl.done && fl.done.delivered) || !!fl.lateUpdate || !!fl.history || !!a.done; }
-function dealAdmin(a) { return perms().write && ((S.role.role === 'admin' && a.br === S.role.branch) || canApproveBr(a.br)); }
+function dealAdmin(a) { return perms().write && (adminOwns(a) || canApproveBr(a.br)); }
 function dealMonthly(v) {
   const amt = num(v.fin_amount), rate = Number(v.rate), term = parseInt(v.term, 10);
   if (!amt || !term || !(rate >= 0)) return null;

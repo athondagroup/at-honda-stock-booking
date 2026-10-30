@@ -113,7 +113,7 @@ async function bkMerge(a, into, how) {
   return true;
 }
 // executive, managers and branch admins (own branch) merge straight away and can undo; sales ask the manager
-function canMergeNow(a) { return !!a && perms().write && (canDecideBooking(a) || (S.role.role === 'admin' && a.br === S.role.branch)); }
+function canMergeNow(a) { return !!a && perms().write && (canDecideBooking(a) || adminOwns(a)); }
 // what IDS has for a booking, in words
 function mergeIdsText(a) {
   const mm = a.match; if (!mm) return '';

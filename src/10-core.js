@@ -144,6 +144,9 @@ const inChargeBr = canApproveBr;
 const lockBrs = l => [l && l.car_br, l && l.booking && (l.booking.br || (l.booking.app && l.booking.app.br))].filter(Boolean);
 const canLockMgr = l => perms().approve && lockBrs(l).some(b => mgrBranches().includes(b));
 // allocating a car: the branch admin, or the manager of that branch
+// a branch admin also owns the bookings of her own branch's sales booked at another branch (e.g. a sales moved to book at PSC) and the ones
+// delivered with another branch's car (e.g. a SPH car): the booking's branch, the sales' branch or the delivering branch is hers
+const adminOwns = a => !!(a && S.role.role === 'admin' && S.role.branch && [a.br, a.salesBr, a.delivBr].includes(S.role.branch));
 const canAllocBr = br => (S.role.role === 'admin' && br === S.role.branch) || canApproveBr(br);
 function custCell(name, sales, o = {}) {
   if (o.other) return chip('ขายให้สาขาอื่น', 'muted');

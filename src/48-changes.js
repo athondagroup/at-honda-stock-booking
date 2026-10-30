@@ -6,7 +6,7 @@ const CHANGE_KEYS = { customer: 'ชื่อลูกค้า', model: 'Model'
 const ADMIN_KEYS = ['booking_date', 'deposit', 'receipt_no', 'paper_no'];
 // the manager keeps the old queue place only with a reason
 const QUEUE_KEEP_REASONS = ['ลงรุ่น/เกรด/สีผิดตั้งแต่แรก ลูกค้าไม่ได้เปลี่ยน', 'ลูกค้าเปลี่ยนก่อนมีรถให้จัดสรร ไม่กระทบคิวคนอื่น', 'สเปกใหม่มีรถว่าง ไม่ต้องแย่งคิว', 'ผู้บริหารอนุมัติเป็นกรณีพิเศษ', 'อื่น ๆ'];
-const canAdminEdit = a => (S.role.role === 'admin' && a.br === S.role.branch) || canApproveBr(a.br);
+const canAdminEdit = a => adminOwns(a) || canApproveBr(a.br);
 // model / grade / colour can be typed only before the booking is in IDS; after that the system follows IDS
 const specLocked = a => !!a.match;
 function queuePick(path, q, a) {
@@ -27,9 +27,9 @@ const fieldVal = (k, v) => v === null || v === undefined || v === '' ? '–' : (
 const changeText = ch => ch && ch.type === 'merge' ? `ลงซ้ำ ขอรวมกับใบจอง ${ch.into_label || ''}` : Object.keys(ch.fields || {}).map(k => `${CHANGE_KEYS[k] || INSTANT_KEYS[k] || k}: ${fieldVal(k, (ch.old || {})[k])} → ${fieldVal(k, ch.fields[k])}`).join(' · ');
 // the role that asked (one sales, or the branch admin desk) can withdraw its own request
 const isRequester = ch => !!ch && ch.role === roleLabel();
-const canOwnerConfirm = a => perms().write && (isMine(a.sales) || (S.role.role === 'admin' && a.br === S.role.branch) || canApproveBr(a.br));
+const canOwnerConfirm = a => perms().write && (isMine(a.sales) || adminOwns(a) || canApproveBr(a.br));
 const canDecideBooking = a => perms().write && canApproveBr(a.br);
-const canRequestChange = a => perms().write && !canApproveBr(a.br) && (isMine(a.sales) || (S.role.role === 'admin' && a.br === S.role.branch));
+const canRequestChange = a => perms().write && !canApproveBr(a.br) && (isMine(a.sales) || adminOwns(a));
 const nameOk = (x, y) => keyScore(nameKey(x), nameKey(y)) >= 2;
 const logLine = h => `<div class="text-xs text-muted">${fmtDT(h.at)} · ${esc(h.act)}${h.note ? ` · ${esc(h.note)}` : ''} · ${who(h)}</div>`;
 const box = (tone, html) => `<div class="p-3 rounded-lg text-sm" style="background:var(--${tone}-soft, var(--surface-2));${tone === 'surface' ? '' : `color:var(--fg)`};border-left:3px solid var(--${tone === 'surface' ? 'line' : tone})">${html}</div>`;

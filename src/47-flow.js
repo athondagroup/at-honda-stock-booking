@@ -10,7 +10,7 @@ function focCatalog() {
   return rows;
 }
 // the owner sales, the branch admin, or the manager of the booking's branch (the executive: every branch)
-const canEditBooking = a => isMine(a.sales) || (S.role.role === 'admin' && a.br === S.role.branch) || canApproveBr(a.br);
+const canEditBooking = a => isMine(a.sales) || adminOwns(a) || canApproveBr(a.br);
 // a step can be done when it is the next one, or when IDS already delivered the car this month (late update) and the step is still missing:
 // the sales / admin must fill the earlier steps in, nothing else blocks them
 function stepOpen(a, k) { return a.flow.next === k || (!!a.flow.lateUpdate && !a.flow.done[k] && !a.flow.history && k !== 'delivered' && k !== 'confirmed'); }
@@ -18,7 +18,7 @@ function stepAllowed(a, k) {
   const p = perms();
   if (!p.write || a.cancelled) return false;
   if (k === 'confirmed') return canApproveBr(a.br);
-  if (k === 'assign') return canAllocBr(a.br);
+  if (k === 'assign') return canAllocBr(a.br) || adminOwns(a);
   return canEditBooking(a);
 }
 // the branch manager can allocate a car at any step, without the deposit receipt or the finance approval (13/10)
