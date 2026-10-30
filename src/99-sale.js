@@ -6,7 +6,7 @@ function saleDates(a, D) {
 }
 function saleFoc(a) {
   const po = (a.rec.flow && a.rec.flow.po) || {}, items = po.items || [];
-  const cost = items.reduce((n, x) => n + (x.cpay ? 0 : (Number(x.cost) || 0) * (Number(x.qty) || 1)), 0);
+  const cost = poAutoCost(a, po) + items.reduce((n, x) => n + (x.cpay ? 0 : (Number(x.cost) || 0) * (Number(x.qty) || 1)), 0);
   if (po.at && cost) return { v: cost, src: 'ตามใบสั่งแต่งรถ' };
   const f = a.rec.foc_total;
   return f === null || f === undefined || f === '' ? { v: null, src: '' } : { v: Number(f) || 0, src: 'ตามใบจอง' };
@@ -63,8 +63,9 @@ function printSaleApp(a, D) {
     ['หัก ส่วนลดรวม', M(s.disc)], [`หัก FOC รวม (${s.foc.src || '–'})`, M(s.foc.v)], [s.bal !== null && s.bal < 0 ? 'เกิน Margin' : 'เหลือ', s.bal === null ? '–' : money(Math.abs(s.bal))]];
   // gifts (accessories PO): each item with its sale value and its FOC cost, then the totals (26/10)
   const po = (r.flow && r.flow.po) || {}, pit = po.items || [];
-  const qn = x => Number(x.qty) || 1, gv = pit.reduce((n, x) => n + (Number(x.sale) || 0) * qn(x), 0), gc = pit.reduce((n, x) => n + (x.cpay ? 0 : (Number(x.cost) || 0) * qn(x)), 0);
+  const qn = x => Number(x.qty) || 1, gv = pit.reduce((n, x) => n + (Number(x.sale) || 0) * qn(x), 0), gc = poAutoCost(a, po) + pit.reduce((n, x) => n + (x.cpay ? 0 : (Number(x.cost) || 0) * qn(x)), 0);
   const gifts = pit.map((x, i) => [`${i + 1}. ${x.name || ''}`, String(qn(x)), M((Number(x.sale) || 0) * qn(x)), M((Number(x.cost) || 0) * qn(x))]);
+  poAuto(a).filter(x => x.fee && Number((po.ac || {})[x.key])).forEach(x => gifts.push([`${gifts.length + 1}. ${x.name}`, '1', '', M(Number(po.ac[x.key]))]));
   if (pit.length) gifts.push(['รวม', '', M(gv), M(gc)]);
   const blocks = [
     { h: 'ข้อมูลรถและลูกค้า' }, { kv },

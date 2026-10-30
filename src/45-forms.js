@@ -2,7 +2,7 @@
 function newBookingDraft() {
   return {
     booking_no: '', booking_date: todayISO(), br: '', sales: '', customer: '', source: 'Walk-in', model: '', grade: '', color: '', model_text: '',
-    purchase: 'ไฟแนนซ์', finance: 'HLTC', deposit: '', insurance: 'Honda แถม', insurance_kind: 'ชั้น 1 + พ.ร.บ.', price: '', discount: '', foc_items: '', down: '', fin_amount: '',
+    purchase: 'ไฟแนนซ์', finance: 'HLTC', deposit: '', insurance: 'Honda แถม', insurance_kind: '', price: '', discount: '', foc_items: '', down: '', fin_amount: '',
     rate: '', term: '', campaign: '', trade_in: '', trade: '', t_brand: '', t_model: '', t_year: '', t_price: '', lead_id: '', note: '', foc_total: '', delivery_plan: '', ids_claim: '', receipt_no: '', paper_no: '', multi_reason: '', multi_note: '', multi_old: '', ai: null, aiFields: [], slip_ai: null, unreadable: []
   };
 }
@@ -116,7 +116,7 @@ function bookingForm(D) {
         ${bookFormPrice(d)}
         ${F('purchase', 'เงื่อนไข', sel('purchase', ['ไฟแนนซ์', 'ซื้อสด']), true)}
         ${F('insurance', 'ประกันภัยชั้น 1 + พ.ร.บ. (ของใคร)', sel('insurance', d.insurance && !['Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม', 'ลูกค้าซื้อ'].includes(d.insurance) ? [d.insurance, 'Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม', 'ลูกค้าซื้อ'] : ['Honda แถม', 'AT แถม', 'ไฟแนนซ์แถม', 'ลูกค้าซื้อ']), true)}
-        ${F('insurance_kind', 'เป็นประกันของ', sel('insurance_kind', INS_KINDS.slice(1).map(x => x[0]), 'เลือก'))}
+        ${F('insurance_kind', 'บริษัทประกัน', sel('insurance_kind', INSURERS, 'เลือก'))}
         ${F('foc_total', 'FOC ที่ใช้ทั้งหมด', inp('foc_total', 'number', 'min="0" step="100" inputmode="numeric" placeholder="0"'), true)}
         ${bookTradeFields(d)}
         <div class="field"><label for="b-note">หมายเหตุ</label>${inp('note', 'text', 'placeholder="เช่น Trade in"')}</div>

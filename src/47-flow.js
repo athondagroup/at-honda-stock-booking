@@ -198,29 +198,30 @@ function flowPanel(m, a, D) {
 // ---------- PO: accessories order (ใบแต่งรถ)
 // the insurance / registration / discount lines come from the sale terms (and the booking), first rows of the PO
 function poAuto(a) {
-  const d = a.rec.deal || {}, r = a.rec, out = [];
-  const by1 = d.ins1_by || (['AT แถม', 'Honda แถม', 'ลูกค้าซื้อ'].includes(r.insurance) ? r.insurance : ''), kind = d.ins1_kind || r.insurance_kind || 'ชั้น 1 + พ.ร.บ.';
-  const free = by => by && by !== 'ลูกค้าซื้อ';
-  if (by1) out.push({ key: 'ins1', by: by1, name: kind === 'ชั้น 1 + พ.ร.บ.' ? `${free(by1) ? 'ฟรี' : ''}ประกันภัยชั้น 1 + พ.ร.บ.` : kind === 'Honda' ? `${free(by1) ? 'ฟรี' : ''}ประกันภัย Honda` : `${kind}` });
-  if (d.ins2_by) out.push({ key: 'ins2', by: d.ins2_by, name: `${free(d.ins2_by) ? 'ฟรี' : ''}ประกันภัย ปีที่ 2` });
-  if (d.ins3_by) out.push({ key: 'ins3', by: d.ins3_by, name: `${free(d.ins3_by) ? 'ฟรี' : ''}ประกันภัย ปีที่ 3` });
-  if (d.reg_by) out.push({ key: 'reg', by: d.reg_by, name: `${free(d.reg_by) ? 'ฟรี' : ''}ค่าจดทะเบียน` });
+  const d = a.rec.deal || {}, r = a.rec, out = [], co = d.ins1_kind || r.insurance_kind || '';
+  const by1 = d.ins1_by || (['AT แถม', 'Honda แถม', 'ลูกค้าซื้อ'].includes(r.insurance) ? r.insurance : '');
+  const ins = (key, by, yr, c) => by && out.push({ key, by, name: `${by === 'ลูกค้าซื้อ' ? '' : 'ฟรี'}ประกันภัยชั้น 1 + พ.ร.บ. ปีที่ ${yr}${c ? ` (${c})` : ''}`, fee: by === 'AT แถม' });
+  ins('ins1', by1, 1, co); ins('ins2', d.ins2_by, 2, ''); ins('ins3', d.ins3_by, 3, '');
+  if (d.reg_by === 'AT แถม') out.push({ key: 'reg', by: d.reg_by, name: 'ฟรีค่าจดทะเบียน', fee: true });   // paid by the customer: not on the PO; Honda does not give it
   const disc = num(d.disc) || num(r.discount); if (disc > 0) out.push({ key: 'disc', by: '', name: 'ส่วนลด', amt: disc });
   return out;
 }
+const poAutoCost = (a, po) => poAuto(a).reduce((n, x) => n + (x.fee ? Number((po.ac || {})[x.key]) || 0 : 0), 0);
+const poCharge = x => x.cpay ? (x.cprice !== undefined && x.cprice !== '' ? Number(x.cprice) || 0 : (/^ATG-/.test(x.part || '') || x.custom ? 0 : Number(x.sale) || 0)) : 0;
+const poChargeNote = x => x.cpay ? (x.cpart ? 'เรียกเก็บบางส่วน ' : 'ลูกค้าชำระเพิ่ม ') + money(poCharge(x)) : '';
 const poPart = x => [x.part || x.vendor || '', x.ptag || ''].filter(Boolean).join(' ');
-const poStd = a => ['รับประกันคุณภาพรถ 3 ปี หรือ 100,000 กม.', 'บริการช่วยเหลือฉุกเฉิน 24 ชม. 3 ปี หรือ 100,000 กม.', 'ฟรีค่าแรงเช็คระยะ 10,000–20,000 กม.', ...(/e:HEV/i.test(a.model || '') ? ['รับประกันแบตเตอรี่ไฮบริด 10 ปี', 'รับประกันระบบไฮบริด 5 ปี'] : [])];
+const poStd = (a, po) => ['รับประกันคุณภาพรถ 3 ปี หรือ 100,000 กม.', 'บริการช่วยเหลือฉุกเฉิน 24 ชม. 3 ปี หรือ 100,000 กม.', 'ฟรีค่าแรงเช็คระยะ 10,000–20,000 กม.', ...(/e:HEV/i.test(a.model || '') ? ['รับประกันแบตเตอรี่ไฮบริด 10 ปี', 'รับประกันระบบไฮบริด 5 ปี'] : []), ...(po && po.ucare ? [UCARE] : [])];
 const UCARE = 'Ultimate Care รับประกันคุณภาพเพิ่ม 2 ปี หรือ 40,000 กม.';
 function poDraft(a) {
   const po = (a.rec.flow && a.rec.flow.po) || {};
-  return { items: (po.items || []).map(x => ({ ...x })), date: po.date || todayISO(), ddate: po.ddate || a.rec.delivery_plan || '', dtime: po.dtime || '', by: po.by_name || a.sales || '', note: po.note || '', cp: { ...(po.cp || {}) }, ucare: !!po.ucare };
+  return { items: (po.items || []).map(x => ({ ...x })), date: po.date || todayISO(), ddate: po.ddate || a.rec.delivery_plan || '', dtime: po.dtime || '', by: po.by_name || a.sales || '', note: po.note || '', ac: { ...(po.ac || {}) }, ucare: !!po.ucare };
 }
 function poEditor(m, a, D) {
   const po = m.po, codes = [...(MODEL_CODES[a.model] || []), 'OT', 'ALL'];
   const cat = focCatalog();
   const q = (m.poq || '').trim().toLowerCase();
   const hits = cat.filter(x => codes.includes(x.model) && (!q || x.name.toLowerCase().includes(q) || (x.part || '').toLowerCase().includes(q) || (x.cat || '').toLowerCase().includes(q))).sort((x, y) => (/^(DVP|แพ็คเกจ)/.test(y.cat || '')) - (/^(DVP|แพ็คเกจ)/.test(x.cat || ''))).slice(0, 60);
-  const cost = po.items.reduce((n, x) => n + (x.cpay ? 0 : (Number(x.cost) || 0) * (Number(x.qty) || 1)), 0);
+  const cost = poAutoCost(a, po) + po.items.reduce((n, x) => n + (x.cpay ? 0 : (Number(x.cost) || 0) * (Number(x.qty) || 1)), 0);
   const sale = po.items.reduce((n, x) => n + (Number(x.sale) || 0) * (Number(x.qty) || 1), 0);
   const focBudget = Number(a.rec.foc_total) || 0;
   const ro = poLocked(a) || !stepAllowed(a, 'po');
@@ -237,16 +238,16 @@ function poEditor(m, a, D) {
         <div class="field"><label for="po-dt">เวลา</label><input id="po-dt" type="time" data-modal="po.dtime" value="${esc(po.dtime)}" ${ro ? 'disabled' : ''}></div>
       </div>
       <table class="tbl text-sm"><thead><tr><th>ลำดับ</th><th>ชื่ออุปกรณ์อะไหล่</th><th>หมายเลขอะไหล่ / ผู้ขาย</th><th class="text-right">จำนวน</th><th class="text-right">ทุน FOC</th><th>ลูกค้าจ่ายเพิ่ม</th><th></th></tr></thead>
-        <tbody>${poAuto(a).map(x => `<tr style="background:var(--surface-2)"><td class="text-muted">★</td><td>${esc(x.name)}${x.amt ? ` <b class="num">${money(x.amt)}</b>` : ''}</td><td class="text-xs">${esc(x.by || 'จากเงื่อนไขการขาย')}</td><td class="text-right">1</td><td class="text-muted text-xs text-right">${x.by === 'ลูกค้าซื้อ' ? 'ลูกค้าซื้อ' : 'ไม่คิดทุนที่นี่'}</td><td>${x.by === 'ลูกค้าซื้อ' ? `<label class="text-xs flex items-center gap-1"><input type="checkbox" data-modal="po.cp.${x.key}" ${po.cp && po.cp[x.key] ? 'checked' : ''} ${ro ? 'disabled' : ''}> ชำระเพิ่ม</label>` : ''}</td><td></td></tr>`).join('')}${po.items.map((x, i) => `<tr><td class="num">${i + 1}</td><td style="min-width:160px">${ro || x.grp ? esc(x.name) : `<input data-modal="po.items.${i}.name" value="${esc(x.name)}" class="w-full" style="background:transparent;border-bottom:1px solid var(--line)">`}</td>
+        <tbody>${poAuto(a).map(x => `<tr style="background:var(--surface-2)"><td class="text-muted">★</td><td>${esc(x.name)}${x.amt ? ` <b class="num">${money(x.amt)}</b>` : ''}</td><td class="text-xs">${esc(x.by || 'จากเงื่อนไขการขาย')}</td><td class="text-right">1</td><td class="num text-right">${x.fee ? `<input type="number" min="0" data-modal="po.ac.${x.key}" value="${esc((po.ac || {})[x.key] ?? '')}" placeholder="ทุน FOC" class="w-24 text-right" ${ro ? 'disabled' : ''} style="background:transparent;border-bottom:1px solid var(--line)">` : `<span class="text-muted text-xs">${x.by === 'Honda แถม' ? 'Honda แถม ไม่คิด FOC' : x.by === 'ลูกค้าซื้อ' ? 'ลูกค้าชำระ ไม่คิด FOC' : '–'}</span>`}</td><td></td><td></td></tr>`).join('')}${po.items.map((x, i) => `<tr><td class="num">${i + 1}</td><td style="min-width:160px">${ro || x.grp ? esc(x.name) : `<input data-modal="po.items.${i}.name" value="${esc(x.name)}" class="w-full" style="background:transparent;border-bottom:1px solid var(--line)">`}</td>
           <td class="code text-xs">${esc(poPart(x) || '–')}</td>
           <td class="text-right">${ro || x.grp ? esc(x.qty) : `<input type="number" min="1" data-modal="po.items.${i}.qty" value="${esc(x.qty)}" class="w-12 text-right" style="background:transparent;border-bottom:1px solid var(--line)">`}</td>
           <td class="num text-right">${x.grp && !x.gp ? '<span class="text-muted text-xs">รวมในชุด</span>' : money((Number(x.cost) || 0) * (Number(x.qty) || 1))}</td>
-          <td>${x.grp && !x.gp ? '' : `<label class="text-xs flex items-center gap-1"><input type="checkbox" data-modal="po.items.${i}.cpay" ${x.cpay ? 'checked' : ''} ${ro ? 'disabled' : ''}> ชำระเพิ่ม</label>`}</td>
+          <td>${x.grp && !x.gp ? '' : `<label class="text-xs flex items-center gap-1"><input type="checkbox" data-modal="po.items.${i}.cpay" ${x.cpay ? 'checked' : ''} ${ro ? 'disabled' : ''}> ชำระเพิ่ม</label>${x.cpay ? `<label class="text-xs flex items-center gap-1"><input type="checkbox" data-modal="po.items.${i}.cpart" ${x.cpart ? 'checked' : ''} ${ro ? 'disabled' : ''}> เรียกเก็บบางส่วน</label><input type="number" min="0" aria-label="ราคาที่เรียกเก็บลูกค้า" data-modal="po.items.${i}.cprice" value="${esc(x.cprice !== undefined && x.cprice !== '' ? x.cprice : (poCharge(x) || ''))}" placeholder="ราคาเรียกเก็บ" class="w-24 text-right" ${ro || !(x.cpart || /^ATG-/.test(x.part || '') || x.custom) ? 'readonly' : ''} style="background:transparent;border-bottom:1px solid var(--line)">` : ''}`}</td>
           <td>${ro ? '' : `<button class="btn btn-ghost btn-sm" data-act="po-del" data-i="${i}" aria-label="ลบรายการ ${i + 1}" ${x.grp ? 'title="ลบทั้งชุด"' : ''}>×</button>`}</td></tr>`).join('') || '<tr><td colspan="7" class="text-muted">ยังไม่มีรายการ เลือกจากรายการ FOC ทางขวา หรือเพิ่มเอง</td></tr>'}</tbody></table>
       <div class="text-sm p-3 rounded-lg" style="background:var(--surface-2)">ทุน FOC รวม <b class="num">${money(cost)}</b> บาท · ราคาขาย <b class="num">${money(sale)}</b> บาท
         ${focBudget ? ` · FOC ในใบจอง ${money(focBudget)} บาท → <b style="color:var(--${cost > focBudget ? 'bad' : 'good'})">${cost > focBudget ? 'เกิน' : 'เหลือ'} ${money(Math.abs(focBudget - cost))}</b>` : ''}</div>
-      <div class="text-sm p-3 rounded-lg border border-line"><div class="font-medium mb-1">รายการมาตรฐานที่มากับตัวรถ</div><ul class="list-disc pl-5">${poStd(a).map(t => `<li>${esc(t)}</li>`).join('')}</ul>
-        <label class="flex items-center gap-2 mt-2"><input type="checkbox" data-modal="po.ucare" ${po.ucare ? 'checked' : ''} ${ro ? 'disabled' : ''}> แคมเปญพิเศษ Honda: ${esc(UCARE)}</label></div>
+      <div class="text-sm p-3 rounded-lg border border-line"><div class="font-medium mb-1">รายการมาตรฐานที่มากับตัวรถ</div><ul class="list-disc pl-5">${poStd(a, po).map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+        <label class="flex items-center gap-2 mt-2"><input type="checkbox" data-modal="po.ucare" ${po.ucare ? 'checked' : ''} ${ro ? 'disabled' : ''}> ${esc(UCARE)}</label></div>
       <div class="field"><label for="po-note">หมายเหตุ</label><input id="po-note" data-modal="po.note" value="${esc(po.note)}" ${ro ? 'disabled' : ''}></div>
       <div class="flex flex-wrap gap-2">${ro ? '' : `<button class="btn btn-red" data-act="po-save" data-id="${esc(a.id)}">บันทึกใบสั่งแต่งรถ</button><button class="btn btn-ghost" data-act="po-custom">+ เพิ่มรายการเอง</button>`}<button class="btn btn-ghost" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button></div>
     </div>
@@ -261,16 +262,15 @@ function poEditor(m, a, D) {
 function printPO(a) {
   const po = (S.modal && S.modal.po) || poDraft(a);
   const vin = atVin(a), car = vin ? (carAny(vin, derive()) || {}) : {};
-  const au = poAuto(a).map(x => [x.name + (x.amt ? ` ${money(x.amt)}` : ''), '', '1', [x.by, x.by === 'ลูกค้าซื้อ' && po.cp && po.cp[x.key] ? 'ลูกค้าชำระเพิ่ม' : ''].filter(Boolean).join(' · ')]);
-  const lines = [...au, ...po.items.map(x => [x.name, poPart(x), String(x.qty), [x.note, x.cpay ? 'ลูกค้าชำระเพิ่ม' : ''].filter(Boolean).join(' · ')])];
+  const au = poAuto(a).map(x => [x.name + (x.amt ? ` ${money(x.amt)}` : ''), '', '1', x.by]);
+  const lines = [...au, ...po.items.map(x => [x.name, poPart(x), String(x.qty), [x.note, poChargeNote(x)].filter(Boolean).join(' · ')])];
   const rows = [...lines.map((l, i) => [String(i + 1), ...l]), ...Array.from({ length: Math.max(0, 15 - lines.length) }, (_, i) => [String(lines.length + i + 1), '', '', '', ''])];
   const spec = { title: 'ใบสั่งแต่งรถ', sub: `บริษัท เอที ฮอนด้า ออโตโมบิล จำกัด สาขา${BR[a.br]?.name || ''}`, blocks: [
     { kv: [['วันที่สั่งอุปกรณ์', fmtD(po.date), 'พนักงานขาย', a.sales || ''], ['เลขที่ใบจอง', a.no || '', 'ชื่อลูกค้า', a.cust || ''], ['รุ่นรถ', a.model || '', 'แบบรถ / สีรถ', `${a.grade || ''} / ${a.color || ''}`],
       ['วันที่ส่งมอบ', `${fmtD(po.ddate)} ${po.dtime || ''}`, 'ผู้สั่งอุปกรณ์', po.by || ''], ['หมายเลขตัวถัง', vin || '', 'หมายเลขเครื่องยนต์', car.engine || '']] },
     { h: 'รายการแต่งอุปกรณ์' },
     { items: { cols: ['ลำดับ', 'ชื่ออุปกรณ์อะไหล่', 'หมายเลขอะไหล่', 'จำนวน', 'หมายเหตุ'], widths: [0.08, 0.44, 0.24, 0.1, 0.14], rows } },
-    { h: 'รายการมาตรฐานที่มากับตัวรถ' }, { note: poStd(a).map(t => '• ' + t).join('\n') },
-    ...(po.ucare ? [{ note: '★ แคมเปญพิเศษ Honda: ' + UCARE }] : []),
+    { h: 'รายการมาตรฐานที่มากับตัวรถ' }, { note: poStd(a, po).map(t => '• ' + t).join('\n') },
     ...(po.note ? [{ note: `หมายเหตุ: ${po.note}` }] : []),
     { sign: ['ผู้สั่งอุปกรณ์', 'ผู้จัดการฝ่ายขาย', 'ฝ่ายอะไหล่ / ผู้ติดตั้ง'] }] };
   const back = S.modal && S.modal.kind === 'at' ? { ...S.modal } : { kind: 'at', id: a.id };

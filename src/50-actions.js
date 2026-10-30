@@ -815,7 +815,7 @@ const ACTIONS = {
     const prev = a.rec.flow && a.rec.flow.po;
     // an edit keeps the earlier version's summary (who, when, items) as history
     const hist = prev && prev.at ? [...(prev.hist || []), { at: prev.at, by: prev.by, role: prev.role, items: (prev.items || []).map(x => `${x.name} ×${x.qty}`) }] : undefined;
-    const rec = { ...actor(), items, date: po.date || todayISO(), ddate: po.ddate || null, dtime: po.dtime || null, by_name: po.by || a.sales, note: (po.note || '').trim() || null, cp: po.cp && Object.keys(po.cp).some(k => po.cp[k]) ? po.cp : null, ucare: !!po.ucare, ...(hist ? { hist } : {}) };
+    const rec = { ...actor(), items, date: po.date || todayISO(), ddate: po.ddate || null, dtime: po.dtime || null, by_name: po.by || a.sales, note: (po.note || '').trim() || null, ac: po.ac && Object.keys(po.ac).some(k => po.ac[k]) ? po.ac : null, ucare: !!po.ucare, ...(hist ? { hist } : {}) };
     if (await saveFlow(a, { flow: { po: rec } }, prev && prev.at ? 'แก้ใบแต่งรถแล้ว' : 'บันทึกใบสั่งแต่งรถ แล้ว')) { if (S.modal.ret) S.modal = S.modal.ret; else S.modal.po = null; render(); }
   },
   'po-print'(el) { const a = atById(el.dataset.id); if (a) printPO(a); },
@@ -984,7 +984,7 @@ document.addEventListener('input', ev => {
     // the search window: only the results are redrawn, the box being typed in stays as it is (no jump, keyboard stays)
     if (path === 'q' && S.modal.kind === 'gsearch') { clearTimeout(poqTimer); poqTimer = setTimeout(() => { const r = document.getElementById('gs-res'); if (r && S.modal && S.modal.kind === 'gsearch') r.innerHTML = gsearchResults(S.modal, derive()); else render(); }, 200); return; }
     if (path === 'poq' || (path === 'q' && (S.modal.kind === 'idspair' || S.modal.kind === 'lockbk' || S.modal.kind === 'gsearch' || S.modal.kind === 'stassign' || S.modal.kind === 'idsview' || S.modal.kind === 'drill'))) { clearTimeout(poqTimer); poqTimer = setTimeout(render, 250); return; }
-    if (t.tagName === 'SELECT' || t.type === 'radio' || (t.type === 'checkbox' && path.startsWith('po.')) || (path.endsWith('.vin') && val.length === 17)) render();
+    if (t.tagName === 'SELECT' || t.type === 'radio' || (t.type === 'checkbox' && path.startsWith('po.')) || path.endsWith('.cpay') || (path.endsWith('.vin') && val.length === 17)) render();
   } else if (t.dataset.filter) {
     S.filters[t.dataset.filter] = t.type === 'checkbox' ? t.checked : t.value;
     if (t.dataset.filter !== 'bPage') S.filters.bPage = 1;
