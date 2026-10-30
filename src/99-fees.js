@@ -52,10 +52,50 @@ function adminFees() {
   const body = f.tab === 'ins' ? feInsTable(can) : f.tab === 'foc' ? feFocTable(can) : feRegTable(can);
   const d = S.ref.get(f.tab === 'foc' ? 'foc' : 'fees') || {}, src = d.at ? `แก้ล่าสุดในเว็บ ${fmtD(d.at)}` : 'ยังใช้ข้อมูลที่แนบมากับเว็บ (ดึงจากชีต)';
   return `<div class="flex flex-wrap items-center gap-2 mb-3"><div class="tabs" role="tablist">${tb('reg', 'ค่าจดทะเบียน')}${tb('ins', 'เบี้ยประกัน')}${tb('foc', 'รายการ FOC')}</div>
-    <span class="text-xs text-muted">${esc(src)}</span><span class="flex-1"></span>${can ? `<button class="btn btn-red btn-sm" data-act="fe-save">บันทึก${f.tab === 'foc' ? 'รายการ FOC' : f.tab === 'ins' ? 'เบี้ยประกัน' : 'ค่าจดทะเบียน'}</button>` : ''}</div>${body}`;
+    <span class="text-xs text-muted">${esc(src)}</span><span class="flex-1"></span><button class="btn btn-ghost btn-sm" data-act="fe-export">ดาวน์โหลด Excel</button>${can ? `<label class="btn btn-ghost btn-sm relative">อัปโหลด Excel ที่แก้แล้ว<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-fefile="1" class="absolute inset-0 opacity-0 cursor-pointer" aria-label="อัปโหลดไฟล์ Excel"></label>` : ''}${can ? `<button class="btn btn-red btn-sm" data-act="fe-save">บันทึก${f.tab === 'foc' ? 'รายการ FOC' : f.tab === 'ins' ? 'เบี้ยประกัน' : 'ค่าจดทะเบียน'}</button>` : ''}</div>${f.note ? `<p class="text-sm mb-2 p-2 rounded-lg" style="background:var(--surface-2)">${esc(f.note)}</p>` : ''}${body}`;
+}
+const FE_SHEET = { reg: 'ค่าจดทะเบียน', ins: 'เบี้ยประกัน', foc: 'รายการ FOC' };
+const FE_FOCCOLS = [['model', 'รหัสรุ่น'], ['cat', 'หมวด'], ['name', 'ชื่อรายการ'], ['part', 'หมายเลขอะไหล่'], ['vendor', 'ผู้ขาย'], ['cost', 'ทุน FOC'], ['sale', 'ราคาขาย'], ['note', 'หมายเหตุ'], ['pieces', 'ชิ้นส่วนในชุด (อย่าแก้ ถ้าไม่จำเป็น)'], ['src', 'ที่มา']];
+async function feExport() {
+  let X; try { X = await loadXLSX(); } catch (e) { toast('โหลดตัวสร้างไฟล์ Excel ไม่สำเร็จ', 'bad'); return; }
+  const f = feState(), wb = X.utils.book_new(); let aoa;
+  if (f.tab === 'reg') { const r = feFees().reg; aoa = [['รหัสรุ่น', 'รุ่น', 'บุคคลธรรมดา (บาท)', 'นิติบุคคล (บาท)'], ...Object.keys(r).map(k => [k, FEE_GRP[k] || k, feN(r[k][0]), feN(r[k][1])])]; }
+  else if (f.tab === 'ins') { const r = feFees().ins; aoa = [['รหัสรุ่น', 'รุ่น', 'ทำประกัน (ปี)', 'เบี้ยปีที่ 1', 'เบี้ยปีที่ 2', 'เบี้ยปีที่ 3'], ...Object.keys(r).flatMap(k => ['1', '2', '3'].filter(p => r[k][p]).map(p => [k, FEE_GRP[k] || k, Number(p), ...[0, 1, 2].map(i => r[k][p][i] === undefined ? '' : feN(r[k][p][i]))]))]; }
+  else { const d = feFoc(), ci = Object.fromEntries(d.cols.map((c, i) => [c, i])); aoa = [FE_FOCCOLS.map(c => c[1]), ...d.rows.map(r => FE_FOCCOLS.map(([c]) => r[ci[c]] ?? ''))]; }
+  const how = [['วิธีใช้'], ['1. แก้ตัวเลขหรือข้อความในไฟล์นี้ (ใน Excel หรืออัปโหลดเข้า Google Sheets แล้วดาวน์โหลดกลับเป็น .xlsx)'], ['2. อย่าเปลี่ยนชื่อหัวคอลัมน์ ห้ามลบคอลัมน์'], ['3. อัปโหลดกลับที่ หลังบ้าน → ค่าจดทะเบียน/ประกัน/FOC → อัปโหลด Excel ที่แก้แล้ว'], ['4. ระบบแสดงผลที่เปลี่ยนให้ตรวจ แล้วกด "บันทึก" อีกครั้งถึงจะใช้จริง'], f.tab === 'foc' ? ['แถวที่ลบออกจากไฟล์ จะถูกลบจากรายการ FOC เมื่อกดบันทึก'] : ['']];
+  const ws = X.utils.aoa_to_sheet(aoa); ws['!cols'] = aoa[0].map((_, i) => ({ wch: f.tab === 'foc' && i === 2 ? 50 : 18 }));
+  X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(how), 'วิธีใช้'); X.utils.book_append_sheet(wb, ws, FE_SHEET[f.tab]);
+  const buf = X.write(wb, { type: 'array', bookType: 'xlsx' });
+  await docSave(docName('AT Honda ' + FE_SHEET[f.tab], todayISO()) + '.xlsx', new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+}
+async function feImport(file) {
+  let X; try { X = await loadXLSX(); } catch (e) { toast('โหลดตัวอ่านไฟล์ Excel ไม่สำเร็จ', 'bad'); return; }
+  let wb; try { wb = X.read(await file.arrayBuffer(), { type: 'array' }); } catch (e) { toast('อ่านไฟล์ไม่ได้ ใช้ไฟล์ .xlsx ที่ดาวน์โหลดจากหน้านี้', 'bad'); return; }
+  const f = feState(), name = wb.SheetNames.find(n => n === FE_SHEET[f.tab]) || wb.SheetNames.filter(n => n !== 'วิธีใช้')[0];
+  const rows = name ? X.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '', raw: true }) : [];
+  if (rows.length < 2) { toast('ไม่พบข้อมูลในไฟล์', 'bad'); return; }
+  const h = rows[0].map(x => String(x).trim()), col = t => h.findIndex(x => x.startsWith(t)), body = rows.slice(1).filter(r => r.some(x => String(x).trim() !== ''));
+  const need = f.tab === 'reg' ? ['รหัสรุ่น', 'บุคคลธรรมดา', 'นิติบุคคล'] : f.tab === 'ins' ? ['รหัสรุ่น', 'ทำประกัน', 'เบี้ยปีที่ 1'] : ['รหัสรุ่น', 'ชื่อรายการ', 'ทุน FOC', 'ราคาขาย'];
+  const miss = need.filter(t => col(t) < 0); if (miss.length) { toast('หัวคอลัมน์ไม่ครบ: ' + miss.join(', ') + ' (ใช้ไฟล์ที่ดาวน์โหลดจากหน้านี้)', 'bad'); return; }
+  if (f.tab === 'reg') {
+    const cur = feFees().reg, reg = {}; let n = 0;
+    body.forEach(r => { const k = String(r[col('รหัสรุ่น')]).trim(); if (!k) return; reg[k] = [feN(r[col('บุคคลธรรมดา')]), feN(r[col('นิติบุคคล')])]; if (JSON.stringify(cur[k] || []) !== JSON.stringify(reg[k])) n++; });
+    feFees().reg = reg; f.note = `โหลดจากไฟล์แล้ว: ${Object.keys(reg).length} รุ่น เปลี่ยน ${n} รุ่น · ยังไม่บันทึก ตรวจแล้วกด "บันทึกค่าจดทะเบียน"`;
+  } else if (f.tab === 'ins') {
+    const cur = feFees().ins, ins = {}; let n = 0;
+    body.forEach(r => { const k = String(r[col('รหัสรุ่น')]).trim(), p = String(Math.round(feN(r[col('ทำประกัน')]))); if (!k || !['1', '2', '3'].includes(p)) return; ins[k] = ins[k] || {}; ins[k][p] = [0, 1, 2].slice(0, Number(p)).map(i => feN(r[col('เบี้ยปีที่ ' + (i + 1))])); if (JSON.stringify((cur[k] || {})[p] || []) !== JSON.stringify(ins[k][p])) n++; });
+    feFees().ins = ins; f.note = `โหลดจากไฟล์แล้ว: ${Object.keys(ins).length} รุ่น เปลี่ยน ${n} แผน · ยังไม่บันทึก ตรวจแล้วกด "บันทึกเบี้ยประกัน"`;
+  } else {
+    const d = feFoc(), old = (refStatic('foc') || d).rows.map(r => JSON.stringify(r.map(x => typeof x === 'number' ? x : String(x ?? '')))), ix = Object.fromEntries(FE_FOCCOLS.map(([c, t]) => [c, col(t.slice(0, 6))]));
+    const out = body.map(r => d.cols.map(c => { const j = ix[c]; if (j === undefined || j < 0) return ''; const v = r[j]; return c === 'cost' || c === 'sale' ? feN(v) : String(v ?? '').trim(); })).filter(r => r[d.cols.indexOf('name')]);
+    const nw = out.map(r => JSON.stringify(r.map(x => typeof x === 'number' ? x : String(x ?? '')))), oset = new Set(old), nset = new Set(nw);
+    d.rows = out; f.note = `โหลดจากไฟล์แล้ว: ${out.length} รายการ (เดิม ${old.length}) · แถวใหม่หรือที่แก้ ${nw.filter(x => !oset.has(x)).length} · แถวเดิมที่หายไปหรือถูกแก้ ${old.filter(x => !nset.has(x)).length} · ยังไม่บันทึก ตรวจแล้วกด "บันทึกรายการ FOC"`;
+  }
+  render();
 }
 Object.assign(ACTIONS, {
-  'fe-tab'(el) { feState().tab = el.dataset.t; render(); },
+  async 'fe-export'() { await feExport(); },
+  'fe-tab'(el) { feState().tab = el.dataset.t; feState().note = ''; render(); },
   'fe-more'() { feState().show += 100; render(); },
   'fe-foc-del'(el) { if (!adminWrite()) return; const d = feFoc(), i = Number(el.dataset.i); if (d.rows[i]) { d.rows.splice(i, 1); render(); } },
   'fe-foc-add'() {
@@ -69,12 +109,12 @@ Object.assign(ACTIONS, {
     if (f.tab === 'foc') {
       const d = feFoc(), ci = Object.fromEntries(d.cols.map((c, i) => [c, i])); d.rows.forEach(r => { r[ci.cost] = feN(r[ci.cost]); r[ci.sale] = feN(r[ci.sale]); });
       const prev = S.ref.get('foc') || {}, doc = { ...d, at: new Date().toISOString(), log: [...(prev.log || []).slice(-50), { ...actor(), n: d.rows.length }] };
-      if (await write('ref', 'foc', doc)) { S.ref.set('foc', doc); f.foc = null; toast(`บันทึกรายการ FOC ${d.rows.length} รายการแล้ว`); render(); }
+      if (await write('ref', 'foc', doc)) { S.ref.set('foc', doc); f.foc = null; f.note = ''; toast(`บันทึกรายการ FOC ${d.rows.length} รายการแล้ว`); render(); }
       return;
     }
     const x = feFees(), fix = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Array.isArray(v) ? v.map(feN) : Object.fromEntries(Object.entries(v).map(([p, a]) => [p, a.map(feN)]))]));
     const prev = S.ref.get('fees') || {}, doc = { ...x, reg: fix(x.reg), ins: fix(x.ins), at: new Date().toISOString(), log: [...(prev.log || []).slice(-50), { ...actor() }] };
-    if (await write('ref', 'fees', doc)) { S.ref.set('fees', doc); f.fees = null; toast(f.tab === 'ins' ? 'บันทึกเบี้ยประกันแล้ว' : 'บันทึกค่าจดทะเบียนแล้ว'); render(); }
+    if (await write('ref', 'fees', doc)) { S.ref.set('fees', doc); f.fees = null; f.note = ''; toast(f.tab === 'ins' ? 'บันทึกเบี้ยประกันแล้ว' : 'บันทึกค่าจดทะเบียนแล้ว'); render(); }
   }
 });
 // typed values go into the working copy without redrawing (the cursor stays); the search and the filter redraw when they change
@@ -85,4 +125,4 @@ document.addEventListener('input', ev => {
   else if (t.dataset.feFoc) { const [i, c] = t.dataset.feFoc.split('.'), d = feFoc(), k = d.cols.indexOf(c); if (d.rows[Number(i)] && k >= 0) d.rows[Number(i)][k] = t.value; }
   else if (t.dataset.feAdd) { S.fe.add = S.fe.add || {}; S.fe.add[t.dataset.feAdd] = t.value; }
 });
-document.addEventListener('change', ev => { const t = ev.target; if (t && t.dataset && t.dataset.feQ && S.fe) { S.fe[t.dataset.feQ] = t.value; S.fe.show = 60; render(); } });
+document.addEventListener('change', ev => { const t = ev.target; if (t && t.dataset && t.dataset.fefile) { const f = t.files && t.files[0]; t.value = ''; if (f && adminWrite()) feImport(f); return; } if (t && t.dataset && t.dataset.feQ && S.fe) { S.fe[t.dataset.feQ] = t.value; S.fe.show = 60; render(); } });
