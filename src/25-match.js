@@ -56,7 +56,9 @@ function matchForms(at, idsB, cars, inv) {
     const name = c.cust || (c.bknote && c.bknote.includes('/') ? c.bknote.split('/').slice(1).join('/') : null);
     if (name && (c.bkno || c.cust)) recs.push({ kind: 'stock', key: 'car:' + c.vin, name, date: c.bkdate || c.alloc || c.stockin, model: c.model, grade: c.grade, color: c.color, br: c.br, no: c.bkno || null, sales: null, vin: c.vin, row: c });
   });
-  inv.forEach(i => { if (i.cust && !i.company) recs.push({ kind: 'dl', key: 'inv:' + i.br + ':' + i.inv, name: i.cust, date: i.idate, model: i.model, grade: i.grade, color: i.color, br: i.br, no: i.no, sales: i.sales, vin: i.vin, ddate: i.ddate, row: i }); });
+  // a fake-advance invoice (made-up buyer, car free to sell) is not this customer's deal: its car and spec must not replace the booking's
+  const advFakeInv = i => { const v = S.vehicles.get(i.vin), a = v && v.advance; return !!(a && a.kind === 'fake' && a.inv && String(a.inv).replace(/^0+/, '') === String(i.inv || '').replace(/^0+/, '')); };
+  inv.forEach(i => { if (i.cust && !i.company && !advFakeInv(i)) recs.push({ kind: 'dl', key: 'inv:' + i.br + ':' + i.inv, name: i.cust, date: i.idate, model: i.model, grade: i.grade, color: i.color, br: i.br, no: i.no, sales: i.sales, vin: i.vin, ddate: i.ddate, row: i }); });
   // every AT booking is compared with every record: a name typed with a rank or a typo at the start must still be found
   recs.forEach(r => { r.k = nameKey(r.name); r.n = r.k.n; });
   const pairs = [];
