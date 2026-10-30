@@ -792,7 +792,7 @@ const ACTIONS = {
     if (pcs.length) {
       if (m.po.items.some(i => i.grp === x.name)) { toast('เลือกชุดนี้ไว้แล้ว', 'bad'); return; }
       const tag = x.cat === 'DVP Package' ? '(DVP)' : '(แพ็คเกจ S)', gn = x.name.replace(/\s*[:(].*$/, '').trim();
-      pcs.forEach((q, i) => m.po.items.push({ name: q.name, ptag: tag, part: q.part || x.part || '', vendor: x.vendor || '', cat: x.cat || '', cost: i ? 0 : Number(x.cost) || 0, sale: i ? 0 : Number(x.sale) || 0, qty: 1, grp: x.name, note: x.cat === 'DVP Package' ? `${x.part || ''} (DVP)`.trim() : x.name, ...(i ? {} : { gp: true }) }));
+      pcs.forEach((q, i) => m.po.items.push({ name: q.name, ptag: x.cat === 'DVP Package' ? tag : '', part: q.part || (x.cat === 'DVP Package' || !i ? x.part : '') || '', vendor: x.vendor || '', cat: x.cat || '', cost: i ? 0 : Number(x.cost) || 0, sale: i ? 0 : Number(x.sale) || 0, qty: 1, grp: x.name, note: x.cat === 'DVP Package' ? `${x.part || ''} (DVP)`.trim() : x.name, ...(i ? {} : { gp: true }) }));
       const dup = m.po.items.filter(i => !i.grp && i.part && pcs.some(q => q.part && q.part === i.part));
       if (dup.length) toast(`ซ้ำกับชิ้นที่ลงไว้: ${dup.map(i => i.name).join(', ')} · ลบชิ้นเดี่ยวออกเพื่อไม่ให้นับทุนซ้ำ`, 'bad');
       render(); return;
