@@ -116,7 +116,7 @@ function flowPanel(m, a, D) {
   const finBody = () => {
     const fin = f.fin || {};
     if (isCash(r)) return '<div class="text-sm text-muted">ซื้อสด ไม่ต้องผ่านไฟแนนซ์</div>' + dealBox(a, m, D);
-    if (fl.done.fin) return `<div class="text-sm text-muted">${esc(fin.company || r.finance || '')}${r.dsp ? ' · DSP (Double Smile Plus)' : ''} อนุมัติ ${fmtD(fin.date)} ${fin.docs?.length ? `· แนบ ${fin.docs.length} รูป` : ''} · ${who(fin)}</div>${finDocsN(r) ? '' : finDocsLater(a)}${dealBox(a, m, D)}`;
+    if (fl.done.fin) return `<div class="text-sm text-muted">${esc(fin.company || r.finance || '')}${r.dsp ? ' · DSP (Double Smile Plus)' : ''} อนุมัติ ${fmtD(fin.date)} ${fin.docs?.length ? `· แนบ ${fin.docs.length} รูป` : ''} · ${who(fin)}</div>${finDocsN(r) ? finDocsEdit(a) : finDocsLater(a)}${dealBox(a, m, D)}`;
     const status = m.fin_status ?? r.fin_status ?? 'รอผล';
     const company = m.fin_company ?? fin.company ?? r.finance ?? '';
     return `<div class="text-sm text-muted mb-2">ยื่น ${esc(r.finance || '–')} สถานะตอนนี้ <b>${esc(r.fin_status || 'รอผล')}</b> · เมื่อผ่าน ให้ยืนยันบริษัทไฟแนนซ์และแนบใบอนุมัติ</div>
