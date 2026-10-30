@@ -805,6 +805,11 @@ const ACTIONS = {
     render();
   },
   'po-del'(el) { const it = S.modal.po.items, x = it[Number(el.dataset.i)]; if (x && x.grp) S.modal.po.items = it.filter(i => i.grp !== x.grp); else it.splice(Number(el.dataset.i), 1); render(); },
+  'po-quick'(el) {
+    const f = POFREQ[Number(el.dataset.i)]; if (!f || !S.modal.po) return;
+    if (f.q) { S.modal.poq = f.q; render(); return; }
+    S.modal.po.items.push({ name: f.l, part: '', vendor: '', cat: 'ใช้บ่อย', cost: f.c || 0, sale: f.c || 0, qty: 1, custom: true }); render();
+  },
   'po-custom'() { S.modal.po.items.push({ name: '', part: '', vendor: '', cat: 'เพิ่มเอง', cost: 0, sale: 0, qty: 1, custom: true }); render(); },
   async 'po-save'(el) {
     const a = atById(el.dataset.id), po = S.modal.po;

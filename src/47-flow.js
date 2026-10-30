@@ -231,6 +231,9 @@ function poAuto(a, po) {
 const poAutoCost = (a, po) => poAuto(a, po).reduce((n, x) => n + (x.fee ? Number((po.ac || {})[x.key]) || 0 : 0), 0);
 const poCharge = x => x.cpay ? (x.cprice !== undefined && x.cprice !== '' ? Number(x.cprice) || 0 : (/^ATG-/.test(x.part || '') || x.custom ? 0 : Number(x.sale) || 0)) : 0;
 const poChargeNote = x => x.cpay ? (x.cpart ? 'เรียกเก็บบางส่วน ' : 'ลูกค้าชำระเพิ่ม ') + money(poCharge(x)) : '';
+// the items sold most often: a chip searches the FOC list (q) or adds a typed line (cost can be filled in) (31/10)
+const POFREQ = [{ l: 'ฟิล์ม Xtra Cole', q: 'xtra cole' }, { l: 'พ่นกันสนิม 1 ครั้งก่อนส่งมอบ' }, { l: 'เคลือบสี 1 ครั้งก่อนส่งมอบ' }, { l: 'พ่นฆ่าเชื้อโรคก่อนส่งมอบ' }, { l: 'พรมปูพื้น', q: 'พรมปูพื้น' }, { l: 'ผ้ายางปูพื้น', q: 'ผ้ายาง' },
+  { l: 'ถาดท้ายฮอนด้า', q: 'ถาดท้าย' }, { l: 'น้ำมัน 1,200 บาท', c: 1200 }, { l: 'เซ็นเซอร์ถอย 2 จุด' }, { l: 'กล้องหน้าฮอนด้า Modulo', q: 'กล้อง' }, { l: 'ชุดเซฟตี้', q: 'safety set' }];
 const poPart = x => [x.part || x.vendor || '', x.ptag || ''].filter(Boolean).join(' ');
 const poStd = a => ['รับประกันคุณภาพรถ 3 ปี หรือ 100,000 กม.', 'บริการช่วยเหลือฉุกเฉิน 24 ชม. 3 ปี หรือ 100,000 กม.', 'ฟรีค่าแรงเช็คระยะ 10,000–20,000 กม.', ...(/e:HEV/i.test(a.model || '') ? ['รับประกันแบตเตอรี่ไฮบริด 10 ปี', 'รับประกันระบบไฮบริด 5 ปี'] : [])];
 const UCARE = 'Ultimate Care รับประกันคุณภาพเพิ่ม 2 ปี หรือ 40,000 กม.';
@@ -276,6 +279,7 @@ function poEditor(m, a, D) {
       <div class="flex flex-wrap gap-2">${ro ? '' : `<button class="btn btn-red" data-act="po-save" data-id="${esc(a.id)}">บันทึกใบสั่งแต่งรถ</button><button class="btn btn-ghost" data-act="po-custom">+ เพิ่มรายการเอง</button>`}<button class="btn btn-ghost" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button></div>
     </div>
     <div class="flex flex-col gap-2">
+      <div><div class="text-xs text-muted mb-1">ใช้บ่อย</div><div class="flex flex-wrap gap-1">${POFREQ.map((f, i) => `<button class="btn btn-ghost btn-sm" data-act="po-quick" data-i="${i}" ${ro ? 'disabled' : ''}>${esc(f.l)}</button>`).join('')}</div></div>
       <div class="field"><label for="po-q">ค้นหาในรายการ FOC (${cat.length ? cat.length + ' รายการ' : 'ยังไม่มีรายการ'})</label><input id="po-q" type="search" data-modal="poq" value="${esc(m.poq || '')}" placeholder="เช่น ฟิล์ม, พรม, 08P"></div>
       <div class="flex flex-col gap-1 max-h-[55vh] overflow-auto pr-1">${hits.map(x => `<button class="pick text-left text-sm" data-act="po-add" data-name="${esc(x.name)}" ${ro ? 'disabled' : ''}>
         <span class="flex-1 min-w-0">${esc(x.name)}<span class="block text-xs text-muted">${esc(x.cat || '')} · ${esc(x.part || x.vendor || '')} · ทุน ${money(x.cost)} · ขาย ${money(x.sale)}${x.note ? `<span class="block">${esc(x.note)}</span>` : ''}</span></span></button>`).join('') || `<p class="text-sm text-muted">${cat.length ? 'ไม่พบรายการที่ค้นหา' : 'รายการ FOC ยังไม่ได้นำเข้า'}</p>`}</div>
