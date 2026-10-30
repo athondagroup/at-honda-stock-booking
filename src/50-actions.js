@@ -788,8 +788,12 @@ const ACTIONS = {
     const x = focCatalog().find(i => i.name === el.dataset.name && codes.includes(i.model)) || focCatalog().find(i => i.name === el.dataset.name);
     if (!x) return;
     const same = m.po.items.find(i => i.name === x.name);
+    // a DVP package already holds these pieces: warn before the same part is counted twice (FOC is the package's cost)
+    const pcs = s => String(s || '').split('|').filter(Boolean), have = m.po.items;
+    const dupe = x.pieces ? have.filter(i => i.part && pcs(x.pieces).includes(i.part)) : have.filter(i => i.pieces && pcs(i.pieces).includes(x.part));
+    if (dupe.length && !same) toast(`ซ้ำกับชุดแพ็คเกจ: ${dupe.map(i => i.name).join(', ')} · ตรวจก่อนบันทึก ไม่ให้นับทุนซ้ำ`, 'bad');
     if (same) same.qty = (Number(same.qty) || 1) + 1;
-    else m.po.items.push({ name: x.name, part: x.part || '', vendor: x.vendor || '', cat: x.cat || '', cost: Number(x.cost) || 0, sale: Number(x.sale) || 0, qty: 1 });
+    else m.po.items.push({ name: x.name, part: x.part || '', vendor: x.vendor || '', cat: x.cat || '', cost: Number(x.cost) || 0, sale: Number(x.sale) || 0, qty: 1, ...(x.pieces ? { pieces: x.pieces } : {}) });
     render();
   },
   'po-del'(el) { S.modal.po.items.splice(Number(el.dataset.i), 1); render(); },

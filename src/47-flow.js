@@ -205,7 +205,7 @@ function poEditor(m, a, D) {
   const po = m.po, codes = [...(MODEL_CODES[a.model] || []), 'OT', 'ALL'];
   const cat = focCatalog();
   const q = (m.poq || '').trim().toLowerCase();
-  const hits = cat.filter(x => codes.includes(x.model) && (!q || x.name.toLowerCase().includes(q) || (x.part || '').toLowerCase().includes(q))).slice(0, 40);
+  const hits = cat.filter(x => codes.includes(x.model) && (!q || x.name.toLowerCase().includes(q) || (x.part || '').toLowerCase().includes(q) || (x.cat || '').toLowerCase().includes(q))).sort((x, y) => (y.cat === 'DVP Package') - (x.cat === 'DVP Package')).slice(0, 60);
   const cost = po.items.reduce((n, x) => n + (Number(x.cost) || 0) * (Number(x.qty) || 1), 0);
   const sale = po.items.reduce((n, x) => n + (Number(x.sale) || 0) * (Number(x.qty) || 1), 0);
   const focBudget = Number(a.rec.foc_total) || 0;
@@ -236,7 +236,7 @@ function poEditor(m, a, D) {
     <div class="flex flex-col gap-2">
       <div class="field"><label for="po-q">ค้นหาในรายการ FOC (${cat.length ? cat.length + ' รายการ' : 'ยังไม่มีรายการ'})</label><input id="po-q" type="search" data-modal="poq" value="${esc(m.poq || '')}" placeholder="เช่น ฟิล์ม, พรม, 08P"></div>
       <div class="flex flex-col gap-1 max-h-[55vh] overflow-auto pr-1">${hits.map(x => `<button class="pick text-left text-sm" data-act="po-add" data-name="${esc(x.name)}" ${ro ? 'disabled' : ''}>
-        <span class="flex-1 min-w-0">${esc(x.name)}<span class="block text-xs text-muted">${esc(x.cat || '')} · ${esc(x.part || x.vendor || '')} · ทุน ${money(x.cost)} · ขาย ${money(x.sale)}</span></span></button>`).join('') || `<p class="text-sm text-muted">${cat.length ? 'ไม่พบรายการที่ค้นหา' : 'รายการ FOC ยังไม่ได้นำเข้า'}</p>`}</div>
+        <span class="flex-1 min-w-0">${esc(x.name)}<span class="block text-xs text-muted">${esc(x.cat || '')} · ${esc(x.part || x.vendor || '')} · ทุน ${money(x.cost)} · ขาย ${money(x.sale)}${x.note ? `<span class="block">${esc(x.note)}</span>` : ''}</span></span></button>`).join('') || `<p class="text-sm text-muted">${cat.length ? 'ไม่พบรายการที่ค้นหา' : 'รายการ FOC ยังไม่ได้นำเข้า'}</p>`}</div>
     </div>
   </div>`;
 }
