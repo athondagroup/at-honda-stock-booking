@@ -83,10 +83,18 @@ function deriveNow() {
 
   // IDS bookings
   // web changes to IDS bookings (ids/bkfix) go on top of each upload
-  const idsB = X.bookings.map(idsFixApply).map(b => ({
-    ...b, key: 'ids:' + b.no, src: 'IDS', spec: specKey(b.model, b.grade, b.color),
-    match: b.match || (b.ids === CANCEL ? 'cancel' : b.vin ? 'car' : (b.ref || b.ws) ? 'quota' : 'waiting')
-  }));
+  // an invoice / delivery (DL) that carries this booking's number: the car is already IDS-allocated and sold, even if the
+  // booking file is older and still shows no frame number (so it must not sit in the "รอรถ" queue)
+  const invByNo = new Map();
+  X.inv.forEach(i => { if (i.no && i.vin && !i.company) invByNo.set(String(i.no), i); });
+  const idsB = X.bookings.map(idsFixApply).map(b => {
+    const iv = !b.vin && b.ids !== CANCEL ? invByNo.get(String(b.no)) : null;
+    if (iv) b = { ...b, vin: iv.vin };
+    return {
+      ...b, key: 'ids:' + b.no, src: 'IDS', spec: specKey(b.model, b.grade, b.color),
+      match: b.match || (b.ids === CANCEL ? 'cancel' : b.vin ? 'car' : (b.ref || b.ws) ? 'quota' : 'waiting')
+    };
+  });
   const bkByVin = new Map(), bkByNo = new Map();
   idsB.forEach(b => { if (b.match !== 'cancel' && b.vin) bkByVin.set(b.vin, b); bkByNo.set(b.no, b); });
 
