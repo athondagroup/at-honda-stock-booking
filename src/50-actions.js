@@ -797,7 +797,7 @@ const ACTIONS = {
   async 'po-save'(el) {
     const a = atById(el.dataset.id), po = S.modal.po;
     if (!a || !po) return;
-    if (!stepAllowed(a, 'po') || poLocked(a) || !(stepOpen(a, 'po') || a.flow.done.po || a.flow.poSkip || S.modal.ret)) { toast('ทำใบสั่งแต่งรถ ได้หลังจัดสรรรถ และก่อนส่งมอบ', 'bad'); return; }
+    if (!stepAllowed(a, 'po') || poLocked(a) || !(stepOpen(a, 'po') || a.flow.done.po || a.flow.poSkip || S.modal.ret)) { toast('ทำใบสั่งแต่งรถ ได้ก่อนส่งมอบ (ข้ามขั้นก่อนหน้าได้)', 'bad'); return; }
     const items = po.items.map(x => ({ ...x, name: String(x.name || '').trim(), qty: Math.max(1, parseInt(x.qty, 10) || 1) })).filter(x => x.name);
     if (!items.length) { toast('ใส่รายการแต่งอย่างน้อย 1 รายการ (ถ้าไม่มีแต่ง ใส่ "ไม่มีรายการแต่ง")', 'bad'); return; }
     const prev = a.rec.flow && a.rec.flow.po;

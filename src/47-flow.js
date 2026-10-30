@@ -13,7 +13,7 @@ function focCatalog() {
 const canEditBooking = a => isMine(a.sales) || adminOwns(a) || canApproveBr(a.br);
 // a step can be done when it is the next one, or when IDS already delivered the car this month (late update) and the step is still missing:
 // the sales / admin must fill the earlier steps in, nothing else blocks them
-function stepOpen(a, k) { return a.flow.next === k || (!!a.flow.lateUpdate && !a.flow.done[k] && !a.flow.history && k !== 'delivered' && k !== 'confirmed'); }
+function stepOpen(a, k) { return a.flow.next === k || (k === 'po' && !a.flow.done.po && !a.flow.history) || (!!a.flow.lateUpdate && !a.flow.done[k] && !a.flow.history && k !== 'delivered' && k !== 'confirmed'); }
 function stepAllowed(a, k) {
   const p = perms();
   if (!p.write || a.cancelled) return false;
