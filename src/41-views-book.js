@@ -44,6 +44,7 @@ function bookRows(D) {
     if (a.demo) continue;
     const ib = a.ids || a.idsLeft;   // a cancelled booking keeps its IDS booking that is still open (one row, not two)
     if (ib) used.add(ib.key);
+    ((a.match && a.match.alt) || []).forEach(x => used.add(x.key)); ((a.rec && a.rec.ids_alt) || []).forEach(k => used.add(k));   // the old number IDS replaced: same booking, no second row
     rows.push({ key: a.key, a, b: ib || null, row: a.row, date: a.date, no: a.no, cust: a.cust, owner: a.sales, idsSales: a.idsSales, br: a.br, spec: a.spec, model: a.model, vin: a.match && a.match.vin });
   }
   for (const b of D.idsB) {

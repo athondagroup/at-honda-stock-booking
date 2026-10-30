@@ -60,7 +60,7 @@ function atModal(m, D) {
   const mm = a.match;
   const matchInfo = mm ? `<div class="p-3 rounded-lg text-sm" style="background:var(--surface-2)"><b>พบใน IDS</b>${mm.status === 'possible' ? ` <span style="color:var(--warn)">(ชื่อตรงแต่รุ่นใน IDS คือ ${esc(mm.idsModel)} ${esc(mm.idsGrade || '')})</span>` : ''}
       ${mm.recs.map(x => `<div>· ${{ booking: 'Booking IDS', stock: 'Stock IDS', dl: 'Invoice/DL' }[x.kind]} ${x.no ? `เลขที่ใบจอง <span class="code">${esc(x.no)}</span>` : ''} ${x.kind === 'dl' && mm.ddate ? `ส่งมอบ ${fmtD(mm.ddate)}` : ''} ${x.vin ? `<span class="code">${esc(x.vin)}</span>` : ''}</div>`).join('')}
-      ${(mm.alt || []).map(x => `<div class="text-xs text-muted">เลขเดิมที่ IDS ออกใหม่แทน: <span class="code">${esc(x.no || '')}</span> ${fmtD(x.date)}${x.row && x.row.ids ? ' · ' + esc(x.row.ids) : ''}</div>`).join('')}
+      ${(mm.alt || []).map(x => `<div class="text-xs text-muted">เลขเดิมที่ IDS ออกใหม่แทน${mm.autoAlt ? ' (ระบบจับให้เอง)' : ''}: <span class="code">${esc(x.no || '')}</span> ${fmtD(x.date)}${x.row && x.row.ids ? ' · ' + esc(x.row.ids) : ''}</div>`).join('')}
       ${mm.manual ? `<div class="text-xs text-muted">จับคู่โดยคนยืนยัน · ${who(r.match_pick || {})} ${fmtDT(r.match_pick?.at)}</div>` : ''}
       ${a.specFromIds ? `<div class="text-xs text-muted">ใช้รุ่น เกรด สี ตาม IDS (ฟอร์ม AT ลงไว้ ${esc(a.atSpec.model)} ${esc(gradeShort(a.atSpec.model, a.atSpec.grade) || '')} ${esc(a.atSpec.color || '')}) คิวเดิม · ลูกค้าเปลี่ยนรุ่นให้แก้ใน IDS</div>` : ''}</div>
       ${a.matchAsk ? matchAskBox(a) : ''}`

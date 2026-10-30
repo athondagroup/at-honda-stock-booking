@@ -133,7 +133,21 @@ function matchForms(at, idsB, cars, inv) {
     const no = new Set(a.rec.dup_no || []), ak = nameKey(bk.name || a.cust);
     const y = idsOnly.find(x => x.key !== bk.key && !no.has(x.key) && x.cust && keyScore(ak, nameKey(x.cust)) >= 2 && x.model === bk.model && x.grade === bk.grade
       && String(x.color || '').toUpperCase() === String(bk.color || '').toUpperCase() && x.br === bk.br);
-    if (y) { dupAsk.set(a.key, { bk, y }); y.dupOf = a; }
+    if (!y) continue;
+    // sure case: one number is 'postponed' with no car, the other is live with a car: IDS re-issued the booking. No one needs to click.
+    const live = r => !!((r.row && r.row.vin) || r.vin), post = r => !!(r.ids === 'เลื่อนการรับรถ' || (r.row && r.row.ids === 'เลื่อนการรับรถ')) && !live(r);
+    const yr = recs.find(x => x.key === y.key);
+    if (yr && ((post(y) && live(bk)) || (post(bk) && live(y)))) {
+      if (post(bk)) {
+        res.recs = res.recs.map(r => r === bk ? yr : r);
+        res.no = yr.no || res.no; res.idsSales = yr.sales || res.idsSales; res.vin = res.recs.find(r => r.vin)?.vin || null;
+        if (res.recs[0] === yr) { res.idsBr = yr.br; res.idsModel = yr.model; res.idsGrade = yr.grade; res.idsColor = yr.color; res.kind = 'booking'; }
+      }
+      const old = post(bk) ? bk : yr;
+      (res.alt = res.alt || []).push(old); res.autoAlt = true; idsOnly = idsOnly.filter(x => x.key !== y.key);
+      continue;
+    }
+    dupAsk.set(a.key, { bk, y }); y.dupOf = a;
   }
   // unmatched AT bookings: records anywhere in IDS (any branch, model or date) with the same or a contained name,
   // so the admin can see e.g. the customer already took a different car on another booking
