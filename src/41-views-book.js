@@ -183,32 +183,52 @@ function queueCard(b, D) {
     <div class="ml-auto flex gap-2 items-center justify-end md:w-44">${b.app && (!isSales() || isMine(b.owner)) ? `<button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(b.app.id)}">เปิดใบจอง</button>` : ''}${canReq ? `${(D.specs[b.spec]?.free || 0) > 0 ? '' : '<span class="text-xs text-muted">สเปกนี้ยังไม่มีรถว่าง</span>'}<button class="btn btn-ghost btn-sm" data-act="lock-open" data-bk="${esc(b.key)}">ขอล็อกรถ</button>` : ''}</div>
   </div>`;
 }
+// the waiting-queue tab: every booking in one Excel-like table (per-column filter, click a header to sort)
+const QT_ORDER = { waiting: 0, pending: 1, locked: 2, allocated: 3, idsquota: 4, idscar: 5 };
+const QT_COLS = [['st', 'สถานะ/คิว', 'sel'], ['date', 'วันจอง', 'txt'], ['cust', 'ลูกค้า', 'txt'], ['model', 'รุ่น', 'sel'], ['grade', 'เกรด', 'sel'], ['color', 'สี', 'sel'], ['sales', 'เซลล์', 'txt'], ['br', 'สาขา', 'sel'], ['no', 'เลขใบจอง', 'txt'], ['dep', 'มัดจำ/ฟอร์ม', 'sel']];
+function qtVals(b) {
+  const mine = !isSales() || isMine(b.owner);
+  const dep = b.app ? (b.app.rec.imported ? 'มีใบจองในฟอร์ม' : (b.app.deposit > 0 && b.app.slip ? 'มีมัดจำ+สลิป' : 'ยังไม่มีมัดจำ/สลิป')) : (b.src === 'IDS' ? 'ยังไม่มีฟอร์ม AT' : '–');
+  const lab = (BOOK_STATE[b.state] || [b.state])[0];
+  return { st: b.state === 'waiting' ? `${lab} คิวที่ ${b.pos}` : lab, so: (QT_ORDER[b.state] ?? 9) * 100000 + (b.pos || 0), date: b.date || '', cust: mine ? (b.cust || '') : '', model: b.model || '', grade: b.grade || '', color: b.color || '', sales: (b.app ? b.app.sales : null) || (b.src === 'IDS' ? b.sales : b.idsSales) || '', br: b.br || '', no: b.no || '', dep };
+}
+function qtData(D) {
+  const t = S.qt || (S.qt = { f: {}, s: { c: 'spec', d: 1 } });
+  if (S.filters.qModel) { t.f.model = S.filters.qModel; S.filters.qModel = ''; }
+  let all = D.bookings.filter(b => b.state !== 'cancel' && inBr(b));
+  if (isSales()) all = all.filter(b => isMine(b.owner));
+  all = all.map(b => ({ b, v: qtVals(b) }));
+  let rows = all.filter(r => QT_COLS.every(([k, , ty]) => { const q = (t.f[k] || '').trim().toLowerCase(); if (!q) return true; const x = String(k === 'date' ? fmtD(r.v.date) + ' ' + r.v.date : r.v[k]).toLowerCase(); return ty === 'sel' ? x === q || (k === 'st' && x.startsWith(q)) : x.includes(q); }));
+  const c = t.s.c, d = t.s.d;
+  const key = r => c === 'spec' ? [r.v.model, r.v.grade, r.v.color, String(r.v.so).padStart(8, '0')].join('|') : c === 'st' ? String(r.v.so).padStart(8, '0') : r.v[c];
+  rows.sort((x, y) => (String(key(x)).localeCompare(String(key(y)), 'th', { numeric: true }) * d) || (x.v.so - y.v.so) || (x.v.date || '').localeCompare(y.v.date || ''));
+  return { t, all, rows };
+}
+function qtBody(D) {
+  const { rows } = qtData(D), p = perms();
+  return `<tbody id="qt-tb">${rows.slice(0, 1000).map(({ b, v }) => {
+    const canReq = p.write && p.request && b.state === 'waiting' && (!isSales() || isMine(b.owner)) && branchOk(b.br);
+    return `<tr><td class="whitespace-nowrap">${b.state === 'waiting' ? chip(`รอรถ คิวที่ ${b.pos}`, 'warn') : statusChip(BOOK_STATE, b.state)}</td><td class="num whitespace-nowrap">${fmtD(b.date)}</td><td>${custCell(b.cust, b.owner, { seed: b.seed })}</td><td>${esc(v.model)}</td><td>${esc(v.grade)}</td><td>${esc(v.color)}</td><td>${esc(v.sales)}</td><td>${esc(v.br)}</td><td class="code">${esc(v.no) || '<span style="color:var(--warn)">ยังไม่มี</span>'}</td><td class="text-xs">${esc(v.dep)}</td>
+      <td class="whitespace-nowrap">${b.app && (!isSales() || isMine(b.owner)) ? `<button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(b.app.id)}">เปิดใบจอง</button>` : ''}${canReq ? ` <button class="btn btn-ghost btn-sm" data-act="lock-open" data-bk="${esc(b.key)}">ขอล็อกรถ</button>` : ''}</td></tr>`;
+  }).join('') || `<tr><td colspan="11" class="p-3 text-muted">ไม่พบใบจองตามตัวกรองนี้</td></tr>`}</tbody>`;
+}
+function qtCount(D) { const { all, rows } = qtData(D), f = Object.values(S.qt.f).some(x => x); return (f ? `แสดง ${rows.length} จาก ${all.length}` : `${all.length}`) + ' ใบ' + (rows.length > 1000 ? ' (แสดง 1,000 แรก)' : ''); }
 function queueList(D) {
-  const f = S.filters;
-  let bks = D.bookings.filter(b => b.state !== 'cancel' && inBr(b));
-  if (f.qModel) bks = bks.filter(b => b.model === f.qModel);
-  const mineOnly = isSales();
-  const groups = {};
-  bks.forEach(b => (groups[b.spec] ||= []).push(b));
-  const order = { waiting: 0, pending: 1, locked: 2, allocated: 3, idsquota: 4, idscar: 5 };
-  let keys = Object.keys(groups).sort((a, b) => ((D.specs[a]?.low ? 0 : 1) - (D.specs[b]?.low ? 0 : 1)) || a.localeCompare(b));
-  if (mineOnly) keys = keys.filter(k => groups[k].some(b => isMine(b.owner)));
-  return `
-  <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
-    <div class="field"><label for="q-model">รุ่น</label><select id="q-model" data-filter="qModel"><option value="">ทุกรุ่น</option>${Object.keys(CATALOG).map(m => `<option ${f.qModel === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
-  </div>
-  <p class="text-sm text-muted mb-3">คิวนับรวมทุกสาขาตามสเปก เรียงตามวันที่จอง${mineOnly ? ' · เซลล์เห็นเฉพาะใบจองของตัวเองและลำดับคิว' : ''}</p>
-  <div class="flex flex-col gap-4">${keys.map(k => {
-    const s = D.specs[k] || { free: 0, waiting: 0, incoming: 0 };
-    const list = groups[k].sort((a, b) => (order[a.state] - order[b.state]) || (a.pos || 0) - (b.pos || 0) || (a.date || '').localeCompare(b.date || ''));
-    const shown = mineOnly ? list.filter(b => isMine(b.owner)) : list;
-    return `<section class="bg-surface border ${s.low ? 'border-red' : 'border-line'} rounded-lg overflow-hidden">
-      <div class="px-4 py-2 flex flex-wrap gap-x-4 items-center ${s.low ? 'bg-redsoft' : 'bg-surface2'}">
-        <h3 class="font-head font-semibold">${specLabel(k)}</h3>
-        <span class="text-sm">รอรถ <b class="num">${s.waiting}</b> · ว่าง <b class="num">${s.free}</b> · Quota ว่าง <b class="num">${s.incoming}</b></span>
-        ${s.short ? '<span class="text-sm font-semibold" style="color:var(--bad)">รถไม่พอคิว</span>' : ''}</div>
-      <div class="divide-y divide-line">${shown.map(b => queueCard(b, D)).join('')}</div></section>`;
-  }).join('') || `<div class="bg-surface border border-line rounded-lg">${emptyBox('ไม่มีใบจองตามตัวกรองนี้', 'ลองเลือกรุ่นอื่นหรือล้างตัวกรอง')}</div>`}</div>`;
+  const { t, all } = qtData(D), W = all.filter(x => x.b.state === 'waiting').length;
+  const opts = k => [...new Set(all.map(r => k === 'st' ? (BOOK_STATE[r.b.state] || [r.b.state])[0] : r.v[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th'));
+  const sortTh = ([k, l]) => `<th class="whitespace-nowrap"><button data-act="qt-sort" data-c="${k}" class="font-semibold">${l}${t.s.c === k ? (t.s.d > 0 ? ' ▲' : ' ▼') : ''}</button></th>`;
+  const fTh = ([k, , ty]) => `<th>${ty === 'sel' ? `<select data-qt="${k}" class="text-xs w-full" style="min-width:70px"><option value="">ทั้งหมด</option>${opts(k).map(o => `<option ${t.f[k] === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>` : `<input data-qt="${k}" value="${esc(t.f[k] || '')}" placeholder="กรอง" class="text-xs w-full" style="min-width:70px">`}</th>`;
+  return `<p class="text-sm text-muted mb-3">ใบจองทุกใบรวมทุกสาขา · <b class="num" id="qt-cnt">${qtCount(D)}</b> (รอรถ <b class="num">${W}</b>) · กดหัวคอลัมน์เพื่อเรียง (วันจอง รุ่น เกรด สี ฯลฯ) · เลือก/พิมพ์ใต้หัวคอลัมน์เพื่อกรอง${isSales() ? ' · เซลล์เห็นเฉพาะใบจองของตัวเอง' : ''}
+    <button class="underline ml-2" data-act="qt-clear">ล้างตัวกรอง</button> <button class="underline ml-2" data-act="qt-sort" data-c="spec">เรียงตามรุ่น เกรด สี</button></p>
+  <div class="bg-surface border border-line rounded-lg scroll-x" style="max-height:70vh;overflow:auto"><table><thead><tr>${QT_COLS.map(sortTh).join('')}<th></th></tr><tr>${QT_COLS.map(fTh).join('')}<th></th></tr></thead>${qtBody(D)}</table></div>`;
+}
+document.addEventListener('input', e => qtEvt(e));
+document.addEventListener('change', e => qtEvt(e));
+function qtEvt(e) {
+  const k = e.target && e.target.dataset && e.target.dataset.qt; if (!k || !S.qt) return;
+  e.stopPropagation(); S.qt.f[k] = e.target.value;
+  const D = derive(), tb = document.getElementById('qt-tb'), c = document.getElementById('qt-cnt');
+  if (tb) tb.outerHTML = qtBody(D); if (c) c.textContent = qtCount(D);
 }
 
 // ---------- booking summary for executives and managers (sales see counts only)

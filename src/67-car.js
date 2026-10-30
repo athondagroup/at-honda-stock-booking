@@ -157,3 +157,7 @@ Object.assign(ACTIONS, {
   'car-open'(el) { const back = S.modal && S.modal.kind !== 'car' ? S.modal : null; S.modal = { kind: 'car', vin: el.dataset.vin, back }; render(); },
   'car-back'() { S.modal = (S.modal && S.modal.back) || null; render(); }
 });
+Object.assign(ACTIONS, {
+  'qt-sort'(el) { const t = S.qt || (S.qt = { f: {}, s: { c: 'spec', d: 1 } }), c = el.dataset.c; t.s = { c, d: t.s.c === c && c !== 'spec' ? -t.s.d : 1 }; render(); },
+  'qt-clear'() { if (S.qt) S.qt.f = {}; S.filters.qModel = ''; render(); }
+});
