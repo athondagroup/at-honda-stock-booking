@@ -23,17 +23,20 @@ function matchChip(a) {
 }
 
 // ---------- bookings: one list for AT Honda forms and IDS bookings, paired
+function viewSold(D) {
+  return `${pageHead('ส่งมอบ / แจ้งขาย', 'รถที่ออกใบกำกับภาษีแล้วหรือส่งมอบแล้ว', '')}${brSeg()}${soldList(D)}`;
+}
 function viewBook(D) {
   const p = perms();
-  if (S.sub.book === 'ids' || S.sub.book === 'at') S.sub.book = 'list';
+  if (S.sub.book === 'ids' || S.sub.book === 'at' || S.sub.book === 'sold') S.sub.book = 'list';
   if (S.sub.book === 'new' && !p.book) S.sub.book = 'list';
   const sub = S.sub.book;
   const body = sub === 'new' ? bookingForm(D) : sub === 'steps' ? flowBody(D) : sub === 'queue' ? queueList(D) : sub === 'summary' ? summaryView(D) : sub === 'cancels' ? cancelHistory(D) : sub === 'sold' ? soldList(D) : gsBookBox(D) + bookList(D);
   const active = bookRows(D).filter(r => rowState(r, D, 'active')).length;
   return `
   ${pageHead('Booking', 'ใบจอง AT Honda กับ Booking IDS อยู่ในรายการเดียว ระบบจับคู่ด้วยชื่อลูกค้า รุ่น และวันที่ เจ้าของเคสตามฟอร์ม AT Honda รุ่น เกรด สี ตาม IDS',
-    (sub === 'new' ? '' : `<div class="flex flex-wrap gap-2">${tgtCanEdit() ? `<button class="btn btn-ghost" data-act="tgt-open">ใส่/แก้เป้า</button>` : ''}${p.book ? `<button class="btn btn-red" data-act="sub" data-key="book" data-sub="new">+ ใบจอง AT Honda</button>` : ''}</div>`))}
-  ${tabs('book', [['list', 'ใบจอง', String(active)], ['steps', 'ตามขั้นตอนส่งมอบ'], ['queue', 'คิวรอรถ'], ['sold', 'ส่งมอบ / แจ้งขาย'], ['summary', 'สรุปจอง'], ['cancels', 'ประวัติยกเลิก'], ...(p.book ? [['new', '+ ใบจองใหม่']] : [])])}
+    (sub === 'new' ? '' : `<div class="flex flex-wrap gap-2">${p.book ? `<button class="btn btn-red" data-act="sub" data-key="book" data-sub="new">+ ใบจอง AT Honda</button>` : ''}</div>`))}
+  ${tabs('book', [['list', 'ใบจอง', String(active)], ['queue', 'คิวรอรถ'], ['summary', 'สรุปจอง'], ['steps', 'ตามขั้นตอนส่งมอบ'], ['cancels', 'ประวัติยกเลิก'], ...(p.book ? [['new', '+ ใบจองใหม่']] : [])])}
   ${sub === 'new' ? '' : brSeg()}${body}`;
 }
 // every AT form (with its IDS booking when paired) plus IDS bookings that have no form
@@ -185,7 +188,7 @@ function queueCard(b, D) {
 }
 // the waiting-queue tab: every booking in one Excel-like table (per-column filter, click a header to sort)
 const QT_ORDER = { waiting: 0, pending: 1, locked: 2, allocated: 3, idsquota: 4, idscar: 5 };
-const QT_COLS = [['st', 'สถานะ/คิว', 'sel'], ['date', 'วันจอง', 'txt'], ['cust', 'ลูกค้า', 'txt'], ['model', 'รุ่น', 'sel'], ['grade', 'เกรด', 'sel'], ['color', 'สี', 'sel'], ['sales', 'เซลล์', 'txt'], ['br', 'สาขา', 'sel'], ['no', 'เลขใบจอง', 'txt'], ['dep', 'มัดจำ/ฟอร์ม', 'sel']];
+const QT_COLS = [['st', 'สถานะ/คิว', 'sel'], ['date', 'วันจอง', 'txt'], ['cust', 'ลูกค้า', 'txt'], ['model', 'รุ่น', 'sel'], ['grade', 'เกรด', 'sel'], ['color', 'สี', 'sel'], ['sales', 'เซลล์', 'sel'], ['br', 'สาขา', 'sel'], ['no', 'เลขใบจอง', 'txt'], ['dep', 'มัดจำ/ฟอร์ม', 'sel']];
 function qtVals(b) {
   const mine = !isSales() || isMine(b.owner);
   const dep = b.app ? (b.app.rec.imported ? 'มีใบจองในฟอร์ม' : (b.app.deposit > 0 && b.app.slip ? 'มีมัดจำ+สลิป' : 'ยังไม่มีมัดจำ/สลิป')) : (b.src === 'IDS' ? 'ยังไม่มีฟอร์ม AT' : '–');
@@ -216,15 +219,17 @@ function qtCount(D) { const { all, rows } = qtData(D), f = Object.values(S.qt.f)
 function queueList(D) {
   const { t, all } = qtData(D), W = all.filter(x => x.b.state === 'waiting').length;
   const opts = k => [...new Set(all.map(r => k === 'st' ? (BOOK_STATE[r.b.state] || [r.b.state])[0] : r.v[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th'));
-  const sortTh = ([k, l]) => `<th class="whitespace-nowrap"><button data-act="qt-sort" data-c="${k}" class="font-semibold">${l}${t.s.c === k ? (t.s.d > 0 ? ' ▲' : ' ▼') : ''}</button></th>`;
+  const sortTh = ([k, l]) => `<th class="whitespace-nowrap"><button data-act="qt-sort" data-c="${k}" class="font-semibold">${l}${t.s.c === k ? (t.s.d > 0 ? ' ▲' : ' ▼') : ' <span class="text-muted">⇅</span>'}</button></th>`;
   const fTh = ([k, , ty]) => `<th>${ty === 'sel' ? `<select data-qt="${k}" class="text-xs w-full" style="min-width:70px"><option value="">ทั้งหมด</option>${opts(k).map(o => `<option ${t.f[k] === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>` : `<input data-qt="${k}" value="${esc(t.f[k] || '')}" placeholder="กรอง" class="text-xs w-full" style="min-width:70px">`}</th>`;
   return `<p class="text-sm text-muted mb-3">ใบจองทุกใบรวมทุกสาขา · <b class="num" id="qt-cnt">${qtCount(D)}</b> (รอรถ <b class="num">${W}</b>) · กดหัวคอลัมน์เพื่อเรียง (วันจอง รุ่น เกรด สี ฯลฯ) · เลือก/พิมพ์ใต้หัวคอลัมน์เพื่อกรอง${isSales() ? ' · เซลล์เห็นเฉพาะใบจองของตัวเอง' : ''}
-    <button class="underline ml-2" data-act="qt-clear">ล้างตัวกรอง</button> <button class="underline ml-2" data-act="qt-sort" data-c="spec">เรียงตามรุ่น เกรด สี</button></p>
+    <button class="underline ml-2" data-act="qt-clear">ล้างตัวกรอง</button></p>
+  <div class="field mb-3" style="max-width:280px"><label for="qt-sortsel">เรียงตาม</label><select id="qt-sortsel" data-qtsort="1">${[['spec:1', 'รุ่น → เกรด → สี → คิว'], ['date:1', 'วันจอง น้อยไปมาก (เก่า → ใหม่)'], ['date:-1', 'วันจอง มากไปน้อย (ใหม่ → เก่า)'], ['cust:1', 'ลูกค้า ก → ฮ'], ['cust:-1', 'ลูกค้า ฮ → ก'], ['sales:1', 'เซลล์ ก → ฮ'], ['sales:-1', 'เซลล์ ฮ → ก'], ['model:1', 'รุ่น ก → ฮ / A → Z'], ['grade:1', 'เกรด'], ['color:1', 'สี'], ['st:1', 'สถานะ/คิว']].map(([v, l]) => `<option value="${v}" ${v === t.s.c + ':' + t.s.d ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
   <div class="bg-surface border border-line rounded-lg scroll-x" style="max-height:70vh;overflow:auto"><table><thead><tr>${QT_COLS.map(sortTh).join('')}<th></th></tr><tr>${QT_COLS.map(fTh).join('')}<th></th></tr></thead>${qtBody(D)}</table></div>`;
 }
 document.addEventListener('input', e => qtEvt(e));
 document.addEventListener('change', e => qtEvt(e));
 function qtEvt(e) {
+  if (e.target && e.target.dataset && e.target.dataset.qtsort && S.qt) { e.stopPropagation(); const [c, d] = e.target.value.split(':'); S.qt.s = { c, d: Number(d) }; render(); return; }
   const k = e.target && e.target.dataset && e.target.dataset.qt; if (!k || !S.qt) return;
   e.stopPropagation(); S.qt.f[k] = e.target.value;
   const D = derive(), tb = document.getElementById('qt-tb'), c = document.getElementById('qt-cnt');
