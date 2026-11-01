@@ -188,7 +188,7 @@ function termsCheck(x, v) {
 }
 // the sale on a booking: model, cash/finance, booking date, the invoice (or the Advance invoice) of its car
 function termsCtxAt(a, D) {
-  const vin = atVin(a), adv = vin ? advRec(vin) : null, inv = adv ? adv.idate : (vin && D.invByVin.get(vin) && D.invByVin.get(vin).idate) || null;
+  const vin = atVin(a), adv = vin ? advRec(vin) : null, inv = adv ? adv.idate : (vin && D.invByVin.get(vin) && D.invByVin.get(vin).idate) || (a.rec.inv_man && a.rec.inv_man.idate) || null;
   return { model: a.model, grade: a.grade, color: a.color, cash: isCash(a.rec), bookDate: a.date || a.rec.booking_date || null, inv: inv || null, adv: !!adv };
 }
 // ---- the booking form: the same fields, price from the price list and the discount from the booking's own field

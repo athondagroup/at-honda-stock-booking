@@ -6,7 +6,9 @@ function soldInv(a, D) {
   const vin = atVin(a); if (!vin) return null;
   const adv = advRec(vin); if (adv) return { idate: adv.idate, inv: adv.inv, adv: true, ibr: advBr(vin, adv, D) || '' };
   const i = D.invByVin.get(vin);
-  return i && !i.company ? { idate: i.idate, inv: i.inv, ddate: i.ddate, ibr: i.br || '' } : null;
+  if (i && !i.company) return { idate: i.idate, inv: i.inv, ddate: i.ddate, ibr: i.br || '' };
+  const m = a.rec.inv_man;   // typed by hand until the DL file has the car (1/11)
+  return m && m.idate ? { idate: m.idate, inv: null, ddate: m.ddate || undefined, ibr: a.br || '', manual: true } : null;
 }
 function soldStatus(a) {
   const d = a.rec.deal || {}, fl = a.flow || {};

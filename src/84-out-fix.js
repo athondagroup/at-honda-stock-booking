@@ -5,7 +5,7 @@
 // incomplete). Locks still open on those cars: cancel them (the booking waits for another car) or keep them, picked by name. The answer is kept on the upload record,
 // and on the car, so the next Stock upload gives the reason instead of flagging it again.
 // Only function declarations here: the first render runs before this part of the file.
-function outFixReasons() { return [['other_br', 'ขายให้สาขาอื่น'], ['dealer', 'ขาย/แลกดีลเลอร์'], ['other', 'นำออก (อื่น ๆ)'], ['still', 'ยังอยู่ (ไฟล์ Stock ไม่ครบ)']]; }
+function outFixReasons() { return [['other_br', 'ขายให้สาขาอื่น'], ['dealer', 'ขาย/แลกดีลเลอร์'], ['other', 'นำออก (อื่น ๆ)'], ['still', 'ยังอยู่ (ไฟล์ Stock ไม่ครบ)'], ['taken', 'ลูกค้ารับรถแล้ว (รอใบกำกับ IDS)']]; }
 function outFixWhy(r) { const t = (outFixReasons().find(x => x[0] === r.reason) || [, r.reason])[1]; return t + (r.text ? ' · ' + r.text : ''); }
 // a car flagged by an older upload that a later Stock file of the same branch lists again never left (the older file
 // was incomplete): it is no longer a question
@@ -29,7 +29,7 @@ function outFixList(u) {
       <div class="flex flex-wrap gap-2 mb-2"><button class="btn btn-ghost btn-sm" data-act="outfix-all" data-id="${esc(u.id)}" data-v="1">เลือกทั้งหมด</button><button class="btn btn-ghost btn-sm" data-act="outfix-all" data-id="${esc(u.id)}" data-v="">ไม่เลือกเลย</button></div>
       <div class="flex flex-wrap gap-3 items-end">
         <div class="field"><label for="of-r">ไปไหน</label><select id="of-r" data-outfixf="reason">${outFixReasons().map(([k, t]) => `<option value="${k}" ${(F && F.reason || 'other_br') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
-        ${(F && F.reason || 'other_br') === 'other_br' ? `<div class="field"><label for="of-b" class="req">ขายให้สาขาไหน</label><select id="of-b" data-outfixf="text"><option value="">เลือกสาขา</option>${BRS.filter(b => b !== u.br).map(b => `<option value="${b}" ${(F && F.text) === b ? 'selected' : ''}>${b} ${esc(BR[b].name)}</option>`).join('')}</select></div>`
+        ${(F && F.reason) === 'taken' ? outTakenFields(u, sel, F) : (F && F.reason || 'other_br') === 'other_br' ? `<div class="field"><label for="of-b" class="req">ขายให้สาขาไหน</label><select id="of-b" data-outfixf="text"><option value="">เลือกสาขา</option>${BRS.filter(b => b !== u.br).map(b => `<option value="${b}" ${(F && F.text) === b ? 'selected' : ''}>${b} ${esc(BR[b].name)}</option>`).join('')}</select></div>`
           : (F && F.reason) === 'dealer' ? `<div class="field"><label for="of-d" class="req">ชื่อดีลเลอร์</label><input id="of-d" data-outfixf="text" value="${esc(F.text || '')}"></div>`
           : `<div class="field"><label for="of-n">หมายเหตุ</label><input id="of-n" data-outfixf="text" value="${esc(F && F.text || '')}"></div>`}
         ${outFixLockField(sel, F)}
@@ -51,6 +51,7 @@ function outFixLockField(sel, F) {
 function outFixState(id) { if (!S.outFix || S.outFix.id !== id) S.outFix = { id, sel: {}, reason: 'other_br', text: '', closeLocks: true }; return S.outFix; }
 async function outFixSave(id) {
   const F = S.outFix, u0 = S.uploads.get(id); if (!F || F.id !== id || !u0 || !canAllocBr(u0.br) || !perms().write || F.busy) return;
+  if (F.reason === 'taken') { await outTakenSave(id); return; }
   const vins = (u0.out || []).filter(o => outOpen(u0, o) && F.sel[o.vin]).map(o => o.vin); if (!vins.length) return;
   const text = (F.text || '').trim();
   if (F.reason === 'dealer' && !text) { toast('ใส่ชื่อดีลเลอร์', 'bad'); return; }
@@ -90,6 +91,6 @@ Object.assign(ACTIONS, {
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t || !t.dataset) return;
   if (t.dataset.outfix) { const F = outFixState(t.dataset.outfix); F.sel[t.dataset.vin] = t.checked; render(); return; }
-  if (t.dataset.outfixf && S.outFix) { const k = t.dataset.outfixf; S.outFix[k] = t.type === 'checkbox' ? t.checked : t.value; if (k === 'reason') { S.outFix.closeLocks = t.value !== 'still'; S.outFix.text = ''; render(); } else if (k === 'lockAct') { S.outFix.closeLocks = t.value === 'release'; render(); } }
+  if (t.dataset.outfixf && S.outFix) { const k = t.dataset.outfixf; S.outFix[k] = t.type === 'checkbox' ? t.checked : t.value; if (k === 'reason') { S.outFix.closeLocks = t.value !== 'still' && t.value !== 'taken'; S.outFix.text = ''; render(); } else if (k === 'lockAct') { S.outFix.closeLocks = t.value === 'release'; render(); } }
 });
 document.addEventListener('input', ev => { const t = ev.target; if (t && t.dataset && t.dataset.outfixf === 'text' && S.outFix) S.outFix.text = t.value; });

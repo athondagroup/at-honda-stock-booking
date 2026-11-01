@@ -185,7 +185,7 @@ function flowPanel(m, a, D) {
   function delivForm() {
     const v = m.deliv || {}, dv = f.delivered || {};
     return `      <div class="grid sm:grid-cols-3 gap-3 items-end mt-1">
-      <div class="field"><label for="fl-dd" class="req">วันที่ส่งมอบรถ (ลูกค้ารับรถจริง)</label><input id="fl-dd" type="date" data-modal="deliv.date" value="${esc(v.date ?? (fl.deliveredDate || ''))}" max="${todayISO()}"></div>
+      <div class="field"><label for="fl-dd" class="req">วันที่ส่งมอบรถ (ลูกค้ารับรถจริง)</label><input id="fl-dd" type="date" data-modal="deliv.date" value="${esc(v.date ?? (fl.deliveredDate || (a.rec.inv_man && a.rec.inv_man.ddate) || ''))}" max="${todayISO()}"></div>
       <div class="field"><label for="fl-pl" class="req">เลขทะเบียนป้ายแดง</label><input id="fl-pl" data-modal="deliv.plate" value="${esc(v.plate ?? dv.plate ?? '')}" placeholder="เช่น ป-1234 นครปฐม" autocomplete="off"></div>
 </div>
       ${tradeDelivFields('deliv', (m.deliv = m.deliv || tradePre(r)), 'fl', tradeCur(r), true)}
@@ -198,7 +198,7 @@ function flowPanel(m, a, D) {
   };
   const planRow = canEditBooking(a) && !fl.done.delivered ? `<div class="grid sm:grid-cols-[1fr_auto] gap-2 items-end mb-1"><div class="field"><label for="fl-plan">วันนัดรับรถ</label><input id="fl-plan" type="date" data-modal="plan" value="${esc(m.plan ?? r.delivery_plan ?? '')}"></div>
       <button class="btn btn-ghost btn-sm" data-act="plan-save" data-id="${esc(a.id)}">บันทึกวันนัด</button></div><p class="text-xs text-muted mb-2">มีวันนัดรับรถแล้ว ล็อกรถจะถือไว้จนส่งมอบ ไม่ต้องปลดทุก 15 วัน</p>` : (r.delivery_plan ? `<p class="text-sm mb-2">วันนัดรับรถ ${fmtD(r.delivery_plan)}</p>` : '');
-  return `<section data-flow-steps><h3 class="font-head font-semibold mb-2">ขั้นตอนส่งมอบ</h3>${planRow}
+  return `<section data-flow-steps><h3 class="font-head font-semibold mb-2">ขั้นตอนส่งมอบ</h3>${planRow}${invManBox(a, D)}
     ${step('booked', bookedBody())}${step('fin', finBody())}${step('assign', assignBody())}${step('po', poBody())}${step('down', downBody())}${step('delivered', delivBody() + discBox(a, m, D, 'deliv'))}${step('confirmed', confBody())}</section>`;
 }
 
