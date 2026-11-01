@@ -139,6 +139,7 @@ function deriveNow() {
     const car = cars.get(vin);
     if (!car) continue;
     if (o.branch) car.br = o.branch;
+    car.xfer = o.xfer || null;
     if (o.special) { car.special = o.special; if (car0 && ['company', 'free'].includes(car.st)) car.st = spStatus(o.special); }
     // production date keyed here (from the label on the car), kept even after IDS later has its own value
     car.prodKey = (o.prod_info && o.prod_info.date) || (o.added && o.added.prod) || null;
@@ -545,6 +546,13 @@ function buildAlerts(D) {
   for (const a of D.at) {
     if (a.cancelled || a.demo) continue;
     if ((a.flow.done.delivered || a.flow.lateUpdate) && !a.flow.done.confirmed) add('conf:' + a.id, { br: a.br, roles: ['manager'] }, 'warn', 'ส่งมอบแล้ว รอผู้จัดการยืนยัน', `${a.cust} · ${a.model} · เซลล์ ${a.sales}`, { act: 'at-open', id: a.id });
+  }
+  // a car asked for / sent to another branch: the other branch's admin and manager are told (ตกลง 2/11)
+  for (const [vin, o] of S.vehicles) {
+    const x = o && o.xfer, c = x && D.cars.get(vin); if (!c) continue;
+    const to = x.dir === 'pull' ? x.from : x.to;
+    add('xfer:' + vin, { br: to, roles: ['admin', 'manager'] }, 'warn', x.dir === 'pull' ? `สาขา ${x.to} ขอรถเข้าสาขา กดยืนยันย้าย Stock` : `สาขา ${x.from} แจ้งขายรถให้สาขา ${x.to} กดรับรถเข้า Stock`,
+      `${vin} · ${specLabelText(c.spec)} · ${x.role || ''}${x.note ? ' · ' + x.note : ''}`, { act: 'xfer-open', id: vin, label: x.dir === 'pull' ? 'ดูคำขอ' : 'ดูรายการ' });
   }
   for (const br of BRS) {
     const m = D.X.src[br];

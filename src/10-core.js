@@ -121,6 +121,7 @@ function perms() {
     confirmReceive: r === 'admin' || mgr || r === 'exec',
     upload: r === 'admin' || mgr || r === 'exec',
     remove: mgr || r === 'exec',
+    xfer: r === 'admin' || mgr || r === 'exec',   // sell a car out / ask for a car / send a car to another branch (ตกลง 2/11)
     write: S.mode !== 'readonly'
   };
 }

@@ -185,14 +185,19 @@ function removeModal(m, D) {
   <p class="text-sm mb-4"><span class="code font-medium">${esc(car.vin)}</span> ${specLabel(car.spec)} · ${car.br}</p>
   <div class="flex flex-col gap-4">
     <div class="field"><label for="x-reason" class="req">เหตุผล</label><select id="x-reason" data-modal="reason">
-      <option value="dealer" ${m.reason === 'dealer' ? 'selected' : ''}>ขาย/แลกให้ดีลเลอร์อื่น</option>
+      ${S.role.role === 'admin' ? (car.br === myBranch() ? `<option value="dealer" ${m.reason === 'dealer' ? 'selected' : ''}>ขาย/แลกให้ดีลเลอร์อื่น (ตัดออกจาก Stock)</option>
+      <option value="push" ${m.reason === 'push' ? 'selected' : ''}>ขายออกจากสาขาตัวเองไปให้สาขาอื่น (ปลายทางกดรับรถเข้า)</option>`
+        : `<option value="pull" selected>นำรถเข้าสาขาตัวเอง (ขอไปสาขาต้นทาง ต้นทางกดยืนยันย้าย)</option>`)
+      : `<option value="dealer" ${m.reason === 'dealer' ? 'selected' : ''}>ขาย/แลกให้ดีลเลอร์อื่น</option>
       <option value="move" ${m.reason === 'move' ? 'selected' : ''}>ย้ายไปสาขาอื่นของเรา</option>
-      <option value="other" ${m.reason === 'other' ? 'selected' : ''}>อื่น ๆ</option></select></div>
+      <option value="other" ${m.reason === 'other' ? 'selected' : ''}>อื่น ๆ</option>`}</select></div>
+    ${m.reason === 'pull' ? `<p class="text-sm p-3 rounded-lg" style="background:var(--warn-soft)">ส่งคำขอให้แอดมินสาขา ${esc(car.br)} (เจ้าของรถ) รถยังอยู่ Stock ${esc(car.br)} จนกว่าเขากดยืนยันย้ายมาสาขา ${esc(myBranch() || '')}</p>` : ''}
+    ${m.reason === 'push' ? `<div class="field"><label for="x-to" class="req">ขายให้สาขา</label><select id="x-to" data-modal="to">${BRS.filter(b => b !== car.br).map(b => `<option value="${b}" ${(m.to || BRS.find(q => q !== car.br)) === b ? 'selected' : ''}>${b} ${BR[b].name || ''}</option>`).join('')}</select></div><p class="text-sm p-3 rounded-lg" style="background:var(--warn-soft)">รถยังอยู่ Stock ${esc(car.br)} จนกว่าแอดมินสาขาปลายทางกด "รับรถเข้า Stock"</p>` : ''}
     ${m.reason === 'dealer' ? `<div class="field"><label for="x-dealer" class="req">ชื่อดีลเลอร์</label><input id="x-dealer" data-modal="dealer" value="${esc(m.dealer || '')}"></div>` : ''}
     ${m.reason === 'move' ? `<div class="field"><label for="x-to" class="req">ย้ายไปสาขา</label><select id="x-to" data-modal="to">${BRS.filter(b => b !== car.br).map(b => `<option value="${b}" ${m.to === b ? 'selected' : ''}>${b} ${BR[b].name}</option>`).join('')}</select></div>` : ''}
     <div class="field"><label for="x-note" class="${m.reason === 'other' ? 'req' : ''}">หมายเหตุ</label><input id="x-note" data-modal="note" value="${esc(m.note || '')}"></div>
     <p class="text-xs text-muted">ข้อมูลการขาย/แลกกับดีลเลอร์อื่นไม่มีในไฟล์ IDS การบันทึกที่นี่ครั้งเดียวจึงไม่ใช่การลงซ้ำ และทำให้รถคันนี้ไม่ถูกแจ้งว่า "ไม่พบข้อมูล" ตอนอัปโหลด Stock รอบถัดไป</p>
-    <div class="flex justify-end gap-2"><button class="btn btn-ghost" data-act="close">ยกเลิก</button><button class="btn btn-red" data-act="remove-submit">${m.reason === 'move' ? 'ย้ายสาขา' : 'นำออก'}</button></div>
+    <div class="flex justify-end gap-2"><button class="btn btn-ghost" data-act="close">ยกเลิก</button><button class="btn btn-red" data-act="remove-submit">${m.reason === 'move' ? 'ย้ายสาขา' : m.reason === 'pull' ? 'ส่งคำขอ' : m.reason === 'push' ? 'แจ้งปลายทาง' : 'นำออก'}</button></div>
   </div>`;
 }
 function noteModal(m) {
@@ -862,12 +867,20 @@ const ACTIONS = {
   },
 
   // ---- stock, receiving, uploads
-  'remove-open'(el) { S.modal = { kind: 'remove', vin: el.dataset.vin, reason: 'dealer', dealer: '', to: '', note: '' }; render(); },
+  'remove-open'(el) { const c0 = derive().cars.get(el.dataset.vin); S.modal = { kind: 'remove', vin: el.dataset.vin, reason: S.role.role === 'admin' && c0 && c0.br !== myBranch() ? 'pull' : 'dealer', dealer: '', to: '', note: '' }; render(); },
   async 'remove-submit'() {
     const m = S.modal, D = derive(), car = D.cars.get(m.vin); if (!car) return;
     const cur = S.vehicles.get(m.vin) || { added: null, removed: null, branch: null };
     if (m.reason === 'dealer' && !(m.dealer || '').trim()) { toast('ใส่ชื่อดีลเลอร์', 'bad'); return; }
     if (m.reason === 'other' && !(m.note || '').trim()) { toast('เขียนหมายเหตุว่ารถไปไหน', 'bad'); return; }
+    if (S.role.role === 'admin' && m.reason === 'dealer' && car.br !== myBranch()) { toast('ตัดออกได้เฉพาะรถสาขาตัวเอง', 'bad'); return; }
+    if (m.reason === 'pull' || m.reason === 'push') {
+      const mine = myBranch(), to = m.reason === 'pull' ? mine : (m.to || BRS.find(b => b !== car.br)), spec = (car.model || car.grade || car.color) ? [car.model || '?', car.grade || '?', car.color || '?'].join('|') : (cur.moved && cur.moved.spec) || null;
+      if (car.xfer) { toast('มีคำขอย้ายรถคันนี้ค้างอยู่แล้ว', 'bad'); return; }
+      if (m.reason === 'pull' ? car.br === mine : car.br !== mine) { toast('สาขาไม่ตรงกับประเภทที่เลือก', 'bad'); return; }
+      if (await write('vehicles', m.vin, { ...cur, xfer: { dir: m.reason, from: car.br, to, spec, note: (m.note || '').trim() || null, ...actor() } })) { S.modal = null; toast(m.reason === 'pull' ? `ส่งคำขอไปสาขา ${car.br} แล้ว` : `แจ้งสาขา ${to} แล้ว`); render(); }
+      return;
+    }
     let doc;
     if (m.reason === 'move') { const to = m.to || BRS.find(b => b !== car.br); // keep the car's spec: a car that only exists through an earlier move has nothing else to show its model, grade and colour
       const spec = (car.model || car.grade || car.color) ? [car.model || '?', car.grade || '?', car.color || '?'].join('|') : (cur.moved && cur.moved.spec) || null;

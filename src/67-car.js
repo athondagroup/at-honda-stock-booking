@@ -99,10 +99,11 @@ function carModal(m, D) {
         <div class="border border-line rounded-lg divide-y divide-line max-h-60 overflow-auto">${hist.slice(0, 40).map(e => `<div class="p-2 px-3 text-sm flex flex-wrap gap-x-3"><span class="num text-muted">${fmtDT(e.at)}</span><span class="font-medium">${esc(e.act)}</span><span class="text-muted">${esc(e.what || '')}${e.note ? ' · ' + esc(e.note) : ''}</span><span class="ml-auto text-xs">${who(e)}</span></div>`).join('') || '<div class="p-3 text-sm text-muted">ยังไม่มีประวัติในระบบนี้</div>'}</div></section>
     </div>
   </div>
+  ${xferBox(c)}
   <div class="flex flex-wrap justify-end gap-2 mt-4">
     ${delivBtn(c, D, true)}
     ${carLockable(c) && p.write && p.request ? `<button class="btn btn-red" data-act="lock-open" data-vin="${esc(c.vin)}">${c.status === 'pending' ? 'ขอคิวต่อ' : 'ขอล็อกรถคันนี้'}</button>` : ''}
-    ${p.remove && p.write && !c.lock && D.cars.has(c.vin) ? `<button class="btn btn-ghost" data-act="remove-open" data-vin="${esc(c.vin)}">นำรถออก / ย้ายสาขา</button>` : ''}
+    ${(p.remove || p.xfer) && p.write && !c.lock && !c.xfer && D.cars.has(c.vin) ? `<button class="btn btn-ghost" data-act="remove-open" data-vin="${esc(c.vin)}">นำรถออก / ย้ายสาขา</button>` : ''}
     ${m.back ? '<button class="btn btn-dark" data-act="car-back">← กลับไปหน้าก่อน</button>' : '<button class="btn btn-ghost" data-act="close">ปิด</button>'}</div>`;
 }
 // the frame number in a list, clickable
