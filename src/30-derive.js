@@ -431,6 +431,14 @@ function buildAlerts(D) {
   const out = [], today = D.today;
   const add = (id, to, tone, title, text, act) => out.push({ id, to, tone, title, text, act });
   const asof = br => D.X.src[br] && D.X.src[br].booking ? D.X.src[br].booking.asof : null;
+  // allocated in the web, IDS not yet showing the car under this booking: the branch admin keys it in IDS; the alert closes by itself
+  // when an uploaded IDS file gives the car to this booking (booking number + full name), no second confirmation (ตกลง 1/11)
+  for (const a of D.at) {
+    const f = a.rec.flow || {}, v = f.assign && f.assign.vin;
+    if (!v || !a.active || a.cancelled || a.demo || (f.delivered && f.delivered.date) || (a.match && a.match.vin === v)) continue;
+    const c = D.cars.get(v);
+    add('idsal:' + a.id, { br: c ? c.br : a.br, roles: ['admin'] }, 'warn', 'จัดสรรในเว็บแล้ว ต้องจัดสรรใน IDS', `${a.cust} · ${v}${c ? ' · ' + (c.model || '') + ' ' + (c.color || '') : ''} · ${a.sales || ''} · อัปโหลดไฟล์ IDS ที่มีเลขใบจองและชื่อลูกค้าเต็ม ระบบปิดรายการนี้เอง`, { act: 'at-open', id: a.id });
+  }
   for (const a of D.at) {
     if (!a.active || a.match) continue;
     const ref = asof(a.br);

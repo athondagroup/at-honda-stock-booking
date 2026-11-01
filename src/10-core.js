@@ -109,7 +109,8 @@ function perms() {
     lockDirect: mgr || r === 'exec',
     // the branch admin runs operations (upload, receive, allocate) but does not key bookings or ask for locks
     // locks (ตกลง 14/10): executive / managers lock at once, the branch admin asks (a manager approves), sales only look
-    request: r === 'admin' || mgr || r === 'exec',
+    // locks (ตกลง 1/11): the branch admin no longer asks; she allocates a car at once (no approval) and a manager holds a queue lock himself
+    request: mgr || r === 'exec',
     book: r === 'sales' || mgr || r === 'exec',
     receive: r === 'admin' || mgr || r === 'exec',
     assign: r === 'admin' || mgr || r === 'exec',

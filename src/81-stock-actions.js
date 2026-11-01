@@ -46,7 +46,7 @@ function stAssignModal(m, D) {
     ${c.st === 'invoiced' ? '<p class="text-sm mb-2" style="color:var(--warn)">IDS ออกใบกำกับคันนี้แล้ว (เช่น advanced invoice) จัดสรรได้ ตรวจชื่อในใบกำกับก่อนส่งมอบ</p>' : ''}
     <div class="field mb-2"><label for="sa-q">ค้นหาใบจอง (ชื่อลูกค้า / เซลล์ / เลขที่ใบจอง) — ไม่ค้นจะแสดงรุ่นเดียวกัน สเปกตรงก่อน</label><input id="sa-q" type="search" data-modal="q" value="${esc(m.q || '')}" autocomplete="off"></div>
     <div class="flex flex-col gap-2 max-h-[50vh] overflow-auto mb-3">${list.map(row).join('') || '<p class="text-sm text-muted">ไม่พบใบจองที่ยังไม่ส่งมอบ</p>'}</div>
-    ${S.role.role === 'admin' ? '<p class="text-xs text-muted mb-2">แอดมินจัดสรรได้เมื่อใบจองมีเลขที่ใบเสร็จมัดจำ และไฟแนนซ์ผ่าน (หรือซื้อสด)</p>' : ''}
+    ${S.role.role === 'admin' ? '<p class="text-xs text-muted mb-2">แอดมินจัดสรรได้ทันที ไม่ต้องรอผู้จัดการอนุมัติ เมื่อใบจองมีเลขที่ใบเสร็จมัดจำ และไฟแนนซ์ผ่าน (หรือซื้อสด)</p>' : ''}
     <div class="flex justify-end gap-2"><button class="btn btn-ghost" data-act="close">ยกเลิก</button><button class="btn btn-red" data-act="st-assign-save" ${m.id ? '' : 'disabled'}>จัดสรรรถคันนี้</button></div>`;
 }
 // give the car to booking a; the booking that had it goes back to waiting (its lock on this car is released)
@@ -67,7 +67,7 @@ async function stAssignSave(vin, a, D) {
   if (!D.locks.some(l => l.vin === vin && l.bkref === a.key && ['pending', 'approved', 'allocated'].includes(l.status))) {
     const id = newId('locks'), days = LOCK_DAYS_BY.booking || 15;
     await saveLock(id, { vin, ref: c.ref || null, car_br: c.br, spec: c.spec, type: 'booking', bkref: a.key, bk_br: a.br, sales: a.sales || null, prospect: null, dealer_name: null,
-      reason: 'จัดสรรรถ', note: '', warnings: [], status: 'approved', requested_at: now, requested_by: S.me.id || null, approved_at: now, start: todayISO(), end: addDays(todayISO(), days),
+      reason: 'จัดสรรรถ', note: '', warnings: [], status: 'allocated', requested_at: now, requested_by: S.me.id || null, approved_at: now, start: todayISO(), end: addDays(todayISO(), days),
       ext: 0, history: [], requested_role: roleLabel(), via_assign: true }, 'จัดสรรรถ', a.cust || '');
   }
   const r = S.bookings.get(a.id); if (!r) return false;
@@ -79,6 +79,8 @@ Object.assign(ACTIONS, {
   async 'st-assign-save'() {
     const m = S.modal, D = derive(), a = D.at.find(x => x.id === m.id); if (!a) return;
     const w = stAssignWhy(a); if (w) { toast(w, 'bad'); return; }
+    // the branch admin cannot take a car another booking holds: the manager releases that lock first (ตกลง 1/11)
+    if (S.role.role === 'admin') { const hold = D.locks.find(l => l.vin === m.vin && l.live && l.bkref !== a.key); if (hold) { toast(`รถคันนี้ล็อกให้ ${hold.owner || 'ใบจองอื่น'} อยู่ ให้ผู้จัดการปล่อยล็อกก่อน`, 'bad'); return; } }
     if (await stAssignSave(m.vin, a, D)) { S.modal = null; toast(`จัดสรร ${m.vin} ให้ ${a.cust || 'ใบจอง'} แล้ว`); render(); }
   },
   async 'st-unassign'(el) {
