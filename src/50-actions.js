@@ -672,7 +672,7 @@ const ACTIONS = {
       o.status = sd.from; delete o.bumped_by; delete o.bumped_at;
       await saveLock(sd.id, o, `ย้อนกลับ: ${u.act} ของคำขออื่น`, 'กดผิด');
     }
-    toast(`ย้อนกลับแล้ว สถานะกลับเป็น "${{ pending: 'รออนุมัติ', approved: 'ล็อก', allocated: 'แจ้งจัดสรรแล้ว รอไฟล์ IDS' }[u.from] || u.from}"`);
+    toast(`ย้อนกลับแล้ว สถานะกลับเป็น "${{ pending: 'รออนุมัติ', approved: 'ล็อก', allocated: 'จัดสรรแล้ว (เว็บ) รอไฟล์ IDS' }[u.from] || u.from}"`);
   },
   'reject-open'(el) { S.modal = { kind: 'note', act: 'reject', id: el.dataset.id, title: 'ไม่อนุมัติการล็อก', label: 'เหตุผล (ผู้ขอจะเห็น)', required: true, button: 'ไม่อนุมัติ' }; render(); },
   'bd-clear'() { Object.assign(S.filters, { bDFrom: '', bDTo: '', qModel: '', bGrade: '', bColor: '', bSales: '', aState: 'active' }); render(); },

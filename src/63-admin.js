@@ -117,7 +117,7 @@ function adminLock(D) {
     <td class="text-right"><button class="btn btn-ghost btn-sm" data-act="ad-lk-open" data-id="${esc(id)}">${adminWrite(l.car_br) || (l.type === 'dealer' && perms().approveDealer) ? 'แก้ไข' : 'ดู'}</button></td></tr>`).join('')}
   </tbody></table></div>`;
 }
-function adLockSt() { return { pending: 'รออนุมัติ', approved: 'ล็อก', allocated: 'แจ้งจัดสรรแล้ว รอไฟล์ IDS', released: 'ปล่อยแล้ว', rejected: 'ไม่อนุมัติ', withdrawn: 'ถอนคำขอ', done: 'ส่งมอบแล้ว', bumped: 'มีคนจองก่อน', converted: 'เปลี่ยนเป็นล็อกให้ใบจอง' }; }
+function adLockSt() { return { pending: 'รออนุมัติ', approved: 'ล็อก', allocated: 'จัดสรรแล้ว (เว็บ) รอไฟล์ IDS', released: 'ปล่อยแล้ว', rejected: 'ไม่อนุมัติ', withdrawn: 'ถอนคำขอ', done: 'ส่งมอบแล้ว', bumped: 'มีคนจองก่อน', converted: 'เปลี่ยนเป็นล็อกให้ใบจอง' }; }
 function adminLkModal(m) {
   const l = S.locks.get(m.id) || {}, e = m.e, can = adminWrite(l.car_br) || (l.type === 'dealer' && perms().approveDealer);
   return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">แก้ข้อมูลล็อก (หลังบ้าน)</h2><div class="text-xs text-muted code">${esc(m.id)} · ${esc(l.vin || 'Quota ' + (l.ref || ''))}</div></div><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>

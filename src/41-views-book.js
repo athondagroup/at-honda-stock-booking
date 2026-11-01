@@ -370,7 +370,7 @@ function lockRow(l, D, o = {}) {
   const br = l.car_br || car?.br || q?.br;
   const stTxt = l.status === 'pending' ? chip('รออนุมัติ', 'warn')
     : l.status === 'approved' ? (l.mgrDue ? chip(`ครบกำหนด ผู้จัดการต่อหรือปล่อยภายใน ${fmtD(addDays(l.releaseOn, -1))}`, 'bad') : l.autoReleased ? chip(`ปล่อยคิวแล้ว ${fmtD(l.releaseOn)} (ผู้จัดการไม่ได้ต่อ)`, 'muted') : l.hold ? chip(`ถือไว้จนส่งมอบ ${fmtD(l.holdUntil)}`, 'red') : l.expired ? chip('หมดอายุ', 'bad') : chip(`ล็อก เหลือ ${l.daysLeft} วัน`, l.daysLeft <= 2 ? 'bad' : 'red'))
-    : l.status === 'allocated' ? chip('แจ้งจัดสรรแล้ว รอไฟล์ IDS', 'ink') : l.status === 'rejected' ? chip('ไม่อนุมัติ', 'muted') : l.status === 'converted' ? chip('เปลี่ยนเป็นล็อกให้ใบจอง', 'muted') : l.status === 'bumped' ? chip(`มีคนจองก่อน (${l.bumped_by || ''})`, 'muted') : l.status === 'done' ? chip(l.ids_done ? 'สำเร็จ: IDS จัดสรรให้แล้ว' : l.type === 'dealer' ? 'ขายให้ดีลเลอร์แล้ว' : 'ส่งมอบแล้ว', 'good') : l.status === 'withdrawn' ? chip('ถอนคำขอแล้ว', 'muted') : chip('ปล่อยแล้ว', 'muted');
+    : l.status === 'allocated' ? chip('จัดสรรแล้ว (เว็บ) รอไฟล์ IDS', 'ink') : l.status === 'rejected' ? chip('ไม่อนุมัติ', 'muted') : l.status === 'converted' ? chip('เปลี่ยนเป็นล็อกให้ใบจอง', 'muted') : l.status === 'bumped' ? chip(`มีคนจองก่อน (${l.bumped_by || ''})`, 'muted') : l.status === 'done' ? chip(l.ids_done ? 'สำเร็จ: IDS จัดสรรให้แล้ว' : l.type === 'dealer' ? 'ขายให้ดีลเลอร์แล้ว' : 'ส่งมอบแล้ว', 'good') : l.status === 'withdrawn' ? chip('ถอนคำขอแล้ว', 'muted') : chip('ปล่อยแล้ว', 'muted');
   const took = l.idsTook && !l.idsTook.same ? l.idsTook : null;
   const canDecide = p.write && l.status === 'pending' && (l.type === 'dealer' ? p.approveDealer : canLockMgr(l));
   const sheet = sheetTextOf(l);
@@ -401,7 +401,7 @@ function lockRow(l, D, o = {}) {
     else if (!l.mgrDue && canLockMgr(l) && (l.ext || 0) < MAX_EXT && !l.hold) acts.push(`<button class="btn btn-ghost btn-sm" data-act="extend" data-id="${l.id}">ต่ออายุ ${l.days} วัน (${l.ext || 0}/${MAX_EXT})</button>`);
     if (l.type === 'temp' && mine && !l.bumped) acts.push(`<button class="btn btn-dark btn-sm" data-act="lock-convert" data-id="${l.id}">ลูกค้ามาจองแล้ว</button>`);
     if (rec && mine && l.finDue) acts.push(`<button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(bk.app.id)}">อัปเดตไฟแนนซ์</button>`);
-    if (canAllocBr(br) && l.type !== 'temp') acts.push(`<button class="btn btn-dark btn-sm" data-act="allocate" data-id="${l.id}">จัดสรรใน IDS แล้ว</button>`);
+    // no "จัดสรรใน IDS แล้ว" button (ตกลง 2/11): a lock stays a lock until the uploaded IDS file shows the car under the booking
     if (canAllocBr(br) || mine) acts.push(`<button class="btn btn-ghost btn-sm" data-act="release-open" data-id="${l.id}">${l.type === 'dealer' ? 'ยกเลิกการแลก/ขาย' : 'ยกเลิกล็อก (ปล่อยรถ)'}</button>`);
   }
   if (!o.compact && l.type === 'booking' && l.vin && ['approved', 'allocated'].includes(l.status) && canSwap(swapCtx(D, { lockId: l.id }))) acts.push(`<button class="btn btn-ghost btn-sm" data-act="swap-open" data-lock="${esc(l.id)}">เปลี่ยนคัน</button>`);

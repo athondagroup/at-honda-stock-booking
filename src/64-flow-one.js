@@ -11,7 +11,6 @@ function bkLocks(a, D) {
 function rowLockActs(l, D) {
   const p = perms(), br = l.car_br, mine = isMine(l.owner), out = [], b = (x, act, t, dark) => `<button class="btn ${dark ? 'btn-red' : 'btn-ghost'} btn-sm" data-act="${act}" data-id="${esc(l.id)}">${t}</button>`;
   if (canDecideLock(l)) { out.push(b(l, 'approve', 'อนุมัติล็อก', true)); out.push(b(l, 'reject-open', 'ไม่อนุมัติ')); }
-  if (l.status === 'approved' && l.type !== 'temp' && canAllocBr(br)) out.push(`<button class="btn btn-dark btn-sm" data-act="allocate" data-id="${esc(l.id)}">จัดสรรใน IDS แล้ว</button>`);
   if (l.status === 'approved' && l.live && canApproveBr(br) && (l.mgrDue ? (l.finWait || (l.ext || 0) < MAX_EXT) : ((l.ext || 0) < MAX_EXT && !l.hold))) out.push(b(l, 'extend', `ต่ออายุ ${l.days} วัน`, l.mgrDue));
   if (['approved', 'allocated'].includes(l.status) && (canAllocBr(br) || mine || (l.type === 'dealer' && p.approveDealer))) out.push(b(l, 'release-open', l.type === 'dealer' ? 'ยกเลิกการแลก/ขาย' : 'ยกเลิกล็อก'));
   if (l.type === 'booking' && l.vin && ['approved', 'allocated'].includes(l.status) && canSwap(swapCtx(D, { lockId: l.id }))) out.push(`<button class="btn btn-ghost btn-sm" data-act="swap-open" data-lock="${esc(l.id)}">เปลี่ยนคัน</button>`);
