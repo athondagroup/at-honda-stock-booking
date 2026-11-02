@@ -33,7 +33,7 @@ function flowOf(a, today) {
     // IDS allocating a car to this booking (VIN in Stock / DL) counts as the allocation, so nobody presses it twice
     assign: !!(f.assign && f.assign.vin) || !!(m && m.vin),
     po: !!(f.po && f.po.at),
-    down: !!(f.down && f.down.receipt_no),
+    down: payDone(a),
     delivered: !!(f.delivered && f.delivered.date && (f.delivered.plate || f.delivered.src === 'IDS')),
     confirmed: !!(f.confirm && f.confirm.at)
   };

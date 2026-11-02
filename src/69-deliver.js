@@ -47,7 +47,7 @@ function cdelivModal(m, D) {
     sec('assign', true, done(`รถ <span class="code">${esc(c.vin)}</span>${linked ? '' : ' · จะบันทึกการจัดสรรให้ใบจองนี้'}`)),
     sec('po', fl.done.po, fl.done.po ? done(`สั่งแต่ง ${(f.po.items || []).length} รายการ`) : `<label class="flex items-center gap-2 text-sm mt-1"><input type="checkbox" data-modal="v.po_none" ${v.po_none ? 'checked' : ''}> ไม่มีแต่งรถ (บันทึกเป็น "ไม่มีรายการแต่ง")</label>
       <button class="btn btn-ghost btn-sm mt-1" data-act="cdeliv-po" data-id="${esc(a.id)}">ทำใบสั่งแต่งรถ</button>`),
-    sec('down', fl.done.down, fl.done.down ? done(`ใบเสร็จ ${esc(f.down.receipt_no)}`) : `<div class="grid sm:grid-cols-3 gap-3 mt-1">${F('cd-dn', `เลขที่ใบเสร็จ${isCash(r) ? 'ชำระครบ' : 'เงินดาวน์'}`, 'down_no', '')}${F('cd-da', 'ยอดเงิน (บาท)', 'down_amount', '', 'type="number" min="0" inputmode="numeric"')}${F('cd-dd2', 'วันที่ชำระ', 'down_date', todayISO(), `type="date" max="${todayISO()}"`)}</div>`),
+    sec('down', fl.done.down, fl.done.down ? done(`ใบเสร็จ ${esc(f.down.receipt_no)}`) : payItems(a).length ? `<div class="text-sm" style="color:var(--warn)">ชำระแล้ว ${money(payPaid(a))} จาก ${money(payRequired(a))} บาท ยังไม่ครบ เพิ่มการชำระในใบจองก่อน</div>` : `<div class="grid sm:grid-cols-3 gap-3 mt-1">${F('cd-dn', `เลขที่ใบเสร็จ${isCash(r) ? 'ชำระครบ' : 'เงินดาวน์'}`, 'down_no', '')}${F('cd-da', 'ยอดเงิน (บาท)', 'down_amount', '', 'type="number" min="0" inputmode="numeric"')}${F('cd-dd2', 'วันที่ชำระ', 'down_date', todayISO(), `type="date" max="${todayISO()}"`)}</div>`),
     sec('delivered', false, `<div class="grid sm:grid-cols-3 gap-3 mt-1">${F('cd-dd', 'วันที่ส่งมอบรถ (ลูกค้ารับรถจริง) *', 'date', '', `type="date" max="${todayISO()}"`)}${F('cd-pl', 'เลขทะเบียนป้ายแดง', 'plate', (f.delivered && f.delivered.plate) || '', 'placeholder="เช่น ป-1234 นครปฐม"')}
 </div>
       ${tradeDelivFields('v', v, 'cd', tradeCur(r), true)}`)
@@ -93,10 +93,11 @@ Object.assign(ACTIONS, {
       patch.flow.po = { ...actor(), items: [{ name: 'ไม่มีรายการแต่ง', qty: 1, cost: 0, sale: 0, custom: true }], date: t, by_name: a.sales, none: true };
     }
     if (!fl.done.down) {
+      if (payItems(a).length) return bad(`ชำระยังไม่ครบ (ชำระแล้ว ${money(payPaid(a))} จาก ${money(payRequired(a))} บาท) เพิ่มการชำระในใบจองก่อน`);
       const no = String(v.down_no || '').trim(), date = v.down_date || t;
       if (!no) return bad('ใส่เลขที่ใบเสร็จ' + (isCash(r) ? 'ชำระครบ' : 'เงินดาวน์'), 'cd-dn');
       if (!validDate(date) || date > t) return bad('วันที่ชำระต้องไม่เกินวันนี้', 'cd-dd2');
-      patch.flow.down = { ...actor(), receipt_no: no, amount: num(v.down_amount), date };
+      patch.flow.down = payDown(a, [{ method: '', receipt_no: no, amount: num(v.down_amount), date, ...actor() }]);
     }
     if (!v.date) return bad('ใส่วันที่ส่งมอบรถ (วันที่ลูกค้ารับรถจริง)', 'cd-dd');
     const date = v.date, plate = String(v.plate ?? (f.delivered && f.delivered.plate) ?? '').trim();

@@ -140,16 +140,7 @@ function flowPanel(m, a, D) {
       <div class="mt-2 flex gap-2"><button class="btn btn-dark btn-sm" data-act="flow-fin" data-id="${esc(a.id)}">บันทึก</button>
       <span class="text-xs text-muted self-center">เลือก "ผ่าน" แล้วไปขั้นถัดไปได้ · ใบอนุมัติแนบภายหลังได้ แต่ต้องแนบก่อนส่งมอบ</span></div>` : ''}${dealBox(a, m, D)}`;
   };
-  const downBody = () => {
-    const d = f.down || {};
-    if (fl.done.down) return `<div class="text-sm text-muted">${isCash(r) ? 'ชำระครบ' : 'ชำระดาวน์'} ใบเสร็จ <span class="code">${esc(d.receipt_no)}</span>${d.amount ? ` · ${money(d.amount)} บาท` : ''} · ${fmtD(d.date)}${tradeText(d.tradein)} · ${who(d)}</div>`;
-    if (!can('down')) return '';
-    return `<div class="grid sm:grid-cols-3 gap-3 items-end mt-1">
-      <div class="field"><label for="fl-dn">เลขที่ใบเสร็จ${isCash(r) ? 'ชำระครบ' : 'เงินดาวน์'}</label><input id="fl-dn" data-modal="down.receipt_no" value="${esc(m.down?.receipt_no ?? '')}" autocomplete="off"></div>
-      <div class="field"><label for="fl-da">ยอดเงิน (บาท)</label><input id="fl-da" type="number" min="0" step="100" inputmode="numeric" data-modal="down.amount" value="${esc(m.down?.amount ?? '')}"></div>
-      <div class="field"><label for="fl-dd2">วันที่ชำระ</label><input id="fl-dd2" type="date" data-modal="down.date" value="${esc(m.down?.date ?? todayISO())}" max="${todayISO()}"></div></div>
-      <button class="btn btn-dark btn-sm mt-2" data-act="flow-down" data-id="${esc(a.id)}">บันทึกการชำระ</button>`;
-  };
+  const downBody = () => (fl.done.down || payItems(a).length || can('down')) ? payBody(a, m, who, perms().write && (can('down') || (payItems(a).length > 0 && stepAllowed(a, 'down') && !fl.done.delivered))) : '';
   const assignBody = () => {
     if (fl.done.assign && !(f.assign && f.assign.vin)) return `<div class="text-sm text-muted">IDS จัดสรรรถ <span class="code">${esc(a.match.vin)}</span> ให้ใบจองนี้แล้ว (จากไฟล์ IDS)</div>${bkLocks(a, D)}${swapHist(a)}`;
     if (fl.done.assign) { const ac = D.cars.get(f.assign.vin); return `<div class="text-sm text-muted">รถ <span class="code">${esc(f.assign.vin)}</span>${ac ? ` · ${esc(ac.br)} · ${prodPlain(ac)}` : ''} · ${who(f.assign)}</div>${swapHist(a)}`; }
