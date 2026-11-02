@@ -556,7 +556,7 @@ const ACTIONS = {
     S.files.fin = [];
     S.modal = { kind: 'at', id: el.dataset.id }; render();
   },
-  'sum-reset'() { ['sFrom', 'sTo', 'sModel', 'sGrade', 'sColor', 'sSales', 'sBrBy'].forEach(k => { S.filters[k] = ''; }); render(); },
+  'sum-reset'() { ['sFrom', 'sTo', 'sModel', 'sGrade', 'sColor', 'sSales'].forEach(k => { S.filters[k] = ''; }); render(); },
   // an IDS booking with no AT form: open the AT form already filled from IDS
   'ids-claim'(el) {
     const D = derive(), b = D.idsB.find(x => x.no === el.dataset.id);
