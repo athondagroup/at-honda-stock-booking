@@ -6,7 +6,7 @@ const CDB_SHEET = '17pqWhpWAcj_rqg5jkzqCIVCGj3Awno__aqpIUZ_sSI8';
 const CDB_TAB = { camp: 'แคมเปญ Honda', margin: 'Margin มาตรฐาน', priv: 'สิทธิพิเศษ Honda' };
 const CDB_LAST = { camp: 'P', margin: 'H', priv: 'J' };
 const CDB_MKEY = { accord: 'Accord e:HEV', crv: 'CR-V e:HEV', city: 'City e:HEV', cityHb: 'City HB e:HEV', civic: 'Civic e:HEV', hrv: 'HR-V e:HEV', en2: 'e:N2', step: 'STEP WGN e:HEV' };
-const CDB_PRIV = { gtg: 'Gen to Gen', ln: 'Local Native', hk: 'ฮอนด้าเคียงข้างคุณ', loyalty: 'Honda Loyalty (ลดดอกเบี้ย −0.15%)', fj: 'First Jobber (ลดดอกเบี้ย −0.10%)', yto: "You're the One (ลดดอกเบี้ย −0.15%)" };
+const CDB_PRIV = { gtg: 'Gen to Gen', ln: 'Local Native', hk: 'ฮอนด้าเคียงข้างคุณ', td: 'e:N2 Test Drive (เงินสนับสนุน)', loyalty: 'Honda Loyalty (ลดดอกเบี้ย −0.15%)', fj: 'First Jobber (ลดดอกเบี้ย −0.10%)', yto: "You're the One (ลดดอกเบี้ย −0.15%)" };
 const CDB_PRIVM = { city: 'New City', cityHb: 'City Hatchback', civic: 'New Civic', hrv: 'New HR-V', accord: 'New Accord', crv: 'New CR-V', en2: 'e:N2', step: 'STEP WGN', all: 'ทุกรุ่นที่ร่วม' };
 const cdbDocId = k => k === 'camp' ? 'campaigns' : k === 'priv' ? 'privileges' : 'margins';
 const cdbDoc = k => S.ref.get(cdbDocId(k)) || {};
@@ -35,7 +35,7 @@ function cdbFromSheet(k, r, n) {
   return { month: c(0), model: c(1), mkey: cdbMkey(c(1)), cash: cdbPct(c(2)), fin: cdbPct(c(3)), step1: gsNum(c(4)) || 0, step2: gsNum(c(5)) || 0, note: c(6), active: c(7).toUpperCase() !== 'N', srow: n };
 }
 function cdbToSheet(k, x) {
-  if (k === 'priv') return [x.month, x.priv, x.name || CDB_PRIV[x.priv] || '', x.mkey, x.model || CDB_PRIVM[x.mkey] || '', x.a1 || '', x.a2 || '', x.into || (['gtg', 'ln', 'hk'].includes(x.priv) ? 'ใช่' : 'ไม่ (บันทึกไว้)'), x.cond || '', x.active === false ? 'FALSE' : 'TRUE'];
+  if (k === 'priv') return [x.month, x.priv, x.name || CDB_PRIV[x.priv] || '', x.mkey, x.model || CDB_PRIVM[x.mkey] || '', x.a1 || '', x.a2 || '', x.into || (['gtg', 'ln', 'hk', 'td'].includes(x.priv) ? 'ใช่' : 'ไม่ (บันทึกไว้)'), x.cond || '', x.active === false ? 'FALSE' : 'TRUE'];
   if (k === 'camp') return [x.month, x.book_from || '', x.book_to || '', x.deliver_by || '', x.id, x.key, x.group || '', x.grade || '', x.no ?? '', x.name || '', x.rate || '', x.sup || 0, x.ins ?? '', x.excl || '', x.ref || '', x.active === false ? 'N' : 'Y'];
   return [x.month, x.model || CDB_MKEY[x.mkey] || x.mkey, cdbPctTxt(x.cash), cdbPctTxt(x.fin), x.step1 || 0, x.step2 || 0, x.note || '', x.active === false ? 'N' : 'Y'];
 }
