@@ -160,7 +160,7 @@ function carLockModal(m, D) {
   const ls = carLocks(c, D), p = perms();
   const plan = c.bknote ? sheetPlan(D).find(x => x.u.vin === c.vin) : null;
   return `<div class="flex items-start justify-between gap-3 mb-1"><h2 class="font-head text-xl font-semibold">ล็อกของรถคันนี้</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
-  <p class="text-sm mb-1"><span class="code font-medium">${esc(c.vin)}</span> · ${esc(c.br)} · ${specLabel(c.spec)} · ${c.status === 'temp' ? chip('ว่าง', 'good') : statusChip(CAR_STATUS, c.status)} · ${prodPlain(c)} · อายุ ${c.age ?? '–'} วัน</p>
+  <p class="text-sm mb-1"><span class="code font-medium">${esc(c.vin)}</span> · ${esc(c.br)} · ${specLabel(c.spec)} · ${c.status === 'temp' ? chip('ล็อกชั่วคราว (แซงได้)', 'warn') : statusChip(CAR_STATUS, c.status)} · ${prodPlain(c)} · อายุ ${c.age ?? '–'} วัน</p>
   ${c.bknote ? `<p class="text-sm mb-3">ข้อความในชีต: <b>"${esc(c.bknote)}"</b>${c.cust ? ` · ชื่อลูกค้าใน IDS ${esc(c.cust)}` : ''}</p>` : '<div class="mb-3"></div>'}
   <div class="border border-line rounded-lg divide-y divide-line">${ls.map(l => lockRow(l, D)).join('') || emptyBox('ยังไม่มีคำขอล็อกในระบบ', plan ? 'สร้างคำขอจากข้อความในชีตได้ตามกฎเดียวกับตอนอัปโหลด' : 'ขอล็อกได้จากปุ่มด้านล่าง')}</div>
   <div class="flex flex-wrap justify-end gap-2 mt-4">
@@ -170,7 +170,7 @@ function carLockModal(m, D) {
 }
 // the status itself opens the car's locks, so a pending request is approved or changed where it is seen
 function carStatusCell(c, D) {
-  const chips = `${c.status === 'temp' ? chip('ว่าง', 'good') : statusChip(CAR_STATUS, c.status)} ${tempChip(c)}${spChip(c)}`;
+  const chips = `${c.status === 'temp' ? chip('ล็อกชั่วคราว (แซงได้)', 'warn') : statusChip(CAR_STATUS, c.status)} ${tempChip(c)}${spChip(c)}`;
   if (!D || !carLocks(c, D).length) return chips;
   const pend = carLocks(c, D).some(canDecideLock);
   return `<button class="text-left inline-flex flex-wrap items-center gap-1" data-act="carlock-open" data-vin="${esc(c.vin)}" title="กดเพื่ออนุมัติหรือแก้ไขล็อก">${chips}<span class="text-xs underline ${pend ? '' : 'text-muted'}" ${pend ? 'style="color:var(--red)"' : ''}>${pend ? 'อนุมัติ/แก้' : 'ดูล็อก'}</span></button>`;

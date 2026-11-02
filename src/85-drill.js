@@ -36,8 +36,8 @@ function drillRows(D, sp) {
       const E = execData(D, [f, t]);
       rows = sp.m === 'trades' ? E.trades.map(x => ({ date: x.date, br: x.br, model: x.newModel, vin: '', cust: x.cust, sales: x.sales, fin: '', inv: '', src: `${x.brand || ''} ${x.model || ''} ${x.year || ''}`.trim(), id: x.id, extra: x.price ? money(x.price) + ' บาท' : '' }))
         : E[sp.m].map(x => ({ ...x, src: x.src || 'DL' }));
-    } else if (sp.m === 'stk') rows = [...D.cars.values()].filter(c => inBr(c) && !c.company && (!sp.min || (c.age ?? 0) > sp.min) && (!sp.spec || c.spec === sp.spec) && (!sp.free || c.status === 'free' || c.status === 'temp'))
-      .sort((x, y) => (y.age ?? 0) - (x.age ?? 0)).map(c => ({ date: c.stockin || c.consign || c.prod || '', br: c.br, model: c.model, grade: c.grade, color: c.color, vin: c.vin, cust: '', sales: '', fin: '', inv: '', src: `อายุ ${c.age ?? '–'} วัน${c.status === 'free' || c.status === 'temp' ? ' · ว่าง' : ''}` }));
+    } else if (sp.m === 'stk') rows = [...D.cars.values()].filter(c => inBr(c) && !c.company && (!sp.min || (c.age ?? 0) > sp.min) && (!sp.spec || c.spec === sp.spec) && (!sp.free || c.status === 'free'))
+      .sort((x, y) => (y.age ?? 0) - (x.age ?? 0)).map(c => ({ date: c.stockin || c.consign || c.prod || '', br: c.br, model: c.model, grade: c.grade, color: c.color, vin: c.vin, cust: '', sales: '', fin: '', inv: '', src: `อายุ ${c.age ?? '–'} วัน${c.status === 'free' ? ' · ว่าง' : ''}` }));
     else if (sp.m === 'tinv') rows = tgtInvList(D, f || '2000-01-01', t || '2999-12-31');
     else if (sp.m === 'dv' || sp.m === 'inv') rows = carListRows(D, { from: f || '2000-01-01', to: t || '2999-12-31' }, sp.m).map(r => ({ ...r, src: r.src || 'DL' }));
     else if (sp.m === 'bk') rows = bks().filter(a => !a.cancelled).map(bkRow);
@@ -48,7 +48,7 @@ function drillRows(D, sp) {
     else if (sp.m === 'tr') rows = D.at.filter(a => !a.demo && !a.cancelled && inBr({ br: a.delivBr || a.br }) && pmEvents(a, D).some(([c, d]) => c === 'tr' && inR(d)))
       .map(a => { const x = (a.rec.flow.down || {}).tradein || {}; return { ...bkRow(a), br: a.delivBr || a.br, date: (pmEvents(a, D).find(e => e[0] === 'tr') || [])[1], src: `${x.brand || ''} ${x.model || ''} ${x.year || ''}`.trim(), extra: x.price ? money(x.price) + ' บาท' : '' }; });
     else if (sp.m === 'wait') rows = D.bookings.filter(b => b.state === 'waiting' && inBr(b)).map(b => ({ date: b.qdate || b.date, br: b.br, model: b.model, grade: b.grade, color: b.color, vin: '', cust: b.cust, sales: b.owner || b.sales, fin: '', inv: '', src: b.src === 'IDS' ? 'IDS' : 'ฟอร์ม AT', id: b.app ? b.app.id : null, extra: b.pos ? 'คิวที่ ' + b.pos : '' }));
-    else if (sp.m === 'free') rows = [...D.cars.values()].filter(c => inBr(c) && (c.status === 'free' || c.status === 'temp')).map(c => ({ date: c.stockin, br: c.br, model: c.model, grade: c.grade, color: c.color, vin: c.vin, cust: '', sales: '', fin: '', inv: '', src: c.status === 'temp' ? 'ล็อกชั่วคราว' : 'ว่าง', extra: c.stockin ? daysBetween(c.stockin, D.today) + ' วัน' : '' }));
+    else if (sp.m === 'free') rows = [...D.cars.values()].filter(c => inBr(c) && (c.status === 'free')).map(c => ({ date: c.stockin, br: c.br, model: c.model, grade: c.grade, color: c.color, vin: c.vin, cust: '', sales: '', fin: '', inv: '', src: c.status === 'temp' ? 'ล็อกชั่วคราว' : 'ว่าง', extra: c.stockin ? daysBetween(c.stockin, D.today) + ' วัน' : '' }));
     else rows = [];
     const up = v => String(v || '').toUpperCase();
     if (sp.br) rows = rows.filter(r => r.br === sp.br);

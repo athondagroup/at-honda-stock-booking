@@ -25,6 +25,7 @@ function stepAllowed(a, k) {
   const p = perms();
   if (!p.write || a.cancelled) return false;
   if (k === 'confirmed') return canApproveBr(a.br);
+  if (k === 'delivered') return adminOwns(a) || canApproveBr(a.br) || canApproveBr(a.delivBr);   // the branch admin (or a manager) records the delivery; the sales only look (ตกลง 2/11)
   if (k === 'assign') return canAllocBr(a.br) || adminOwns(a);
   return canEditBooking(a);
 }
@@ -171,7 +172,7 @@ function flowPanel(m, a, D) {
     if (fl.done.delivered && dv.src === 'IDS' && !dv.plate) return `<div class="text-sm">ส่งมอบแล้วตาม IDS (DL) ${fmtD(dv.date)} · บันทึกเข้าระบบแล้ว</div>${stepAllowed(a, 'delivered') ? `<details class="mt-1"><summary class="text-sm cursor-pointer" style="color:var(--warn)">เพิ่มเลขทะเบียนป้ายแดง (ไม่บังคับ)</summary>${delivForm()}</details>` : ''}${commBody()}`;
     if (fl.done.delivered) return `<div class="text-sm text-muted">ส่งมอบ ${fmtD(dv.date)} · ป้ายแดง <span class="code">${esc(dv.plate)}</span> · ${who(dv)}</div><div class="text-sm text-muted">รถเก่าเทิร์น: ${esc(tradeLine(r))}</div>${commBody()}`;
     if (fl.lateUpdate) return `<div class="text-sm">ส่งมอบแล้วตาม IDS (DL) ${fmtD(fl.deliveredDate)}</div>${stepAllowed(a, 'delivered') ? `<details class="mt-1"><summary class="text-sm cursor-pointer" style="color:var(--warn)">เพิ่มเลขทะเบียนป้ายแดง (ไม่บังคับ)</summary>${delivForm()}</details>` : ''}${commBody()}`;
-    if (!can('delivered')) return fl.next === 'delivered' && !stepAllowed(a, 'delivered') ? '<div class="text-sm text-muted">รอเซลล์อัปเดตการส่งมอบ</div>' : '';
+    if (!can('delivered')) return fl.next === 'delivered' && !stepAllowed(a, 'delivered') ? '<div class="text-sm text-muted">รอแอดมินสาขาบันทึกการส่งมอบ</div>' : '';
     return delivForm();
   };
   function delivForm() {

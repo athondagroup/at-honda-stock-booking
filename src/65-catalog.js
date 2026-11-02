@@ -170,7 +170,7 @@ function pickCatalog(D) {
 }
 // the model years of one spec in stock: "ว่าง 3 คัน (MY'27 2 · MY'26 1)"
 function specYears(D, key) {
-  const by = {}; [...D.cars.values()].filter(c => c.spec === key && (c.status === 'free' || c.status === 'temp')).forEach(c => { const y = c.year ? `MY'${String(c.year).slice(-2)}` : 'ไม่ทราบปี'; by[y] = (by[y] || 0) + 1; });
+  const by = {}; [...D.cars.values()].filter(c => c.spec === key && (c.status === 'free')).forEach(c => { const y = c.year ? `MY'${String(c.year).slice(-2)}` : 'ไม่ทราบปี'; by[y] = (by[y] || 0) + 1; });
   return Object.entries(by).sort((a, b) => b[0].localeCompare(a[0]));
 }
 function catYearOf(model, grade) { const ys = catRows().filter(x => x.model === model && (!grade || x.grade === grade) && x.year).map(x => x.year); return ys.length ? Math.max(...ys) : null; }

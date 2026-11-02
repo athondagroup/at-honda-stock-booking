@@ -55,7 +55,7 @@ function bookDelivChart(E, id) {
 // this month: target, invoices so far, projection and the pace needed (invoices only reach as far as the DL file)
 function monthPace(D, E) {
   const m = D.today.slice(0, 7), t = tgtOf(m);
-  const inv = D.X.inv.filter(i => !i.company && i.idate && i.idate.slice(0, 7) === m && inBr(i)).length;
+  const inv = D.X.inv.filter(i => i.idate && i.idate.slice(0, 7) === m && inBr(i)).length;   // company cars count in the invoice sales (the target)
   const dim = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).getUTCDate();
   const asof = E.dlAsof && E.dlAsof.slice(0, 7) === m ? E.dlAsof : null;
   const day = asof ? Number(asof.slice(8)) : 0, left = dim - Number(D.today.slice(8)) + 1;
@@ -93,7 +93,7 @@ function dashSalesTarget(D) {
     tile('ออกใบกำกับแล้ว ยังไม่ส่งมอบ', fmtN(W.length), { tone: W.some(w => w.age > 14) ? 'warn' : '', sub2: `เกิน 14 วัน ${fmtN(W.filter(w => w.age > 14).length)} คัน` })
   ], 'lg:grid-cols-5')}
   <div class="grid lg:grid-cols-2 gap-5 mb-5">
-    <div class="lg:col-span-2">${dCard('เป้า เทียบ ยอดขาย (ใบกำกับภาษี)', tgtChart(E, 'tg1'), 'ใบกำกับนับตามวันที่ออกใบกำกับในไฟล์ DL ไม่รวมรถบริษัท')}</div>
+    <div class="lg:col-span-2">${dCard('เป้า เทียบ ยอดขาย (ใบกำกับภาษี)', tgtChart(E, 'tg1'), 'ใบกำกับนับตามวันที่ออกใบกำกับในไฟล์ DL รวมรถบริษัท')}</div>
     ${dCard('ยอดจอง เทียบ ยอดขาย (ส่งมอบ)', bookDelivChart(E, 'tg2'), `ยอดจองนับจากฟอร์ม AT ตามวันที่จอง · ส่งมอบนับตามวันที่ส่งมอบ${E.dlAsof ? ` · DL ถึง ${fmtD(E.dlAsof)}` : ''}`)}
   </div>
   <div class="grid lg:grid-cols-2 gap-5 mb-5">
@@ -140,7 +140,7 @@ function atVin(a) { return (a.match && a.match.vin) || (a.rec.flow && a.rec.flow
 // รถยนต์ (28/10): what the stock tells about the cars, moved here from ยอดขาย
 function dashCars(D) {
   const A = dashAna(D, true), cars = [...D.cars.values()].filter(c => inBr(c) && !c.company);
-  const o60 = cars.filter(c => (c.age ?? 0) > 60).length, o90 = cars.filter(c => (c.age ?? 0) > 90).length, free = cars.filter(c => c.status === 'free' || c.status === 'temp').length;
+  const o60 = cars.filter(c => (c.age ?? 0) > 60).length, o90 = cars.filter(c => (c.age ?? 0) > 90).length, free = cars.filter(c => c.status === 'free').length;
   return `${pageHead('รถยนต์', 'รถในสต็อกตอนนี้ · อายุรถนับจากวันผลิต (ถ้าไม่มี นับจากวันฝากศูนย์หรือวันเข้าสต็อก) · ไม่นับรถบริษัท')}
   ${dashTabs()}${brSeg()}
   ${tiles([
@@ -179,9 +179,9 @@ function dashAna(D, part) {
   const allLead = Object.values(lead).flat();
   // stock: old cars by spec, and specs with free cars that nobody is waiting for
   const cars = [...D.cars.values()].filter(c => inBr(c) && !c.company);
-  const old = {}; cars.filter(c => (c.age ?? 0) > 60).forEach(c => { const o = (old[c.spec] ||= { s: c.spec, n60: 0, n90: 0, max: 0, free: 0 }); o.n60++; if (c.age > 90) o.n90++; o.max = Math.max(o.max, c.age); if (c.status === 'free' || c.status === 'temp') o.free++; });
+  const old = {}; cars.filter(c => (c.age ?? 0) > 60).forEach(c => { const o = (old[c.spec] ||= { s: c.spec, n60: 0, n90: 0, max: 0, free: 0 }); o.n60++; if (c.age > 90) o.n90++; o.max = Math.max(o.max, c.age); if (c.status === 'free') o.free++; });
   const oldRows = Object.values(old).sort((a, b) => b.n90 - a.n90 || b.n60 - a.n60);
-  const idle = {}; cars.filter(c => c.status === 'free' || c.status === 'temp').forEach(c => { const sp = D.specs[c.spec]; if (sp && sp.waiting) return; const o = (idle[c.spec] ||= { s: c.spec, n: 0, max: 0 }); o.n++; o.max = Math.max(o.max, c.age ?? 0); });
+  const idle = {}; cars.filter(c => c.status === 'free').forEach(c => { const sp = D.specs[c.spec]; if (sp && sp.waiting) return; const o = (idle[c.spec] ||= { s: c.spec, n: 0, max: 0 }); o.n++; o.max = Math.max(o.max, c.age ?? 0); });
   const idleRows = Object.values(idle).sort((a, b) => b.n - a.n || b.max - a.max);
   // pieces, shown on ยอดจอง (bookings) and ยอดขาย (sales) since 14/10
   const PARTS = { tiles: `${tiles([

@@ -35,7 +35,7 @@ function cdelivModal(m, D) {
         <button class="btn btn-dark btn-sm" data-act="cdeliv-pick" data-id="${esc(x.id)}">ใช้ใบจองนี้</button></div>`).join('') || '<div class="p-3 text-sm text-muted">ไม่มีใบจองสเปกนี้ที่ยังไม่ส่งมอบ ให้ลงใบจองก่อน แล้วกลับมากดส่งมอบ</div>'}</div>`;
   }
   const r = a.rec, f = r.flow || {}, fl = a.flow, v = (m.v = m.v || tradePre(r));
-  if (!stepAllowed(a, 'delivered')) return head + `<p class="text-sm">บันทึกส่งมอบได้เฉพาะเซลล์เจ้าของใบจอง แอดมินสาขา หรือผู้จัดการ</p>`;
+  if (!stepAllowed(a, 'delivered')) return head + `<p class="text-sm">บันทึกส่งมอบได้เฉพาะแอดมินสาขาหรือผู้จัดการ</p>`;
   const done = (t) => `<div class="text-sm text-muted">✓ ${t}</div>`;
   const sec = (k, ok, body) => `<div class="flex gap-3 py-2 border-b border-line"><span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold shrink-0" style="background:${ok ? 'var(--good)' : 'var(--warn)'};color:#fff">${ok ? '✓' : FLOW.indexOf(k) + 1}</span><div class="flex-1 min-w-0"><div class="font-medium">${FLOW_LABEL[k]}</div>${body}</div></div>`;
   const F = (id, label, path, val, extra = '') => `<div class="field"><label for="${id}">${label}</label><input id="${id}" data-modal="v.${path}" value="${esc(v[path] ?? val ?? '')}" autocomplete="off" ${extra}></div>`;

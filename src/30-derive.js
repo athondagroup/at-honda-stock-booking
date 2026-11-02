@@ -12,7 +12,7 @@ function atBranchOf(name) {
   const w = [['ภาษีเจริญ', 'PSC'], ['เอกชัย', 'ATE'], ['บางบอน', 'ATE'], ['สามพราน', 'SPH'], ['กำแพงแสน', 'KPA']].find(([k]) => t.includes(k));
   return w ? w[1] : null;
 }
-function specCat(st) { return st === 'free' || st === 'temp' ? 'free' : st === 'company' ? 'company' : ['locked', 'pending', 'allocated', 'noted'].includes(st) ? 'lock' : 'held'; }
+function specCat(st) { return st === 'free' ? 'free' : st === 'company' ? 'company' : ['locked', 'pending', 'allocated', 'noted', 'temp'].includes(st) ? 'lock' : 'held'; }
 function carStatus(c, inv, bkByVin) {
   if (inv && !inv.company) return inv.ddate ? 'delivered' : 'invoiced';
   if (c.company) return 'company';
@@ -391,8 +391,8 @@ function deriveNow() {
   for (const car of cars.values()) {
     const s = sp(car.spec);
     s.total++; s.totalBy[car.br] = (s.totalBy[car.br] || 0) + 1;
-    if (car.status === 'free' || car.status === 'temp') { s.free++; s.freeBy[car.br] = (s.freeBy[car.br] || 0) + 1; }
-    if (car.status === 'temp') s.temp++;
+    if (car.status === 'free') { s.free++; s.freeBy[car.br] = (s.freeBy[car.br] || 0) + 1; }
+    if (car.status === 'temp') { s.temp++; s.locked++; }   // a temporary lock is not free (ตกลง 2/11) but a booking can still take the car
     if (car.status === 'locked' || car.status === 'allocated') s.locked++;
     if (car.status === 'pending') s.pending++;
     // taken for a customer (booked, typed name, locked, sold) but not company cars
@@ -414,8 +414,8 @@ function deriveNow() {
   for (const c of cars.values()) {
     const s = sum[c.br]; if (!s) continue;
     s.stock++;
-    if (c.status === 'free' || c.status === 'temp') s.free++;
-    else if (['locked', 'pending', 'allocated'].includes(c.status)) s.locked++;
+    if (c.status === 'free') s.free++;
+    else if (['locked', 'pending', 'allocated', 'temp'].includes(c.status)) s.locked++;
     else s.held++;
   }
   idsB.forEach(b => { if (b.match !== 'cancel' && sum[b.br]) sum[b.br].ids++; });

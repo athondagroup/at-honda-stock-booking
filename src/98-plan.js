@@ -13,7 +13,7 @@ function planCalc(D) {
     if (b.state === 'waiting') { c.wait++; c.bks.push(b); } else c.has++;
   }
   for (const car of D.cars.values()) {
-    if ((car.status !== 'free' && car.status !== 'temp') || !inBr(car)) continue;
+    if (car.status !== 'free' || !inBr(car)) continue;
     const c = C(car.spec, car.br); c.free++; c.cars.push(car); if ((car.age ?? -1) > c.age) c.age = car.age;
   }
   for (const q of D.quota) if (q.open && inBr(q) && q.spec) C(q.spec, q.br).inc += q.qty || 1;
