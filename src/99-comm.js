@@ -7,6 +7,9 @@
 // Only function declarations here: the first render runs before this part of the file.
 function campRowsBuiltIn() {
   const g = (key, group, list) => list.map(([n, name, sup]) => ({ month: '2026-10', book_from: '2026-10-01', book_to: '2026-10-31', deliver_by: '2026-11-30', key, id: key + '-' + n, group, name, sup }));
+  return [...campRowsOct(g), ...campRowsNov()];
+}
+function campRowsOct(g) {
   return [
     ...g('cityRec', 'City ราคาแนะนำ (แคมเปญเดิม ก.ย.)', [[1, 'ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี', 0], [2, 'ทางเลือก 2: Service e-coupon มูลค่า 6,000 บาท + ฟรีประกันภัย 1 ปี', 0], [3, 'ทางเลือก 3: ค่าช่วยเหลือการขาย 12,000 บาท + ฟรีประกันภัย 1 ปี (ไม่ร่วม Gen to Gen / Test Drive / Local Native)', 12000]]),
     ...g('cityHbRec', 'City Hatchback ราคาแนะนำ (แคมเปญเดิม ก.ย.)', [[1, 'ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี', 0], [2, 'ทางเลือก 2: Service e-coupon มูลค่า 6,000 บาท + ฟรีประกันภัย 1 ปี', 0], [3, 'ทางเลือก 3: ค่าช่วยเหลือการขาย 12,000 บาท + ฟรีประกันภัย 1 ปี (ไม่ร่วม Gen to Gen / Test Drive / Local Native)', 12000]]),
@@ -21,12 +24,33 @@ function campRowsBuiltIn() {
     ...g('step', 'STEP WGN e:HEV', [[1, 'ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี + Ultimate Care', 0], [2, 'ทางเลือก 2: ค่าช่วยเหลือการขาย 40,000 บาท + Ultimate Care (ดอกเบี้ยมาตรฐาน)', 40000]])
   ];
 }
+// November – December 2026 campaign (Honda letter SP133/26): book 1 Nov – 31 Dec 2026, invoice / deliver by 31 Jan 2027 (added 2/11)
+function campRowsNov() {
+  const g = (key, group, list) => list.map(([n, name, sup]) => ({ month: '2026-11', book_from: '2026-11-01', book_to: '2026-12-31', deliver_by: '2027-01-31', key, id: key + '-' + n, group, name, sup }));
+  const city = [[1, 'ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี + ค่าช่วยเหลือการขาย 20,000 บาท', 20000], [2, 'ทางเลือก 2: ดอกเบี้ยพิเศษ 1.69% + Honda Exclusive Care 3 ปี', 0], [3, 'ทางเลือก 3: ดอกเบี้ยพิเศษ 0.99% + ฟรีประกันภัย 1 ปี + ค่าช่วยเหลือการขาย 8,000 บาท', 8000], [4, 'ทางเลือก 4: ค่าช่วยเหลือการขาย 26,000 บาท + ฟรีประกันภัย 1 ปี (ซื้อสด / Standard Rate / Double Smile Plus)', 26000]];
+  const rec = [[1, 'ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี', 0], [2, 'ทางเลือก 2: Service e-coupon มูลค่า 6,000 บาท + ฟรีประกันภัย 1 ปี', 0], [3, 'ทางเลือก 3: ค่าช่วยเหลือการขาย 12,000 บาท + ฟรีประกันภัย 1 ปี (ไม่ร่วม Gen to Gen / Test Drive / Local Native)', 12000]];
+  return [
+    ...g('cityRec', 'City ราคาช่วงแนะนำ (แคมเปญ พ.ย.–ธ.ค.)', rec),
+    ...g('cityHbRec', 'City Hatchback ราคาช่วงแนะนำ (แคมเปญ พ.ย.–ธ.ค.)', rec),
+    ...g('city', 'City ราคาปกติ (แคมเปญ พ.ย.–ธ.ค.)', city),
+    ...g('cityHb', 'City Hatchback ราคาปกติ (แคมเปญ พ.ย.–ธ.ค.)', city),
+    ...g('civic', 'Civic e:HEV EL+ / RS', [[1, 'ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี', 0], [2, 'ทางเลือก 2: ดอกเบี้ยพิเศษ 0% + ฟรีประกันภัย 1 ปี + ค่าช่วยเหลือการขาย 35,000 บาท', 35000], [3, 'ทางเลือก 3: ค่าช่วยเหลือการขาย 90,000 บาท + ฟรีประกันภัย 1 ปี (ดอกเบี้ยมาตรฐาน)', 90000]]),
+    ...g('civicEL', 'Civic e:HEV EL', [[1, 'ทางเลือก 1: ดอกเบี้ยพิเศษ 1.89% + Honda Exclusive Care 3 ปี', 0], [2, 'ทางเลือก 2: ค่าช่วยเหลือการขาย 50,000 บาท (ดอกเบี้ยมาตรฐาน)', 50000]]),
+    ...g('hrv', 'HR-V e:HEV / HuNT / EL, RS สีทูโทน', [[1, 'ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี + ฟรีประกันภัยเพิ่ม 1 ปี (รวม 2 ปี)', 0], [2, 'ทางเลือก 2: ค่าช่วยเหลือการขาย 90,000 บาท + ฟรีประกันภัย 2 ปี (ดอกเบี้ยมาตรฐาน)', 90000], [3, 'ทางเลือก 3: ค่าช่วยเหลือการขาย 140,000 บาท (ดอกเบี้ยมาตรฐาน · เฉพาะ EL, RS สีทูโทน)', 140000]]),
+    ...g('accord', 'Accord e:HEV', [[1, 'ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี', 0], [2, 'ทางเลือก 2: ค่าช่วยเหลือการขาย 110,000 บาท + ฟรีประกันภัย 1 ปี (ดอกเบี้ยมาตรฐาน)', 110000]]),
+    ...g('crv', 'CR-V e:HEV', [[1, 'ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี', 0], [2, 'ทางเลือก 2: ดอกเบี้ยพิเศษ 0.99% + Honda Exclusive Care 5 ปี + เพิ่มฟรีค่าแรงค่าอะไหล่เช็คระยะ 2 ปี หรือ 40,000 กม.', 0], [3, 'ทางเลือก 3: ค่าช่วยเหลือการขาย 110,000 บาท + ฟรีประกันภัย 1 ปี (ดอกเบี้ยมาตรฐาน)', 110000]]),
+    ...g('crvHunt', 'CR-V e:HEV HuNT', [[1, 'ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี + ฟรีประกันภัยเพิ่ม 1 ปี (รวม 2 ปี)', 0], [2, 'ทางเลือก 2: ดอกเบี้ยพิเศษ 0.99% + Honda Exclusive Care 5 ปี + เพิ่มฟรีค่าแรงค่าอะไหล่เช็คระยะ 2 ปี หรือ 40,000 กม. + ฟรีประกันภัยเพิ่ม 1 ปี (รวม 2 ปี)', 0], [3, 'ทางเลือก 3: ค่าช่วยเหลือการขาย 110,000 บาท + ฟรีประกันภัย 2 ปี (ดอกเบี้ยมาตรฐาน)', 110000]]),
+    ...g('en2', 'e:N2', [[1, 'ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + ฟรีประกันภัย 1 ปี + Ultimate Care + โฮมชาร์จเจอร์ + ค่าช่วยเหลือการขาย 200,000 บาท (ไม่ร่วม Gen to Gen / Local Native)', 200000], [2, 'ทางเลือก 2: ดอกเบี้ยพิเศษ 0% สูงสุด 84 เดือน + ฟรีประกันภัย 2 ปี + Ultimate Care + ฟรีค่าแรงและค่าอะไหล่เช็คระยะ 7 ปี หรือ 140,000 กม. + โฮมชาร์จเจอร์ (ไม่ร่วม Gen to Gen / Local Native)', 0], [3, 'ทางเลือก 3: ค่าช่วยเหลือการขาย 330,000 บาท + Ultimate Care (ดอกเบี้ยมาตรฐาน · ไม่ร่วม Gen to Gen / Local Native)', 330000]]),
+    ...g('step', 'STEP WGN e:HEV', [[1, 'ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี + Ultimate Care (ไม่ร่วม Gen to Gen / Local Native)', 0], [2, 'ทางเลือก 2: ค่าช่วยเหลือการขาย 40,000 บาท + Ultimate Care (ดอกเบี้ยมาตรฐาน · ไม่ร่วม Gen to Gen / Local Native)', 40000]])
+  ];
+}
 function campRows() { const d = S.ref.get('campaigns'); return d && Array.isArray(d.rows) && d.rows.length ? d.rows.filter(r => r.active !== false) : campRowsBuiltIn(); }
 // standard margin table: % of the price without paint (cash / finance); AT campaign baht per Step column, finance only
 function marginRowsBuiltIn() {
   const r = (mkey, cash, fin, s1, s2) => ({ month: '2026-10', mkey, cash, fin, step1: s1, step2: s2 });
-  return [r('accord', 0.03, 0.03, 10000, 20000), r('crv', 0.03, 0.03, 15000, 20000), r('city', 0.03, 0.03, 15000, 20000), r('cityHb', 0.03, 0.03, 15000, 20000),
+  const oct = [r('accord', 0.03, 0.03, 10000, 20000), r('crv', 0.03, 0.03, 15000, 20000), r('city', 0.03, 0.03, 15000, 20000), r('cityHb', 0.03, 0.03, 15000, 20000),
     r('civic', 0.03, 0.03, 10000, 20000), r('hrv', 0.03, 0.03, 12000, 20000), r('en2', 0.03, 0.03, 15000, 20000), r('step', 0.02, 0.03, 0, 0)];
+  return [...oct, ...oct.map(x => ({ ...x, month: '2026-11' }))];   // Nov–Dec: same standard margin as October until it is changed in the table
 }
 function marginRows() { const d = S.ref.get('margins'); return d && Array.isArray(d.rows) && d.rows.length ? d.rows.filter(r => r.active !== false) : marginRowsBuiltIn(); }
 function termsModelKey(model) {
@@ -38,6 +62,7 @@ function campKeysFor(x) {
   if (k === 'city') return ['city', 'cityRec'];
   if (k === 'cityHb') return ['cityHb', 'cityHbRec'];
   if (k === 'civic') return /EL\+|RS/.test(g) ? ['civic'] : /EL/.test(g) ? ['civicEL'] : ['civic', 'civicEL'];
+  if (k === 'crv' && /HUNT/.test(g)) return ['crvHunt', 'crv'];
   return k ? [k] : [];
 }
 // the months whose campaigns this sale may use
@@ -49,7 +74,10 @@ function termsMonths(x) {
 function termsMonthUse(rows, M) { if (rows.some(r => r.month === M)) return M; const ms = [...new Set(rows.map(r => r.month))].sort(); return ms.filter(m => m <= M).pop() || ms.pop() || null; }
 // → { opts: [{value, month, name, sup, group, ok, why}], warns: [] }
 function campOptions(x) {
-  const keys = campKeysFor(x), all = campRows().filter(r => keys.includes(r.key)), out = [], warns = [];
+  const keys = campKeysFor(x), out = [], warns = [];
+  let all = campRows().filter(r => keys.includes(r.key));
+  // CR-V HuNT has its own table from November; the months before use the CR-V table
+  if (keys.includes('crvHunt')) { const hm = new Set(all.filter(r => r.key === 'crvHunt').map(r => r.month)); all = all.filter(r => r.key === 'crvHunt' || !hm.has(r.month)); }
   const bm = x.bookDate ? x.bookDate.slice(0, 7) : null, im = x.inv ? x.inv.slice(0, 7) : null;
   if (x.adv && !im) warns.push('รถ Advance ใช้แคมเปญตามเดือนใบกำกับ Advance แต่ยังไม่พบวันที่ใบกำกับ');
   termsMonths(x).forEach(M => {
@@ -81,7 +109,7 @@ function marginStdFor(x, campValue) {
 function privRowsBuiltIn() {
   const r = (priv, mkey, a1, a2) => ({ month: '2026-10', priv, mkey, a1, a2 });
   return [r('gtg', 'city', 8000, 10000), r('gtg', 'cityHb', 8000, 10000), r('gtg', 'civic', 10000, 15000), r('gtg', 'hrv', 10000, 15000), r('gtg', 'accord', 25000, 30000), r('gtg', 'crv', 25000, 30000),
-    ...['city', 'cityHb', 'civic', 'hrv', 'accord', 'crv', 'en2', 'step'].map(k => r('ln', k, 10000, 0))];
+    ...['city', 'cityHb', 'civic', 'hrv', 'accord', 'crv', 'en2', 'step'].map(k => r('ln', k, 10000, 0))].flatMap(x => [x, { ...x, month: '2026-11' }]);   // Nov–Dec: same amounts (Honda letter SP133/26)
 }
 function privRows() { const d = S.ref.get('privileges'); return d && Array.isArray(d.rows) && d.rows.length ? d.rows.filter(r => r.active !== false) : privRowsBuiltIn(); }
 function privFor(x, month) {
