@@ -212,7 +212,8 @@ function deriveNow() {
     a.salesBr = salesBranch(a.sales);
     const dlRec = a.match && a.match.recs.find(x => x.kind === 'dl');
     // the invoice (DL) branch once delivered, otherwise the branch on the booking; a car moved in from another branch's stock does not change it
-    a.delivBr = (dlRec && dlRec.br) || a.br;
+    a.xfer = r0(a).xfer || null;
+    a.delivBr = (dlRec && dlRec.br) || (a.xfer && a.xfer.to) || a.br;
     a.cross = !!(a.salesBr && a.delivBr && a.salesBr !== a.delivBr);
   }
   // two live AT bookings with the same customer and the same model / grade / colour: a duplicate to check (or a real second car)
@@ -487,6 +488,9 @@ function buildAlerts(D) {
   // a form cancelled in the web while IDS still holds the booking: the admin of the IDS branch cancels it in IDS (2/11)
   for (const a of D.at) if (a.cancelled && a.idsLeft && !a.demo) add('cxids:' + a.idsLeft.key, { br: a.idsLeft.br, roles: ['admin', 'manager'] }, 'warn', 'ยกเลิกในเว็บแล้ว ต้องยกเลิกใน IDS',
     `${a.cust} · ใบจอง IDS ${a.idsLeft.no || ''} (${a.idsLeft.br}) · ${a.model} ${gradeShort(a.model, a.grade)} ${a.color || ''} ยกเลิกฟอร์มแล้ว ไปยกเลิกใบจองนี้ใน IDS แจ้งหายไปจากคิวเมื่ออัปโหลดไฟล์ IDS รอบหน้า`, { act: 'book-filter', st: 'cxids', label: 'ดูรายการ' });
+  // a customer moved to another branch: the destination admin keys the new IDS booking and allocates a car (2/11)
+  for (const a of D.at) if (a.xfer && a.active && typeof bkxWaiting === 'function' && bkxWaiting(a)) add('bkx:' + a.id, { br: a.xfer.to, roles: ['admin', 'manager'] }, 'warn', 'ลูกค้าโอนมาสาขานี้ ต้องคีย์ใบจองใน IDS',
+    `${a.cust} · ${specLabelText(a.spec)} · จองที่ ${a.br} (${a.sales || ''}) · ถอนจองที่ ${a.xfer.from} แล้วคีย์ใหม่ที่ ${a.xfer.to} · จัดสรรรถและใส่ใบเสร็จใหม่`, { act: 'at-open', id: a.id, label: 'เปิดใบจอง' });
   for (const a of D.at) if (a.dupAsk && a.active) add('dupids:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin', 'manager'] }, 'warn', 'ใบจอง IDS ซ้ำ ชื่อ รุ่น เกรด สีตรงกัน',
     `${a.cust} · ${specLabelText(a.spec)} · IDS ${a.dupAsk.bk.no} กับ ${a.dupAsk.y.no} · เป็นใบเดียวกัน (IDS ออกเลขใหม่) หรือจอง 2 คัน`, { act: 'at-open', id: a.id, label: 'ตรวจ' });
   for (const a of D.at) if (a.dupAt && a.active) add('dupat:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin', 'manager'] }, 'warn', 'ใบจองซ้ำ ชื่อ รุ่น เกรด สีตรงกัน',

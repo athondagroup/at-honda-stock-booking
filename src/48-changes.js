@@ -246,7 +246,7 @@ function dupAskBox(a) {
   if (a.dupAsk) {
     const { bk, y } = a.dupAsk, st = r => (r.row && r.row.ids) || '', vn = r => (r.row && r.row.vin) || '–';
     const row = (r, tag) => `<tr><td class="text-muted nowrap">${tag}</td><td class="code">${esc(r.no || '')}</td><td class="nowrap">${fmtD(r.date)}</td><td>${esc(st(r) || '–')}</td><td class="code">${esc(vn(r))}</td></tr>`;
-    out.push(box('warn', `<b>ใบจอง IDS ซ้ำ</b> ชื่อ รุ่น เกรด สี และสาขาตรงกัน 2 เลข · มักเป็นใบเดียวกันที่ IDS ออกเลขใหม่ (เช่น เลื่อนรับรถแล้วออกเลขใหม่ตอนรถมา)
+    out.push(box('warn', `<b>ใบจอง IDS ซ้ำ</b> ${bk.br !== y.br ? `ชื่อ รุ่น เกรด สีตรงกัน แต่คนละสาขา (${esc(bk.br)} / ${esc(y.br)}) · อาจเป็น <b>ลูกค้าที่โอนข้ามสาขา</b> (ถอนจองที่เดิมแล้วคีย์ใหม่) ถ้ากด "ใบเดียวกัน" ระบบบันทึกเป็นโอนลูกค้า ยอดจองยังอยู่สาขาเดิม` : 'ชื่อ รุ่น เกรด สี และสาขาตรงกัน 2 เลข · มักเป็นใบเดียวกันที่ IDS ออกเลขใหม่ (เช่น เลื่อนรับรถแล้วออกเลขใหม่ตอนรถมา)'}
       <table class="tbl text-sm mt-2"><thead><tr><th></th><th>เลขที่ใบจอง</th><th>วันที่</th><th>สถานะใน IDS</th><th>รถ</th></tr></thead><tbody>${row(bk, 'จับคู่อยู่')}${row(y, 'อีกใบ')}</tbody></table>
       ${can ? `<div class="flex flex-wrap gap-2 mt-2"><button class="btn btn-dark btn-sm" data-act="dup-same" data-id="${esc(a.id)}" data-a="${esc(bk.key)}" data-b="${esc(y.key)}">ใบเดียวกัน → ใช้เลขที่ยังใช้งาน เก็บอีกเลขเป็นเลขเดิม</button>
         <button class="btn btn-ghost btn-sm" data-act="dup-no" data-id="${esc(a.id)}" data-key="${esc(y.key)}">คนละใบ ไม่ซ้ำ</button></div>` : '<div class="text-xs mt-2">เซลล์เจ้าของ แอดมินสาขา หรือผู้จัดการเป็นคนยืนยัน</div>'}`));

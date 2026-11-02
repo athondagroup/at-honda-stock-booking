@@ -95,6 +95,7 @@ function atModal(m, D) {
       ${mergedBox(a, D)}
       ${m.cancel ? cancelPanel(m, a) : ''}
       ${ownerBox(m, a)}
+      ${bkxBox(m, a)}
       ${matchInfo}${dupAskBox(a)}
       ${a.cancelled ? '' : flowPanel(m, a, D)}
       <div class="text-xs text-muted">บันทึก ${fmtDT(r.created_at)} โดย ${who({ by: r.created_by, role: r.created_role })}</div>

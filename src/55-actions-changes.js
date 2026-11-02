@@ -107,9 +107,10 @@ Object.assign(ACTIONS, {
   async 'dup-same'(el) {
     const a = atById(el.dataset.id), ka = el.dataset.a, kb = el.dataset.b; if (!a || !canEditBooking(a)) return;
     const D = derive(), g = k => D.idsB.find(x => x.key === k) || {};
-    const sc = r => (r.vin ? 2 : 0) + (r.ids && r.ids !== 'เลื่อนการรับรถ' ? 1 : 0), ra = g(ka), rb = g(kb);
+    const sc = r => (r.vin ? 2 : 0) + (r.ids && r.ids !== 'เลื่อนการรับรถ' ? 1 : 0) - (r.match === 'cancel' || r.ids === CANCEL ? 4 : 0), ra = g(ka), rb = g(kb);
     const primary = sc(rb) > sc(ra) || (sc(rb) === sc(ra) && (rb.date || '') > (ra.date || '')) ? kb : ka, other = primary === ka ? kb : ka;
     const r = await saveBk(a.id, 'ใบเดียวกัน IDS ออกเลขใหม่', `ใช้ ${primary.replace('ids:', '')} · เลขเดิม ${other.replace('ids:', '')}`, x => {
+      const pr = g(primary), ot = g(other); if (pr.br && ot.br && pr.br !== ot.br && !x.xfer) x.xfer = { from: ot.br, to: pr.br, why: 'ลูกค้าโอนข้ามสาขา (ยืนยันจากใบจอง IDS ซ้ำ)', old_no: ot.no || null, old_key: other, ...actor() };
       x.match_pick = { key: primary, ...actor() }; x.ids_alt = [...new Set([...(x.ids_alt || []), other])]; x.dup_no = (x.dup_no || []).filter(k => k !== other);
     });
     if (r) toast('ผูกแล้ว ใช้เลข ' + primary.replace('ids:', '') + ' เป็นหลัก เลขเดิมเก็บไว้');

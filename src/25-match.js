@@ -81,7 +81,7 @@ function matchForms(at, idsB, cars, inv) {
       if (d < win[0] || d > win[1]) continue;
       const same = a.model === r.model;
       if (ns === 1 && !(same && a.grade === r.grade)) continue;
-      const score = ns * 10 + (same ? 6 : 0) + (a.grade === r.grade ? 2 : 0) + ((a.color || '') === (r.color || '') ? 1 : 0) + (a.br === r.br ? 1 : 0) - Math.abs(d) / 60 + (r.kind === 'dl' ? 0.5 : r.kind === 'stock' ? 0.3 : 0);
+      const score = ns * 10 + (same ? 6 : 0) + (a.grade === r.grade ? 2 : 0) + ((a.color || '') === (r.color || '') ? 1 : 0) + (a.br === r.br ? 1 : 0) + (a.rec.xfer && a.rec.xfer.to === r.br ? 3 : 0) - Math.abs(d) / 60 + (r.kind === 'dl' ? 0.5 : r.kind === 'stock' ? 0.3 : 0);
       pairs.push({ a, r, score, same });
     }
   }
@@ -126,13 +126,14 @@ function matchForms(at, idsB, cars, inv) {
   idsOnly = idsOnly.filter(b => !idsCx.has(b.key));
   // the same customer, model, grade, colour and branch twice in IDS: usually IDS re-issued the booking (e.g. 'postponed' then a new number
   // when the car came). A person confirms: same booking (old number kept as an alias) or two different bookings.
+  const isCx = r => !!(r.row && (r.row.match === 'cancel' || r.row.ids === CANCEL));
   const dupAsk = new Map();
   for (const a of at) {
     if (a.cancelled || a.demo) continue;
     const res = result.get(a.key), bk = res && res.recs.find(x => x.kind === 'booking'); if (!bk) continue;
     const no = new Set(a.rec.dup_no || []), ak = nameKey(bk.name || a.cust);
     const y = idsOnly.find(x => x.key !== bk.key && !no.has(x.key) && x.cust && keyScore(ak, nameKey(x.cust)) >= 2 && x.model === bk.model && x.grade === bk.grade
-      && String(x.color || '').toUpperCase() === String(bk.color || '').toUpperCase() && x.br === bk.br);
+      && String(x.color || '').toUpperCase() === String(bk.color || '').toUpperCase() && (x.br === bk.br || isCx(bk)));   // another branch: only when the old booking was withdrawn (a customer moved to another branch)
     if (!y) continue;
     // sure case: one number is 'postponed' with no car, the other is live with a car: IDS re-issued the booking. No one needs to click.
     const live = r => !!((r.row && r.row.vin) || r.vin), post = r => !!(r.ids === 'เลื่อนการรับรถ' || (r.row && r.row.ids === 'เลื่อนการรับรถ')) && !live(r);
