@@ -21,8 +21,10 @@ function soldStatus(a) {
 function soldRows(D) {
   const out = [];
   for (const a of D.at) {
-    if (a.cancelled || a.demo || !inBr(a) || !atVisible(a)) continue;
-    const inv = soldInv(a, D), fl = a.flow || {}, dd = fl.deliveredDate || (inv && inv.ddate) || null;
+    if (a.cancelled || a.demo || !atVisible(a)) continue;
+    const inv = soldInv(a, D);
+    if (!inBr(S.filters.soBrBy === 'inv' && inv && inv.ibr ? { br: inv.ibr } : a)) continue;   // branch counted by the booking branch or by the branch that issued the invoice
+    const fl = a.flow || {}, dd = fl.deliveredDate || (inv && inv.ddate) || null;
     if (!inv && !dd) continue;
     // delivery as the web and IDS tell it (26/10): web recorded by hand, IDS (DL) delivery date, or a delivered car with no date at all
     const rec = fl.done && fl.done.delivered, recDate = a.rec.flow && a.rec.flow.delivered && a.rec.flow.delivered.date, idsDd = inv && !inv.adv ? inv.ddate : null;
@@ -51,6 +53,7 @@ function soldList(D) {
   return `<p class="text-sm text-muted mb-3">รถที่ออกใบกำกับภาษีแล้วหรือส่งมอบแล้ว ดูและแก้เงื่อนไขการขาย (ส่วนลด ดาวน์ แคมเปญ Margin) ได้ที่นี่ · กดแถวเพื่อเปิดใบจองที่ช่องเงื่อนไขการขาย</p>
   <div class="flex flex-wrap gap-2 items-end mb-3">
     <div class="field"><label for="so-by">นับเดือนจาก</label><select id="so-by" data-filter="soBy"><option value="inv" ${by === 'inv' ? 'selected' : ''}>วันออกใบกำกับ</option><option value="deliv" ${by === 'deliv' ? 'selected' : ''}>วันส่งมอบ</option></select></div>
+    <div class="field"><label for="so-brby">สาขานับตาม</label><select id="so-brby" data-filter="soBrBy"><option value="" ${f.soBrBy !== 'inv' ? 'selected' : ''}>สาขาที่จอง</option><option value="inv" ${f.soBrBy === 'inv' ? 'selected' : ''}>สาขาที่ออกใบกำกับ</option></select></div>
     <div class="field"><label for="so-m">เดือน</label><select id="so-m" data-filter="soMonth"><option value="" ${!month ? 'selected' : ''}>ทุกเดือน</option>${months.map(m => `<option value="${m}" ${m === month ? 'selected' : ''}>${mLabel(m)}</option>`).join('')}</select></div>
     ${isSales() ? '' : `<div class="field"><label for="so-s">เซลล์</label><select id="so-s" data-filter="soSales"><option value="">ทุกคน</option>${sales.map(s => `<option ${s === f.soSales ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></div>`}
     <div class="field flex-1" style="min-width:200px"><label for="so-q">ค้นหา</label><input id="so-q" type="search" data-filter="soQ" value="${esc(f.soQ || '')}" placeholder="ชื่อลูกค้า หรือ เลขตัวถัง"></div>
