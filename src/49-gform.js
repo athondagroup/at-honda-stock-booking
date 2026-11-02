@@ -3,7 +3,7 @@
 // The form's field ids come from a pre-filled link pasted once (stored in ref/gform).
 const GF_FIELDS = [['br', 'สาขา'], ['sales', 'ชื่อเซลล์'], ['customer', 'ชื่อ-นามสกุลลูกค้า'], ['model', 'รุ่นรถที่จอง'], ['grade', 'เกรด'], ['color', 'สี'],
   ['purchase', 'เงื่อนไข'], ['insurance', 'ประกันภัย'], ['discount', 'ส่วนลด'], ['foc_total', 'FOC ที่ใช้ทั้งหมด'], ['note', 'หมายเหตุ'], ['booking_date', 'วันที่จอง'],
-  ['source', 'แหล่งที่มาของการจอง'], ['lead_id', 'Lead ID จาก BOT'], ['web_id', 'รหัสใบจองเว็บ (ถ้าเพิ่มคำถามนี้ในฟอร์ม)']];
+  ['source', 'แหล่งที่มาของการจอง'], ['lead_id', 'Lead ID จาก BOT'], ['trade', 'มี / ไม่มีรถเก่า (ถ้าเพิ่มคำถามนี้ในฟอร์ม)'], ['web_id', 'รหัสใบจองเว็บ (ถ้าเพิ่มคำถามนี้ในฟอร์ม)']];
 const GF_LEAD_ENTRY = 'entry.56565845';   // already used by the Lead BOT's pre-filled links
 // the form's own wording for choices that the web names differently
 const GF_MODEL = { 'HR-V e:HEV': 'HRV e:HEV', 'CR-V e:HEV': 'CRV e:HEV', 'STEP WGN e:HEV': 'STEP WGN' };
@@ -37,6 +37,7 @@ function gformParse(link) {
   take('note', v => /หมายเหตุ|หมายเหต|note/i.test(v));
   take('discount', v => /^\d[\d,]*$/.test(v));
   take('foc_total', v => /^\d[\d,]*$/.test(v));
+  take('trade', v => v === 'มี' || v === 'ไม่มี' || /รถเก่า/.test(v));
   take('web_id', v => /^web$/i.test(v.trim()) || /รหัส/.test(v));
   take('customer', v => /name|ชื่อ/i.test(v));
   take('customer', () => true);
@@ -60,6 +61,7 @@ function gformValue(field, a) {
     case 'booking_date': return r.booking_date || '';
     case 'source': return GF_SOURCE[r.source] || r.source || '';
     case 'lead_id': return r.lead_id || '';
+    case 'trade': { const tr = a.rec.trade; return tr ? (tr.has ? 'มี' : 'ไม่มี') : ''; }
     case 'web_id': return a.id;
     default: return '';
   }

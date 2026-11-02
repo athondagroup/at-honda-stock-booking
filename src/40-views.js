@@ -260,7 +260,7 @@ function stockCars(D) {
 function viewStock(D) {
   if (S.sub.stock === 'hist' && perms().approve) return carHistView(D);
   if (S.sub.stock === 'sp') return spView(D);
-  const f = S.filters, p = perms(), mode = S.sub.stock === 'list' ? 'list' : 'spec';
+  const f = S.filters, p = perms(), mode = S.sub.stock === 'spec' ? 'spec' : 'list';
   const all = stockCars(D);
   const counts = {}; all.forEach(c => { counts[c.status] = (counts[c.status] || 0) + 1; });
   const models = [...new Set([...D.cars.values()].map(c => c.model).filter(Boolean))].sort();

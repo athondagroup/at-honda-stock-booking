@@ -235,7 +235,9 @@ function deriveNow() {
 
   // queue rows: IDS bookings (linked to their AT form when found) + AT bookings not yet in IDS
   const bookings = [];
-  idsB.forEach(b => { b.app = atByIds.get(b.key) || null; b.owner = b.app ? b.app.sales : b.sales; b.qdate = b.app && b.app.rec.queue_date ? b.app.rec.queue_date : b.date; bookings.push(b); });
+  // the form was cancelled in the web but IDS still has the booking: it leaves the queue, the IDS admin is told to cancel it in IDS (2/11)
+  const cxByIds = new Map(at.filter(a => a.cancelled && a.idsLeft).map(a => [a.idsLeft.key, a]));
+  idsB.forEach(b => { if (cxByIds.has(b.key)) { b.cxForm = cxByIds.get(b.key); b.state = 'cxform'; return; } b.app = atByIds.get(b.key) || null; b.owner = b.app ? b.app.sales : b.sales; b.qdate = b.app && b.app.rec.queue_date ? b.app.rec.queue_date : b.date; bookings.push(b); });
   at.filter(a => !a.ids && a.active).forEach(a => {
     const kind = a.match ? a.match.kind : null;
     bookings.push({ ...a, app: a, owner: a.sales, match: kind === 'stock' ? 'car' : kind === 'dl' ? 'car' : 'waiting', vin: a.match ? a.match.vin : null });
@@ -481,6 +483,9 @@ function buildAlerts(D) {
   for (const a of D.at) if (a.cancelled && !a.demo && a.rec.cancel && a.rec.cancel.refund === 'transfer' && !a.rec.cancel.to)
     add('trheld:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin', 'manager'] }, 'warn', 'มัดจำรอโอนไปใบจองใหม่',
       `${a.cust} · ${specLabelText(a.spec)} · ${money((a.rec.cancel.transfer || {}).amount ?? a.deposit)} บาท · ลงใบจองใหม่ของลูกค้าแล้วกดผูก`, { act: 'tr-open', id: a.id, label: 'ผูกกับใบจองใหม่' });
+  // a form cancelled in the web while IDS still holds the booking: the admin of the IDS branch cancels it in IDS (2/11)
+  for (const a of D.at) if (a.cancelled && a.idsLeft && !a.demo) add('cxids:' + a.idsLeft.key, { br: a.idsLeft.br, roles: ['admin', 'manager'] }, 'warn', 'ยกเลิกในเว็บแล้ว ต้องยกเลิกใน IDS',
+    `${a.cust} · ใบจอง IDS ${a.idsLeft.no || ''} (${a.idsLeft.br}) · ${a.model} ${gradeShort(a.model, a.grade)} ${a.color || ''} ยกเลิกฟอร์มแล้ว ไปยกเลิกใบจองนี้ใน IDS แจ้งหายไปจากคิวเมื่ออัปโหลดไฟล์ IDS รอบหน้า`, { act: 'book-filter', st: 'cxids', label: 'ดูรายการ' });
   for (const a of D.at) if (a.dupAsk && a.active) add('dupids:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin', 'manager'] }, 'warn', 'ใบจอง IDS ซ้ำ ชื่อ รุ่น เกรด สีตรงกัน',
     `${a.cust} · ${specLabelText(a.spec)} · IDS ${a.dupAsk.bk.no} กับ ${a.dupAsk.y.no} · เป็นใบเดียวกัน (IDS ออกเลขใหม่) หรือจอง 2 คัน`, { act: 'at-open', id: a.id, label: 'ตรวจ' });
   for (const a of D.at) if (a.dupAt && a.active) add('dupat:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin', 'manager'] }, 'warn', 'ใบจองซ้ำ ชื่อ รุ่น เกรด สีตรงกัน',

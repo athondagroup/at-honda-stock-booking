@@ -79,7 +79,7 @@ const VIEWS = ['dash', 'alerts', 'inbox', 'stock', 'book', 'quota', 'lock', 'flo
 const S = {
   mode: 'connecting', // shared | local | readonly | connecting
   view: 'dash',
-  sub: { dash: 'exec', inbox: 'all', book: 'list', lock: 'approve', stock: 'spec', receive: 'pending', flow: 'booked', admin: 'sales' },
+  sub: { dash: 'exec', inbox: 'all', book: 'list', lock: 'approve', stock: 'list', receive: 'pending', flow: 'booked', admin: 'sales' },
   br: lsGet('ath-br', ''),
   role: lsGet('ath-role', { role: 'aum', branch: 'SPH', sales: SEED.sales[0]?.name || '' }),
   me: { id: null, name: '' },

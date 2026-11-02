@@ -653,11 +653,12 @@ const ACTIONS = {
     l.status = 'approved'; l.start = todayISO(); l.end = addDays(l.start, days); l.approved_at = new Date().toISOString();
     markUndo(l, 'อนุมัติ', 'pending');
     if (!await saveLock(id, l, 'อนุมัติล็อก', `หมด ${fmtD(l.end)}`)) return;
+    let closed = 0;
     if (l.type !== 'temp') {
-      const side = await settleUnit(derive(), l, id);
+      const side = await settleUnit(derive(), l, id); closed = side.length;
       if (side.length) { const cur = findLock(id); cur.undo = { ...cur.undo, side }; await write('locks', id, cur); }
     }
-    toast(`อนุมัติแล้ว ล็อกถึง ${fmtD(l.end)}`);
+    toast(`อนุมัติแล้ว ล็อกถึง ${fmtD(l.end)}${closed ? ` · ปิดคำขออื่นของรถคันนี้ ${closed} รายการให้อัตโนมัติ` : ''}`);
   },
   // put a lock back to where it was before the last action (pressed by mistake)
   async undo(el) {
