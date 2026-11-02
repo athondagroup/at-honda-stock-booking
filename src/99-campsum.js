@@ -47,7 +47,7 @@ function rptCompare(D, rep, rows) {
   return {
     delHonda: H.del.length, delWeb: w.del.size, advHonda: H.adv.length,
     notInWeb: H.del.filter(r => !w.del.has(r.vin)),                                  // Honda says delivered, the web has no delivery in that month
-    notInHonda: [...w.del.entries()].filter(([v]) => withDeal.has(v) && !hd.has(v) && !H.adv.some(r => r.vin === v)).map(([vin, d]) => ({ vin, d })),   // delivered in the web, not reported
+    notInHonda: [...w.del.entries()].filter(([v]) => withDeal.has(v) && !hd.has(v) && !H.adv.some(r => r.vin === v) && !(rptFirstMonth(v) && rptFirstMonth(v) < ym)).map(([vin, d]) => ({ vin, d })),   // delivered in the web, not reported
     // ALLOCATED = Advance = invoiced, not handed over: with a customer (waiting to deliver / delivered next month) or without a customer
     adv: H.adv.map(r => {
       const i = D.invByVin.get(r.vin), cust = i && i.cust ? i.cust : '', dd = i && i.ddate ? String(i.ddate).slice(0, 10) : '', next = dd && dd.slice(0, 7) > ym;
@@ -238,3 +238,20 @@ Object.assign(ACTIONS, {
   'rpt-br'(el) { S.filters.rptBr = el.dataset.br || ''; S.filters.rptRep = ''; S.filters.rptOpen = {}; render(); },
   'rpt-model'(el) { const o = { ...(S.filters.rptOpen || {}) }; o[el.dataset.m] = !o[el.dataset.m]; S.filters.rptOpen = o; render(); }
 });
+
+// ---- the invoice month follows Honda's campaign file (ตกลง 2/11): the first file a car appears in is its real invoice month
+// (that count is what the target is made from). A car in the September file but invoiced again in October (the first invoice
+// was cancelled) stays a September invoice and is not counted again in October.
+function repYm(rep) { const m = String(rep || '').match(/(\d{2})\/(\d{4})/); return m ? m[2] + '-' + m[1] : ''; }
+function rptFirstMonth(vin, rp) {
+  const sv = (rp || (S.ref.get('honda_rpt') || {}).v || {})[String(vin || '').toUpperCase()]; if (!sv) return null;
+  const ms = [sv.rep, ...(sv.prev || []).map(p => p.rep)].map(repYm).filter(Boolean).sort();
+  return ms[0] || null;
+}
+function invByFile(i, rp) {
+  if (!i.vin || i.company || !i.idate) return i;
+  const m = rptFirstMonth(i.vin, rp); if (!m || String(i.idate).slice(0, 7) <= m) return i;
+  const sv = rp[String(i.vin).toUpperCase()], first = [...(sv.prev || []), sv].find(p => repYm(p.rep) === m) || sv;
+  const [y, mo] = m.split('-').map(Number), last = `${m}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}`;
+  return { ...i, idate: first.date && String(first.date).slice(0, 7) === m ? String(first.date).slice(0, 10) : last, idate_web: i.idate, fileMonth: m };
+}

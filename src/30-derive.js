@@ -74,7 +74,8 @@ function derive() {
   return D;
 }
 function deriveNow() {
-  const today = todayISO(), X = idsData();
+  const today = todayISO(), X0 = idsData(), rpFile = (S.ref.get('honda_rpt') || {}).v || {};
+  const X = Object.keys(rpFile).length ? { ...X0, inv: X0.inv.map(i => invByFile(i, rpFile)) } : X0;   // invoice month = the month of Honda's campaign file (2/11)
   const invByVin = new Map();
   // latest invoice per car; on the same date the sale to a customer wins over the sale between AT Honda branches
   // (PSC sells to SPH on 31/03 and SPH sells to the customer the same day: the car is SPH's customer's)

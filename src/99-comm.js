@@ -134,7 +134,7 @@ function termsFields(x, v, f) {
     ${N('priv_hk', 'ฮอนด้าเคียงข้างคุณ (บาท)', 'step="1000" placeholder="25,000–70,000"')}
     ${N('margin_priv', '4. สิทธิพิเศษ Honda (บาท)')}</div>
     <div class="text-xs text-muted mt-1">${pv.pr.miss ? `เดือน ${fmtM(pv.pr.req)} ไม่มียอดในตาราง (Gen to Gen ของแคมเปญเดือนนี้ขึ้นกับปีที่ครอบครองรถเดิม) ใส่ยอดเองในช่อง 4 และดูเงื่อนไขในเอกสารแคมเปญ` : `ยอดตามแท็บสิทธิพิเศษ Honda เดือน ${fmtM(pv.pr.month)}`} · ฮอนด้าเคียงข้างคุณใช้ร่วมกับ Gen to Gen / Local Native ไม่ได้</div></div>`;
-  const price = f.priceDisc ? `<div class="field"><label for="${f.idp}-price" class="req">ราคารถ (ราคาเต็ม)</label><input id="${f.idp}-price" type="number" min="0" step="100" inputmode="decimal" ${f.attr}="${f.pre}.price" value="${esc(o.price ?? '')}" ${f.lockPrice || f.ro ? 'readonly style="background:var(--surface-2)"' : ''}>${f.priceNote ? `<span class="text-xs text-muted">${f.priceNote}</span>` : ''}</div>` + N('disc', 'ส่วนลดราคารถ', 'step="100"') : '';
+  const price = f.priceDisc ? `<div class="field"><label for="${f.idp}-price" class="req">ราคารถ (ราคาเต็ม)</label><input id="${f.idp}-price" type="number" min="0" step="100" inputmode="decimal" ${f.attr}="${f.pre}.price" value="${esc(o.price ?? '')}" ${f.lockPrice || f.ro ? 'readonly style="background:var(--surface-2)"' : ''}>${f.priceNote ? `<span class="text-xs text-muted">${f.priceNote}</span>` : ''}</div>` + (f.priceAdd ? N('price_add', 'บวกราคารถ (บาท)', 'step="100" placeholder="ถ้าราคาจริงสูงกว่าราคาในเว็บ"') + (num(o.price_add) ? `<div class="field"><label for="${f.idp}-price_add_note" class="req">เหตุผลที่บวกราคา</label><input id="${f.idp}-price_add_note" ${f.attr}="${f.pre}.price_add_note" value="${esc(o.price_add_note ?? '')}" autocomplete="off" placeholder="เช่น ติดตั้งอุปกรณ์เพิ่ม"></div>` : '') : '') + N('disc', 'ส่วนลดราคารถ', 'step="100"') : '';
   const fin = x.cash ? '' : N('down', 'เงินดาวน์', 'step="100"') + N('down_disc', 'ส่วนลดดาวน์', 'step="100"') + RO('ยอดจัด', o.fin_amount, 'ราคารถ − ส่วนลด − ดาวน์ (คิดให้เอง)') + N('rate', 'ดอกเบี้ย (% ต่อปี)', 'step="0.01" max="30"') + N('term', 'จำนวนงวด (เดือน)', 'step="1" max="120"');
   const groups = [...new Set(opts.map(y => y.group))];
   const sel = `<div class="field sm:col-span-3"><label for="${f.idp}-camp">แคมเปญ Honda <span class="text-xs text-muted">(ยังไม่เลือกได้)</span></label><select id="${f.idp}-camp" ${f.attr}="${f.pre}.campaign_id" ${dis}><option value="">เลือกแคมเปญ</option>${groups.map(gname => {
@@ -237,7 +237,7 @@ document.addEventListener('input', ev => {
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t || !t.dataset) return;
   const k = t.dataset.modal || t.dataset.draft || '';
-  if (k === 'booking.discount' && S.draft.booking && S.draft.booking.model) { softRender(); return; } const m = k.match(/^(deal|booking\.deal)\.(campaign_id|at_step|price|disc|down|down_disc|rate|term|margin_car|margin_at|margin_honda|margin_priv|priv_hk|campaign_text)$/);
+  if (k === 'booking.discount' && S.draft.booking && S.draft.booking.model) { softRender(); return; } const m = k.match(/^(deal|booking\.deal)\.(campaign_id|at_step|purchase_to|price_add|price|disc|down|down_disc|rate|term|margin_car|margin_at|margin_honda|margin_priv|priv_hk|campaign_text)$/);
   if (!m) return;
   const tgt = m[1] === 'deal' ? (S.modal && S.modal.deal) : (S.draft.booking && S.draft.booking.deal);
   if (!tgt) return;
