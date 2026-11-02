@@ -628,7 +628,8 @@ const ACTIONS = {
       bkref: b ? (b.app ? b.app.key : b.key) : null, bk_br: b ? b.br : null, sales: owner || null,
       prospect: m.type === 'temp' ? m.prospect.trim() : null, dealer_name: m.type === 'dealer' ? m.dealer_name.trim() : null,
       reason: m.reason, note: (m.note || '').trim(), warnings: chk.warn, status: 'pending', requested_at: now, requested_by: S.me.id || null,
-      ext: 0, history: [], convert_from: m.convertFrom || null, requested_role: roleLabel()
+      ext: 0, history: [], convert_from: m.convertFrom || null, requested_role: roleLabel(),
+      req_br: (b ? b.br : null) || (owner ? salesBranch(owner) : null) || mgrBranches()[0] || null   // the branch that asked for the lock (a manager can lock a car of any branch)
     };
     const conv = m.convertFrom ? findLock(m.convertFrom) : null;
     if (direct) { l.status = 'approved'; l.start = todayISO(); l.end = addDays(l.start, days); l.approved_at = now; }
@@ -637,7 +638,7 @@ const ACTIONS = {
     if (conv) { conv.status = 'converted'; conv.converted_to = id; await saveLock(m.convertFrom, conv, 'ลูกค้ามาจองแล้ว', `เปลี่ยนเป็นล็อกให้ใบจอง${direct ? '' : ' รอผู้จัดการอนุมัติ'}`); }
     if (direct && m.type !== 'temp') await settleUnit(derive(), l, id);
     S.modal = null; if (S.view === 'lock') { S.sub.lock = direct ? 'active' : 'approve'; setHash(); }
-    toast(direct ? `ล็อกแล้วถึง ${fmtD(l.end)}` : 'ส่งให้ผู้จัดการอนุมัติแล้ว (ดูได้ที่หน้าล็อก)'); render();
+    toast(direct ? `ล็อกแล้วถึง ${fmtD(l.end)}${l.req_br && l.req_br !== l.car_br ? ` · แจ้งสาขา ${l.car_br} (เจ้าของรถ) แล้ว` : ''}` : 'ส่งให้ผู้จัดการอนุมัติแล้ว (ดูได้ที่หน้าล็อก)'); render();
   },
   async approve(el) {
     const cur0 = S.locks.get(el.dataset.id);
@@ -729,7 +730,9 @@ const ACTIONS = {
       S.modal = null; toast('บันทึกขายสำเร็จ นำรถออกจากสต็อกแล้ว (คืนรถเข้าสต็อกได้ที่ "รถที่นำออก")'); render(); return;
     }
     if (m.act === 'dealer-edit') { const was = l.dealer_name || ''; if (note === was) { S.modal = null; render(); return; } l.dealer_name = note; if (await saveLock(m.id, l, 'แก้ชื่อดีลเลอร์', `${was} → ${note}`)) { S.modal = null; toast('แก้ไขแล้ว'); render(); } return; }
-    if (m.act === 'release') { markUndo(l, 'ปล่อยล็อก', l.status); l.status = 'released'; if (await saveLock(m.id, l, 'ปล่อยล็อก', [m.opt, note].filter(Boolean).join(': '))) { S.modal = null; toast('ปล่อยล็อกแล้ว รถกลับเป็นว่าง'); render(); } }
+    if (m.act === 'release') { if (l.req_br && l.req_br !== l.car_br && !note) { toast('ล็อกนี้สาขา ' + l.req_br + ' เป็นคนขอ ใส่เหตุผลที่ปลดล็อกด้วย', 'bad'); return; }
+      l.rel = { at: new Date().toISOString(), reason: [m.opt, note].filter(Boolean).join(': '), self: !!(l.requested_by && l.requested_by === S.me.id), by: roleLabel() };
+      markUndo(l, 'ปล่อยล็อก', l.status); l.status = 'released'; if (await saveLock(m.id, l, 'ปล่อยล็อก', [m.opt, note].filter(Boolean).join(': '))) { S.modal = null; toast('ปล่อยล็อกแล้ว รถกลับเป็นว่าง'); render(); } }
   },
 
   // ---- delivery steps, in order: จอง → ไฟแนนซ์ผ่าน → จัดสรรรถ → PO → ส่งมอบ → ผู้จัดการยืนยัน

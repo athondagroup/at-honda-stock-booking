@@ -517,6 +517,13 @@ function buildAlerts(D) {
     // the last day of a 15-day lock: the manager extends or releases; no update = the queue is released on releaseOn
     if (l.mgrDue) add('lockx:' + l.id, { br, roles: ['manager'] }, 'warn', `ครบ ${l.days} วันแล้ว${l.finWait ? ' ไฟแนนซ์ยังไม่ผ่าน' : ''} ต่อล็อกหรือปล่อย`,
       `${unit} · ${cust} · เซลล์ ${who || ''} · ถ้าไม่ต่อ ระบบปล่อยคิววันที่ ${fmtD(l.releaseOn)}`, { act: 'go', view: 'lock', sub: 'active' });
+    // a manager locked a car of another branch (2/11): the owner branch is told and may release it (with a reason); the asking branch is told when it is released
+    if (l.req_br && l.req_br !== l.car_br) {
+      if (['approved', 'allocated'].includes(l.status)) add('lockc:' + l.id, { br: l.car_br, roles: ['admin', 'manager'] }, 'warn', `รถของสาขา ${l.car_br} ถูกผู้จัดการสาขา ${l.req_br} ล็อกแล้ว`,
+        `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · ${l.status === 'approved' ? `ล็อกถึง ${fmtD(l.end)} · ` : ''}ไม่ว่างแล้ว · ผู้จัดการสาขา ${l.car_br} ปลดล็อกได้ (ต้องใส่เหตุผล)`, { act: 'go', view: 'lock', sub: 'active', label: 'ดู / ปลดล็อก' });
+      if (l.status === 'released' && l.rel && !l.rel.self && daysBetween(l.rel.at.slice(0, 10), today) <= 7) add('lockrel:' + l.id, { br: l.req_br, roles: ['admin', 'manager'] }, 'bad', `ล็อกรถสาขา ${l.car_br} ที่สาขาคุณขอไว้ ถูกปลดแล้ว`,
+        `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · เหตุผล: ${l.rel.reason || '–'}`, { act: 'go', view: 'lock', sub: 'active', label: 'ดู' });
+    }
     if (l.finDue) add('lockf:' + l.id, { sales: who, br, roles: ['sales'] }, 'warn', 'ครบ 15 วัน อัปเดตสถานะไฟแนนซ์', `${unit} · ${cust} · ผู้จัดการต้องต่อล็อกภายใน ${fmtD(addDays(l.releaseOn, -1))} ไม่งั้นระบบปล่อยคิว`, l.booking && l.booking.app ? { act: 'at-open', id: l.booking.app.id } : null);
     else if (!l.mgrDue && l.status === 'approved' && !l.hold && l.live && l.daysLeft !== null && l.daysLeft <= 2 && l.daysLeft >= 0) add('locke:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'warn', `ล็อกจะหมดใน ${l.daysLeft} วัน`, `${unit} · ${l.type === 'temp' ? 'ลูกค้าที่จะมาจอง ' + (l.prospect || '') : cust}`, { act: 'go', view: 'lock', sub: 'active' });
     if (l.autoReleased && daysBetween(l.releaseOn, today) <= 3) add('lockr:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'muted', `ปล่อยคิวแล้ว: ครบ ${l.days} วัน ผู้จัดการไม่ได้ต่อ`, `${unit} · ${cust} · รถกลับเป็นว่าง ต้องการรถคันนี้ให้ขอล็อกใหม่`, { act: 'go', view: 'lock', sub: 'active' });
