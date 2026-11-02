@@ -175,6 +175,9 @@ function viewCampUp(D) {
     ${U.items ? `<div class="mt-3 flex flex-wrap items-center gap-2 text-sm"><label for="cu-br" class="font-medium">ไฟล์นี้เป็นของสาขา</label><select id="cu-br" data-campup-br ${myBranch() ? 'disabled' : ''}><option value="">เลือกสาขา…</option>${BRS.map(b => `<option value="${b}" ${U.br === b ? 'selected' : ''}>${b} ${esc(BR[b].name)}</option>`).join('')}</select>${U.brAuto && U.br ? '<span class="text-xs text-muted">อ่านจากหัวไฟล์ ตรวจให้ถูกก่อนบันทึก</span>' : !U.br ? '<span class="text-xs" style="color:var(--bad)">ต้องเลือกสาขาก่อนบันทึก</span>' : ''}</div>` : ''}
     ${U.pay ? `<div class="mt-3 flex flex-wrap items-center gap-2 text-sm">ไฟล์ <b>${esc(U.file)}</b><button class="btn btn-ghost btn-sm ml-auto" data-act="campup-clear">ล้างไฟล์</button></div>` : ''}
     ${U.text || U.items ? `<div class="mt-3 flex flex-wrap items-center gap-2 text-sm">ไฟล์ <b>${esc(U.file)}</b>${U.report ? ` (รายงาน ${esc(U.report)})` : ''} ${chip('ตรง ' + n('ok'), 'good')}${chip('ไม่ตรง ' + n('diff'), 'warn')}${(U.items ? chip('ยังไม่มีข้อมูล ' + n('new'), 'muted') : chip('ไม่พบ ' + n('miss'), 'bad'))}<button class="btn btn-ghost btn-sm ml-auto" data-act="campup-clear">ล้างไฟล์</button></div>` : ''}
+    <div class="mt-4 pt-4 border-t border-line"><div class="font-medium text-sm mb-1">หรือวางข้อมูลจาก Excel (ไม่ต้องเลือกไฟล์)</div>
+      <div class="text-xs text-muted mb-2">เปิดไฟล์แคมเปญใน Excel คลิกในตาราง กด <b>Ctrl+A</b> → <b>Ctrl+C</b> (ให้ติดแถวหัวตารางมาด้วย) แล้วคลิกในกล่องนี้กด <b>Ctrl+V</b> · ใช้ได้กับ Dealer Incentive Report และไฟล์เงินรางวัลรายเดือน</div>
+      <textarea data-campuppaste="1" rows="3" class="w-full font-mono text-xs border border-line rounded-lg p-3 bg-surface" placeholder="คลิกที่นี่ แล้วกด Ctrl+V" aria-label="วางข้อมูลแคมเปญจาก Excel" ${can && !U.busy ? '' : 'disabled'}></textarea></div>
   </section>
   ${U.pay ? campUpPayView(D) : U.items ? campUpItems(D) : `<h3 class="font-head font-semibold mb-2">ใบจองที่ลงเงื่อนไขการขายแล้ว (${rows.length})</h3>
   <div class="flex flex-col gap-2">${rows.map(campUpRow).join('') || emptyBox('ยังไม่มีใบจองที่ลงเงื่อนไขการขาย', 'ใบจองที่ผ่านขั้นไฟแนนซ์และลงเงื่อนไขแล้วจะขึ้นที่นี่')}</div>`}`;
@@ -187,7 +190,8 @@ async function campUpRead(file) {
       const res = await aiRead('This is a photo or screenshot of a Honda sales campaign sheet from a Honda dealer in Thailand. Transcribe every campaign line as plain text (interest rates, free insurance, support baht, conditions) exactly as written in Thai. Return JSON only: {"text":"all lines joined by newline"}', [await shrink(file)]);
       text = String(res && res.text || '');
     } else {
-      const X = await loadXLSX(), wb = /\.(csv|txt)$/i.test(file.name) ? X.read(await file.text(), { type: 'string' }) : X.read(await file.arrayBuffer(), { type: 'array' });
+      const X = await loadXLSX(), wb = file.paste !== undefined ? { SheetNames: ['paste'], Sheets: { paste: X.utils.aoa_to_sheet(idsTsv(file.paste)) } }   // copied from Excel (ตกลง 2/11)
+        : /\.(csv|txt)$/i.test(file.name) ? X.read(await file.text(), { type: 'string' }) : X.read(await file.arrayBuffer(), { type: 'array' });
       const dir = campParseDIR(X, wb);
       if (dir) { Object.assign(U, { pay: null, items: dir.items, report: dir.report, text: '', file: file.name, pick: {}, br: myBranch() || dir.br || '', brAuto: !!dir.br }); U.sel = new Set(campUpVinRows(derive()).filter(r => !r.done && !r.chg).map(r => r.it.vin)); U.busy = false; render(); return; }
       const pay = campParsePay(X, wb);
@@ -199,6 +203,12 @@ async function campUpRead(file) {
   } catch (e) { U.msg = 'อ่านไฟล์ไม่ได้ ลองไฟล์อื่น'; }
   U.busy = false; render();
 }
+document.addEventListener('paste', ev => {
+  const t = ev.target; if (!t || !t.dataset || !t.dataset.campuppaste) return;
+  const text = ev.clipboardData && ev.clipboardData.getData('text/plain'); if (!text) return;
+  ev.preventDefault(); t.value = '';
+  if (campUpCan()) campUpRead({ name: 'วางจาก Excel', type: '', paste: text });
+});
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t || !t.dataset) return;
   if (t.dataset.campupFile !== undefined) { const f = t.files && t.files[0]; t.value = ''; if (f) campUpRead(f); }
