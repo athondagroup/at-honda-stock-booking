@@ -261,7 +261,7 @@ function summaryView(D) {
     const k = keyOf(a);
     if (a.cancelled) { bump(k, 'cancel'); continue; }
     // branch columns: the branch that delivers the car (sales volume); the sales column still follows the case owner (commission)
-    bump(k, 'total', a.delivBr || a.br);
+    bump(k, 'total', f.sBrBy === 'book' ? a.br : (a.delivBr || a.br));
     if (a.match && a.idsSales && !sameName(a.idsSales, a.sales)) bump(k, 'idsDiff');
     if (a.cross) bump(k, 'cross');
     if (a.done) bump(k, 'delivered');
@@ -286,6 +286,7 @@ function summaryView(D) {
     <div class="field"><label for="s-grade">เกรด</label><select id="s-grade" data-filter="sGrade"><option value="">ทุกเกรด</option>${grades.map(m => `<option ${f.sGrade === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
     <div class="field"><label for="s-color">สี</label><select id="s-color" data-filter="sColor"><option value="">ทุกสี</option>${colors.map(m => `<option ${f.sColor === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
     <div class="field"><label for="s-sales">เซลล์</label><select id="s-sales" data-filter="sSales"><option value="">ทุกคน</option>${sales.map(m => `<option ${f.sSales === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
+    <div class="field"><label for="s-brby">สาขานับตาม</label><select id="s-brby" data-filter="sBrBy"><option value="deliv" ${f.sBrBy !== 'book' ? 'selected' : ''}>สาขาที่ออกรถ/ใบกำกับ</option><option value="book" ${f.sBrBy === 'book' ? 'selected' : ''}>สาขาที่จอง</option></select></div>
     <button class="btn btn-ghost btn-sm" data-act="sum-reset">เดือนนี้</button>
   </div>
   <p class="text-sm mb-2">ใบจองวันที่ ${fmtD(from)} – ${fmtD(to)}${S.br ? ` · สาขา ${S.br}` : ' · ทุกสาขา'}: จอง <b class="num">${tot.total}</b> ใบ · ส่งมอบแล้ว <b class="num">${tot.delivered}</b> · อยู่ใน IDS รอรถ <b class="num">${tot.inIds}</b> · ยังไม่อยู่ใน IDS <b class="num" style="color:var(--bad)">${tot.noIds}</b> · ยกเลิก <b class="num">${tot.cancel}</b>${tot.idsOnly ? ` · มีใน IDS ไม่มีฟอร์ม <b class="num" style="color:var(--bad)">${tot.idsOnly}</b>` : ''}</p>

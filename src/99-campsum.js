@@ -240,7 +240,7 @@ Object.assign(ACTIONS, {
 });
 
 // ---- the invoice month follows Honda's campaign file (ตกลง 2/11): the first file a car appears in is its real invoice month
-// (that count is what the target is made from). A car in the September file but invoiced again in October (the first invoice
+// (that count is what the target is made from). A car in a campaign file counts as an invoice of the file month (either direction); the delivery count and the seller credit stay with the booking. E.g. in the September file but invoiced again in October (the first invoice
 // was cancelled) stays a September invoice and is not counted again in October.
 function repYm(rep) { const m = String(rep || '').match(/(\d{2})\/(\d{4})/); return m ? m[2] + '-' + m[1] : ''; }
 function rptFirstMonth(vin, rp) {
@@ -250,7 +250,7 @@ function rptFirstMonth(vin, rp) {
 }
 function invByFile(i, rp) {
   if (!i.vin || i.company || !i.idate) return i;
-  const m = rptFirstMonth(i.vin, rp); if (!m || String(i.idate).slice(0, 7) <= m) return i;
+  const m = rptFirstMonth(i.vin, rp); if (!m || String(i.idate).slice(0, 7) === m) return i;
   const sv = rp[String(i.vin).toUpperCase()], first = [...(sv.prev || []), sv].find(p => repYm(p.rep) === m) || sv;
   const [y, mo] = m.split('-').map(Number), last = `${m}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}`;
   return { ...i, idate: first.date && String(first.date).slice(0, 7) === m ? String(first.date).slice(0, 10) : last, idate_web: i.idate, fileMonth: m };

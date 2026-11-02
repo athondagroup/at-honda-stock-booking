@@ -124,7 +124,6 @@ Object.assign(ACTIONS, {
     const wasCash = isCash(a.rec); let newPur = null;
     if ((mode === 'admin' || mode === 'first') && st.admin && v.purchase_to && (v.purchase_to === 'ซื้อสด') !== wasCash) { newPur = v.purchase_to; x.cash = newPur === 'ซื้อสด'; }
     if (web && (!st.admin || num(v.price_add))) v.price = dealPriceAt(web, v);
-    if (num(v.price_add) && !String(v.price_add_note || '').trim()) { toast('ใส่เหตุผลที่บวกราคา', 'bad'); $('#dl-price_add_note')?.focus(); return; }
     const ck = termsCheck(x, v); if (ck.err) { toast(ck.err, 'bad'); $('#dl-' + ck.id)?.focus(); return; }
     const paint = web && num(v.price) === dealPriceAt(web, v) ? web.paint : 0;
     const vals = { ...termsRecord(x, v, paint), price_src: web && num(v.price) === web.price ? web.src : web && num(v.price_add) && num(v.price) === dealPriceAt(web, v) ? web.src + ' + บวกราคา' : 'ใส่เอง', cash: x.cash, price_add: num(v.price_add) || null, price_add_note: num(v.price_add) ? String(v.price_add_note || '').trim() : null };
