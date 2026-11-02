@@ -55,21 +55,21 @@ function dealBox(a, m, D) { return '<div data-deal-box></div>' + dealBoxIn(a, m,
 function dealBoxIn(a, m, D) {
   const st = dealState(a), d = st.d, x = termsCtxAt(a, D), web = dealWeb(a, D);
   // the branch admin can change cash <-> finance here (2/11): the fields below follow the choice
-  const swap = !!(m.deal && m.dealMode === 'admin' && st.admin && m.deal.purchase_to);
+  const swap = !!(m.deal && (m.dealMode === 'admin' || m.dealMode === 'first') && st.admin && m.deal.purchase_to);
   if (swap) x.cash = m.deal.purchase_to === 'ซื้อสด';
   const cash = x.cash;
   const title = `<div class="font-medium text-sm">เงื่อนไขการขาย (${cash ? 'ซื้อสด' : 'ไฟแนนซ์'})</div>`;
   const editing = m.deal && m.dealMode && ((m.dealMode === 'first' && st.mayFirst) || (m.dealMode === 'admin' && st.mayAdmin) || (m.dealMode === 'req' && st.mayReq));
   if (editing) {
     const lockPrice = !!web && !st.admin;
-    const v = { ...m.deal, ...(lockPrice ? { price: dealPriceAt(web, m.deal) } : {}) };
+    const v = { ...m.deal, ...(lockPrice || (web && num(m.deal.price_add)) ? { price: dealPriceAt(web, m.deal) } : {}) };
     const paint = web && num(v.price) === dealPriceAt(web, v) ? web.paint : 0;
     const priceNote = web ? `ดึงจากราคาในเว็บ (${esc(web.src)})${web.paint ? ` · รวมค่าสี ${money(web.paint)}` : ''}${num(v.price_add) ? ` · บวกเพิ่ม ${money(num(v.price_add))} (ราคาเว็บ ${money(web.price)})` : ''}${!lockPrice && num(v.price) && num(v.price) !== dealPriceAt(web, v) ? ` · <b style="color:var(--warn)">ไม่ตรงราคาในเว็บ ${money(web.price)}</b>` : ''}` : 'ยังไม่มีราคารุ่น/เกรด/สีนี้ในเว็บ ใส่เอง';
     const note = m.dealMode === 'first' ? 'บันทึกแล้ว เซลล์ขอแก้ได้อีก 1 ครั้งตอนไฟแนนซ์ผ่าน (แอดมินสาขาหรือผู้จัดการอนุมัติ)'
       : m.dealMode === 'req' ? 'ขอแก้ได้ครั้งเดียว · ส่งแล้วรอแอดมินสาขาหรือผู้จัดการอนุมัติ ตัวเลขเดิมยังใช้อยู่จนกว่าจะอนุมัติ' : 'แอดมินขึ้นไปแก้ได้เลย ระบบเก็บตัวเลขเดิมไว้ในประวัติ';
     const swapSel = swap ? `<div class="field mb-2"><label for="dl-purchase_to">เงื่อนไขการซื้อ</label><select id="dl-purchase_to" data-modal="deal.purchase_to"><option ${cash ? 'selected' : ''}>ซื้อสด</option><option ${cash ? '' : 'selected'}>ไฟแนนซ์</option></select>${(m.deal.purchase_to === 'ซื้อสด') !== isCash(a.rec) ? `<span class="text-xs" style="color:var(--warn)">เปลี่ยนจาก${isCash(a.rec) ? 'ซื้อสด' : 'ไฟแนนซ์'} · ${cash ? 'ข้ามขั้นไฟแนนซ์ ไม่ต้องใส่ดาวน์/ผ่อน' : 'ต้องมีขั้นไฟแนนซ์ผ่านและใส่ดาวน์ ดอกเบี้ย งวด'}</span>` : ''}</div>` : '';
     return `<div class="mt-2 p-3 rounded-lg border border-line" style="background:var(--surface-2)">${title}<div class="mt-2">${swapSel}
-      ${termsFields(x, v, { attr: 'data-modal', pre: 'deal', idp: 'dl', paint, priceDisc: true, lockPrice, priceNote, priceAdd: lockPrice, adm: st.admin && m.dealMode !== 'req' })}</div>
+      ${termsFields(x, v, { attr: 'data-modal', pre: 'deal', idp: 'dl', paint, priceDisc: true, lockPrice, priceNote, priceAdd: !!web, adm: st.admin && m.dealMode !== 'req' })}</div>
       ${m.dealMode === 'admin' && poLocked(a) ? `<div class="field mt-2"><label for="dl-why" class="req">เหตุผลที่แก้หลังส่งมอบ (บังคับ · เก็บในประวัติ)</label><input id="dl-why" data-modal="dealWhy" value="${esc(m.dealWhy || '')}" autocomplete="off" placeholder="เช่น Honda แจ้งเปลี่ยนทางเลือก / บัญชีตรวจพบ"></div>` : ''}
       ${m.dealMode === 'req' ? `<div class="field mt-2"><label for="dl-why" class="req">เหตุผลที่ขอแก้</label><input id="dl-why" data-modal="dealWhy" value="${esc(m.dealWhy || '')}" autocomplete="off" placeholder="เช่น ไฟแนนซ์อนุมัติดาวน์ 25%"></div>` : ''}
       <div class="text-xs text-muted mt-2">${note}</div>
@@ -122,8 +122,8 @@ Object.assign(ACTIONS, {
     if (!((mode === 'first' && st.mayFirst) || (mode === 'admin' && st.mayAdmin) || (mode === 'req' && st.mayReq))) { toast('แก้เงื่อนไขไม่ได้ในขั้นนี้', 'bad'); return; }
     const x = termsCtxAt(a, D), web = dealWeb(a, D);
     const wasCash = isCash(a.rec); let newPur = null;
-    if (mode === 'admin' && st.admin && v.purchase_to && (v.purchase_to === 'ซื้อสด') !== wasCash) { newPur = v.purchase_to; x.cash = newPur === 'ซื้อสด'; }
-    if (web && !st.admin) v.price = dealPriceAt(web, v);
+    if ((mode === 'admin' || mode === 'first') && st.admin && v.purchase_to && (v.purchase_to === 'ซื้อสด') !== wasCash) { newPur = v.purchase_to; x.cash = newPur === 'ซื้อสด'; }
+    if (web && (!st.admin || num(v.price_add))) v.price = dealPriceAt(web, v);
     if (num(v.price_add) && !String(v.price_add_note || '').trim()) { toast('ใส่เหตุผลที่บวกราคา', 'bad'); $('#dl-price_add_note')?.focus(); return; }
     const ck = termsCheck(x, v); if (ck.err) { toast(ck.err, 'bad'); $('#dl-' + ck.id)?.focus(); return; }
     const paint = web && num(v.price) === dealPriceAt(web, v) ? web.paint : 0;
