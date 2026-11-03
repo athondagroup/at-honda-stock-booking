@@ -26,7 +26,7 @@ function ccData(D) {
   // in Honda's file for the period but not among the web's invoices of the period: no invoice in the web at all, or invoiced on another date
   const extra = fileRows.filter(r => !inv.has(r.vin)).map(r => { const a = at.get(r.vin), w = D.invByVin.get(r.vin), wd = w && w.idate ? String(w.idate).slice(0, 10) : '';
     return { vin: r.vin, br: r.br, row: r, a, inv: null, webInv: wd, extra: true, delivered: false, adv: false, src: '', cust: a ? a.cust : (w && w.cust) || '', money: rptMoneyCheck(r, a, D, false) }; });
-  return { from, to, months, fileRows, list, extra, rows: list.map(x => x.row) };
+  return { from, to, months, fileRows, list, extra, invBy: D.invByVin, rows: list.map(x => x.row) };
 }
 function ccNum(n, k, extra) { return n ? `<button type="button" class="num underline decoration-dotted" data-act="cc-drill" data-k="${k}" title="กดดูเลขตัวถัง">${n}</button>` : `<span class="num">${n}</span>`; }
 function ccCountTable(C) {
@@ -40,10 +40,18 @@ function ccCountTable(C) {
 // the cars behind a number (frame numbers, open one for its details)
 function ccDrillItems(C, k) {
   const fk = r => rptKinds(r), inFile = new Set(C.fileRows.map(r => r.vin)), inWeb = new Set(C.list.map(x => x.vin));
-  const L = C.list, fromRow = (r, note) => ({ vin: r.vin, br: r.br, who: r.name, date: '', note });
-  const fromX = (x, note) => ({ vin: x.vin, br: x.br, who: `${x.cust || ''}${x.row && x.row.name ? ' · ' + x.row.name : ''}`, date: x.inv && x.inv.idate ? String(x.inv.idate).slice(0, 10) : '', note });
-  const fileOnly = k0 => C.fileRows.filter(r => !inWeb.has(r.vin) && (!k0 || fk(r) === k0)).map(r => { const x = C.extra.find(e => e.vin === r.vin); return { vin: r.vin, br: r.br, who: `${x && x.cust ? x.cust + ' · ' : ''}${r.name || ''}`, date: '', note: `อยู่ในไฟล์ (${fk(r) === 'adv' ? 'Advance' : 'ส่งมอบ'}) · ${x && x.webInv ? 'เว็บลงใบกำกับ ' + fmtD(x.webInv) + ' (นอกช่วง)' : 'เว็บไม่มีใบกำกับ'}` }; });
-  const webOnly = pred => L.filter(x => pred(x) && !inFile.has(x.vin)).map(x => fromX(x, 'ใบกำกับในเว็บ ไม่อยู่ในไฟล์'));
+  const L = C.list, lm = new Map(L.map(x => [x.vin, x])), d10 = v => v ? String(v).slice(0, 10) : '';
+  const wi = vin => { const x = lm.get(vin), e = C.extra.find(y => y.vin === vin), w = C.invBy && C.invBy.get(vin), iv = (x && x.inv) || w || null;
+    return { cust: (x && x.cust) || (e && e.cust) || (iv && iv.cust) || '', date: d10(iv && iv.idate), ddate: iv && !iv.company ? d10(iv.ddate) : '' }; };
+  const mk = (vin, br, name, note) => { const w = wi(vin); return { vin, br, who: `${w.cust ? w.cust + ' · ' : ''}${name || ''}`, date: w.date, ddate: w.ddate, note }; };
+  const fromRow = (r, note) => mk(r.vin, r.br, r.name, note);
+  const fromX = (x, note) => mk(x.vin, x.br, x.row && x.row.name, note);
+  const fileBy = new Map(C.fileRows.map(r => [r.vin, r])), kn = r => fk(r) === 'adv' ? 'Advance' : 'ส่งมอบ';
+  const wdel = vin => { const x = lm.get(vin); return !!(x && x.delivered); }, wadv = vin => { const x = lm.get(vin); return !!(x && x.adv); };
+  const webNote = vin => { const x = lm.get(vin); return x ? (x.delivered ? 'เว็บ: ส่งมอบแล้ว' : 'เว็บ: Advance') : (() => { const e = C.extra.find(y => y.vin === vin); return e && e.webInv ? 'เว็บลงใบกำกับ ' + fmtD(e.webInv) + ' (นอกช่วง)' : 'เว็บไม่มีใบกำกับ'; })(); };
+  // cars the file counts under kind k0 ('del' / 'adv' / '' = any) that the web does not count the same way, and the web's cars the file counts differently
+  const fileDiff = (k0, okWeb) => C.fileRows.filter(r => (!k0 || fk(r) === k0) && !okWeb(r.vin)).map(r => fromRow(r, `ไฟล์: ${kn(r)} · ${webNote(r.vin)}`));
+  const webDiff = (k0, pred) => L.filter(x => pred(x) && (!k0 || !fileBy.has(x.vin) || fk(fileBy.get(x.vin)) !== k0)).map(x => { const f = fileBy.get(x.vin); return fromX(x, f ? `เว็บ: ${x.delivered ? 'ส่งมอบแล้ว' : 'Advance'} · ไฟล์เป็น ${kn(f)}` : 'ใบกำกับในเว็บ ไม่อยู่ในไฟล์'); });
   const T = {
     fd: ['ส่งมอบ ตามไฟล์ Honda', C.fileRows.filter(r => fk(r) === 'del').map(r => fromRow(r, r.st || ''))],
     fa: ['Advance ตามไฟล์ Honda', C.fileRows.filter(r => fk(r) === 'adv').map(r => fromRow(r, r.st || ''))],
@@ -51,9 +59,9 @@ function ccDrillItems(C, k) {
     wd: ['ส่งมอบ ตามเว็บ', L.filter(x => x.delivered).map(x => fromX(x, ''))],
     wa: ['Advance ตามเว็บ (ยังไม่ส่งมอบ)', L.filter(x => x.adv).map(x => fromX(x, ''))],
     wt: ['ใบกำกับทั้งหมด ตามเว็บ', L.map(x => fromX(x, ''))],
-    dd: ['ส่งมอบ: คันที่ไฟล์กับเว็บไม่ตรงกัน', [...fileOnly('del'), ...webOnly(x => x.delivered)]],
-    da: ['Advance: คันที่ไฟล์กับเว็บไม่ตรงกัน', [...fileOnly('adv'), ...webOnly(x => x.adv)]],
-    dt: ['ใบกำกับ: คันที่ไฟล์กับเว็บไม่ตรงกัน', [...fileOnly(''), ...webOnly(() => true)]],
+    dd: ['ส่งมอบ: คันที่ไฟล์กับเว็บไม่ตรงกัน', [...fileDiff('del', wdel), ...webDiff('del', x => x.delivered)]],
+    da: ['Advance: คันที่ไฟล์กับเว็บไม่ตรงกัน', [...fileDiff('adv', wadv), ...webDiff('adv', x => x.adv)]],
+    dt: ['ใบกำกับ: คันที่ไฟล์กับเว็บไม่ตรงกัน', [...fileDiff('', v => lm.has(v)), ...webDiff('', () => true).filter(r => !fileBy.has(r.vin))]],
     admin: ['แอดมินเลือกแคมเปญแล้ว', L.filter(x => x.src === 'admin').map(x => fromX(x, ''))],
     file: ['จับคู่แคมเปญจากไฟล์แล้ว', L.filter(x => x.src === 'file').map(x => fromX(x, ''))],
     pend: ['รอเลือกแคมเปญ', L.filter(x => x.pend).map(x => fromX(x, ''))],
@@ -66,7 +74,7 @@ function ccDrillItems(C, k) {
 function ccDrillPanel(C) {
   const k = S.filters.ccDrill, t = k && ccDrillItems(C, k); if (!t) return '';
   return `<section class="bg-surface border border-line rounded-lg p-4 mb-4" id="rpt-drill" style="scroll-margin-top:72px"><div class="flex items-center gap-2 mb-2"><h3 class="font-head font-semibold">${esc(t[0])} · ${t[1].length} คัน</h3><button type="button" class="btn btn-ghost btn-sm ml-auto" data-act="cc-drill" data-k="">ปิด</button></div>
-    <div class="overflow-x-auto max-h-[50vh] overflow-y-auto"><table class="tbl text-sm"><thead><tr><th>เลขตัวถัง</th><th>สาขา</th><th>ลูกค้า / รุ่น</th><th>ใบกำกับ (เว็บ)</th><th>หมายเหตุ</th></tr></thead><tbody>${t[1].map(r => `<tr><td>${vinLink({ vin: r.vin })}</td><td>${esc(r.br || '')}</td><td class="text-xs">${esc(r.who)}</td><td class="text-xs nowrap">${r.date ? esc(fmtD(r.date)) : '–'}</td><td class="text-xs">${esc(r.note)}</td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">ไม่มีรายการ</td></tr>'}</tbody></table></div></section>`;
+    <div class="overflow-x-auto max-h-[50vh] overflow-y-auto"><table class="tbl text-sm"><thead><tr><th>เลขตัวถัง</th><th>สาขา</th><th>ลูกค้า / รุ่น</th><th>วันที่ออกใบกำกับ</th><th>วันที่ส่งมอบ</th><th>หมายเหตุ</th></tr></thead><tbody>${t[1].map(r => `<tr><td>${vinLink({ vin: r.vin })}</td><td>${esc(r.br || '')}</td><td class="text-xs">${esc(r.who)}</td><td class="text-xs nowrap">${r.date ? esc(fmtD(r.date)) : '–'}</td><td class="text-xs nowrap">${r.ddate ? esc(fmtD(r.ddate)) : '–'}</td><td class="text-xs">${esc(r.note)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ไม่มีรายการ</td></tr>'}</tbody></table></div></section>`;
 }
 function ccCarsTable(C, D) {
   const F = S.filters.ccF || '', L = C.list, n = f => L.filter(f).length, sel = S.filters.ccSel || {};
