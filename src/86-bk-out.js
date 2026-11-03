@@ -59,6 +59,7 @@ function bkOutDiff(r, D) {
     const a = atBy.get('ids:' + b.no) || null, inv = (b.vin && D.invByVin.get(b.vin)) || D.X.inv.find(i => i.no && String(i.no) === String(b.no));
     let why, flag = false;
     if (inv && !inv.company) why = inv.ddate ? `ส่งมอบแล้ว ${fmtD(inv.ddate)}` : `ออกใบกำกับแล้ว ${fmtD(inv.idate)}`;
+    else if (D.cars && [...D.cars.values()].some(c => String(c.bkno || c.bk || '') === String(b.no))) why = 'IDS จัดสรรรถแล้ว (อยู่ในไฟล์ Stock)';
     else if (a && a.cancelled) why = 'ใบจองในเว็บยกเลิกแล้ว';
     else if (a && a.done) why = 'ส่งมอบแล้วตามข้อมูลในเว็บ';
     else if (a) { why = 'หายจาก IDS: ยกเลิก หรือเปลี่ยนใบจอง ต้องตรวจสอบ'; flag = true; }
@@ -86,13 +87,24 @@ function bkOutDelivered(o) {
   const inv = o.no ? derive().X.inv.find(i => String(i.no || '') === String(o.no) && !i.company) : null;
   return inv ? { date: inv.ddate || inv.idate || null, inv: inv.inv } : null;
 }
-function bkOutPending(o) { return !!(o && o.flag && !o.res && !bkOutAuto(o) && !bkOutDelivered(o)); }
+// gone from the Booking file because a car is now allocated to it (the Stock file lists the car with this booking no., or the web booking has the car): not lost
+function bkOutAlloc(o) {
+  if (!o) return null;
+  const D = derive(), no = String(o.no || ''), a = o.atId && typeof atById === 'function' ? atById(o.atId) : null;
+  const car = no ? [...D.cars.values()].find(c => String(c.bkno || c.bk || '') === no) : null;
+  if (car) return { vin: car.vin, br: car.br };
+  const vin = a && !a.cancelled ? atVin(a) : null;
+  return vin ? { vin, br: a.br } : null;
+}
+function bkOutPending(o) { return !!(o && o.flag && !o.res && !bkOutAuto(o) && !bkOutDelivered(o) && !bkOutAlloc(o)); }
 function bkOutList(u, D) {
   const can = canApproveBr(u.br) && perms().write, F = S.bkOut && S.bkOut.id === u.id ? S.bkOut : { sel: {}, pick: {} };
   const todo = (u.out || []).filter(bkOutPending);
   const row = (o, i) => {
     const a = o.atId ? atById(o.atId) : null, auto = o.flag && !o.res ? bkOutAuto(o) : null, open = bkOutPending(o) && a && !a.cancelled;
     const dv = o.flag && !o.res && !auto ? bkOutDelivered(o) : null;
+    const al = o.flag && !o.res && !auto && !dv ? bkOutAlloc(o) : null;
+    if (al) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">IDS จัดสรรรถแล้ว · <span class="code">${esc(al.vin)}</span> (ใบจองย้ายไปอยู่ในไฟล์ Stock)</span>${a ? `<button class="underline text-xs" data-act="at-open" data-id="${esc(a.id)}">เปิด</button>` : ''}</div>`;
     if (dv) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">ส่งมอบแล้ว${dv.date ? ' ' + fmtD(dv.date) : ''}${dv.inv ? ` (DL ใบกำกับ ${esc(dv.inv)})` : ''} · หายจากไฟล์ Booking เพราะส่งมอบ ไม่ต้องทำอะไร</span></div>`;
     if (auto) return `<div class="py-2 border-t border-line"><div class="flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span class="text-muted">${esc(o.sales || '')}</span>
       <span style="color:var(--good)">ระบบจับคู่กับ IDS ใบใหม่แล้ว: ${esc(auto.no)} · ${esc(auto.cust || '')} · ${specLabel(auto.spec)}</span></div>
