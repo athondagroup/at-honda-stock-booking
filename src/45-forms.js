@@ -323,7 +323,6 @@ function viewUploadBase(D) {
   const sel = U.results.filter(r => r.on);
   return `
   ${pageHead('อัปเดตข้อมูล IDS', 'อัปโหลดไฟล์ Excel ที่ export จาก IDS หรือ Google Sheets ที่ดาวน์โหลดเป็น .xlsx ได้หลายไฟล์พร้อมกัน ระบบอ่านทุกชีตและแยกเองว่าเป็น Stock, Booking, Quota หรือ Invoice/DL ของสาขาไหน')}
-  ${idsPasteBox()}
   <section class="bg-surface border border-line rounded-lg p-4 md:p-5 mb-5">
     <label class="drop relative ${p.upload && p.write && !U.busy ? '' : 'opacity-50'}">
       <input type="file" multiple accept=".xlsx,.xls,.csv,.htm,.html,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" data-file="ids" ${p.upload && p.write && !U.busy ? '' : 'disabled'} aria-label="ไฟล์จาก IDS">
@@ -332,6 +331,7 @@ function viewUploadBase(D) {
       <span class="text-xs text-muted">${p.upload ? (myBranch() ? `แอดมินอัปโหลดได้เฉพาะสาขา ${myBranch()}` : 'อ่านในเครื่องก่อน ยังไม่บันทึกจนกว่าจะกดยืนยัน') : 'บทบาทนี้อัปโหลดไม่ได้ ลองสลับเป็นแอดมินหรือผู้จัดการ'}</span>
     </label>
     ${U.msg ? `<p class="mt-3 text-sm" style="color:var(--bad)">${esc(U.msg)}</p>` : ''}
+    ${idsPasteBox()}
     ${U.results.length ? `<div class="mt-4">
       <h3 class="font-head font-semibold mb-2">ตารางที่พบในไฟล์</h3>
       <div class="border border-line rounded-lg scroll-x"><table class="tbl text-sm">
@@ -343,8 +343,8 @@ function viewUploadBase(D) {
           <td><b>${esc(r.br || '?')}</b></td>
           <td>${r.error ? '–' : `<input type="date" data-upl-date="${i}" value="${esc(r.asof || '')}" max="${todayISO()}" style="background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 6px">`}</td>
           <td class="num text-right">${r.rows.length}</td>
-          <td class="text-xs">${r.src === 'invoice' && r.diff && !r.error ? uplInvCell(r, i) : r.diff ? `เดิม ${r.diff.prevN} → ใหม่ ${r.rows.length}${r.src === 'stock' ? `<div>ออก <b>${r.diff.out.length}</b> · เข้าใหม่ <b>${r.diff.inN}</b>${r.diff.out.filter(o => o.flag).length ? ` · <span style="color:var(--bad)">ไม่พบข้อมูล ${r.diff.out.filter(o => o.flag).length}</span>` : ''}</div>` : ''}${r.diff.baseSample ? '<div class="text-muted">(เทียบกับข้อมูลตัวอย่าง)</div>' : ''}${uplGateCell(r)}${uplKeepCell(r, i)}` : '–'}</td>
-          <td class="text-xs">${r.error ? `<span style="color:var(--bad)">${esc(r.error)}</span>` : ''}${r.block ? `<div style="color:var(--bad)">${esc(r.block)}</div>` : ''}${r.older ? `<div style="color:var(--warn)">${esc(r.older)}</div>` : ''}${r.note ? `<div class="text-muted">${esc(r.note)}</div>` : ''}${r.warn.slice(0, 3).map(w => `<div style="color:var(--warn)">${esc(w)}</div>`).join('')}${r.warn.length > 3 ? `<div class="text-muted">และอีก ${r.warn.length - 3} ข้อ</div>` : ''}</td></tr>`).join('')}</tbody></table></div>
+          <td class="text-xs">${r.src === 'invoice' && r.diff && !r.error ? uplInvCell(r, i) : r.diff ? `เดิม ${r.diff.prevN} → ใหม่ ${r.rows.length}${r.src === 'stock' ? `<div>ออก <b>${r.diff.out.length}</b> · เข้าใหม่ <b>${r.diff.inN}</b>${r.diff.out.filter(o => o.flag).length ? ` · <span style="color:var(--bad)">ไม่พบข้อมูล ${r.diff.out.filter(o => o.flag).length}</span>` : ''}</div>` : ''}${r.diff.baseSample ? '<div class="text-muted">(เทียบกับข้อมูลตัวอย่าง)</div>' : ''}${uplKeepCell(r, i)}` : '–'}</td>
+          <td class="text-xs">${r.error ? `<span style="color:var(--bad)">${esc(r.error)}</span>` : ''}${r.block ? `<div style="color:var(--bad)">${esc(r.block)}</div>` : ''}${uplGateCell(r)}${r.older ? `<div style="color:var(--warn)">${esc(r.older)}</div>` : ''}${r.note ? `<div class="text-muted">${esc(r.note)}</div>` : ''}${r.warn.slice(0, 3).map(w => `<div style="color:var(--warn)">${esc(w)}</div>`).join('')}${r.warn.length > 3 ? `<div class="text-muted">และอีก ${r.warn.length - 3} ข้อ</div>` : ''}</td></tr>`).join('')}</tbody></table></div>
       <div class="flex flex-wrap gap-3 items-center mt-3">
         <button class="btn btn-red" data-act="upl-save" ${sel.length && !U.busy && !sel.some(uplNeedsChoice) ? '' : 'disabled'}>${U.busy ? '<span class="spin"></span> กำลังบันทึก…' : `บันทึก ${sel.length} ตาราง`}</button>
         <button class="btn btn-ghost" data-act="upl-clear">ล้าง</button>

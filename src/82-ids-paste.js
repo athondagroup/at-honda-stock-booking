@@ -45,12 +45,12 @@ function idsPasteDates(rows) {
 function idsPasteBox() {
   const p = perms(), U = S.upl, can = p.upload && p.write && !U.busy, P = S.idsPaste || {};
   if (!p.upload) return '';
-  return `<section class="bg-surface border border-line rounded-lg p-4 md:p-5 mb-5"><h2 class="font-head text-lg font-semibold mb-1">วางข้อมูลจาก Excel (ไม่ต้องเลือกไฟล์)</h2>
+  return `<div class="mt-4 pt-4 border-t border-line"><h2 class="font-head text-lg font-semibold mb-1">หรือวางข้อมูลจาก Excel (ไม่ต้องเลือกไฟล์)</h2>
     <ol class="text-sm text-muted list-decimal pl-5 mb-3"><li>เปิดไฟล์ IDS ใน Excel คลิกในตาราง แล้วกด <b>Ctrl+A</b> → <b>Ctrl+C</b> (ให้ติดแถวหัวตารางมาด้วย)</li>
       <li>คลิกในกล่องด้านล่าง แล้วกด <b>Ctrl+V</b> ระบบรู้เองว่าเป็น Stock / Booking / Quota / DL และสาขาไหน</li>
       <li>วางต่อได้ทีละตาราง ทุกตารางจะเข้ารายการตรวจด้านล่าง ตรวจจำนวนแล้วกด "บันทึก" (ยังไม่บันทึกจนกว่าจะกด)</li></ol>
     <textarea data-idspaste="1" rows="3" class="w-full font-mono text-xs border border-line rounded-lg p-3 bg-surface" placeholder="คลิกที่นี่ แล้วกด Ctrl+V" aria-label="วางข้อมูลจาก Excel" ${can ? '' : 'disabled'}></textarea>
-    ${P.msg ? `<p class="text-sm mt-2" style="color:var(--${P.bad ? 'bad' : 'good'})" role="status">${esc(P.msg)}</p>` : ''}</section>`;
+    ${P.msg ? `<p class="text-sm mt-2" style="color:var(--${P.bad ? 'bad' : 'good'})" role="status">${esc(P.msg)}</p>` : ''}</div>`;
 }
 function idsPasteRead(text) {
   const p = perms(), U = S.upl;

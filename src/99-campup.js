@@ -1,5 +1,5 @@
 
-// ---------- อัปเดตข้อมูลแคมเปญ (ขอ 26/10): its own page, like the IDS update
+// ---------- อัปเดตรายงานแคมเปญ (ขอ 26/10): its own page, like the IDS update
 // Upload the campaign file (photo / Excel / CSV). The file is read to text, compared with the campaign each booking already
 // chose, and shows ตรง / ไม่ตรง / ไม่พบ. Nothing is changed by itself: the person picks which campaign a booking uses.
 const campUpCan = () => perms().write && (perms().upload || perms().approve);
@@ -168,7 +168,7 @@ function campUpItems(D) {
 function viewCampUp(D) {
   const U = S.campUp || (S.campUp = { text: '', file: '', busy: false, msg: '', pick: {} }), can = campUpCan();
   const rows = U.items ? campUpVinRows(D) : campUpRows(D), n = s => rows.filter(r => r.state === s).length;
-  return `${pageHead('อัปเดตข้อมูลแคมเปญ', 'อัปโหลดไฟล์แคมเปญของ Honda: Dealer Incentive Report (เทียบรายคันตามเลข VIN) หรือไฟล์เงินรางวัลรายเดือน (ทางเลือก / แคมเปญพิเศษ) ระบบเทียบรายคันตามเลข VIN กับแคมเปญที่เลือกไว้ในแต่ละใบจอง (รูปหรือไฟล์อื่นเทียบจากข้อความ) ถ้าไม่ตรงหรือไม่พบ กดเลือกเองว่าใบนั้นใช้แคมเปญอะไร')}
+  return `${pageHead('อัปเดตรายงานแคมเปญ', 'อัปโหลดไฟล์แคมเปญของ Honda: Dealer Incentive Report (เทียบรายคันตามเลข VIN) หรือไฟล์เงินรางวัลรายเดือน (ทางเลือก / แคมเปญพิเศษ) ระบบเทียบรายคันตามเลข VIN กับแคมเปญที่เลือกไว้ในแต่ละใบจอง (รูปหรือไฟล์อื่นเทียบจากข้อความ) ถ้าไม่ตรงหรือไม่พบ กดเลือกเองว่าใบนั้นใช้แคมเปญอะไร')}
   <section class="bg-surface border border-line rounded-lg p-4 md:p-5 mb-5">
     <label class="drop relative ${can && !U.busy ? '' : 'opacity-50'}">
       <input type="file" accept="image/*,.xlsx,.xls,.csv,.txt" data-campup-file ${can && !U.busy ? '' : 'disabled'} class="absolute inset-0 opacity-0 cursor-pointer">
@@ -201,7 +201,7 @@ async function campUpAuto() {
     else if ((!d.campaign_id || d.campaign_id === 'pending') && !poLocked(a)) apply.push([a, hit.value]);
   }
   if (nPick) await write('ref', 'honda_pay', { ...cur, picks });
-  let nApply = 0; for (const [a, cid] of apply) if (await rptApplyCamp(a, cid, 'ปรับตามไฟล์ Honda อัตโนมัติ (อัปเดตข้อมูลแคมเปญ)', null, null, U.file || 'ไฟล์ Honda')) nApply++;
+  let nApply = 0; for (const [a, cid] of apply) if (await rptApplyCamp(a, cid, 'ปรับตามไฟล์ Honda อัตโนมัติ (อัปเดตรายงานแคมเปญ)', null, null, U.file || 'ไฟล์ Honda')) nApply++;
   // every VIN in the file is recorded by VIN, with or without a booking (ตกลง 3/11)
   let nSave = 0;
   if (U.br) { U.sel = new Set(campUpVinRows(derive()).filter(r => !r.done).map(r => r.it.vin)); nSave = U.sel.size; if (nSave) await ACTIONS['campup-save'](); }
@@ -282,7 +282,7 @@ Object.assign(ACTIONS, {
     const x = termsCtxAt(a, D), c = campOptions(x).opts.find(y => y.value === cid);
     if (!c || !c.ok) { toast('แคมเปญนี้ใช้ไม่ได้กับใบจองนี้', 'bad'); return; }
     const vals = termsRecord(x, { ...d, campaign_id: cid, margin_honda: '', margin_priv: '' }, d.paint || 0);
-    const rec = { ...d, ...vals, ...actor(), how: 'แอดมินแก้ (อัปเดตข้อมูลแคมเปญ)', sales_camp_id: d.sales_camp_id ?? null, sales_camp: d.sales_camp ?? null, adm_mode: 'upload', adm_file: U.file || null, hist: [...(d.hist || []), dealOld(d)] };
+    const rec = { ...d, ...vals, ...actor(), how: 'แอดมินแก้ (อัปเดตรายงานแคมเปญ)', sales_camp_id: d.sales_camp_id ?? null, sales_camp: d.sales_camp ?? null, adm_mode: 'upload', adm_file: U.file || null, hist: [...(d.hist || []), dealOld(d)] };
     if (await saveFlow(a, { deal: rec }, 'เปลี่ยนแคมเปญแล้ว ' + (a.cust || ''))) { delete U.pick[a.id]; delete U.pick[String(atVin(a) || '').toUpperCase()]; render(); }
   }
 });

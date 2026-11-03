@@ -107,7 +107,7 @@ function viewCampSum(D) {
   const box = (t, body, id) => `<section class="bg-surface border border-line rounded-lg p-4 min-w-0" ${id ? `id="${id}" style="scroll-margin-top:72px"` : ''}><h3 class="font-head font-semibold mb-2">${t}</h3>${body}</section>`;
   const advDone = C.list.filter(x => x.delivered && x.row.hasDir && (rptKinds(x.row) === 'adv' || x.row.toDel)).length;
   const exMoney = sumBy(C.extra, x => x.row.tot);
-  return `${pageHead('รายงานสรุปแคมเปญ', `ใบกำกับภาษีที่เว็บลงไว้ ${fmtD(C.from)} – ${fmtD(C.to)} เทียบไฟล์ Honda · เงินรางวัลจ่ายตามเดือนที่ออกใบกำกับ`)}${ctl}
+  return `${pageHead('รายงานสรุปแคมเปญ', `ใบกำกับภาษีที่เว็บลงไว้ ${fmtD(C.from)} – ${fmtD(C.to)} เทียบไฟล์ Honda · เงินรางวัลจ่ายตามเดือนที่ออกใบกำกับ`, '<button class="btn btn-ghost" data-act="go" data-view="campup">อัปเดตรายงานแคมเปญ</button>')}${ctl}
   <div class="grid lg:grid-cols-3 gap-4 mb-4">
     ${box('1. ใบกำกับภาษี: ไฟล์ Honda vs เว็บ', ccCountTable(C))}
     ${box('2. เงินรางวัลรวม', `<div class="num text-3xl font-semibold">${money(sumBy(rows, r => r.tot))} <span class="text-sm font-normal text-muted">บาท</span></div><div class="text-xs text-muted mt-1">ทางเลือก ${money(sumBy(rows, r => r.pay + r.est))} · พิเศษ ${money(sumBy(rows, r => r.actAmt))}</div><div class="text-xs mt-2">แอดมินเลือก ${ccNum(nSrc('admin'), 'admin')} · จับคู่จากไฟล์ ${ccNum(nSrc('file'), 'file')}${nPend ? ` · รอเลือก ${ccNum(nPend, 'pend')}` : ''} · <span style="color:var(--bad)">ยังไม่เลือก ${ccNum(nNone, 'none')}</span></div>${C.extra.length ? `<div class="text-xs text-muted mt-1">ไม่รวมคันที่อยู่ในไฟล์แต่ยังไม่ออกใบกำกับ ${C.extra.length} คัน (${money(exMoney)})</div>` : ''}`)}

@@ -16,7 +16,7 @@ const ICON = {
 const NAV = [
   { id: 'dash', label: 'ภาพรวม' }, { id: 'alerts', label: 'แจ้งเตือน' }, { id: 'inbox', get label() { return perms().approve ? 'รออนุมัติ' : 'คำขอของฉัน'; } }, { id: 'stock', label: 'สต็อก' }, { id: 'book', label: 'Booking' },
   { id: 'quota', label: 'Quota' }, { id: 'lock', label: 'ล็อกรถ' }, { id: 'sold', label: 'ส่งมอบ / แจ้งขาย' }, { id: 'flow', label: 'ขั้นตอนส่งมอบ' }, { id: 'receive', label: 'รับรถเข้า' },
-  { id: 'upload', label: 'อัปเดตข้อมูล IDS' }, { id: 'campup', label: 'อัปเดตแคมเปญ' }, { id: 'campdb', label: 'ตารางแคมเปญรายเดือน' }, { id: 'admin', label: 'หลังบ้าน' }, { id: 'datafix', label: 'ข้อมูลผิด/ขาด' }
+  { id: 'upload', label: 'อัปเดตข้อมูล IDS' }, { id: 'campup', label: 'อัปเดตรายงานแคมเปญ' }, { id: 'campdb', label: 'ตารางแคมเปญรายเดือน' }, { id: 'admin', label: 'หลังบ้าน' }, { id: 'datafix', label: 'ข้อมูลผิด/ขาด' }
 ];
 const svg = (id, n = 20) => `<svg width="${n}" height="${n}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${ICON[id]}</svg>`;
 const isSales = () => S.role.role === 'sales';
@@ -47,7 +47,7 @@ const GROUPS = [
 const groupsFor = () => { const ok = new Set(navFor().map(n => n.id)); return GROUPS.map(g => ({ ...g, views: g.views.filter(v => ok.has(v)) })).filter(g => g.views.length); };
 const groupOf = v => GROUPS.find(g => g.views.includes(v)) || GROUPS[0];
 const groupEntry = g => (S.lastIn && g.views.includes(S.lastIn[g.id])) ? S.lastIn[g.id] : g.views[0];
-const GROUP_TAB = { dash: 'ภาพรวม', alerts: 'งานของฉัน', get inbox() { return perms().approve ? 'รอฉันอนุมัติ' : 'คำขอของฉัน (ติดตาม)'; }, stock: 'สต็อก', quota: 'Quota', lock: 'ล็อก', sold: 'ส่งมอบ/แจ้งขาย', book: 'ใบจอง', flow: 'ตามขั้นตอนส่งมอบ', receive: 'รับรถ', upload: 'อัปเดตข้อมูล IDS', campup: 'อัปเดตข้อมูลแคมเปญ', campdb: 'ตารางแคมเปญ', campsum: 'รายงานสรุปแคมเปญ', datafix: 'ข้อมูลผิด/ขาด/ต้องจับคู่', admin: 'หลังบ้าน' };
+const GROUP_TAB = { dash: 'ภาพรวม', alerts: 'งานของฉัน', get inbox() { return perms().approve ? 'รอฉันอนุมัติ' : 'คำขอของฉัน (ติดตาม)'; }, stock: 'สต็อก', quota: 'Quota', lock: 'ล็อก', sold: 'ส่งมอบ/แจ้งขาย', book: 'ใบจอง', flow: 'ตามขั้นตอนส่งมอบ', receive: 'รับรถ', upload: 'อัปเดตข้อมูล IDS', campup: 'อัปเดตรายงานแคมเปญ', campdb: 'ตารางแคมเปญ', campsum: 'รายงานสรุปแคมเปญ', datafix: 'ข้อมูลผิด/ขาด/ต้องจับคู่', admin: 'หลังบ้าน' };
 function groupTabs(badges) {
   const g = groupsFor().find(x => x.views.includes(S.view));
   if (!g || g.views.length < 2) return '';

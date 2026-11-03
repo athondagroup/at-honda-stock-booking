@@ -253,7 +253,7 @@ function prepareUploads(results) {
     const cur = r.src === 'quota' ? null : S.ids.get(keys[0]);
     if (cur && r.src !== 'invoice' && r.asof && cur.asof && r.asof < cur.asof) { r.older = `ไฟล์นี้เก่ากว่าข้อมูลที่ใช้อยู่ (ณ ${fmtD(cur.asof)}) จึงไม่ได้เลือกไว้`; r.on = false; }
     if (!r.asof) r.asof = todayISO();
-    uplGate(r);
+    uplGate(r); if (r.block) continue;
     if (r.src === 'stock') {
       const prev = X.cars.filter(c => c.br === r.br), now = new Set(r.rows.map(c => c.vin)), prevSet = new Set(prev.map(c => c.vin));
       const out = prev.filter(c => !now.has(c.vin)).map(c => {
