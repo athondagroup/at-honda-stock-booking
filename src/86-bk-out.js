@@ -110,6 +110,7 @@ function bkOutList(u, D) {
       <div class="mt-1 flex flex-wrap gap-2 items-end"><div class="field"><label class="text-xs" for="bko-${i}">หรือเลือกจับคู่เอง (ใบ IDS ที่ยังไม่มีฟอร์ม สาขา ${esc(a.br)})</label><select id="bko-${i}" data-bkoutpick="${esc(u.id)}" data-i="${i}"><option value="">–</option>${all.map(b => `<option value="${esc(b.key)}" ${pick === b.key ? 'selected' : ''}>${esc(opt(b))}</option>`).join('')}</select></div>
         <button class="btn btn-dark btn-sm" data-act="bkout-relink" data-id="${esc(u.id)}" data-i="${i}" data-key="${esc(pick)}" ${pick ? '' : 'disabled'}>แก้ไขใบจองเป็นใบนี้</button>
         <button class="btn btn-red btn-sm" data-act="bkout-cancel" data-id="${esc(u.id)}" data-i="${i}">ยกเลิกใบจอง</button>
+        <button class="btn btn-ghost btn-sm" data-act="bkout-keep" data-id="${esc(u.id)}" data-i="${i}" title="ใบจองและรถยังอยู่ในเว็บ ยังไม่จับคู่กับใบ IDS ใหม่ รอกรอกฟอร์ม">ยังเก็บ · ไม่ match รอกรอกฟอร์ม</button>
         <button class="btn btn-ghost btn-sm" data-act="bkout-wait" data-id="${esc(u.id)}" data-i="${i}" title="ใบจองยังอยู่ในเว็บ ไม่ยกเลิก รอไฟล์ DL รอบหน้า">แจ้งขายแล้ว รออัปเดต DL</button></div></div>`;
   };
   const sel = todo.filter(o => F.sel[(u.out || []).indexOf(o)]).length;
@@ -154,6 +155,10 @@ Object.assign(ACTIONS, {
   'bkout-all'(el) { const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id); F.sel = {}; if (el.dataset.v && u) (u.out || []).forEach((o, i) => { if (bkOutPending(o)) F.sel[i] = true; }); render(); },
   async 'bkout-cancel'(el) { const o = (S.uploads.get(el.dataset.id) || {}).out?.[Number(el.dataset.i)]; if (!o || !confirm(`ยกเลิกใบจอง ${o.cust || ''} (${o.no}) ในเว็บทันที?`)) return; await bkOutCancel(el.dataset.id, [Number(el.dataset.i)]); },
   async 'bkout-cancel-sel'(el) { const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k] && u && bkOutPending(u.out[Number(k)])).map(Number); if (!idxs.length || !confirm(`ยกเลิกใบจองที่เลือก ${idxs.length} ใบในเว็บทันที?`)) return; await bkOutCancel(el.dataset.id, idxs); },
+  async 'bkout-keep'(el) {
+    const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !canApproveBr(u.br) || !bkOutPending(u.out[i])) return;
+    if (await bkOutMark(el.dataset.id, [i], 'ยังเก็บใบจองไว้ ไม่ match รอกรอกฟอร์ม (รถยังผูกอยู่)')) { toast('บันทึกแล้ว: ยังเก็บใบจองไว้ รถไม่ถูกปล่อย'); render(); }
+  },
   async 'bkout-wait'(el) {
     const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !canApproveBr(u.br) || !bkOutPending(u.out[i])) return;
     if (await bkOutMark(el.dataset.id, [i], 'แจ้งขายแล้ว รออัปเดต DL')) { toast('บันทึกแล้ว: แจ้งขายแล้ว รออัปเดต DL (ใบจองยังอยู่)'); render(); }

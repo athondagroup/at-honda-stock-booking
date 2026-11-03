@@ -239,6 +239,21 @@ function deriveNow() {
   const bookings = [];
   // the form was cancelled in the web but IDS still has the booking: it leaves the queue, the IDS admin is told to cancel it in IDS (2/11)
   const cxByIds = new Map(at.filter(a => a.cancelled && a.idsLeft).map(a => [a.idsLeft.key, a]));
+  // a booking cancelled in the web lets go of its car at once (ตกลง 3/11): IDS may still show the car as booked, the web shows it free
+  { const used = new Set(at.filter(a => !a.cancelled && !a.demo).flatMap(a => [a.rec.booking_no, a.ids && a.ids.no, a.match && a.match.vin, (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || null].filter(Boolean).map(String)));
+    for (const a of at) {
+      if (!a.cancelled || a.demo) continue;
+      const nos = [a.rec.booking_no, a.ids && a.ids.no, a.idsLeft && a.idsLeft.no].filter(Boolean).map(String), vin = (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || (a.match && a.match.vin) || null;
+      for (const car of cars.values()) {
+        if (car.st !== 'booked' || car.advFake) continue;
+        const no = String(car.bkno || car.bk || '');
+        const byName = car.cust && car.model === a.model && keyScore(nameKey(a.cust), nameKey(car.cust)) >= 2 && !at.some(x => !x.cancelled && !x.demo && keyScore(nameKey(x.cust), nameKey(car.cust)) >= 2 && x.model === a.model);
+        if (!((no && nos.includes(no) && !used.has(no)) || (vin && car.vin === vin && !used.has(String(vin))) || (byName && !used.has(no)))) continue;
+        if (invByVin.get(car.vin)) continue;
+        car.withdrawn = { cust: a.cust, no: no || null, at: a.rec.cancel && a.rec.cancel.at || null };
+        car.st = 'free'; car.bkno = null; car.bk = null; car.cust = null; car.sales = null;
+      }
+    } }
   idsB.forEach(b => { if (cxByIds.has(b.key)) { b.cxForm = cxByIds.get(b.key); b.state = 'cxform'; return; } b.app = atByIds.get(b.key) || null; b.owner = b.app ? b.app.sales : b.sales; b.qdate = b.app && b.app.rec.queue_date ? b.app.rec.queue_date : b.date; bookings.push(b); });
   at.filter(a => !a.ids && a.active).forEach(a => {
     const kind = a.match ? a.match.kind : null;

@@ -274,6 +274,7 @@ function prepareUploads(results) {
     } else if (r.src === 'booking') r.diff = { prevN: X.bookings.filter(b => b.br === r.br).length, baseSample: !X.src[r.br].booking, out: X.src[r.br].booking ? bkOutDiff(r, D) : [] };
     else if (r.src === 'quota') r.diff = { prevN: X.quota.filter(q => q.br === r.br && r.months.includes(q.m)).length, baseSample: !X.src[r.br].quota.length };
     else { r.diff = invDiff(r); r.nameChoice = r.diff.lost.length ? (r.nameChoice || null) : null; }
+    if (['stock', 'booking', 'quota'].includes(r.src) && !r.older) r.keep = uplKeepCalc(r, D, results); else r.keep = null;
   }
 }
 function uplNeedsChoice(r) { return r.src === 'invoice' && r.diff && r.diff.lost && r.diff.lost.length && !r.nameChoice; }
@@ -301,7 +302,7 @@ async function saveUploads() {
     }
     const parts = r.src === 'quota' ? r.months.map(m => ({ id: idsDocId('quota', r.br, m), m, rows: r.rows.filter(x => x.m === m) })) : [{ id: idsDocId(r.src, r.br), m: null, rows: r.rows }];
     for (const part of parts) {
-      let rows = part.rows;
+      let rows = uplKeepRows(r, part.rows);
       const mk = () => ({ src: r.src, br: r.br, m: part.m, asof: r.asof, file: r.file, sheet: r.sheet, n: rows.length, ...pack(r.src, rows), warn: r.warn.slice(0, 20), ...actor() });
       let doc = mk();
       if (utf8len(doc) > 250000) { toast(`ตาราง ${SRC_LABEL[r.src]} ${r.br} ใหญ่เกินที่ต้นแบบเก็บได้`, 'bad'); continue; }
