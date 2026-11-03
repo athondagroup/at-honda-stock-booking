@@ -96,13 +96,16 @@ function bkOutAlloc(o) {
   const vin = a && !a.cancelled ? atVin(a) : null;
   return vin ? { vin, br: a.br } : null;
 }
-function bkOutPending(o) { return !!(o && o.flag && !o.res && !bkOutAuto(o) && !bkOutDelivered(o) && !bkOutAlloc(o)); }
+// the booking is in the current Booking table again (a later upload has it): it never really left
+function bkOutBack(o) { return !!(o && o.no && derive().X.bookings.some(b => String(b.no) === String(o.no))); }
+function bkOutPending(o) { return !!(o && o.flag && !o.res && !bkOutAuto(o) && !bkOutDelivered(o) && !bkOutAlloc(o) && !bkOutBack(o)); }
 function bkOutList(u, D) {
   const can = canApproveBr(u.br) && perms().write, F = S.bkOut && S.bkOut.id === u.id ? S.bkOut : { sel: {}, pick: {} };
   const todo = (u.out || []).filter(bkOutPending);
   const row = (o, i) => {
     const a = o.atId ? atById(o.atId) : null, auto = o.flag && !o.res ? bkOutAuto(o) : null, open = bkOutPending(o) && a && !a.cancelled;
     const dv = o.flag && !o.res && !auto ? bkOutDelivered(o) : null;
+    if (o.flag && !o.res && !auto && !dv && bkOutBack(o)) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">กลับมาอยู่ใน IDS แล้ว (ไฟล์ Booking รอบหลังมีใบจองนี้)</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>${a ? `<button class="underline text-xs" data-act="at-open" data-id="${esc(a.id)}">เปิด</button>` : ''}</div>`;
     const al = o.flag && !o.res && !auto && !dv ? bkOutAlloc(o) : null;
     if (al) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">IDS จัดสรรรถแล้ว · <span class="code">${esc(al.vin)}</span> (ใบจองย้ายไปอยู่ในไฟล์ Stock)</span>${a ? `<button class="underline text-xs" data-act="at-open" data-id="${esc(a.id)}">เปิด</button>` : ''}</div>`;
     if (dv) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">ส่งมอบแล้ว${dv.date ? ' ' + fmtD(dv.date) : ''}${dv.inv ? ` (DL ใบกำกับ ${esc(dv.inv)})` : ''} · หายจากไฟล์ Booking เพราะส่งมอบ ไม่ต้องทำอะไร</span></div>`;

@@ -119,7 +119,7 @@ function carHistRows(D) {
     r.date = r.in || (r.lastInv && r.lastInv.idate) || r.prod || null;
     r.al.sort((a, b) => (a.d || '').localeCompare(b.d || ''));
     r.lastAl = r.al[r.al.length - 1] || null;
-    r.state = r.now ? 'stock' : r.lastInv && r.lastInv.ddate ? 'delivered' : r.lastInv ? 'invoiced' : r.out ? 'out' : 'unknown';
+    r.state = r.now ? 'stock' : r.lastInv && r.lastInv.ddate ? 'delivered' : r.lastInv ? 'invoiced' : (r.web.some(a => !a.cancelled) || r.lastAl) ? 'allocated' : r.out ? 'out' : 'unknown';
   });
   return out;
 }
@@ -127,6 +127,7 @@ function carHistState(r) {
   if (r.state === 'stock') return `${statusChip(CAR_STATUS, r.now.status)}`;
   if (r.state === 'delivered') return chip(r.lastInv.other ? `ขายให้${r.lastInv.to && BRS.includes(r.lastInv.to) ? 'สาขา ' + r.lastInv.to : 'ดีลเลอร์/สาขาอื่น'}` : `ส่งมอบ ${fmtD(r.lastInv.ddate)}`, 'muted');
   if (r.state === 'invoiced') return chip(r.lastInv.other ? 'ขายให้สาขาอื่น/ดีลเลอร์' : `ออกใบกำกับ ${fmtD(r.lastInv.idate)}`, 'neutral');
+  if (r.state === 'allocated') { const w = r.web.filter(x => !x.cancelled).slice(-1)[0], who = w ? w.cust : r.lastAl.cust; return `${chip(w && w.flow && w.flow.done && w.flow.done.delivered ? 'ส่งมอบแล้ว' : 'จัดสรรให้ใบจองแล้ว', 'good')}<div class="text-xs text-muted">${esc(who || '')}${r.lastAl && r.lastAl.no ? ' · ใบจอง ' + esc(r.lastAl.no) : ''}${r.out ? ' · ไม่อยู่ใน Stock แล้ว' : ''}</div>`; }
   if (r.state === 'out') return `${chip('ออกจากสต็อก', 'muted')}<div class="text-xs text-muted">${esc(r.out.why || '')}</div>`;
   return chip('ไม่ทราบ', 'muted');
 }
@@ -228,7 +229,7 @@ async function carHistXlsx() {
     ...list.map(r => { const l = r.locks.slice().sort((a, b) => (b.requested_at || '').localeCompare(a.requested_at || ''))[0], i = r.lastInv;
       return [r.vin, r.model || '', r.grade || '', r.color || '', r.br || '', r.prod || '', r.in || '', r.lastAl ? r.lastAl.cust || '' : '', r.lastAl ? r.lastAl.no || '' : '', r.lastAl ? r.lastAl.s || '' : '', r.al.length, r.locks.length,
         l ? `${l.owner || ''} · ${lockIdsCust(l) || ''} · ${lockStatusTxt(l.status)}` : '', i ? i.cust || i.to || '' : '', i ? i.inv || '' : '', i ? i.idate || '' : '', i ? i.ddate || '' : '', i ? i.sales || '' : '',
-        r.out ? r.out.d : '', r.out ? r.out.why : '', { stock: 'อยู่ในสต็อก', delivered: 'ส่งมอบแล้ว', invoiced: 'ออกใบกำกับแล้ว', out: 'ออกจากสต็อก', unknown: '' }[r.state]]; })];
+        r.out ? r.out.d : '', r.out ? r.out.why : '', { stock: 'อยู่ในสต็อก', allocated: 'จัดสรรให้ใบจองแล้ว', delivered: 'ส่งมอบแล้ว', invoiced: 'ออกใบกำกับแล้ว', out: 'ออกจากสต็อก', unknown: '' }[r.state]]; })];
   const wb = X.utils.book_new(), ws = X.utils.aoa_to_sheet(aoa); ws['!cols'] = aoa[0].map(() => ({ wch: 16 })); X.utils.book_append_sheet(wb, ws, 'ประวัติรถ');
   const buf = X.write(wb, { type: 'array', bookType: 'xlsx' });
   await docSave(docName('ประวัติรถ' + (S.filters.chModel ? ' ' + S.filters.chModel : ''), S.filters.chAt || S.filters.chFrom || '', S.filters.chAt ? '' : S.filters.chTo || '') + '.xlsx', new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
