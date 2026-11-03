@@ -37,7 +37,7 @@ function viewBook(D) {
   ${pageHead('Booking', 'ใบจอง AT Honda กับ Booking IDS อยู่ในรายการเดียว ระบบจับคู่ด้วยชื่อลูกค้า รุ่น และวันที่ เจ้าของเคสตามฟอร์ม AT Honda รุ่น เกรด สี ตาม IDS',
     (sub === 'new' ? '' : `<div class="flex flex-wrap gap-2">${p.book ? `<button class="btn btn-red" data-act="sub" data-key="book" data-sub="new">+ ใบจอง AT Honda</button>` : ''}</div>`))}
   ${tabs('book', [['list', 'ใบจอง', String(active)], ['queue', 'คิวรอรถ'], ['summary', 'สรุปจอง'], ['steps', 'ตามขั้นตอนส่งมอบ'], ['cancels', 'ประวัติยกเลิก'], ...(p.book ? [['new', '+ ใบจองใหม่']] : [])])}
-  ${sub === 'new' ? '' : brSeg()}${body}`;
+  ${sub === 'new' ? '' : brSeg()}${sub === 'list' && typeof idsVinFillBar === 'function' ? idsVinFillBar(D) : ''}${body}`;
 }
 // every AT form (with its IDS booking when paired) plus IDS bookings that have no form
 function bookRows(D) {

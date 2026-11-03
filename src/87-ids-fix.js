@@ -136,3 +136,41 @@ Object.assign(ACTIONS, {
     S.modal = null; toast('คืนค่าตาม IDS แล้ว'); render();
   }
 });
+
+// bulk: every IDS booking with an empty model whose VIN tells it (confirm in a list first)
+function idsVinFillList(D) { return D.idsB.filter(b => b.vinSugg && b.match !== 'cancel' && !b.skip && idsFixCan(b)); }
+function idsVinFillBar(D) {
+  const n = idsVinFillList(D).length; if (!n) return '';
+  return `<div class="mb-3 p-3 rounded border border-line text-sm flex flex-wrap items-center gap-3"><span>ใบจอง IDS ${n} ใบไม่มีรุ่น/เกรด/สี แต่รู้ VIN จากไฟล์ Stock/DL</span><button class="btn btn-dark btn-sm" data-act="vinfill-open">ดูรายการ และเติมทุกใบ</button></div>`;
+}
+function idsVinFillModal(m, D) {
+  const L = idsVinFillList(D), pick = m.pick || {};
+  const rows = L.map(b => `<label class="flex flex-wrap gap-x-3 py-1.5 border-t border-line items-center"><input type="checkbox" data-vinfill="${esc(b.no)}" ${pick[b.no] === false ? '' : 'checked'}><span class="code">${esc(b.no)}</span><span>${esc(b.cust || '')}</span><span class="text-muted">${esc(b.br || '')}</span><span class="code text-xs">${esc(b.vin)}</span><b>${esc(b.vinSugg.model)} ${esc(b.vinSugg.grade)} ${esc(b.vinSugg.color || '')}</b></label>`).join('');
+  const k = L.filter(b => pick[b.no] !== false).length;
+  return `<div class="flex items-start justify-between gap-3 mb-2"><h2 class="font-head text-xl font-semibold">เติมรุ่น/เกรด/สี จาก VIN</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
+    <p class="text-xs text-muted mb-2">ติ๊กเฉพาะใบที่ถูกต้อง กด "ยืนยัน" แล้วจึงเติมจริง · ใช้ในเว็บเท่านั้น ไม่ได้แก้ใน IDS · คืนค่าได้ที่หน้าแก้ไขใบจองแต่ละใบ</p>
+    ${rows || '<p class="text-sm">ไม่มีรายการแล้ว</p>'}
+    <div class="flex justify-end gap-2 mt-3"><button class="btn btn-dark" data-act="vinfill-go" ${k ? '' : 'disabled'}>ยืนยัน เติม ${k} ใบ</button></div>`;
+}
+document.addEventListener('change', e => {
+  const t = e.target; if (!t || !t.dataset || t.dataset.vinfill === undefined || !S.modal || S.modal.kind !== 'vinfill') return;
+  S.modal.pick = { ...(S.modal.pick || {}), [t.dataset.vinfill]: t.checked }; render();
+});
+Object.assign(ACTIONS, {
+  'vinfill-open'() { S.modal = { kind: 'vinfill', pick: {} }; render(); },
+  async 'vinfill-go'() {
+    const D = derive(), m = S.modal; if (!m || m.kind !== 'vinfill') return;
+    const L = idsVinFillList(D).filter(b => (m.pick || {})[b.no] !== false); if (!L.length) return;
+    if (!confirm(`เติมรุ่น/เกรด/สี ให้ใบจอง IDS ${L.length} ใบ จาก VIN?`)) return;
+    let doc = idsFixDoc() ? await claimFresh('ids', 'bkfix', () => true) : { src: 'bkfix', fix: {} };
+    if (!doc) return;
+    doc.fix = doc.fix || {};
+    for (const b of L) {
+      const v = b.vinSugg, cur = doc.fix[b.no] || { set: {}, log: [] }, set = { model: v.model, grade: v.grade }; if (v.color) set.color = v.color;
+      doc.fix[b.no] = { ...cur, set: { ...(cur.set || {}), ...set }, log: [...(cur.log || []), { act: 'เติมรุ่นจาก VIN', note: `${v.model} ${v.grade} ${v.color || ''} (VIN ${b.vin})`, ...actor() }].slice(-20) };
+    }
+    doc.src = 'bkfix'; Object.assign(doc, actor());
+    if (!(await write('ids', 'bkfix', doc))) return;
+    S.modal = null; toast(`เติมแล้ว ${L.length} ใบ`); render();
+  }
+});

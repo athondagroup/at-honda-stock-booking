@@ -22,6 +22,7 @@ function renderModal(D) {
   else if (m.kind === 'recvdup') body = recvDupModal(m);
   else if (m.kind === 'idspair') { body = idsPairModal(m, D); wide = true; }
   else if (m.kind === 'idsfix') { body = idsFixModal(m, D); wide = true; }
+  else if (m.kind === 'vinfill') { body = idsVinFillModal(m, D); wide = true; }
   else if (m.kind === 'carhist') { body = carHistModal(m, D); wide = true; }
   else if (m.kind === 'gsearch') { body = gsearchModal(m, D); wide = true; }
   else if (m.kind === 'advsum') { body = advSumModal(m, D); wide = true; }
