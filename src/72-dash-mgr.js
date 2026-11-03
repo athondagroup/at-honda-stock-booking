@@ -55,7 +55,7 @@ function bookDelivChart(E, id) {
 // this month: target, invoices so far, projection and the pace needed (invoices only reach as far as the DL file)
 function monthPace(D, E) {
   const m = D.today.slice(0, 7), t = tgtOf(m);
-  const inv = D.X.inv.filter(i => i.idate && i.idate.slice(0, 7) === m && inBr(i)).length;   // company cars count in the invoice sales (the target)
+  const inv = D.X.inv.filter(i => i.idate && !i.other && i.idate.slice(0, 7) === m && inBr(i)).length;   // company cars count in the invoice sales (the target)
   const dim = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).getUTCDate();
   const asof = E.dlAsof && E.dlAsof.slice(0, 7) === m ? E.dlAsof : null;
   const day = asof ? Number(asof.slice(8)) : 0, left = dim - Number(D.today.slice(8)) + 1;

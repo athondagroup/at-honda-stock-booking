@@ -158,7 +158,7 @@ function execData(D, rng) {
   // Advance box; a later invoice for that car is a re-issue, not counted again as an invoice (its delivery counts below)
   const advs = new Map(); for (const [vin] of S.vehicles) { const a = advRec(vin); if (a) advs.set(vin, a); }
   // company cars count in the invoice sales (the Honda target) but not in deliveries or the sales' own sales (ตกลง 2/11); a click shows they are company cars
-  D.X.inv.forEach(i => { if (i.idate && inBrX(i) && inR(i.idate) && !(i.vin && advs.has(i.vin))) invoiced.push({ date: i.idate, br: i.br, model: i.model, fin: i.fin || null, ...det(i), ...(i.company ? { co: true, extra: 'รถบริษัท' } : {}) }); });
+  D.X.inv.forEach(i => { if (i.idate && !i.other && inBrX(i) && inR(i.idate) && !(i.vin && advs.has(i.vin))) invoiced.push({ date: i.idate, br: i.br, model: i.model, fin: i.fin || null, ...det(i), ...(i.company ? { co: true, extra: 'รถบริษัท (Demo)' } : {}) }); });
   for (const [vin, a] of advs) {
     const br = advBr(vin, a, D), c = carAny(vin, D) || {};
     if (br && inBrX({ br }) && inR(a.idate)) invoiced.push({ date: a.idate, br, model: c.model, grade: c.grade, color: c.color, vin, cust: a.cust, sales: null, inv: a.inv, idate: a.idate, ddate: null, fin: null, adv: true, src: 'ใบ Advance', extra: 'ADV' });
