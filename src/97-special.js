@@ -30,7 +30,7 @@ function spBox(c, D) {
   if (!spCan()) return c.special ? spDetail(c, D, false) : '';
   const sp = c.special, vin = esc(c.vin);
   if (!sp) {
-    const out = c.fromInv || ['company', 'free'].includes(c.status) || D.deliveredOut.some(x => x.vin === c.vin);
+    const out = c.fromInv || ['company', 'free', 'sold'].includes(c.status) || /คืนรถ/.test(c.note || '') || D.deliveredOut.some(x => x.vin === c.vin);
     if (!out) return '';
     return `<div class="mb-3 p-3 rounded-lg text-sm flex flex-wrap items-center gap-3" style="background:var(--surface-2)">
       <div class="flex-1 min-w-[220px]">${c.fromInv ? 'รถคันนี้ไม่อยู่ในไฟล์ Stock IDS แล้ว · ' : ''}รถบริษัท Advance · รถ Demon · ลูกค้าคืนรถ ที่ยังอยู่ที่สาขา ดึงเข้าแท็บ "รถพิเศษ" (แยกจาก Stock ปกติ) ได้ ระบบจะจำวันที่ใบกำกับ วันที่ส่งมอบ และว่าขายได้หรือไม่</div>
