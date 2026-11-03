@@ -16,7 +16,7 @@ function campFeats(t) {
 const campNo = t => { const r = fixTh(t).match(/ทางเลือก(?:ที่)? ?(\d+)/); return r ? r[1] : ''; };
 // the Honda "Dealer Incentive Report": one row per VIN with the campaign, the option, delivery date and status
 function campParseDIR(X, wb) {
-  const items = new Map(), reps = []; let br = '';
+  const items = new Map(), reps = [], seen = new Map(); let br = '';
   for (const n of wb.SheetNames) {
     const rows = X.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: false, defval: '' });
     const hi = rows.findIndex(r => r.some(c => String(c).includes('หมายเลขตัวถัง')));
@@ -27,12 +27,13 @@ function campParseDIR(X, wb) {
     let k = 0;
     for (const r of rows.slice(hi + 1)) {
       const vin = String(r[iV] || '').trim().toUpperCase(); if (!/^[A-Z0-9]{17}$/.test(vin)) continue;
+      (seen.get(vin) || seen.set(vin, []).get(vin)).push({ rep, opt: fixTh(r[iO]).replace(/\s+/g, ' ').trim(), st: String(r[iS] || '').trim(), date: String(r[iD] || '').trim() });
       items.set(vin, { vin, rep, camp: String(r[iC] || '').trim(), opt: fixTh(r[iO]).replace(/\s+/g, ' ').trim(), date: String(r[iD] || '').trim(), name: String(r[iN] || '').trim(), st: String(r[iS] || '').trim(), mtoc: String(r[iM] || '').trim(), typ: String(r[iT] || '').trim() }); k++;
     }
     if (k) { if (rep && !reps.includes(rep)) reps.push(rep); br = br || BRS.find(b => head.includes(BR[b].name)) || ''; }
   }
   // one sheet per month (a whole-year file): the newest sheet wins for a car listed twice (ALLOCATED, then DELIVERED)
-  return items.size ? { items, report: reps.length > 1 ? reps[0] + ' – ' + reps[reps.length - 1] : reps[0] || '', br } : null;
+  return items.size ? { items, report: reps.length > 1 ? reps[0] + ' – ' + reps[reps.length - 1] : reps[0] || '', br, dups: [...seen].filter(([, l]) => l.length > 1).map(([vin, l]) => ({ vin, list: l })) } : null;
 }
 // Honda payout files (per dealer, per incentive month): the option file with the baht per VIN, and the special-campaign file (Gen to Gen, Loyalty ...)
 const campBrOf = t => /กำแพงแสน|KAMP/i.test(t) ? 'KPA' : /สามพราน|SAMPRAN/i.test(t) ? 'SPH' : /ภาษีเจริญ|PASI/i.test(t) ? 'PSC' : /เอกชัย|บางบอน|EKACHAI|BANGBON/i.test(t) ? 'ATE' : '';
@@ -134,6 +135,7 @@ function campUpRptBox(vr) {
   return `<section class="bg-surface border border-line rounded-lg p-4 mb-4"><div class="flex flex-wrap items-center gap-2"><h3 class="font-head font-semibold">ยอดแจ้งขาย Honda${U.br ? ' สาขา ' + esc(U.br) : ''}${U.report ? ' ' + esc(U.report) : ''}: ${vr.length} คัน</h3>
     <span class="text-sm text-muted">${Object.entries(st).map(([k, v]) => esc(k) + ' ' + v).join(' · ')}</span>
     ${campUpCan() ? `<span class="ml-auto flex flex-wrap gap-2"><button class="btn btn-ghost btn-sm" data-act="campup-selall" ${todo ? '' : 'disabled'}>เลือกทั้งหมด (${todo})</button><button class="btn btn-ghost btn-sm" data-act="campup-selnone">ไม่เลือก</button><button class="btn btn-red btn-sm" data-act="campup-save" ${nSel && U.br ? '' : 'disabled'}>${todo ? `บันทึกที่เลือก (${nSel} คัน)` : 'บันทึกครบแล้ว'}</button></span>` : ''}</div>
+    ${(U.dups || []).length ? `<div class="mt-2 px-3 py-2 rounded text-sm" style="background:var(--warn-soft);color:var(--warn)"><b>รถ ${U.dups.length} คันอยู่ในหลายชีต (หลายเดือน)</b> ระบบใช้ชีตล่าสุด ตรวจว่าถูกต้องหรือไม่<div class="text-xs mt-1 flex flex-col gap-0.5">${U.dups.slice(0, 30).map(d => `<div><span class="code">${esc(d.vin)}</span> ${d.list.map(x => esc(x.rep || '–') + ': ' + esc(x.opt || '–') + (x.st ? ' (' + esc(x.st) + ')' : '')).join(' → ')}</div>`).join('')}${U.dups.length > 30 ? `<div>… อีก ${U.dups.length - 30} คัน</div>` : ''}</div></div>` : ''}
     ${vr.filter(r => r.state === 'diff').length ? `<div class="mt-2 px-3 py-2 rounded text-sm font-semibold" style="background:var(--bad);color:#fff">แคมเปญในไฟล์ไม่ตรงกับที่แอดมินเลือก ${vr.filter(r => r.state === 'diff').length} คัน — ตรวจแถวที่มีแถบแดง แล้วเลือก "ใช้แคมเปญตามไฟล์" หรือเลือกใหม่</div>` : ''}${nChg ? `<div class="text-sm mt-2" style="color:var(--warn)">มี ${nChg} คันที่ทางเลือกเปลี่ยนจากที่บันทึกไว้ ตรวจแล้วติ๊กเลือกเองก่อนบันทึก</div>` : ''}<div class="text-xs text-muted mt-1">รุ่น: ${Object.entries(by).map(([k, v]) => esc(k) + ' ' + v).join(' · ')} · บันทึกแล้วเก็บไว้ที่ VIN แต่ละคัน (เห็นเฉพาะแอดมินขึ้นไป) ไม่เปลี่ยนเงื่อนไขขายในใบจอง · ดูสรุปที่ รายงาน › รายงานสรุปแคมเปญ</div></section>`;
 }
 function campUpRow(r) {
@@ -200,6 +202,11 @@ async function campUpAuto() {
   }
   if (nPick) await write('ref', 'honda_pay', { ...cur, picks });
   let nApply = 0; for (const [a, cid] of apply) if (await rptApplyCamp(a, cid, 'ปรับตามไฟล์ Honda อัตโนมัติ (อัปเดตข้อมูลแคมเปญ)', null, null, U.file || 'ไฟล์ Honda')) nApply++;
+  // every VIN in the file is recorded by VIN, with or without a booking (ตกลง 3/11)
+  let nSave = 0;
+  if (U.br) { U.sel = new Set(campUpVinRows(derive()).filter(r => !r.done).map(r => r.it.vin)); nSave = U.sel.size; if (nSave) await ACTIONS['campup-save'](); }
+  else toast('เลือกสาขาของไฟล์ แล้วกด "บันทึกที่เลือก" เพื่อลงตาม VIN', 'bad');
+  if ((U.dups || []).length) setTimeout(() => toast(`รถ ${U.dups.length} คันอยู่ในหลายชีต ตรวจรายการสีส้มด้านบน`, 'bad'), 1200);
   const nDiff = campUpVinRows(derive()).filter(r => r.state === 'diff').length;
   if (nPick + nApply) toast(`จับคู่แคมเปญตามไฟล์ให้อัตโนมัติ ${nPick + nApply} คัน`);
   if (nDiff) setTimeout(() => toast(`แคมเปญในไฟล์ไม่ตรงกับที่แอดมินเลือก ${nDiff} คัน ตรวจแถวแดง`, 'bad'), nPick + nApply ? 2600 : 0);
@@ -216,7 +223,7 @@ async function campUpRead(file) {
       const X = await loadXLSX(), wb = file.paste !== undefined ? { SheetNames: ['paste'], Sheets: { paste: X.utils.aoa_to_sheet(idsTsv(file.paste)) } }   // copied from Excel (ตกลง 2/11)
         : /\.(csv|txt)$/i.test(file.name) ? X.read(await file.text(), { type: 'string' }) : X.read(await file.arrayBuffer(), { type: 'array' });
       const dir = campParseDIR(X, wb);
-      if (dir) { Object.assign(U, { pay: null, items: dir.items, report: dir.report, text: '', file: file.name, pick: {}, br: myBranch() || dir.br || '', brAuto: !!dir.br }); U.sel = new Set(campUpVinRows(derive()).filter(r => !r.done && !r.chg).map(r => r.it.vin)); U.busy = false; render(); campUpAuto(); return; }
+      if (dir) { Object.assign(U, { pay: null, items: dir.items, dups: dir.dups || [], report: dir.report, text: '', file: file.name, pick: {}, br: myBranch() || dir.br || '', brAuto: !!dir.br }); U.sel = new Set(campUpVinRows(derive()).filter(r => !r.done && !r.chg).map(r => r.it.vin)); U.busy = false; render(); campUpAuto(); return; }
       const pay = campParsePay(X, wb);
       if (pay) { Object.assign(U, { pay, items: null, text: '', file: file.name, br: myBranch() || pay.br || '' }); U.busy = false; render(); return; }
       text = wb.SheetNames.map(n => X.utils.sheet_to_csv(wb.Sheets[n])).join(' ');
