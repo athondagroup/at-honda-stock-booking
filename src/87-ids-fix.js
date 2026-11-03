@@ -139,9 +139,13 @@ Object.assign(ACTIONS, {
 
 // bulk: every IDS booking with an empty model whose VIN tells it (confirm in a list first)
 function idsVinFillList(D) { return D.idsB.filter(b => b.vinSugg && b.match !== 'cancel' && !b.skip && idsFixCan(b)); }
+// no model / grade and nothing in Stock / DL tells it: the booking must be fixed by hand
+function idsNoSpecList(D) { return D.idsB.filter(b => (!b.model || !b.grade) && !b.vinSugg && b.match !== 'cancel' && !b.skip && !b.webCancel && idsFixCan(b)); }
 function idsVinFillBar(D) {
-  const n = idsVinFillList(D).length; if (!n) return '';
-  return `<div class="mb-3 p-3 rounded border border-line text-sm flex flex-wrap items-center gap-3"><span>ใบจอง IDS ${n} ใบไม่มีรุ่น/เกรด/สี แต่รู้ VIN จากไฟล์ Stock/DL</span><button class="btn btn-dark btn-sm" data-act="vinfill-open">ดูรายการ และเติมทุกใบ</button></div>`;
+  const n = idsVinFillList(D).length, miss = idsNoSpecList(D); if (!n && !miss.length) return '';
+  return `${n ? `<div class="mb-3 p-3 rounded border border-line text-sm flex flex-wrap items-center gap-3"><span>ใบจอง IDS ${n} ใบไม่มีรุ่น/เกรด/สี แต่รู้จากไฟล์ Stock/DL</span><button class="btn btn-dark btn-sm" data-act="vinfill-open">ดูรายการ และเติมทุกใบ</button></div>` : ''}
+    ${miss.length ? `<div class="mb-3 p-3 rounded border border-line text-sm" style="background:var(--warn-soft)"><b style="color:var(--warn)">ใบจอง IDS ${miss.length} ใบไม่มีรุ่น/เกรด/สี และหาจาก Stock/DL ไม่เจอ</b> ต้องเลือกเอง
+      <details class="mt-1"><summary class="cursor-pointer">ดูรายการ</summary>${miss.slice(0, 60).map(b => `<div class="flex flex-wrap gap-x-3 items-center py-0.5"><span class="code">${esc(b.no)}</span><span>${esc(b.cust || '')}</span><span class="text-muted">${esc(b.br || '')}</span><button class="btn btn-ghost btn-sm" data-act="idsfix-open" data-id="${esc(b.no)}">แก้ไข</button></div>`).join('')}${miss.length > 60 ? `<div>และอีก ${miss.length - 60}</div>` : ''}</details></div>` : ''}`;
 }
 function idsVinFillModal(m, D) {
   const L = idsVinFillList(D), pick = m.pick || {};
