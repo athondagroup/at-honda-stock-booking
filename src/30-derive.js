@@ -93,9 +93,9 @@ function deriveNow() {
     if (iv) b = { ...b, vin: iv.vin };
     // model / grade / colour empty in IDS (no MTO) but the frame number is known: offer what Stock or DL says (needs a confirm click)
     let vs = null;
-    if (b.vin && (!b.model || !b.grade) && !(b.fix && b.fix.set && b.fix.set.model)) {
-      const src = vinSpecMap(X).get(b.vin);
-      if (src) vs = { model: src.model, grade: src.grade, color: src.color || b.color || null };
+    if ((!b.model || !b.grade) && !(b.fix && b.fix.set && b.fix.set.model)) {
+      const sm = vinSpecMap(X), src = (b.vin && sm.get(b.vin)) || sm.get('no:' + b.no) || (iv && iv.model && iv.grade ? iv : null);
+      if (src) vs = { model: src.model, grade: src.grade, color: src.color || b.color || null, vin: b.vin || src.vin || null };
     }
     return {
       ...b, vinSugg: vs, key: 'ids:' + b.no, src: 'IDS', spec: specKey(b.model, b.grade, b.color),
@@ -802,5 +802,7 @@ function vinSpecMap(X) {
   if (_vsm && _vsmK === X) return _vsm;
   const m = new Map();
   [...(X.cars || []), ...(X.inv || [])].forEach(c => { if (c.vin && c.model && c.grade && !m.has(c.vin)) m.set(c.vin, c); });
+  // no frame number on the booking: the stock file / DL may still carry its booking number
+  [...(X.cars || []), ...(X.inv || [])].forEach(c => { const n = c.bkno || c.no; if (n && c.model && c.grade && !m.has('no:' + n)) m.set('no:' + n, c); });
   _vsm = m; _vsmK = X; return m;
 }

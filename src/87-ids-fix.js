@@ -61,7 +61,7 @@ function idsFixModal(m, D) {
   const log = ((b.fix && b.fix.log) || []).slice(-5).reverse();
   let body;
   const vsb = b.vinSugg && !(b.fix && b.fix.set && b.fix.set.model) && idsFixCan(b)
-    ? `<div class="mb-3 p-3 rounded border border-line text-sm" style="background:var(--warn-bg, transparent)">IDS ไม่มีรุ่น/สีของใบจองนี้ แต่ VIN <span class="code">${esc(b.vin)}</span> เป็น <b>${esc(b.vinSugg.model)} ${esc(b.vinSugg.grade)} ${esc(b.vinSugg.color || '')}</b> ตามไฟล์ Stock/DL
+    ? `<div class="mb-3 p-3 rounded border border-line text-sm" style="background:var(--warn-bg, transparent)">IDS ไม่มีรุ่น/สีของใบจองนี้ แต่ ${b.vin ? 'VIN' : 'ไฟล์ Stock/DL ที่มีเลขใบจองนี้ VIN'} <span class="code">${esc(b.vin || b.vinSugg.vin || '')}</span> เป็น <b>${esc(b.vinSugg.model)} ${esc(b.vinSugg.grade)} ${esc(b.vinSugg.color || '')}</b> ตามไฟล์ Stock/DL
       <button class="btn btn-dark btn-sm ml-2" data-act="idsfix-vinfill" data-id="${esc(b.no)}">ยืนยัน เติมรุ่น/เกรด/สี</button></div>` : '';
   if (m.mode === 'edit') body = vsb + `<div class="grid sm:grid-cols-3 gap-3">${idsFixFields().map(fld).join('')}</div>
     <p class="text-xs text-muted mt-2">● = ต่างจาก IDS · ข้อมูลที่แก้ตรงนี้ใช้ในเว็บเท่านั้น (ไม่ได้แก้ในระบบ IDS) และอัพโหลด IDS รอบหน้าจะไม่ทับ · ถ้าแก้ชื่อลูกค้าให้ตรงกับฟอร์มที่ลงไว้ ระบบจะจับคู่ให้เอง</p>
@@ -109,9 +109,9 @@ Object.assign(ACTIONS, {
   async 'idsfix-vinfill'(el) {
     const b = derive().idsB.find(x => String(x.no) === String(el.dataset.id)); if (!b || !b.vinSugg || !idsFixCan(b)) return;
     const v = b.vinSugg, txt = `${v.model} ${v.grade} ${v.color || ''}`.trim();
-    if (!confirm(`เติม ${txt} ให้ใบจอง IDS ${b.no} (${b.cust || ''}) จาก VIN ${b.vin}?`)) return;
+    if (!confirm(`เติม ${txt} ให้ใบจอง IDS ${b.no} (${b.cust || ''}) จาก ${b.vin ? "VIN " + b.vin : "เลขใบจอง"}?`)) return;
     const set = { model: v.model, grade: v.grade }; if (v.color) set.color = v.color;
-    if (!(await idsFixWrite(String(b.no), x => ({ ...x, set: { ...(x.set || {}), ...set } }), 'เติมรุ่นจาก VIN', `${txt} (VIN ${b.vin})`))) return;
+    if (!(await idsFixWrite(String(b.no), x => ({ ...x, set: { ...(x.set || {}), ...set } }), 'เติมรุ่นจาก VIN', `${txt} (${b.vin || b.vinSugg.vin || "ตามเลขใบจอง"})`))) return;
     S.modal = null; toast(`เติมแล้ว: ${txt}`); render();
   },
   async 'idsfix-skip'() {
@@ -145,7 +145,7 @@ function idsVinFillBar(D) {
 }
 function idsVinFillModal(m, D) {
   const L = idsVinFillList(D), pick = m.pick || {};
-  const rows = L.map(b => `<label class="flex flex-wrap gap-x-3 py-1.5 border-t border-line items-center"><input type="checkbox" data-vinfill="${esc(b.no)}" ${pick[b.no] === false ? '' : 'checked'}><span class="code">${esc(b.no)}</span><span>${esc(b.cust || '')}</span><span class="text-muted">${esc(b.br || '')}</span><span class="code text-xs">${esc(b.vin)}</span><b>${esc(b.vinSugg.model)} ${esc(b.vinSugg.grade)} ${esc(b.vinSugg.color || '')}</b></label>`).join('');
+  const rows = L.map(b => `<label class="flex flex-wrap gap-x-3 py-1.5 border-t border-line items-center"><input type="checkbox" data-vinfill="${esc(b.no)}" ${pick[b.no] === false ? '' : 'checked'}><span class="code">${esc(b.no)}</span><span>${esc(b.cust || '')}</span><span class="text-muted">${esc(b.br || '')}</span><span class="code text-xs">${esc(b.vin || b.vinSugg.vin || 'ตามเลขใบจอง')}</span><b>${esc(b.vinSugg.model)} ${esc(b.vinSugg.grade)} ${esc(b.vinSugg.color || '')}</b></label>`).join('');
   const k = L.filter(b => pick[b.no] !== false).length;
   return `<div class="flex items-start justify-between gap-3 mb-2"><h2 class="font-head text-xl font-semibold">เติมรุ่น/เกรด/สี จาก VIN</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
     <p class="text-xs text-muted mb-2">ติ๊กเฉพาะใบที่ถูกต้อง กด "ยืนยัน" แล้วจึงเติมจริง · ใช้ในเว็บเท่านั้น ไม่ได้แก้ใน IDS · คืนค่าได้ที่หน้าแก้ไขใบจองแต่ละใบ</p>
@@ -167,7 +167,7 @@ Object.assign(ACTIONS, {
     doc.fix = doc.fix || {};
     for (const b of L) {
       const v = b.vinSugg, cur = doc.fix[b.no] || { set: {}, log: [] }, set = { model: v.model, grade: v.grade }; if (v.color) set.color = v.color;
-      doc.fix[b.no] = { ...cur, set: { ...(cur.set || {}), ...set }, log: [...(cur.log || []), { act: 'เติมรุ่นจาก VIN', note: `${v.model} ${v.grade} ${v.color || ''} (VIN ${b.vin})`, ...actor() }].slice(-20) };
+      doc.fix[b.no] = { ...cur, set: { ...(cur.set || {}), ...set }, log: [...(cur.log || []), { act: 'เติมรุ่นจาก VIN', note: `${v.model} ${v.grade} ${v.color || ''} (${b.vin || b.vinSugg.vin || "ตามเลขใบจอง"})`, ...actor() }].slice(-20) };
     }
     doc.src = 'bkfix'; Object.assign(doc, actor());
     if (!(await write('ids', 'bkfix', doc))) return;
