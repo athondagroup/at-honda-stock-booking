@@ -214,9 +214,10 @@ function idsViewHead() {
   return { vin: 'VIN', model: 'รุ่น', grade: 'เกรด', color: 'สี', year: 'ปี', note: 'หมายเหตุ', consign: 'ฝากขาย', stockin: 'วันที่เข้าสต็อก', prod: 'ผลิต', ref: 'Quota Ref', bkno: 'เลขที่ใบจอง', bknote: 'หมายเหตุใบจอง',
     cust: 'ลูกค้า', sold: 'แจ้งขาย', company: 'รถบริษัท', alloc: 'จัดสรร', bkdate: 'วันที่จอง', engine: 'เลขเครื่อง', no: 'เลขที่ใบจอง', date: 'วันที่จอง', sales: 'เซลล์', ids: 'IDS', ws: 'W/S Order',
     aging: 'อายุ', est: 'ประมาณการ', m: 'เดือน', vnote: 'หมายเหตุ VIN', qty: 'จำนวน', week: 'สัปดาห์', cdate: 'Create date', ndc: 'NDC out', dstock: 'Dealer stock in', otype: 'Order type',
-    inv: 'เลขที่ใบกำกับ', idate: 'วันที่ใบกำกับ', ddate: 'วันที่ส่งมอบ', fin: 'ไฟแนนซ์', other: 'ขายให้สาขาอื่น', archived: 'เก็บสำรอง' };
+    inv: 'เลขที่ใบกำกับ', idate: 'วันที่ใบกำกับ', ddate: 'วันที่ส่งมอบ', fin: 'ไฟแนนซ์', other: 'ขายให้สาขาอื่น', archived: 'เก็บสำรอง', br: 'สาขา' };
 }
-function idsViewRows(src, br) {
+function idsViewRows(src, br) { const o = idsViewRows0(src, br), code = (BR[br] || {}).code || br; return { cols: [...o.cols, 'br'], rows: o.rows.map(r => ({ ...r, br: code })) }; }
+function idsViewRows0(src, br) {
   if (src === 'invoice') { const live = unpack(S.ids.get('invoice_' + br)), keys = new Set(live.map(invKey)); return { cols: [...PACK.invoice, 'archived'], rows: [...live, ...invArchiveRows(br, keys).map(r => ({ ...r, archived: true }))] }; }
   if (src === 'quota') return { cols: PACK.quota, rows: [...S.ids.values()].filter(d => d.src === 'quota' && d.br === br).sort((a, b) => String(a.m).localeCompare(String(b.m))).flatMap(d => unpack(d)) };
   return { cols: PACK[src], rows: unpack(S.ids.get(idsDocId(src, br))) };

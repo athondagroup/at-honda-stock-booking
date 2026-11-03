@@ -414,7 +414,7 @@ const IDS = (() => {
   }
   function parseSheet(rows, sheet, file) {
     const loc = locate(rows);
-    if (!loc) return null;
+    if (!loc) return webTable(rows, sheet, file);
     const { src, hdr } = loc, spec = SPECS[src];
     const res = { file, sheet, src, br: null, rows: [], sold: [], warn: [], note: null, error: null, asof: null, months: [] };
     const body = [];
@@ -437,6 +437,51 @@ const IDS = (() => {
     });
     POST[src](res, recs);
     if (!res.error && !res.rows.length) res.error = 'ไม่พบแถวข้อมูลที่ใช้ได้';
+    return res;
+  }
+  // A table copied from this web's own "ข้อมูลที่ใช้อยู่ตอนนี้" view (หน้า ดูตาราง / Excel ที่ดาวน์โหลดจากเว็บ) has the web's own column names
+  // (เลขที่ใบจอง, วันที่จอง, รุ่น, เกรด …) instead of IDS's. Read it back by those names; the branch comes from the สาขา column
+  // (dealer code 220 / 1630 / 1350 / 1400, or PSC / ATE / SPH / KPA).
+  function webTable(rows, sheet, file) {
+    const H = typeof idsViewHead === 'function' ? idsViewHead() : null; if (!H) return null;
+    const need = { booking: ['no', 'date', 'model', 'sales', 'ids'], stock: ['vin', 'model', 'stockin'], quota: ['ref', 'm', 'model'], invoice: ['inv', 'idate', 'vin'] };
+    let best = null;
+    for (let i = 0; i < Math.min(rows.length, 20); i++) {
+      const row = rows[i]; if (!row) continue;
+      const labels = row.map(x => clean(x));
+      for (const src of Object.keys(need)) {
+        const cols = {};
+        PACK[src].forEach(k => { const j = labels.indexOf(H[k]); if (j >= 0 && !Object.values(cols).includes(j)) cols[k] = j; });
+        if (!need[src].every(k => k in cols)) continue;
+        const brI = labels.findIndex(l => l === 'สาขา');
+        if (!best || Object.keys(cols).length > best.n) best = { src, hdr: i, cols, brI, n: Object.keys(cols).length };
+      }
+    }
+    if (!best) return null;
+    const { src, hdr, cols, brI } = best, res = { file, sheet, src, br: null, rows: [], sold: [], warn: [], note: 'ตารางจากหน้าข้อมูลของเว็บ (อ่านตามชื่อคอลัมน์ของเว็บ)', error: null, asof: null, months: [] };
+    const DT = ['consign', 'stockin', 'prod', 'alloc', 'bkdate', 'date', 'idate', 'ddate', 'cdate', 'ndc', 'dstock'], INT = ['year', 'aging', 'qty', 'week'], MO = ['est', 'm'], FLAG = ['sold', 'company', 'other'];
+    const cnt = {};
+    for (let i = hdr + 1; i < rows.length; i++) {
+      const r = rows[i]; if (!r || !r.some(x => clean(x))) continue;
+      const o = {};
+      for (const [k, j] of Object.entries(cols)) {
+        const v = r[j];
+        o[k] = DT.includes(k) ? date(v) : INT.includes(k) ? int(v) : MO.includes(k) ? (/^\d{4}-\d{2}$/.test(clean(v)) ? clean(v) : month(v)) : FLAG.includes(k) ? /^(y|true|1|ใช่)$/i.test(clean(v)) : (clean(v) || null);
+      }
+      const key = src === 'stock' ? o.vin : src === 'booking' ? o.no : src === 'quota' ? o.ref : o.inv; if (!key) continue;
+      if (o.vin) o.vin = String(o.vin).toUpperCase();
+      if (o.color) o.color = String(o.color).toUpperCase();
+      if (brI >= 0) { const t = clean(r[brI]), b = dealerBr(t) || (BR[t.toUpperCase()] ? t.toUpperCase() : null); if (b) cnt[b] = (cnt[b] || 0) + 1; }
+      res.rows.push(o);
+    }
+    if (!res.rows.length) { res.error = 'มีแต่หัวตาราง ไม่มีข้อมูล'; return res; }
+    const bs = Object.keys(cnt);
+    if (src === 'quota' && !bs.length) { const c = {}; res.rows.forEach(x => { const b = String(x.ref || '').slice(0, 3); if (BR[b]) c[b] = 1; }); Object.keys(c).forEach(b => bs.push(b)); }
+    if (bs.length !== 1) { res.error = bs.length ? `ตารางเดียวมีหลายสาขา (${bs.sort().join(', ')}) กรุณาวางแยกสาขา` : 'ตารางไม่มีคอลัมน์ "สาขา" (ใส่รหัส 220 / 1630 / 1350 / 1400 หรือ PSC / ATE / SPH / KPA ต่อท้ายทุกแถว)'; return res; }
+    res.br = bs[0];
+    if (src === 'quota') res.months = [...new Set(res.rows.map(x => x.m).filter(Boolean))].sort();
+    if (src === 'invoice') res.noCust = !res.rows.some(x => x.cust || x.sales);
+    res.asof = src === 'booking' ? inferAsof(res.rows.map(x => [x.date, x.aging])) : null;
     return res;
   }
   function parseWorkbook(buf, file) {
