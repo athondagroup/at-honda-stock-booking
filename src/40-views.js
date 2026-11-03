@@ -275,7 +275,7 @@ function viewStock(D) {
       ${mode === 'spec' ? `<option value="low" ${f.status === 'low' ? 'selected' : ''}>สเปกที่ไม่พอ (แดง)</option>` : ''}
       ${Object.entries(CAR_STATUS).map(([k, v]) => `<option value="${k}" ${f.status === k ? 'selected' : ''}>${v[0]} (${counts[k] || 0})</option>`).join('')}</select></div>`}
     ${mode === 'spec' ? `<div class="field"><label for="f-spsort">เรียง</label><select id="f-spsort" data-filter="specSort">${[['', 'ขาดมากสุด (รอรถ − ว่าง − Quota)'], ['model', 'รุ่น (A→Z)'], ['free', 'รถว่างมากสุด'], ['waiting', 'รอรถมากสุด'], ['quota', 'Quota ว่างมากสุด'], ['held', 'ติดจองมากสุด'], ['age', 'รถค้างนานสุด']].map(([k, t]) => `<option value="${k}" ${(f.specSort || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
-    ${mode === 'list' ? `<div class="field"><label for="f-ssort">เรียง</label><select id="f-ssort" data-filter="sSort">${[['', 'สาขา → สเปก → อายุ'], ['old', 'เก่าสุดทุกสาขา'], ['free', 'รถว่างพร้อมจัดสรร']].map(([k, t]) => `<option value="${k}" ${(f.sSort || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
+    ${mode === 'list' ? `<div class="field"><label for="f-ssort">เรียง</label><select id="f-ssort" data-filter="sSort">${[['', 'สาขา → สเปก → อายุ'], ['old', 'เก่าสุดทุกสาขา'], ['free', 'รถว่างพร้อมจัดสรร'], ['model', 'รุ่นรถอย่างเดียว']].map(([k, t]) => `<option value="${k}" ${(f.sSort || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
     <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-q">ค้นหา VIN / Ref${isSales() ? '' : ' / เลขใบจอง / ชื่อลูกค้า'} · ${S.br ? 'ในสาขา ' + S.br : 'ทุกสาขา'}</label><input id="f-q" type="search" data-filter="q" value="${esc(f.q)}" placeholder="เช่น MRHGN36"></div>
   </div>`;
   const heldN = [...D.cars.values()].filter(inBr).filter(c => (!f.model || c.model === f.model) && (!f.sGrade || c.grade === f.sGrade) && (!f.sColor || c.color === f.sColor) && !['free', 'company', 'temp'].includes(c.status)).length;
@@ -372,7 +372,8 @@ function carTable(cars, D) {
   const f = S.filters, p = perms();
   let list = cars.filter(c => !f.status || f.status === 'low' || c.status === f.status);
   if (f.sSort === 'free') list = list.filter(c => c.status === 'free');
-  list.sort(f.sSort === 'old' || f.sSort === 'free' ? (a, b) => (b.age ?? -1) - (a.age ?? -1) : (a, b) => (a.br || '').localeCompare(b.br || '') || a.spec.localeCompare(b.spec) || (b.age ?? -1) - (a.age ?? -1));
+  if (f.sSort === 'model') list.sort((a, b) => (a.model || '').localeCompare(b.model || '', 'th'));   // by model only; cars of one model keep the list's order
+  else list.sort(f.sSort === 'old' || f.sSort === 'free' ? (a, b) => (b.age ?? -1) - (a.age ?? -1) : (a, b) => (a.br || '').localeCompare(b.br || '') || a.spec.localeCompare(b.spec) || (b.age ?? -1) - (a.age ?? -1));
   if (!list.length) return `<div class="bg-surface border border-line rounded-lg">${emptyBox('ไม่พบรถตามตัวกรองนี้', 'ลองล้างตัวกรองหรือค้นหาด้วยเลขอื่น')}</div>`;
   return `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl">
     <thead><tr><th>หมายเลขตัวถัง</th><th>สาขา</th><th>รุ่น / เกรด / สี</th><th>สถานะ</th><th>วันผลิต</th><th class="text-right">อยู่ในสต็อก / อายุจากวันผลิต</th>${isSales() ? '<th>ล็อก</th>' : '<th>ชื่อลูกค้า / เลขที่ใบจอง</th><th>ที่ปรึกษาขาย</th>'}<th></th></tr></thead>
