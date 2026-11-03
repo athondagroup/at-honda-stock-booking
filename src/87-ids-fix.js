@@ -60,7 +60,10 @@ function idsFixModal(m, D) {
   const tab = (k, t) => `<button class="btn btn-sm ${m.mode === k ? 'btn-dark' : 'btn-ghost'}" data-act="idsfix-mode" data-k="${k}">${t}</button>`;
   const log = ((b.fix && b.fix.log) || []).slice(-5).reverse();
   let body;
-  if (m.mode === 'edit') body = `<div class="grid sm:grid-cols-3 gap-3">${idsFixFields().map(fld).join('')}</div>
+  const vsb = b.vinSugg && !(b.fix && b.fix.set && b.fix.set.model) && idsFixCan(b)
+    ? `<div class="mb-3 p-3 rounded border border-line text-sm" style="background:var(--warn-bg, transparent)">IDS ไม่มีรุ่น/สีของใบจองนี้ แต่ VIN <span class="code">${esc(b.vin)}</span> เป็น <b>${esc(b.vinSugg.model)} ${esc(b.vinSugg.grade)} ${esc(b.vinSugg.color || '')}</b> ตามไฟล์ Stock/DL
+      <button class="btn btn-dark btn-sm ml-2" data-act="idsfix-vinfill" data-id="${esc(b.no)}">ยืนยัน เติมรุ่น/เกรด/สี</button></div>` : '';
+  if (m.mode === 'edit') body = vsb + `<div class="grid sm:grid-cols-3 gap-3">${idsFixFields().map(fld).join('')}</div>
     <p class="text-xs text-muted mt-2">● = ต่างจาก IDS · ข้อมูลที่แก้ตรงนี้ใช้ในเว็บเท่านั้น (ไม่ได้แก้ในระบบ IDS) และอัพโหลด IDS รอบหน้าจะไม่ทับ · ถ้าแก้ชื่อลูกค้าให้ตรงกับฟอร์มที่ลงไว้ ระบบจะจับคู่ให้เอง</p>
     <div class="flex flex-wrap justify-end gap-2 mt-3"><button class="btn btn-dark" data-act="idsfix-save" ${can ? '' : 'disabled'}>บันทึกการแก้ไข</button></div>`;
   else if (m.mode === 'skip') body = `<div class="grid sm:grid-cols-2 gap-3"><div class="field"><label for="ixf-r" class="req">เหตุผล</label><select id="ixf-r" data-modal="reason" ${canClose ? '' : 'disabled'}>${opt(idsFixSkipReasons(), m.reason, 'เลือกเหตุผล')}</select></div>
@@ -102,6 +105,14 @@ Object.assign(ACTIONS, {
     if (set.model || set.grade || set.color) { set.model = set.model || m.e.model; set.grade = set.grade || m.e.grade; set.color = set.color || m.e.color; }
     if (!(await idsFixWrite(m.no, x => ({ ...x, set }), 'แก้ข้อมูล', ch.join(' · ') || 'ใช้ข้อมูลตาม IDS'))) return;
     S.modal = null; toast(ch.length ? `บันทึกแล้ว: ${ch.join(' · ')}` : 'บันทึกแล้ว (ข้อมูลตาม IDS)'); render();
+  },
+  async 'idsfix-vinfill'(el) {
+    const b = derive().idsB.find(x => String(x.no) === String(el.dataset.id)); if (!b || !b.vinSugg || !idsFixCan(b)) return;
+    const v = b.vinSugg, txt = `${v.model} ${v.grade} ${v.color || ''}`.trim();
+    if (!confirm(`เติม ${txt} ให้ใบจอง IDS ${b.no} (${b.cust || ''}) จาก VIN ${b.vin}?`)) return;
+    const set = { model: v.model, grade: v.grade }; if (v.color) set.color = v.color;
+    if (!(await idsFixWrite(String(b.no), x => ({ ...x, set: { ...(x.set || {}), ...set } }), 'เติมรุ่นจาก VIN', `${txt} (VIN ${b.vin})`))) return;
+    S.modal = null; toast(`เติมแล้ว: ${txt}`); render();
   },
   async 'idsfix-skip'() {
     const m = S.modal, b = derive().idsB.find(x => String(x.no) === m.no); if (!b || !idsFixCanClose(b)) return;

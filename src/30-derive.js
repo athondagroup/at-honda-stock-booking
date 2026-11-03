@@ -91,8 +91,14 @@ function deriveNow() {
   const idsB = X.bookings.map(idsFixApply).map(b => {
     const iv = !b.vin && b.ids !== CANCEL ? invByNo.get(String(b.no)) : null;
     if (iv) b = { ...b, vin: iv.vin };
+    // model / grade / colour empty in IDS (no MTO) but the frame number is known: offer what Stock or DL says (needs a confirm click)
+    let vs = null;
+    if (b.vin && (!b.model || !b.grade) && !(b.fix && b.fix.set && b.fix.set.model)) {
+      const src = vinSpecMap(X).get(b.vin);
+      if (src) vs = { model: src.model, grade: src.grade, color: src.color || b.color || null };
+    }
     return {
-      ...b, key: 'ids:' + b.no, src: 'IDS', spec: specKey(b.model, b.grade, b.color),
+      ...b, vinSugg: vs, key: 'ids:' + b.no, src: 'IDS', spec: specKey(b.model, b.grade, b.color),
       match: b.match || (b.ids === CANCEL ? 'cancel' : b.vin ? 'car' : (b.ref || b.ws) ? 'quota' : 'waiting')
     };
   });
@@ -789,3 +795,12 @@ async function aiRead(prompt, images, signal) {
   return sample.json(prompt, { images, signal, modelTier: 'default', cache: false });
 }
 const catalogHint = () => Object.entries(CATALOG).map(([m, gs]) => Object.entries(gs).map(([g, cs]) => `${m} | ${g} | ${cs.join(' ')}`).join('\n')).join('\n');
+
+// vin -> {model, grade, color} from the stock files and the DL, built once per data version
+let _vsm = null, _vsmK = null;
+function vinSpecMap(X) {
+  if (_vsm && _vsmK === X) return _vsm;
+  const m = new Map();
+  [...(X.cars || []), ...(X.inv || [])].forEach(c => { if (c.vin && c.model && c.grade && !m.has(c.vin)) m.set(c.vin, c); });
+  _vsm = m; _vsmK = X; return m;
+}
