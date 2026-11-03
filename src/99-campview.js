@@ -16,12 +16,13 @@ function ccData(D) {
     const real = d && d.at && d.campaign_id && !['pending', 'none'].includes(d.campaign_id);
     if (!row.pay && !row.est && real) row.est = Number(d.margin_honda) || 0;      // the admin's campaign: its money from the sale terms
     row.tot = row.pay + row.est + row.actAmt;
-    const src = real ? 'admin' : pk && pk.cid ? 'file' : '', pend = !src && !!d && d.campaign_id === 'pending';
+    const nouse = !real && d && d.at && d.campaign_id === 'none', src = real ? 'admin' : pk && pk.cid ? 'file' : nouse ? 'nouse' : '', pend = !src && !!d && d.campaign_id === 'pending';
     const mc = rptMoneyCheck(row, a, D, false), mism = !!(f && f.opt && real && campFeats(d.campaign) !== campFeats(f.opt));
     // the campaign that fits the option written in Honda's file (only for the admin who may apply it)
     let sug = null;
     if ((!src || mism) && a && f && f.opt && rptEditCan(a.br) && dealAdmin(a)) { const opts = campOptions(termsCtxAt(a, D)).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)); sug = rptSuggestOne(opts, f.opt, f.camp, a.model); }
-    list.push({ vin, br: i.br, row, a, inv: i, delivered, adv: !delivered, src, pend, nochoose: !src && !pend, mism, sug, money: mc, cust: a ? a.cust : i.cust || '' });
+    const why = src || pend ? '' : !a ? 'ไม่พบใบจองที่ผูกกับ VIN นี้' : !d ? 'ใบจองยังไม่มีเงื่อนไขการขาย' : !d.at ? 'เงื่อนไขการขายยังไม่ได้บันทึก' : 'ยังไม่ได้เลือกแคมเปญในเงื่อนไขการขาย';
+    list.push({ vin, br: i.br, row, a, inv: i, delivered, adv: !delivered, src, pend, why, nochoose: !src && !pend, mism, sug, money: mc, cust: a ? a.cust : i.cust || '' });
   });
   // in Honda's file for the period but not among the web's invoices of the period: no invoice in the web at all, or invoiced on another date
   const extra = fileRows.filter(r => !inv.has(r.vin)).map(r => { const a = at.get(r.vin), w = D.invByVin.get(r.vin), wd = w && w.idate ? String(w.idate).slice(0, 10) : '';
@@ -46,12 +47,13 @@ function ccDrillItems(C, k) {
   const mk = (vin, br, name, note) => { const w = wi(vin); return { vin, br, who: `${w.cust ? w.cust + ' · ' : ''}${name || ''}`, date: w.date, ddate: w.ddate, note }; };
   const fromRow = (r, note) => mk(r.vin, r.br, r.name, note);
   const fromX = (x, note) => mk(x.vin, x.br, x.row && x.row.name, note);
+  const otherRep = vin => { const r = (typeof rptAll === 'function' ? rptAll() : {})[vin], p = (typeof rptPayAll === 'function' ? rptPayAll() : {})[vin], m = (r && r.rep) || (p && p.per ? fmtM(p.per) : ''); return m ? ` · พบในไฟล์เดือน ${m} (นอกช่วงที่เลือก)` : ''; };
   const fileBy = new Map(C.fileRows.map(r => [r.vin, r])), kn = r => fk(r) === 'adv' ? 'Advance' : 'ส่งมอบ';
   const wdel = vin => { const x = lm.get(vin); return !!(x && x.delivered); }, wadv = vin => { const x = lm.get(vin); return !!(x && x.adv); };
   const webNote = vin => { const x = lm.get(vin); return x ? (x.delivered ? 'เว็บ: ส่งมอบแล้ว' : 'เว็บ: Advance') : (() => { const e = C.extra.find(y => y.vin === vin); return e && e.webInv ? 'เว็บลงใบกำกับ ' + fmtD(e.webInv) + ' (นอกช่วง)' : 'เว็บไม่มีใบกำกับ'; })(); };
   // cars the file counts under kind k0 ('del' / 'adv' / '' = any) that the web does not count the same way, and the web's cars the file counts differently
   const fileDiff = (k0, okWeb) => C.fileRows.filter(r => (!k0 || fk(r) === k0) && !okWeb(r.vin)).map(r => fromRow(r, `ไฟล์: ${kn(r)} · ${webNote(r.vin)}`));
-  const webDiff = (k0, pred) => L.filter(x => pred(x) && (!k0 || !fileBy.has(x.vin) || fk(fileBy.get(x.vin)) !== k0)).map(x => { const f = fileBy.get(x.vin); return fromX(x, f ? `เว็บ: ${x.delivered ? 'ส่งมอบแล้ว' : 'Advance'} · ไฟล์เป็น ${kn(f)}` : 'ใบกำกับในเว็บ ไม่อยู่ในไฟล์'); });
+  const webDiff = (k0, pred) => L.filter(x => pred(x) && (!k0 || !fileBy.has(x.vin) || fk(fileBy.get(x.vin)) !== k0)).map(x => { const f = fileBy.get(x.vin); return fromX(x, f ? `เว็บ: ${x.delivered ? 'ส่งมอบแล้ว' : 'Advance'} · ไฟล์เป็น ${kn(f)}` : 'ใบกำกับในเว็บ ไม่อยู่ในไฟล์' + otherRep(x.vin)); });
   const T = {
     fd: ['ส่งมอบ ตามไฟล์ Honda', C.fileRows.filter(r => fk(r) === 'del').map(r => fromRow(r, r.st || ''))],
     fa: ['Advance ตามไฟล์ Honda', C.fileRows.filter(r => fk(r) === 'adv').map(r => fromRow(r, r.st || ''))],
@@ -81,7 +83,7 @@ function ccCarsTable(C, D) {
   const chips = [['', 'ทั้งหมด', L.length], ['chosen', 'เลือกแคมเปญแล้ว', n(x => !!x.src)], ['pend', 'รอเลือกแคมเปญ', n(x => x.pend)], ['nochoose', 'ยังไม่เลือกแคมเปญ', n(x => x.nochoose)], ['adv', 'Advanced', n(x => x.adv)], ['mism', 'เว็บไม่ตรงไฟล์', n(x => x.mism)], ['extra', 'มีในไฟล์ ยังไม่ออกใบกำกับ', C.extra.length]];
   const base = F === 'extra' ? C.extra : F === '' ? [...L, ...C.extra] : L.filter(x => F === 'chosen' ? !!x.src : F === 'pend' ? x.pend : F === 'nochoose' ? x.nochoose : F === 'adv' ? x.adv : x.mism);
   const show = base, canSug = show.filter(x => x.sug), nSel = Object.keys(sel).filter(v => sel[v] && L.some(x => x.vin === v && x.sug)).length;
-  const srcChip = x => x.extra ? chip('มีในไฟล์ ไม่มีใบกำกับในช่วงนี้', 'warn') : x.mism ? chip('เว็บไม่ตรงไฟล์', 'bad') : x.src === 'admin' ? chip('แอดมินเลือก', 'neutral') : x.src === 'file' ? chip('จับคู่จากไฟล์', 'good') : x.pend ? chip('รอเลือกแคมเปญ', 'warn') : chip('ยังไม่เลือก', 'muted');
+  const srcChip = x => x.extra ? chip('มีในไฟล์ ไม่มีใบกำกับในช่วงนี้', 'warn') : x.mism ? chip('เว็บไม่ตรงไฟล์', 'bad') : x.src === 'admin' ? chip('แอดมินเลือก', 'neutral') : x.src === 'nouse' ? chip('ไม่ใช้แคมเปญ', 'neutral') : x.src === 'file' ? chip('จับคู่จากไฟล์', 'good') : x.pend ? chip('รอเลือกแคมเปญ', 'warn') : chip('ยังไม่เลือก', 'muted') + (x.why ? `<div class="text-xs text-muted">${esc(x.why)}</div>` : '');
   const SUG = /<button[^>]*data-act="(?:rpt-pick-use|rpt-confirm)"[^>]*>[^<]*<\/button>/;
   const body = show.map(x => { const r = x.row;
     // the "use the suggested" button goes on the same line as แก้ไข / เงิน Honda
