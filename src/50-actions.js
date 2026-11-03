@@ -266,6 +266,7 @@ function prepareUploads(results) {
         else if (veh && veh.moved) why = `ย้ายไปสาขา ${veh.moved.to}`;
         else if (veh && veh.removed) why = veh.removed.reason === 'dealer' ? `ขาย/แลกดีลเลอร์ ${veh.removed.dealer || ''}` : veh.removed.reason === 'other_br' ? `ขายให้สาขาอื่น ${veh.removed.note || ''}` : `นำออก: ${veh.removed.note || ''}`;
         else if (c.st === 'invoiced' || c.st === 'delivered') why = 'ออกใบกำกับแล้วตามข้อมูลเดิม';
+        else if (D.at.find(x => !x.cancelled && atVin(x) === c.vin)) { const x = D.at.find(y => !y.cancelled && atVin(y) === c.vin); why = `${x.flow && x.flow.done && x.flow.done.delivered ? 'ส่งมอบแล้วในเว็บ' : 'จัดสรรให้ใบจองแล้ว'} · ${x.cust || ''}`; }
         else { why = 'ไม่พบข้อมูลว่าไปไหน (ไม่มีใบกำกับ ไม่ได้ย้ายสาขา ไม่ได้บันทึกขายดีลเลอร์) ต้องตรวจสอบ'; flag = true; }
         return { vin: c.vin, spec: specKey(c.model, c.grade, c.color), why, flag, p: c.prod || null, bk: c.bkno || null, cust: c.cust || null };
       });

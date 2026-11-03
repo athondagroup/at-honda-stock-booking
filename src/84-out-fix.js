@@ -12,16 +12,27 @@ function outFixWhy(r) { const t = (outFixReasons().find(x => x[0] === r.reason) 
 // a car now in another branch's Stock IDS file moved there (23/10): not lost either
 function outBack(u, o) { const c = derive().cars.get(o.vin); return !!(c && c.src === 'IDS' && (c.br !== u.br || !c.fromBr)); }
 function outBackBr(u, o) { const c = derive().cars.get(o.vin); return c && c.br !== u.br ? c.br : null; }
-function outOpen(u, o) { return !!(o && o.flag && !o.res && !outBack(u, o)); }
+// found afterwards (checked on every view, so a DL or booking that arrives after the upload clears the flag): the car has a DL
+// invoice, or a web booking has it allocated / delivered. Then it is no longer "lost".
+function outKnown(o) {
+  if (!o || !o.flag || o.res) return null;
+  const D = derive(), inv = D.invByVin.get(o.vin);
+  if (inv) return inv.other ? `${inv.to && BRS.includes(inv.to) ? 'โอนให้สาขา ' + inv.to : inv.to ? 'ขายให้ดีลเลอร์ ' + inv.to : 'ขายให้สาขาอื่น/ดีลเลอร์'} · ใบกำกับ ${inv.inv || ''} ${fmtD(inv.idate)}` : inv.ddate ? `ส่งมอบแล้ว ${fmtD(inv.ddate)} · ใบกำกับ ${inv.inv || ''}${inv.cust ? ' · ' + inv.cust : ''}` : `ออกใบกำกับแล้ว ${fmtD(inv.idate)} รอส่งมอบ`;
+  const a = D.at.find(x => !x.cancelled && atVin(x) === o.vin);
+  if (a) return `${a.flow && a.flow.done && a.flow.done.delivered ? 'ส่งมอบแล้วในเว็บ' : 'จัดสรรให้ใบจองแล้ว'} · ${a.cust || ''}`;
+  return null;
+}
+function outOpen(u, o) { return !!(o && o.flag && !o.res && !outBack(u, o) && !outKnown(o)); }
 function outOpenLocks(vin) { return [...S.locks.entries()].filter(([, l]) => l.vin === vin && !l.hidden && ['pending', 'approved', 'allocated'].includes(l.status)); }
 function outFixList(u) {
   const can = canAllocBr(u.br) && perms().write, F = S.outFix && S.outFix.id === u.id ? S.outFix : null;
   const todo = (u.out || []).filter(o => outOpen(u, o)), sel = F ? todo.filter(o => F.sel[o.vin]) : [];
   const row = o => {
-    const back = o.flag && !o.res && outBack(u, o), lk = outOpen(u, o) ? outOpenLocks(o.vin).length : 0;
+    const back = o.flag && !o.res && outBack(u, o), known = !back && outKnown(o), lk = outOpen(u, o) ? outOpenLocks(o.vin).length : 0;
     return `<div class="flex flex-wrap gap-x-4 items-center">${can && outOpen(u, o) ? `<input type="checkbox" class="w-4 h-4" data-outfix="${esc(u.id)}" data-vin="${esc(o.vin)}" ${F && F.sel[o.vin] ? 'checked' : ''} aria-label="เลือก ${esc(o.vin)}">` : ''}<span class="code">${esc(o.vin)}</span><span class="text-muted">${specLabel(o.spec)}</span>
       ${o.res ? `<span style="color:var(--good)">ระบุแล้ว: ${esc(outFixWhy(o.res))}</span><span class="text-xs text-muted">${fmtDT(o.res.at)} ${esc(o.res.role || '')}</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>`
         : back ? `<span style="color:var(--good)">${outBackBr(u, o) ? `อยู่ในไฟล์ Stock สาขา ${esc(outBackBr(u, o))} แล้ว (ย้ายสาขา)` : 'กลับมาอยู่ในไฟล์ Stock ล่าสุดแล้ว (ไม่ได้ออกจริง ไฟล์รอบนั้นไม่ครบ)'}</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>`
+        : known ? `<span style="color:var(--good)">พบข้อมูลแล้ว: ${esc(known)}</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>`
         : `<span style="color:var(--${o.flag ? 'bad' : 'muted'})">${esc(o.why)}</span>${lk ? `<span class="text-xs" style="color:var(--warn)">ล็อกเปิดอยู่ ${lk}</span>` : ''}`}</div>`;
   };
   const bar = can && todo.length ? `<div class="p-3 rounded-lg mb-2" style="background:var(--warn-soft)">
