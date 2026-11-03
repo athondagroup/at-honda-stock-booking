@@ -14,25 +14,39 @@ function outBack(u, o) { const c = derive().cars.get(o.vin); return !!(c && c.sr
 function outBackBr(u, o) { const c = derive().cars.get(o.vin); return c && c.br !== u.br ? c.br : null; }
 // found afterwards (checked on every view, so a DL or booking that arrives after the upload clears the flag): the car has a DL
 // invoice, or a web booking has it allocated / delivered. Then it is no longer "lost".
-function outKnown(o) {
+function outKnown(o, u) {
   if (!o || !o.flag || o.res) return null;
-  const D = derive(), inv = D.invByVin.get(o.vin);
-  if (inv) return inv.other ? `${inv.to && BRS.includes(inv.to) ? 'โอนให้สาขา ' + inv.to : inv.to ? 'ขายให้ดีลเลอร์ ' + inv.to : 'ขายให้สาขาอื่น/ดีลเลอร์'} · ใบกำกับ ${inv.inv || ''} ${fmtD(inv.idate)}` : inv.ddate ? `ส่งมอบแล้ว ${fmtD(inv.ddate)} · ใบกำกับ ${inv.inv || ''}${inv.cust ? ' · ' + inv.cust : ''}` : `ออกใบกำกับแล้ว ${fmtD(inv.idate)} รอส่งมอบ`;
+  const D = derive(), inv = D.invByVin.get(o.vin), br = x => (x && BRS.includes(x) ? x : null);
+  if (inv) { const to = inv.other ? br(inv.to) : br(inv.br); return { to, inv: true, txt: inv.other ? `${inv.to && BRS.includes(inv.to) ? 'โอนให้สาขา ' + inv.to : inv.to ? 'ขายให้ดีลเลอร์ ' + inv.to : 'ขายให้สาขาอื่น/ดีลเลอร์'} · ใบกำกับ ${inv.inv || ''} ${fmtD(inv.idate)}` : inv.ddate ? `ส่งมอบแล้ว ${fmtD(inv.ddate)} · ใบกำกับ ${inv.inv || ''}${inv.cust ? ' · ' + inv.cust : ''}${to ? ' · สาขา ' + to : ''}` : `ออกใบกำกับแล้ว ${fmtD(inv.idate)} รอส่งมอบ${to ? ' · สาขา ' + to : ''}` }; }
   const a = D.at.find(x => !x.cancelled && atVin(x) === o.vin);
-  if (a) return `${a.flow && a.flow.done && a.flow.done.delivered ? 'ส่งมอบแล้วในเว็บ' : 'จัดสรรให้ใบจองแล้ว'} · ${a.cust || ''}`;
+  if (a) { const to = br(a.delivBr || a.br); return { to, inv: false, txt: `${a.flow && a.flow.done && a.flow.done.delivered ? 'ส่งมอบแล้วในเว็บ' : 'จัดสรรให้ใบจองแล้ว'} · ${a.cust || ''}${to ? ' · สาขา ' + to : ''}` }; }
+  const l = D.locks.find(x => x.vin === o.vin && x.req_br && x.req_br !== x.car_br && ['approved', 'allocated', 'done'].includes(x.status));
+  if (l && br(l.req_br)) return { to: l.req_br, inv: false, txt: `สาขา ${l.req_br} ล็อก/จัดสรรคันนี้ไปแล้ว` };
+  const b = D.idsB.find(x => x.vin === o.vin && (!u || x.br !== u.br) && br(x.br));
+  if (b) return { to: b.br, inv: false, txt: `ไฟล์ Booking IDS สาขา ${b.br} จัดสรรคันนี้ให้ ${b.cust || ''}` };
   return null;
 }
-function outOpen(u, o) { return !!(o && o.flag && !o.res && !outBack(u, o) && !outKnown(o)); }
+// cars found at another branch: put them into that branch's stock (one by one is the same as "ขายให้สาขาอื่น")
+async function outMoveFound(id) {
+  const u0 = S.uploads.get(id); if (!u0 || !canAllocBr(u0.br) || !perms().write) return;
+  const list = (u0.out || []).filter(o => o.flag && !o.res).map(o => ({ o, k: outKnown(o, u0) })).filter(x => x.k && x.k.to && x.k.to !== u0.br && !x.k.inv);
+  if (!list.length) return;
+  for (const { o, k } of list) { const cur = S.vehicles.get(o.vin) || { added: null, removed: null, branch: null }; if (!cur.removed) await write('vehicles', o.vin, { ...cur, moved: { to: k.to, from: u0.br, spec: o.spec || null, from_upload: id, auto: true, ...actor() } }); }
+  const u = await claimFresh('uploads', id, () => true);
+  if (u) { const m = new Map(list.map(x => [x.o.vin, x.k.to])); u.out = (u.out || []).map(o => m.has(o.vin) ? { ...o, res: { reason: 'other_br', text: m.get(o.vin), auto: true, ...actor() } } : o); await write('uploads', id, u); }
+  toast(`ย้าย ${list.length} คันเข้า Stock สาขาที่พบแล้ว`); render();
+}
+function outOpen(u, o) { return !!(o && o.flag && !o.res && !outBack(u, o) && !outKnown(o, u)); }
 function outOpenLocks(vin) { return [...S.locks.entries()].filter(([, l]) => l.vin === vin && !l.hidden && ['pending', 'approved', 'allocated'].includes(l.status)); }
 function outFixList(u) {
   const can = canAllocBr(u.br) && perms().write, F = S.outFix && S.outFix.id === u.id ? S.outFix : null;
   const todo = (u.out || []).filter(o => outOpen(u, o)), sel = F ? todo.filter(o => F.sel[o.vin]) : [];
   const row = o => {
-    const back = o.flag && !o.res && outBack(u, o), known = !back && outKnown(o), lk = outOpen(u, o) ? outOpenLocks(o.vin).length : 0;
+    const back = o.flag && !o.res && outBack(u, o), known = !back && outKnown(o, u), mv = known && known.to && known.to !== u.br && !known.inv, lk = outOpen(u, o) ? outOpenLocks(o.vin).length : 0;
     return `<div class="flex flex-wrap gap-x-4 items-center">${can && outOpen(u, o) ? `<input type="checkbox" class="w-4 h-4" data-outfix="${esc(u.id)}" data-vin="${esc(o.vin)}" ${F && F.sel[o.vin] ? 'checked' : ''} aria-label="เลือก ${esc(o.vin)}">` : ''}<span class="code">${esc(o.vin)}</span><span class="text-muted">${specLabel(o.spec)}</span>
       ${o.res ? `<span style="color:var(--good)">ระบุแล้ว: ${esc(outFixWhy(o.res))}</span><span class="text-xs text-muted">${fmtDT(o.res.at)} ${esc(o.res.role || '')}</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>`
         : back ? `<span style="color:var(--good)">${outBackBr(u, o) ? `อยู่ในไฟล์ Stock สาขา ${esc(outBackBr(u, o))} แล้ว (ย้ายสาขา)` : 'กลับมาอยู่ในไฟล์ Stock ล่าสุดแล้ว (ไม่ได้ออกจริง ไฟล์รอบนั้นไม่ครบ)'}</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>`
-        : known ? `<span style="color:var(--good)">พบข้อมูลแล้ว: ${esc(known)}</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>`
+        : known ? `<span style="color:var(--good)">พบข้อมูลแล้ว: ${esc(known.txt)}</span>${mv ? `<span class="text-xs" style="color:var(--warn)">รถยังไม่เข้า Stock ${esc(known.to)}</span>` : ''}<span class="text-xs text-muted line-through">${esc(o.why)}</span>`
         : `<span style="color:var(--${o.flag ? 'bad' : 'muted'})">${esc(o.why)}</span>${lk ? `<span class="text-xs" style="color:var(--warn)">ล็อกเปิดอยู่ ${lk}</span>` : ''}`}</div>`;
   };
   const bar = can && todo.length ? `<div class="p-3 rounded-lg mb-2" style="background:var(--warn-soft)">
@@ -46,7 +60,9 @@ function outFixList(u) {
         ${outFixLockField(sel, F)}
         <button class="btn btn-red btn-sm" data-act="outfix-save" data-id="${esc(u.id)}" ${sel.length && !(F && F.busy) ? '' : 'disabled'}>${F && F.busy ? '<span class="spin"></span> กำลังบันทึก…' : `บันทึก ${sel.length} คัน`}</button></div>
       <p class="text-xs text-muted mt-1">"ยังอยู่" ดึงรถกลับเข้า Stock ของสาขาทันที ใช้เมื่อไฟล์ Stock ไม่ครบ ให้อัปโหลดไฟล์ที่ครบภายหลัง · ขายให้สาขาอื่น จะเอารถเข้า Stock สาขานั้นให้ · ดีลเลอร์ / นำออก จะจำไว้ อัปโหลดครั้งหน้าจะไม่ขึ้นแดงอีก</p></div>` : '';
-  return `<div class="mt-2 text-sm flex flex-col gap-1">${bar}${u.out.map(row).join('')}</div>`;
+  const mvN = (u.out || []).filter(o => { const k = o.flag && !o.res && outKnown(o, u); return k && k.to && k.to !== u.br && !k.inv; }).length;
+  const mvBar = can && mvN ? `<div class="p-3 rounded-lg mb-2" style="background:var(--warn-soft)"><div class="font-medium mb-1">พบ ${mvN} คันที่อยู่ที่สาขาอื่น (จากใบจอง / ล็อก / ไฟล์ Booking)</div><button class="btn btn-red btn-sm" data-act="outfix-found" data-id="${esc(u.id)}">ย้ายเข้า Stock สาขานั้นทั้งหมด</button></div>` : '';
+  return `<div class="mt-2 text-sm flex flex-col gap-1">${mvBar}${bar}${u.out.map(row).join('')}</div>`;
 }
 // what to do with the locks still open on the chosen cars: said in words, no unclear tick box (22/10)
 function outFixLockField(sel, F) {
@@ -102,6 +118,7 @@ Object.assign(ACTIONS, {
     if (u) setTimeout(() => { const b = document.querySelector(`[data-act="upl-open"][data-id="${u.id}"]`); if (b) b.scrollIntoView({ block: 'center' }); }, 50);
   },
   'outfix-all'(el) { const F = outFixState(el.dataset.id), u = S.uploads.get(el.dataset.id); F.sel = {}; if (el.dataset.v && u) (u.out || []).filter(o => outOpen(u, o)).forEach(o => { F.sel[o.vin] = true; }); render(); },
+  async 'outfix-found'(el) { await outMoveFound(el.dataset.id); },
   async 'outfix-save'(el) { await outFixSave(el.dataset.id); }
 });
 document.addEventListener('change', ev => {

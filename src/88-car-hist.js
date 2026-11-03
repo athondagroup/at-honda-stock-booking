@@ -91,7 +91,7 @@ async function carlogSeed() {
 function carHistRows(D) {
   const rows = new Map();
   const row = vin => rows.get(vin) || rows.set(vin, { vin, al: [], inv: [], locks: [], web: [] }).get(vin);
-  for (const [vin, { e }] of carlogAll()) Object.assign(row(vin), { model: e.m, grade: e.g, color: e.c, prod: e.p || null, br: e.br, in: e.in || null, last: e.last || null, out: e.out || null, mv: e.mv || [], al: [...(e.al || [])], logged: true });
+  for (const [vin, { e }] of carlogAll()) Object.assign(row(vin), { model: e.m, grade: e.g, color: e.c, prod: e.p || null, br: e.br, in: e.in || null, last: e.last || null, out: e.out || null, mv: e.mv || [], al: (e.al || []).map(x => ({ ...x })), logged: true });
   const addAl = (r, a) => { if ((a.no || a.cust) && !r.al.some(x => (a.no && x.no === a.no) || (!a.no && x.cust === a.cust))) r.al.push(a); };
   for (const c of [...D.cars.values(), ...D.deliveredOut]) {
     const r = row(c.vin);
@@ -218,6 +218,7 @@ function carHistModal(m, D) {
   const ev = carHistEvents(r);
   return `<div class="flex items-start justify-between gap-3 mb-2"><div><h2 class="font-head text-xl font-semibold">ประวัติรถ <span class="code">${esc(r.vin)}</span></h2>
     <div class="text-sm">${specLabel(r.spec)} · ${esc(r.br || '')} · ${carHistState(r)}</div></div><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
+    ${typeof carFixBox === 'function' ? carFixBox(r) : ''}
     <ol class="flex flex-col divide-y divide-line text-sm">${ev.map(e => `<li class="py-2 flex flex-wrap gap-x-4"><span class="num text-muted w-28">${e.at.length > 10 ? fmtDT(e.at) : fmtD(e.at)}</span><span class="font-medium">${esc(e.what)}</span><span class="text-muted flex-1 min-w-0">${esc(e.note)}</span>${e.who ? `<span class="text-xs text-muted">${esc(e.who)}</span>` : ''}</li>`).join('') || '<li class="py-2 text-muted">ยังไม่มีเหตุการณ์</li>'}</ol>`;
 }
 async function carHistXlsx() {
