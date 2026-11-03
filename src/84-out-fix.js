@@ -34,7 +34,7 @@ function outFixList(u) {
           : `<div class="field"><label for="of-n">หมายเหตุ</label><input id="of-n" data-outfixf="text" value="${esc(F && F.text || '')}"></div>`}
         ${outFixLockField(sel, F)}
         <button class="btn btn-red btn-sm" data-act="outfix-save" data-id="${esc(u.id)}" ${sel.length && !(F && F.busy) ? '' : 'disabled'}>${F && F.busy ? '<span class="spin"></span> กำลังบันทึก…' : `บันทึก ${sel.length} คัน`}</button></div>
-      <p class="text-xs text-muted mt-1">"ยังอยู่" ไม่เอารถออกจากระบบ ใช้เมื่อไฟล์ Stock ไม่ครบ ให้อัปโหลดไฟล์ที่ครบภายหลัง · ขายให้สาขาอื่น จะเอารถเข้า Stock สาขานั้นให้ · ดีลเลอร์ / นำออก จะจำไว้ อัปโหลดครั้งหน้าจะไม่ขึ้นแดงอีก</p></div>` : '';
+      <p class="text-xs text-muted mt-1">"ยังอยู่" ดึงรถกลับเข้า Stock ของสาขาทันที ใช้เมื่อไฟล์ Stock ไม่ครบ ให้อัปโหลดไฟล์ที่ครบภายหลัง · ขายให้สาขาอื่น จะเอารถเข้า Stock สาขานั้นให้ · ดีลเลอร์ / นำออก จะจำไว้ อัปโหลดครั้งหน้าจะไม่ขึ้นแดงอีก</p></div>` : '';
   return `<div class="mt-2 text-sm flex flex-col gap-1">${bar}${u.out.map(row).join('')}</div>`;
 }
 // what to do with the locks still open on the chosen cars: said in words, no unclear tick box (22/10)
@@ -60,6 +60,11 @@ async function outFixSave(id) {
   let closed = 0;
   try {
     for (const vin of vins) {
+      if (F.reason === 'still') {
+        // the Stock file was incomplete: the car is still here, so it goes back into this branch's stock now (until a complete Stock file lists it)
+        const cur = S.vehicles.get(vin) || { added: null, removed: null, branch: null }, o = (u0.out || []).find(x => x.vin === vin) || {}, [m, g, c] = String(o.spec || '').split('|'), q = v => (v && v !== '?' ? v : null);
+        if (!cur.removed && !derive().cars.has(vin)) await write('vehicles', vin, { ...cur, added: { br: u0.br, model: q(m), grade: q(g), color: q(c), stockin: todayISO(), prod: o.p || null, restore: true, from_upload: id, ...actor() } });
+      }
       if (F.reason !== 'still') {
         const cur = S.vehicles.get(vin) || { added: null, removed: null, branch: null };
         // sold/moved to another AT Honda branch: the car goes into that branch's stock (until its own IDS file lists it)

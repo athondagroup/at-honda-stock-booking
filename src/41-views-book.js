@@ -454,7 +454,7 @@ function historyList(D) {
     act: `${h.act}${l.type === 'dealer' ? ' · แลก/ขายดีลเลอร์' : l.type === 'temp' ? ' · ล็อกชั่วคราว' : ''}`, note: [l.type === 'dealer' && !String(h.note || '').includes(l.dealer_name || '\u0000') ? `ดีลเลอร์ ${l.dealer_name || ''}` : '', h.note].filter(Boolean).join(' · ') })));
   if (!isSales() && (!ht || ht === 'car')) {
     for (const [vin, o] of S.vehicles) {
-      if (o.added) ev.push({ ...o.added, act: o.added.receipt ? 'รับรถเข้า (ยืนยันจากรูป)' : 'รับรถเข้า', vin });
+      if (o.added) ev.push({ ...o.added, act: o.added.restore ? 'ไฟล์ Stock ไม่ครบ · ยืนยันว่ารถยังอยู่ กลับเข้าสต็อก' : o.added.receipt ? 'รับรถเข้า (ยืนยันจากรูป)' : 'รับรถเข้า', vin });
       if (o.removed) ev.push({ ...o.removed, act: 'นำรถออก', vin, note: o.removed.dealer || o.removed.note });
       if (o.moved) ev.push({ ...o.moved, act: `ย้ายไป ${o.branch}`, vin });
       if (o.prod_info) ev.push({ ...o.prod_info, act: 'ใส่วันผลิต', vin, note: fmtD(o.prod_info.date) });
