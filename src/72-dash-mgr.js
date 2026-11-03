@@ -81,11 +81,19 @@ function dashSalesTarget(D) {
   const brRows = BRS.filter(b => inBr({ br: b })).map(b => ({ b, t: ms.reduce((n, m) => n + tgtOf(m, b), 0), i: E.invoiced.filter(s => s.br === b).length, it: E.invoiced.filter(s => s.br === b && inTm(s, { br: b })).length, d: E.sales.filter(s => s.br === b).length, bk: E.booked.filter(a => a.br === b).length }));
   const ageB = [[0, 7], [8, 14], [15, 30], [31, 9999]].map(([a, z]) => ({ l: z > 999 ? 'เกิน 30 วัน' : `${a}–${z} วัน`, n: W.filter(w => w.age >= a && w.age <= z).length, bad: a > 14 }));
   const tT = mrow.reduce((n, r) => n + r.t, 0), tI = E.invoiced.length, tIt = E.invoiced.filter(s => inTm(s, {})).length;
+  // when the chosen period does not include the current month, the tiles follow the chosen period (the pace tiles only make sense for the running month)
+  const perOnly = !(E.from.slice(0, 7) <= P.m && E.to.slice(0, 7) >= P.m), pT = ms.reduce((n, m) => n + tgtOf(m), 0), perLbl = ms.length === 1 ? `(${monLabel(ms[0])})` : `(${fmtD(E.from)} – ${fmtD(E.to)})`;
   const pctCell = (i, t) => t ? `<span style="color:var(--${i >= t ? 'good' : 'bad'})">${pctOf(i, t)}%</span>` : '–';
   return `${pageHead('ยอดขายและเป้า', `ใบกำกับภาษี = ยอดที่แจ้งขายกับฮอนด้า (ใช้คิดเงินรางวัล) · ส่งมอบ = รถที่ปล่อยให้ลูกค้าจริง · ${fmtD(E.from)} – ${fmtD(E.to)}`, tgtCanEdit() ? '<button class="btn btn-red" data-act="tgt-open">ใส่ / แก้เป้า</button>' : '')}
   ${dashTabs()}${periodBar(E)}
   ${tgtAdjCard(D)}
-  ${tiles([
+  ${perOnly ? tiles([
+    tile(`เป้า ${perLbl}`, pT ? fmtN(pT) : '–', { sub2: pT ? 'คัน ใบกำกับภาษี' : 'ยังไม่ได้ใส่เป้า' }),
+    tile('ใบกำกับในช่วงที่เลือก', fmtN(E.invoiced.length), { drill: { m: 'invoiced', from: E.from, to: E.to }, tone: pT ? (E.invoiced.length >= pT ? 'good' : '') : '', sub2: pT ? `ขาด ${fmtN(Math.max(0, pT - E.invoiced.length))} คัน` : `DL ถึง ${E.dlAsof ? fmtD(E.dlAsof) : 'ยังไม่มี'}` }),
+    tile('ทำได้ % ของเป้า', pT ? pctOf(E.invoiced.length, pT) + '%' : '–', { tone: pT ? (E.invoiced.length >= pT ? 'good' : 'bad') : '', sub2: 'ใบกำกับภาษี ÷ เป้า' }),
+    tile('ส่งมอบในช่วงที่เลือก', fmtN(E.sales.length), { sub2: 'นับตามวันที่ส่งมอบ' }),
+    tile('ออกใบกำกับแล้ว ยังไม่ส่งมอบ (ตอนนี้)', fmtN(W.length), { tone: W.some(w => w.age > 14) ? 'warn' : '', sub2: `เกิน 14 วัน ${fmtN(W.filter(w => w.age > 14).length)} คัน` })
+  ], 'lg:grid-cols-5') : tiles([
     tile(`เป้าเดือนนี้ (${monLabel(P.m)})`, P.t ? fmtN(P.t) : '–', { sub2: P.t ? 'คัน ใบกำกับภาษี' : 'ยังไม่ได้ใส่เป้า' }),
     tile('ใบกำกับเดือนนี้', fmtN(P.inv), { drill: { m: 'invoiced', from: P.m + '-01', to: D.today }, tone: P.t ? (P.inv >= P.t ? 'good' : '') : '', sub2: P.t ? `ทำได้ ${pctOf(P.inv, P.t)}% · ขาด ${fmtN(Math.max(0, P.t - P.inv))} คัน` : (P.asof ? `DL ถึง ${fmtD(P.asof)}` : 'ยังไม่มี DL ของเดือนนี้') }),
     tile('คาดการณ์สิ้นเดือน', P.proj === null ? '–' : fmtN(P.proj), { tone: P.t && P.proj !== null ? (P.proj >= P.t ? 'good' : 'bad') : '', sub2: P.asof ? `ตามอัตราถึง ${fmtD(P.asof)}` : 'ต้องอัปโหลด DL เดือนนี้' }),
