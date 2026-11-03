@@ -158,7 +158,7 @@ Object.assign(ACTIONS, {
   },
   async 'po-skip'(el) {
     const a = atById(el.dataset.id); if (!a) return;
-    if (!stepAllowed(a, 'po') || a.flow.next !== 'po' || poLocked(a)) { toast('ข้ามใบสั่งแต่งรถ ได้ตอนที่ขั้นถัดไปคือ ใบสั่งแต่งรถ', 'bad'); return; }
+    if (!stepAllowed(a, 'po') || !stepOpen(a, 'po') || a.flow.done.po || poLocked(a)) { toast('ข้ามใบสั่งแต่งรถไม่ได้ในขั้นตอนนี้', 'bad'); return; }   // any time before delivery, not only when it is the next step (ตกลง 3/11)
     await saveFlow(a, { flow: { po_skip: { ...actor() } } }, 'ข้ามใบสั่งแต่งรถ ไว้ก่อนแล้ว ทำใบสั่งแต่งรถ ภายหลังได้จนถึงก่อนส่งมอบ');
   }
 });

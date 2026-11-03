@@ -137,6 +137,26 @@ function bkOutList(u, D) {
   return `<div class="mt-2 text-sm flex flex-col">${bar}${(u.out || []).map(row).join('')}</div>`;
 }
 function bkOutState(id) { if (!S.bkOut || S.bkOut.id !== id) S.bkOut = { id, sel: {}, pick: {}, note: '' }; return S.bkOut; }
+// the car this booking held (from the stored Booking table or the web booking) is also on another booking: then the car does not stay with this one
+function bkOutVinDup(o) {
+  const D = derive(), a = o && o.atId ? atById(o.atId) : null, old = D.X.bookings.find(b => String(b.no) === String(o.no));
+  const vin = (old && old.vin) || (a && !a.cancelled ? atVin(a) : null); if (!vin) return null;
+  const oth = D.idsB.find(b => b.vin === vin && String(b.no) !== String(o.no) && b.match !== 'cancel');
+  if (oth) return { vin, with: `ใบจอง IDS ${oth.no} ${oth.cust || ''}` };
+  const w = D.at.find(x => !x.cancelled && x.id !== (a && a.id) && atVin(x) === vin);
+  if (w) return { vin, with: `ใบจองในเว็บของ ${w.cust}` };
+  const car = D.cars.get(vin); if (car && car.bkno && String(car.bkno) !== String(o.no)) return { vin, with: `ใบจอง ${car.bkno} ${car.cust || ''}` };
+  return null;
+}
+// keep / "sold, waiting for DL": the booking stays; a car that is on another booking too is taken off this one
+async function bkOutHold(id, idxs, text) {
+  const u = S.uploads.get(id); if (!u) return false;
+  const dups = idxs.map(i => ({ i, o: u.out[i], d: bkOutVinDup(u.out[i]) })).filter(x => x.d);
+  if (dups.length && !confirm(`VIN ซ้ำกับคันอื่น ${dups.length} ใบ:\n${dups.slice(0, 5).map(x => `${x.o.no} · ${x.d.vin} อยู่กับ ${x.d.with}`).join('\n')}\n\nถอนรถออกจากใบจองเหล่านี้ (ใบจองยังเก็บไว้) ตกลงไหม`)) return false;
+  for (const x of dups) { const a = x.o.atId ? atById(x.o.atId) : null; if (a && atVin(a) === x.d.vin) { await saveFlow(a, { flow: { assign: null } }, `ถอนรถ ${x.d.vin} ออกจากใบจอง (VIN ซ้ำกับ ${x.d.with})`); await releaseFor(a, `VIN ซ้ำกับ ${x.d.with}`); } }
+  const note = dups.length ? ` · ถอนรถออก ${dups.length} ใบ (VIN ซ้ำ)` : '';
+  return bkOutMark(id, idxs, text + note);
+}
 async function bkOutMark(id, idxs, text) {
   const u = await claimFresh('uploads', id, () => true); if (!u) return false;
   const res = { text, ...actor() };
@@ -169,16 +189,16 @@ Object.assign(ACTIONS, {
   async 'bkout-cancel-sel'(el) { const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k] && u && bkOutPending(u.out[Number(k)])).map(Number); if (!idxs.length || !confirm(`ยกเลิกใบจองที่เลือก ${idxs.length} ใบในเว็บทันที?`)) return; await bkOutCancel(el.dataset.id, idxs); },
   async 'bkout-keep'(el) {
     const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !canApproveBr(u.br) || !bkOutPending(u.out[i])) return;
-    if (await bkOutMark(el.dataset.id, [i], 'ยังเก็บใบจองไว้ ไม่ match รอกรอกฟอร์ม (รถยังผูกอยู่)')) { toast('บันทึกแล้ว: ยังเก็บใบจองไว้ รถไม่ถูกปล่อย'); render(); }
+    if (await bkOutHold(el.dataset.id, [i], 'ยังเก็บใบจองไว้ ไม่ match รอกรอกฟอร์ม (รถยังผูกอยู่)')) { toast('บันทึกแล้ว: ยังเก็บใบจองไว้ รถไม่ถูกปล่อย'); render(); }
   },
   async 'bkout-wait'(el) {
     const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !canApproveBr(u.br) || !bkOutPending(u.out[i])) return;
-    if (await bkOutMark(el.dataset.id, [i], 'แจ้งขายแล้ว รออัปเดต DL')) { toast('บันทึกแล้ว: แจ้งขายแล้ว รออัปเดต DL (ใบจองยังอยู่)'); render(); }
+    if (await bkOutHold(el.dataset.id, [i], 'แจ้งขายแล้ว รออัปเดต DL')) { toast('บันทึกแล้ว: แจ้งขายแล้ว รออัปเดต DL (ใบจองยังอยู่)'); render(); }
   },
   async 'bkout-wait-sel'(el) {
     const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k] && u && bkOutPending(u.out[Number(k)])).map(Number);
     if (!idxs.length || !canApproveBr(u.br)) return;
-    if (await bkOutMark(el.dataset.id, idxs, 'แจ้งขายแล้ว รออัปเดต DL')) { F.sel = {}; toast(`บันทึกแล้ว ${idxs.length} ใบ: แจ้งขายแล้ว รออัปเดต DL`); render(); }
+    if (await bkOutHold(el.dataset.id, idxs, 'แจ้งขายแล้ว รออัปเดต DL')) { F.sel = {}; toast(`บันทึกแล้ว ${idxs.length} ใบ: แจ้งขายแล้ว รออัปเดต DL`); render(); }
   },
   async 'bkout-other-sel'(el) {
     const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k] && u && bkOutPending(u.out[Number(k)])).map(Number), note = (F.note || '').trim();
