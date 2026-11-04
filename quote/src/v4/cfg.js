@@ -268,6 +268,11 @@
                 cfg.foc = stock.foc.rows.map(r => Object.fromEntries(AT_TABLES.foc.cols.map((c, i) => [c, c === 'active' ? (ix[i] >= 0 ? cfgStr(r[ix[i]]) || 'Y' : 'Y') : cfgStr(ix[i] >= 0 ? r[ix[i]] : '')])));
                 cfg.src.foc = stock.foc.__file ? 'stockfile' : 'stock'; cfg.at.foc = stock.foc.at || ''; cfg.focSrc = stock.foc.src || 'เว็บ AT stock'; cfg.stockOn = true;
             }
+            // ของแถมใช้บ่อย: เก็บที่ ref/gifts ของเว็บ AT stock (แก้ได้จากหลังบ้านใบเสนอราคา และเว็บ AT stock ใช้ชุดเดียวกัน)
+            if (stock.gifts && Array.isArray(stock.gifts.rows)) {
+                cfg.gifts = stock.gifts.rows.map(o => cfgRowFromArray(AT_TABLES.gifts.cols, [o.label, o.mode, o.cost ?? '', o.q || '', o.std ? 'Y' : '', o.active === false ? 'N' : 'Y']));
+                cfg.src.gifts = 'stock'; cfg.at.gifts = stock.gifts.at || '';
+            }
             cfg.catalog = stock.catalog || null;
             return cfg;
         };
@@ -477,6 +482,15 @@
             };
             const remove = async (id) => { if (dbRef.current) await dbRef.current.collection('config').doc(id).delete(); };
             const saveTable = async (key, rows, src) => {
+                if (key === 'gifts' && cfg.src.gifts === 'stock') {
+                    let cur = {};
+                    try { const snap = await dbRef.current.collection('atref').doc('gifts').get(); cur = (snap && snap.exists && snap.data()) || {}; } catch (e) { cur = {}; }
+                    const at = new Date().toISOString();
+                    const objs = rows.map(r => ({ label: cfgStr(r.label), mode: /^fix/i.test(cfgStr(r.mode)) ? 'fix' : 'foc', cost: cfgStr(r.cost) === '' ? null : cfgNum(r.cost), q: cfgStr(r.q), std: /^(y|yes|ใช่|1|true)$/i.test(cfgStr(r.std)), active: cfgOn(r.active) }));
+                    const log = [...(cur.log || []), { at, act: 'แก้ของแถมใช้บ่อย (หลังบ้านใบเสนอราคา)', note: `${objs.length} รายการ`, role: by }].slice(-300);
+                    await dbRef.current.collection('atref').doc('gifts').set({ src: cur.src || '', rows: objs, log, at });
+                    return;
+                }
                 const def = AT_TABLES[key];
                 await write(key, { rows: rows.map(r => cfgRowToArray(def.cols, r)), at: new Date().toISOString(), by, src: src || 'แก้ในหลังบ้าน' });
             };

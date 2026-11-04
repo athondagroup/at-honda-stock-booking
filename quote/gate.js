@@ -85,7 +85,7 @@
   // ---- db: the page's collection names → rows of public.docs
   // atref = หลังบ้านของเว็บ AT stock (อ่านอย่างเดียว เฉพาะตารางที่ใบเสนอราคาใช้ ไม่โหลดประวัติการแก้)
   const COL = { config: 'qcfg', quotes: 'quotes', staffreq: 'qreq', atref: 'ref' };
-  const REF_IDS = ['campaigns', 'margins', 'privileges', 'fees', 'foc', 'catalog'];
+  const REF_IDS = ['campaigns', 'margins', 'privileges', 'fees', 'foc', 'catalog', 'gifts'];
   const REF_FIELDS = 'id,at:data->at,rows:data->rows,prices:data->prices,price_issue:data->price_issue,reg:data->reg,ins:data->ins,month:data->month,cols:data->cols,src:data->src';
   const colOf = name => { const c = COL[name]; if (!c) throw Object.assign(new Error('collection ' + name), { code: 'invalid_argument' }); return c; };
   const hex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, '0')).join('');
@@ -156,7 +156,7 @@
           id = id || hex(10);
           return {
             id,
-            async set(body) { if (col === 'ref') throw Object.assign(new Error('read only'), { code: 'not_granted' }); const { error } = await sb.from('docs').upsert({ col, id, data: JSON.parse(JSON.stringify(body)) }); if (error) throw err(error); },
+            async set(body) { if (col === 'ref' && id !== 'gifts') throw Object.assign(new Error('read only'), { code: 'not_granted' }); const { error } = await sb.from('docs').upsert({ col, id, data: JSON.parse(JSON.stringify(body)) }); if (error) throw err(error); },
             async update(body) { const cur = await this.get(); await this.set({ ...(cur.data() || {}), ...body }); },
             async delete() { const { error } = await sb.from('docs').delete().eq('col', col).eq('id', id); if (error) throw err(error); },
             async get() { const { data, error } = await sb.from('docs').select('data').eq('col', col).eq('id', id).maybeSingle(); if (error) throw err(error); return snapOf(id, data ? data.data : undefined); },
