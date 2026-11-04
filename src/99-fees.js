@@ -52,7 +52,7 @@ function adminFees() {
   const body = f.tab === 'ins' ? feInsTable(can) : f.tab === 'foc' ? feFocTable(can) : feRegTable(can);
   const d = S.ref.get(f.tab === 'foc' ? 'foc' : 'fees') || {}, src = d.at ? `แก้ล่าสุดในเว็บ ${fmtD(d.at)}` : 'ยังใช้ข้อมูลที่แนบมากับเว็บ (ดึงจากชีต)';
   return `<div class="flex flex-wrap items-center gap-2 mb-3"><div class="tabs" role="tablist">${tb('reg', 'ค่าจดทะเบียน')}${tb('ins', 'เบี้ยประกัน')}${tb('foc', 'รายการ FOC')}</div>
-    <span class="text-xs text-muted">${esc(src)}</span><span class="flex-1"></span><button class="btn btn-ghost btn-sm" data-act="fe-export">ดาวน์โหลด Excel</button>${can ? `<label class="btn btn-ghost btn-sm relative">อัปโหลด Excel ที่แก้แล้ว<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-fefile="1" class="absolute inset-0 opacity-0 cursor-pointer" aria-label="อัปโหลดไฟล์ Excel"></label>` : ''}${can ? `<button class="btn btn-red btn-sm" data-act="fe-save">บันทึก${f.tab === 'foc' ? 'รายการ FOC' : f.tab === 'ins' ? 'เบี้ยประกัน' : 'ค่าจดทะเบียน'}</button>` : ''}</div>${f.note ? `<p class="text-sm mb-2 p-2 rounded-lg" style="background:var(--surface-2)">${esc(f.note)}</p>` : ''}${body}`;
+    <span class="text-xs text-muted">${esc(src)}</span><span class="flex-1"></span><button class="btn btn-ghost btn-sm" data-act="fe-export">ดาวน์โหลด Excel</button>${can ? `<button class="btn btn-ghost btn-sm" data-act="fe-pull" ${f.busy ? 'disabled' : ''}>${f.busy ? 'กำลังดึง…' : 'ดึงจากชีต'}</button>` : ''}${can ? `<label class="btn btn-ghost btn-sm relative">อัปโหลด Excel ที่แก้แล้ว<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-fefile="1" class="absolute inset-0 opacity-0 cursor-pointer" aria-label="อัปโหลดไฟล์ Excel"></label>` : ''}${can ? `<button class="btn btn-red btn-sm" data-act="fe-save">บันทึก${f.tab === 'foc' ? 'รายการ FOC' : f.tab === 'ins' ? 'เบี้ยประกัน' : 'ค่าจดทะเบียน'}</button>` : ''}</div>${f.note ? `<p class="text-sm mb-2 p-2 rounded-lg" style="background:var(--surface-2)">${esc(f.note)}</p>` : ''}${body}`;
 }
 const FE_SHEET = { reg: 'ค่าจดทะเบียน', ins: 'เบี้ยประกัน', foc: 'รายการ FOC' };
 const FE_FOCCOLS = [['model', 'รหัสรุ่น'], ['cat', 'หมวด'], ['name', 'ชื่อรายการ'], ['part', 'หมายเลขอะไหล่'], ['vendor', 'ผู้ขาย'], ['cost', 'ทุน FOC'], ['sale', 'ราคาขาย'], ['note', 'หมายเหตุ'], ['pieces', 'ชิ้นส่วนในชุด (อย่าแก้ ถ้าไม่จำเป็น)'], ['src', 'ที่มา']];
@@ -93,8 +93,74 @@ async function feImport(file) {
   }
   render();
 }
+// ---------- ดึงจาก Google Sheet (ชีต AT Honda · ฐานข้อมูลของแถม และเงื่อนไขค่าคอม): loads the open tab into the working copy; nothing is saved until "บันทึก"
+const FE_SRC_TAB = { reg: 'ค่าจดทะเบียน', ins: 'ประกันภัย' };
+function feModelCode(text) { const t = String(text || '').toUpperCase(); return /HATCH|HATCB|\bHB\b/.test(t) ? 'CH' : /CITY/.test(t) ? 'CT' : /CIVIC/.test(t) ? 'CV' : /ACCORD/.test(t) ? 'AC' : /CR-?V/.test(t) ? 'CR' : /HR-?V/.test(t) ? 'HR' : /BR-?V/.test(t) ? 'BR' : /E:?N2/.test(t) ? 'EN' : /STEP/.test(t) ? 'SW' : /JAZZ/.test(t) ? 'JZ' : 'OT'; }
+const feOn = v => !/^(n|no|false|0|ไม่|ปิด|off)$/i.test(String(v ?? '').trim());
+async function feSheetRows(tab, last, max) {
+  const out = [], size = 150;
+  for (let r = 1; r < (max || 6000); r += size) {
+    const p = await cdbCall('get_values', { spreadsheetId: cdbSheetId(), range: `'${tab}'!A${r}:${last}${r + size - 1}` });
+    const v = p && Array.isArray(p.values) ? p.values : null; if (!v) throw new Error('shape');
+    for (let k = 0; k < size; k++) out.push(v[k] || []);
+    if (!v.length) break;
+  }
+  while (out.length && !out[out.length - 1].some(x => String(x ?? '').trim())) out.pop();
+  return out;
+}
+const feBody = (vals, head) => { const i = vals.findIndex(r => String(r[0] ?? '').trim() === head); return i < 0 ? null : vals.slice(i + 1); };
+function feFocFromSheet(g, a, d) {
+  const S_ = v => String(v ?? '').trim(), out = [], skipped = { n: 0 };
+  const put = (on, row) => { if (on) out.push(row); else skipped.n++; };
+  (g || []).filter(r => r.some(x => S_(x))).forEach(r => {
+    const [code, model, cat, part, name, , grades, before, withVat, note, active, check] = r.map(S_), price = feN(withVat) || Math.round(feN(before) * 1.07);
+    put(feOn(active), [feModelCode(model), cat, part, 'Honda แท้', name, price, price, [grades ? `เกรด ${grades}` : '', note, check && /^y/i.test(check) ? 'ตรวจราคาก่อนใช้' : ''].filter(Boolean).join(' · '), '', `แท้ ${code}`]);
+  });
+  (a || []).filter(r => r.some(x => S_(x))).forEach(r => {
+    const [part, , catName, modelCode, , name, , vendor, sale, foc, focCamp, active, note] = r.map(S_);
+    put(feOn(active), [modelCode || 'OT', catName, part, vendor, name, feN(focCamp) || feN(foc), feN(sale), note, '', `ATG ${part}`]);
+  });
+  let pack = null;
+  const flush = () => { if (!pack) return; const names = pack.pieces.map(p => p.name);
+    put(pack.active, [feModelCode(pack.model), 'DVP Package', pack.part, 'Honda แท้', `ชุด ${pack.code} (${pack.model}): ${names.join(' + ')}`, pack.cost, pack.sale, 'ราคาเดียวทั้งชุด · ' + pack.pieces.map(p => `${p.name} ${Number(p.price).toLocaleString('en-US')}`).join(' / '), pack.pieces.map(p => `${p.name}~${p.part}`).join('|'), `DVP ${pack.code}`]); pack = null; };
+  (d || []).filter(r => r.some(x => S_(x))).forEach(r => {
+    const [code, partSet, model, focSet, saleSet, partPiece, namePiece, salePiece, active] = r.map(S_);
+    if (!pack || pack.code !== code) { flush(); pack = { code, part: partSet, model, cost: feN(focSet), sale: feN(saleSet), active: feOn(active || 'Y'), pieces: [] }; }
+    if (namePiece) pack.pieces.push({ name: namePiece, part: partPiece, price: feN(salePiece) });
+  });
+  flush();
+  return { rows: out, skipped: skipped.n };
+}
+async function fePull() {
+  const f = feState(); if (!adminWrite() || f.busy) return; f.busy = 1; f.note = 'กำลังดึงจาก Google Sheet…'; render();
+  try {
+    if (f.tab === 'reg') {
+      const v = await feSheetRows(FE_SRC_TAB.reg, 'G', 60), b = feBody(v, 'รายการ / รุ่น'); if (!b) throw new Error('head');
+      const cur = feFees().reg, reg = {}; let n = 0;
+      for (const r of b) { if (!r.some(x => String(x ?? '').trim())) { if (Object.keys(reg).length) break; continue; } const k = String(r[1] ?? '').trim(); if (!k || reg[k] || !feOn(r[5])) continue; reg[k] = [feN(r[2]), feN(r[3])]; if (JSON.stringify(cur[k] || []) !== JSON.stringify(reg[k])) n++; }
+      if (!Object.keys(reg).length) throw new Error('empty');
+      feFees().reg = reg; f.note = `ดึงจากชีตแล้ว: ${Object.keys(reg).length} รุ่น เปลี่ยน ${n} รุ่น · ยังไม่บันทึก ตรวจแล้วกด "บันทึกค่าจดทะเบียน"`;
+    } else if (f.tab === 'ins') {
+      const v = await feSheetRows(FE_SRC_TAB.ins, 'K', 400), b = feBody(v, 'เดือนแคมเปญ'); if (!b) throw new Error('head');
+      const rows = b.filter(r => r.some(x => String(x ?? '').trim()) && /^\d{4}-\d{2}$/.test(String(r[0]).trim()) && feOn(r[9])), mon = rows.map(r => String(r[0]).trim()).sort().pop();
+      const cur = feFees().ins, ins = {}; let n = 0;
+      rows.filter(r => String(r[0]).trim() === mon).forEach(r => { const k = String(r[2] ?? '').trim(), p = String(Math.max(1, Math.min(3, Math.round(feN(r[4])) || 1))); if (!k) return; ins[k] = ins[k] || {}; ins[k][p] = [r[5], r[6], r[7]].slice(0, Number(p)).map(feN); if (JSON.stringify((cur[k] || {})[p] || []) !== JSON.stringify(ins[k][p])) n++; });
+      if (!mon || !Object.keys(ins).length) throw new Error('empty');
+      const fe = feFees(); fe.ins = ins; fe.month = mon; f.note = `ดึงจากชีตแล้ว: เบี้ยเดือนแคมเปญ ${mon} · ${Object.keys(ins).length} รุ่น เปลี่ยน ${n} แผน · ยังไม่บันทึก ตรวจแล้วกด "บันทึกเบี้ยประกัน"`;
+    } else {
+      const g = await feSheetRows('อุปกรณ์แท้', 'M', 3000), a = await feSheetRows('อุปกรณ์เทียบเคียง', 'N', 4000), d = await feSheetRows('DVP Package', 'I', 1500);
+      const x = feFocFromSheet(feBody(g, 'รหัส'), feBody(a, 'หมายเลขอะไหล่'), feBody(d, 'รหัส'));
+      if (!x.rows.length) throw new Error('empty');
+      const dd = feFoc(), old = new Set((refStatic('foc') || dd).rows.map(r => JSON.stringify(r.map(y => typeof y === 'number' ? y : String(y ?? ''))))), same = x.rows.filter(r => old.has(JSON.stringify(r.map(y => typeof y === 'number' ? y : String(y ?? ''))))).length;
+      dd.rows = x.rows; f.show = 60;
+      f.note = `ดึงจากชีตแล้ว: ${x.rows.length} รายการ (เดิม ${old.size}) · แถวใหม่หรือที่แก้ ${x.rows.length - same}${x.skipped ? ` · ข้ามรายการที่ชีตตั้งไม่ใช้งาน ${x.skipped} รายการ` : ''} · ยังไม่บันทึก ตรวจแล้วกด "บันทึกรายการ FOC"`;
+    }
+  } catch (e) { f.note = e && e.code === 'nomcp' ? 'มุมมองนี้ยังไม่ได้เชื่อม Google Sheets ใช้ดาวน์โหลด/อัปโหลด Excel แทน' : 'ดึงจากชีตไม่ได้ (ชีตเปลี่ยนรูปแบบ หรือยังไม่ได้อนุญาต Google Sheets) ข้อมูลเดิมยังอยู่ครบ'; }
+  f.busy = 0; render();
+}
 Object.assign(ACTIONS, {
   async 'fe-export'() { await feExport(); },
+  async 'fe-pull'() { await fePull(); },
   'fe-tab'(el) { feState().tab = el.dataset.t; feState().note = ''; render(); },
   'fe-more'() { feState().show += 100; render(); },
   'fe-foc-del'(el) { if (!adminWrite()) return; const d = feFoc(), i = Number(el.dataset.i); if (d.rows[i]) { d.rows.splice(i, 1); render(); } },
