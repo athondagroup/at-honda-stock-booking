@@ -509,7 +509,7 @@ rep('<div className="w-9 h-9 sm:w-10 sm:h-10 bg-honda rounded-lg flex items-cent
     '<img src={AT_LOGO_COLOR} alt="AT Honda Automobile Group" className="h-10 sm:h-12 w-auto shrink-0" />')
 _old = '<div className="w-11 h-11 sm:w-14 sm:h-14 bg-red-50 rounded-2xl flex items-center justify-center shrink-0"><HondaNextLogo color="#000000" size={37} showWord={false} /></div>'
 assert s.count(_old) == 3, s.count(_old)
-s = s.replace(_old, '<img src={AT_LOGO_BLACK} alt="AT Honda" className="h-12 sm:h-16 w-auto shrink-0" />')
+s = s.replace(_old, '<div className="w-11 sm:w-14 flex items-center justify-center shrink-0"><HondaNextLogo color="#000000" size={44} showWord={false} /></div>')
 rep("""<select id="q-model" value={uiModel} onChange={(e) => setUiModel(e.target.value)} className={`${QSEL} text-lg`}>{UI_MODELS.map(m => <option key={m} value={m}>{uiModelLabel(m)}</option>)}</select>""",
     """<div className="relative min-w-0"><div className={`${QSEL} text-lg flex items-center gap-2 pointer-events-none`}><span className="truncate flex-1">{uiModelShort(uiModel)}</span><i data-html2canvas-ignore="true" className="fa-solid fa-chevron-down text-[11px] text-gray-400"></i></div><select id="q-model" aria-label="รุ่น" value={uiModel} onChange={(e) => setUiModel(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer">{UI_MODELS.map(m => <option key={m} value={m}>{uiModelLabel(m)}</option>)}</select></div>""")
 rep("setPendingFileName(name || `${uiModel} ${grade?.name || ''}`.trim());", "setPendingFileName(name || `${uiModelShort(uiModel)} ${grade?.name || ''}`.trim());")
