@@ -38,7 +38,13 @@ function rptNoBkOpts(vin, D) {
   const i = D.invByVin.get(vin); if (!i || !i.idate) return null;
   const x = { model: i.model || '', grade: i.grade, color: i.color, cash: !i.fin, bookDate: null, inv: i.idate, adv: false };
   if (!x.model) return null;
-  return { x, opts: campOptions(x).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)) };
+  return { x, opts: rptVariantFit(x, campOptions(x).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value))) };
+}
+// the car's own variant (DRIVAL / e:HEV / the rest) narrows the table's groups that share one model key (City Hatchback: e:HEV, Turbo, DRIVAL); no variant fits → keep all
+const rptVar = t => { t = String(t || '').toUpperCase(); return /DRIVAL/.test(t) ? 'drival' : /HEV/.test(t) ? 'hev' : 'std'; };
+function rptVariantFit(x, opts) {
+  const v = rptVar((x.model || '') + ' ' + (x.grade || '')), fit = opts.filter(y => rptVar((y.gname || '') + ' ' + (y.grade || '')) === v);
+  return fit.length ? fit : opts;
 }
 function rptNoBkHit(r, D, why) {
   const no = t => { if (why) why.t = t; return null; };
@@ -48,7 +54,7 @@ function rptNoBkHit(r, D, why) {
     if (!rptWebDelivered(D, r.vin)) return no('ยังไม่ส่งมอบ จึงยังไม่จับคู่อัตโนมัติ');
     const x = { model: i.model || r.name, grade: i.grade, color: i.color, cash: !i.fin, bookDate: null, inv: i.idate, adv: false };
     if (!x.model) return no('ใบกำกับใน DL ไม่มีรุ่น');
-    const all = campOptions(x).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value));
+    const all = rptVariantFit(x, campOptions(x).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)));
     const pk = (((S.ref.get('honda_pay') || {}).picks || {})[r.vin]) || null, pkOpt = pk && pk.cid ? all.find(y => y.value === pk.cid) : null;
     if (pkOpt) return pkOpt;   // the admin's own pick (edit window) wins
     if (!all.length) return no(`ไม่พบแคมเปญของ ${x.model}${x.grade ? ' ' + x.grade : ''} เดือน ${fmtM(String(i.idate).slice(0, 7))} ในตารางแคมเปญ`);
