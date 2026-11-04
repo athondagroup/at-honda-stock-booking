@@ -5195,6 +5195,10 @@ const useAtConfig = () => {
   }, []);
   const [stock, setStock] = useState(null);
   useEffect(() => {
+    if (window.__STOCK_PREVIEW) {
+      setStock(window.__STOCK_PREVIEW);
+      return;
+    }
     if (!window.__QWEB)
       return;
     let off = null, cancelled = false;
@@ -5236,7 +5240,7 @@ const useAtConfig = () => {
   const cfg = useMemo(() => cfgUseStock(cfgBuild(docs), stock), [docs, stock]);
   const month = useMemo(() => cfgApply(cfg), [cfg]);
   const staffMe = useMemo(() => cfg.staff.find((s) => s && s.active !== false && (viewer.key && s.key === viewer.key || viewer.id && s.uid === viewer.id)) || null, [cfg, viewer.key, viewer.id]);
-  const realAdmin = !!(viewer.isOwner || !window.__QWEB && staffMe && staffMe.role === "admin");
+  const realAdmin = !!(window.__QPREVIEW || viewer.isOwner || !window.__QWEB && staffMe && staffMe.role === "admin");
   const isAdmin = realAdmin && viewAs !== "sales";
   const canWrite = !!dbRef.current && isAdmin && (viewer.isOwner || viewer.canEdit);
   const by = staffMe && staffMe.name || viewer.name || "";

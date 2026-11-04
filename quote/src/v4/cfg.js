@@ -445,6 +445,7 @@
             // บนเว็บจริง: อ่านหลังบ้านของเว็บ AT stock (ref/*) + ไฟล์ค่าจด/FOC ที่ติดมากับเว็บเมื่อยังไม่เคยแก้ในหลังบ้าน
             const [stock, setStock] = useState(null);
             useEffect(() => {
+                if (window.__STOCK_PREVIEW) { setStock(window.__STOCK_PREVIEW); return; }
                 if (!window.__QWEB) return;
                 let off = null, cancelled = false;
                 const files = {};
@@ -466,7 +467,7 @@
             const month = useMemo(() => cfgApply(cfg), [cfg]);
             const staffMe = useMemo(() => cfg.staff.find(s => s && s.active !== false && ((viewer.key && s.key === viewer.key) || (viewer.id && s.uid === viewer.id))) || null, [cfg, viewer.key, viewer.id]);
             // เว็บจริง (Supabase): ผู้ดูแล = ผู้บริหารในตาราง members เท่านั้น · ใน claude.ai: เจ้าของ หรือ staff ที่ตั้งเป็นผู้ดูแล
-            const realAdmin = !!(viewer.isOwner || (!window.__QWEB && staffMe && staffMe.role === 'admin'));
+            const realAdmin = !!(window.__QPREVIEW || viewer.isOwner || (!window.__QWEB && staffMe && staffMe.role === 'admin'));
             const isAdmin = realAdmin && viewAs !== 'sales';
             const canWrite = !!dbRef.current && isAdmin && (viewer.isOwner || viewer.canEdit);
             const by = (staffMe && staffMe.name) || viewer.name || '';
