@@ -91,7 +91,7 @@ function campOptions(x) {
         if (r.book_from && x.bookDate < r.book_from || r.book_to && x.bookDate > r.book_to) { ok = false; why = `จองนอกช่วง ${fmtD(r.book_from)}–${fmtD(r.book_to)}`; }
         else if (x.inv && r.deliver_by && x.inv > r.deliver_by) { ok = false; why = `ใบกำกับ ${fmtD(x.inv)} เกินกำหนดรับรถ ${fmtD(r.deliver_by)}`; }
       }
-      out.push({ value: r.month + '|' + r.id, month: r.month, name: r.name, sup: num(r.sup), group: `แคมเปญ ${fmtM(r.month)} (${by}) · ${r.group}`, ok, why, deliver_by: r.deliver_by });
+      out.push({ value: r.month + '|' + r.id, month: r.month, name: r.name, sup: num(r.sup), grade: r.grade || '', gname: r.group || '', group: `แคมเปญ ${fmtM(r.month)} (${by}) · ${r.group}`, ok, why, deliver_by: r.deliver_by });
     });
   });
   return { opts: [...out, { value: 'pending', name: 'รอเลือกแคมเปญ (ยังไม่ตัดสินใจ)', sup: 0, group: '', ok: true }, { value: 'none', name: 'ไม่ใช้แคมเปญ Honda (ดอกเบี้ยมาตรฐาน / นอกตาราง)', sup: 0, group: '', ok: true }, { value: 'other', name: 'อื่น ๆ (พิมพ์เอง)', sup: 0, group: '', ok: true }], warns: [...new Set(warns)] };
