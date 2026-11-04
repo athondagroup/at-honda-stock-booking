@@ -6,6 +6,11 @@
 - ข้อมูลอยู่ในตาราง `docs`: `qcfg` (หลังบ้าน), `quotes` (ใบที่บันทึก), `qreq` (คำขอผูกบัญชี) — migration `supabase/migrations/20261104_quote.sql`
 - ดึงจาก Google Sheet ผ่าน Edge Function `gsheet` (service account ของบริษัท ชีตต้องแชร์ให้ service account)
 
+## หลังบ้านชุดเดียวกับเว็บ AT stock (ขั้นที่ 1)
+- อ่านจาก `ref/campaigns` `ref/margins` `ref/privileges` `ref/fees` `ref/foc` `ref/catalog` ของเว็บ AT stock (อ่านอย่างเดียว) · ถ้ายังไม่มี `ref/fees` / `ref/foc` ใช้ `fees.json` / `foc.json` ที่ติดมากับเว็บ
+- ราคารถ/สี: `AT_PRICE_MAP` (รุ่น/เกรดในใบเสนอราคา → รุ่น เกรด ปีรุ่น ชุดราคา ในใบราคา Honda) และ `AT_COLOR_CODE` (ชื่อสี → รหัสสี) ใน `v4/cfg.js`
+- ยังแก้ในหลังบ้านใบเสนอราคา: ตารางดอกเบี้ย ผูกดอกเบี้ย ของแถมใช้บ่อย ที่ปรึกษา ตั้งค่า (`qcfg`)
+
 ## ไฟล์
 - `quote/index.html` หน้าเว็บที่สร้างแล้ว (React + Tailwind คอมไพล์ล่วงหน้า) · `quote/gate.js` ล็อกอินและตัวเชื่อม Supabase
 - `quote/src/` ต้นฉบับ: `src.html` (เครื่องคิดเลขเดิม) + `v4/patch.py` (แก้ทั้งหมด) + `v4/cfg.js` `v4/admin.jsx` `v4/summary.jsx` + `snapshot.json` (ข้อมูลชีตที่ฝัง)

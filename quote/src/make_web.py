@@ -22,7 +22,7 @@ page = ('<!doctype html>\n<html lang="th"><head><meta charset="utf-8"><meta name
         '<meta name="theme-color" content="#dc2626"><link rel="icon" href="../icon-192.png"><link rel="apple-touch-icon" href="../icon-192.png">\n'
         + top + '<style>\n' + tw_css + '\n</style>\n<style>' + gate_css + '</style>\n' + shim + '\n' + head + '</head><body>\n<div id="gate" hidden></div>\n' + body
         + '\n<script>window.AT_CONFIG = ' + json.dumps(cfg) + ';</script>\n'
-        + '<script>window.__startApp = function () {\n' + js + '\n};</script>\n'
+        + '<script>window.__startApp = function () {\n' + js + ("\nwindow.__T = { GRADES_DATA, MODEL_COLORS, OPTION_DATA, RATE_TABLE_MAP, AT_MARGIN_STD, AT_PRIV, AT_FEES, INSURANCE_PREMIUMS, AT_FOC_ITEMS, AT_PRICE_STATUS, getColorPrice };" if os.environ.get('QTEST') else '') + '\n};</script>\n'
         + '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>\n'
         + '<script src="gate.js"></script>\n</body></html>\n')
 open(out, 'w', encoding='utf-8').write(page)

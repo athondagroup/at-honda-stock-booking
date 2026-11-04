@@ -31,12 +31,14 @@
         };
 
         const AdminPanel = ({ api }) => {
-            const { cfg, canWrite } = api;
+            const { cfg } = api;
             const [sec, setSec] = useState('campaign');
             const [sub, setSub] = useState('camp');
             const [fsub, setFsub] = useState('reg');
             const listKey = sec === 'campaign' ? sub : sec === 'fees' ? fsub : sec;
             const def = ADMIN_LISTS[listKey];
+            const stockOwned = !!(cfg.stockOn && AT_STOCK_KEYS.includes(listKey) && /^stock/.test(cfg.src[listKey] || ''));
+            const canWrite = api.canWrite && !stockOwned;
             const allRows = !def ? [] : listKey === 'foc' ? cfg.foc : (Array.isArray(cfg[listKey]) ? cfg[listKey] : []);
             const months = useMemo(() => [...new Set(allRows.map(r => r.month).filter(Boolean))].sort().reverse(), [allRows]);
             const [month, setMonth] = useState(api.month || '');
@@ -94,14 +96,16 @@
                 };
                 try {
                     const data = {};
-                    for (const k of AT_TABLE_ORDER) {
+                    for (const k of AT_TABLE_ORDER.filter(k => !(cfg.stockOn && AT_STOCK_KEYS.includes(k)))) {
                         setPull({ busy: true, step: AT_TABLES[k].tab });
                         data[k] = cfgParseTab(k, await get(AT_TABLES[k].tab, PULL_RANGES[k]));
                     }
+                    if (!cfg.stockOn) {
                     setPull({ busy: true, step: 'อุปกรณ์แท้ / อุปกรณ์เทียบเคียง / DVP Package' });
                     const g = await get('อุปกรณ์แท้', 'A1:M3000'), a = await get('อุปกรณ์เทียบเคียง', 'A1:N4000'), d = await get('DVP Package', 'A1:I1500');
                     data.foc = cfgFocFromSheet(g, a, d);
                     data.focParts = { genuine: data.foc.filter(x => /^แท้/.test(x.src)).length, atg: data.foc.filter(x => /^ATG/.test(x.src)).length, dvp: data.foc.filter(x => /^DVP/.test(x.src)).length };
+                    }
                     data.counts = counts;
                     setPull({ data, at: new Date() });
                 } catch (e) { setPull({ err: mcpErrText(e) }); }
@@ -112,7 +116,7 @@
                 const stamp = `ดึงจากชีต ${new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}`;
                 setPull({ ...pull, saving: true });
                 try {
-                    for (const k of AT_TABLE_ORDER) if (data[k] && data[k].length) await api.saveTable(k, data[k], stamp);
+                    for (const k of AT_TABLE_ORDER) if (data[k] && data[k].length && !(cfg.stockOn && AT_STOCK_KEYS.includes(k))) await api.saveTable(k, data[k], stamp);
                     if (data.foc && data.foc.length) await api.saveFoc(data.foc, stamp);
                     await api.saveSettings({ pulledAt: new Date().toISOString() });
                     setPull(null);
@@ -204,7 +208,7 @@
 
             const secBtn = (k, label) => <button key={k} type="button" onClick={() => { setSec(k); setQ(''); setEdit(null); setNote(''); setConfirm(''); }} className={`px-4 py-2 rounded-xl text-sm font-bold border transition ${sec === k ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}>{label}</button>;
             const subBtn = (cur, set, k, label) => <button key={k} type="button" onClick={() => { set(k); setQ(''); setNote(''); setConfirm(''); setLimit(150); }} className={`shrink-0 px-3 sm:px-4 py-2.5 text-sm font-bold border-b-[3px] ${cur === k ? 'border-red-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>{label}</button>;
-            const srcText = (k) => cfg.src[k] === 'web' ? `แก้ล่าสุดในหลังบ้าน ${cfg.at[k] ? new Date(cfg.at[k]).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : ''}` : `ใช้ข้อมูลที่ฝังมากับเว็บ (ดึงจากชีต ${new Date(AT_SNAPSHOT.at).toLocaleDateString('th-TH', { dateStyle: 'medium' })})`;
+            const srcText = (k) => cfg.src[k] === 'stock' ? `ใช้ข้อมูลจากเว็บ AT stock${cfg.at[k] ? ' · แก้ล่าสุด ' + new Date(cfg.at[k]).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : ''}` : cfg.src[k] === 'stockfile' ? 'ใช้ไฟล์ที่ติดมากับเว็บ AT stock' : cfg.src[k] === 'web' ? `แก้ล่าสุดในหลังบ้าน ${cfg.at[k] ? new Date(cfg.at[k]).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : ''}` : `ใช้ข้อมูลที่ฝังมากับเว็บ (ดึงจากชีต ${new Date(AT_SNAPSHOT.at).toLocaleDateString('th-TH', { dateStyle: 'medium' })})`;
 
             const field = ([k, label, type]) => {
                 const v = edit.row[k] ?? '';
@@ -237,7 +241,10 @@
                 setStaffEdit(null);
             };
 
-            const readOnlyNote = !canWrite && (
+            const stockNote = stockOwned && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 text-blue-900 text-xs px-3 py-2 leading-relaxed"><i className="fa-solid fa-link mr-1"></i>ข้อมูลส่วนนี้ใช้ชุดเดียวกับเว็บ AT stock · แก้ที่ <a href="../" className="font-bold underline">เว็บ AT stock</a> → {AT_STOCK_PAGE[listKey]} แล้วใบเสนอราคาเปลี่ยนตามทันที{cfg.src[listKey] === 'stockfile' ? ' · ตอนนี้ใช้ไฟล์ที่ติดมากับเว็บ AT stock (ยังไม่เคยแก้ในหลังบ้าน)' : ''}</div>
+            );
+            const readOnlyNote = !stockOwned && !canWrite && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs px-3 py-2"><i className="fa-solid fa-lock mr-1"></i>ดูได้อย่างเดียว · การบันทึกต้องเป็นเจ้าของหน้านี้หรือผู้ที่ได้รับสิทธิ์ Editor จากเมนู Share</div>
             );
 
@@ -261,7 +268,7 @@
                             {pull.data && (
                                 <>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-sm">
-                                        {[...AT_TABLE_ORDER, 'foc'].map(k => {
+                                        {[...AT_TABLE_ORDER, 'foc'].filter(k => pull.data[k]).map(k => {
                                             const n = (pull.data[k] || []).length, cur = (k === 'foc' ? cfg.foc : cfg[k]).length;
                                             return (
                                                 <div key={k} className="flex justify-between gap-2 bg-white rounded-lg border border-blue-100 px-3 py-1.5">
@@ -330,7 +337,8 @@
                                         <input value={q} onChange={e => setQ(e.target.value)} placeholder="ค้นหาในเดือนนี้" className="w-full pl-8 pr-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-red-500" />
                                     </div>
                                 )}
-                                <p className="text-xs text-gray-500">{cfg.settings.pulledAt ? `ดึงจากชีตล่าสุด ${new Date(cfg.settings.pulledAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })} · ` : ''}{srcText(listKey)} · ชีต: <a href={`https://docs.google.com/spreadsheets/d/${cfg.settings.sheetId}/edit`} target="_blank" rel="noopener" className="underline">เปิด Google Sheet</a>{listKey === 'camp' ? ` · ใบเสนอราคาใช้แคมเปญเดือน ${cfgMonthText(api.month)}` : ''}{listKey === 'rates' ? ' · ตารางดอกเบี้ยมาตรฐานของไฟแนนซ์ยังใช้ค่าในโค้ด' : ''}</p>
+                                {stockNote}
+                                <p className="text-xs text-gray-500">{cfg.settings.pulledAt ? `ดึงจากชีตล่าสุด ${new Date(cfg.settings.pulledAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })} · ` : ''}{srcText(listKey)}{stockOwned ? '' : <> · ชีต:</>} {!stockOwned && <a href={`https://docs.google.com/spreadsheets/d/${cfg.settings.sheetId}/edit`} target="_blank" rel="noopener" className="underline">เปิด Google Sheet</a>}{listKey === 'camp' ? ` · ใบเสนอราคาใช้แคมเปญเดือน ${cfgMonthText(api.month)}` : ''}{listKey === 'rates' ? ' · ตารางดอกเบี้ยมาตรฐานของไฟแนนซ์ยังใช้ค่าในโค้ด' : ''}</p>
                                 {importDraft && importDraft.key === listKey && (
                                     <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 flex flex-wrap items-center gap-2">
                                         <span className="flex-1">ไฟล์ {importDraft.name}: {importDraft.rows.length} แถว · แทนตาราง {def.title} ทั้งหมด ({allRows.length} แถวเดิม)</span>
@@ -442,14 +450,20 @@
                                 </label>
                                 <a href={`https://docs.google.com/spreadsheets/d/${cfg.settings.sheetId}/edit`} target="_blank" rel="noopener" className="inline-block text-sm underline text-blue-700">เปิด Google Sheet</a>
                                 <div className="flex flex-wrap items-center gap-2">
-                                    {canWrite && <button type="button" onClick={pullFromSheet} disabled={pull && pull.busy} className="px-4 py-2 rounded-xl bg-gray-900 text-white text-sm font-bold disabled:opacity-50"><i className="fa-solid fa-rotate mr-1"></i>ดึงข้อมูลทั้งหมดจากชีต</button>}
+                                    {canWrite && <button type="button" onClick={pullFromSheet} disabled={pull && pull.busy} className="px-4 py-2 rounded-xl bg-gray-900 text-white text-sm font-bold disabled:opacity-50"><i className="fa-solid fa-rotate mr-1"></i>{cfg.stockOn ? 'ดึงดอกเบี้ยจากชีต' : 'ดึงข้อมูลทั้งหมดจากชีต'}</button>}
                                     <span className="text-xs text-gray-500">{cfg.settings.pulledAt ? `ดึงจากชีตล่าสุด ${new Date(cfg.settings.pulledAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}` : 'ยังไม่เคยดึงจากชีตในเว็บ (ใช้ข้อมูลที่ฝังมา)'}</span>
                                 </div>
-                                <p className="text-xs text-gray-500">ปุ่มดึงจากชีตใช้ Google Sheets ที่เชื่อมไว้ในบัญชี claude.ai ของคนที่กด · ดึงแท็บ แคมเปญ Honda, Margin มาตรฐาน, สิทธิพิเศษ Honda, ดอกเบี้ย, ผูกดอกเบี้ย, ค่าจดทะเบียน, ประกันภัย, อุปกรณ์แท้, อุปกรณ์เทียบเคียง และ DVP Package · หรือดาวน์โหลดแท็บเป็น CSV แล้วกด “นำเข้า CSV” ในตารางนั้น</p>
+                                {cfg.stockOn ? <p className="text-xs text-gray-500">ปุ่มนี้ดึงเฉพาะแท็บ ดอกเบี้ย และ ผูกดอกเบี้ย (ใช้บัญชี Google ของบริษัท) · แคมเปญ Margin สิทธิพิเศษ ค่าจด ประกัน FOC และราคารถ ใช้ชุดเดียวกับเว็บ AT stock ให้ดึงจากชีตที่ <a href="../" className="underline font-bold">เว็บ AT stock</a></p> : <p className="text-xs text-gray-500">ปุ่มดึงจากชีตใช้ Google Sheets ที่เชื่อมไว้ในบัญชี claude.ai ของคนที่กด · ดึงแท็บ แคมเปญ Honda, Margin มาตรฐาน, สิทธิพิเศษ Honda, ดอกเบี้ย, ผูกดอกเบี้ย, ค่าจดทะเบียน, ประกันภัย, อุปกรณ์แท้, อุปกรณ์เทียบเคียง และ DVP Package · หรือดาวน์โหลดแท็บเป็น CSV แล้วกด “นำเข้า CSV” ในตารางนั้น</p>}
                             </div>
                             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                                 <div className="px-4 py-3 font-bold text-gray-800 border-b border-gray-100">แหล่งข้อมูลแต่ละตาราง</div>
                                 <div className="divide-y divide-gray-100">
+                                    {cfg.stockOn && (
+                                        <div className="px-4 py-2.5 flex flex-wrap items-center gap-2 text-sm">
+                                            <span className="font-bold text-gray-800 w-48">ราคารถ / ราคาสี</span>
+                                            <span className="text-xs text-gray-500 flex-1">{AT_PRICE_STATUS.on ? `ใบราคา Honda ในเว็บ AT stock${AT_PRICE_STATUS.issue && AT_PRICE_STATUS.issue.no ? ' (Issued No. ' + AT_PRICE_STATUS.issue.no + ')' : ''} · ตรง ${AT_PRICE_STATUS.matched} เกรด${AT_PRICE_STATUS.missing.length ? ' · ใช้ราคาในโค้ด: ' + AT_PRICE_STATUS.missing.join(', ') : ''}` : 'ยังไม่มีใบราคาในเว็บ AT stock · ใช้ราคาในโค้ด'}</span>
+                                        </div>
+                                    )}
                                     {[...AT_TABLE_ORDER, 'foc', ...AT_TABLE_WEB].map(k => (
                                         <div key={k} className="px-4 py-2.5 flex flex-wrap items-center gap-2 text-sm">
                                             <span className="font-bold text-gray-800 w-48">{ADMIN_LISTS[k].title}</span>

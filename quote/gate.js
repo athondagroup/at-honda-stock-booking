@@ -83,7 +83,10 @@
   }
 
   // ---- db: the page's collection names → rows of public.docs
-  const COL = { config: 'qcfg', quotes: 'quotes', staffreq: 'qreq' };
+  // atref = หลังบ้านของเว็บ AT stock (อ่านอย่างเดียว เฉพาะตารางที่ใบเสนอราคาใช้ ไม่โหลดประวัติการแก้)
+  const COL = { config: 'qcfg', quotes: 'quotes', staffreq: 'qreq', atref: 'ref' };
+  const REF_IDS = ['campaigns', 'margins', 'privileges', 'fees', 'foc', 'catalog'];
+  const REF_FIELDS = 'id,at:data->at,rows:data->rows,prices:data->prices,price_issue:data->price_issue,reg:data->reg,ins:data->ins,month:data->month,cols:data->cols,src:data->src';
   const colOf = name => { const c = COL[name]; if (!c) throw Object.assign(new Error('collection ' + name), { code: 'invalid_argument' }); return c; };
   const hex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, '0')).join('');
   const err = (e, code) => Object.assign(new Error(e && e.message || code), { code: code || (e && /row-level security|permission|violates/i.test(e.message || '') ? 'not_granted' : /too large|payload/i.test(e && e.message || '') ? 'invalid_argument' : 'unavailable') });
@@ -91,6 +94,12 @@
   let channel = null;
   async function loadCol(col) {
     const out = new Map(); let from = 0;
+    if (col === 'ref') {
+      const { data, error } = await sb.from('docs').select(REF_FIELDS).eq('col', 'ref').in('id', REF_IDS);
+      if (error) throw err(error);
+      data.forEach(r => { const d = {}; Object.keys(r).forEach(k => { if (k !== 'id' && r[k] !== null && r[k] !== undefined) d[k] = r[k]; }); out.set(r.id, d); });
+      return out;
+    }
     for (;;) {
       const { data, error } = await sb.from('docs').select('id,data').eq('col', col).range(from, from + 999);
       if (error) throw err(error);
@@ -117,7 +126,7 @@
   const snapOf = (id, d) => ({ id, exists: d !== undefined, data: () => d });
   function listen(col, onChange, onErr) {
     const map = new Map();
-    const s = { put(id, d) { if (d === undefined) map.delete(id); else map.set(id, d); onChange(map); }, reset(m) { map.clear(); m.forEach((v, k) => map.set(k, v)); onChange(map); } };
+    const s = { put(id, d) { if (col === 'ref' && !REF_IDS.includes(id)) return; if (d === undefined) map.delete(id); else map.set(id, d); onChange(map); }, reset(m) { map.clear(); m.forEach((v, k) => map.set(k, v)); onChange(map); } };
     (subs[col] ||= []).push(s);
     ensureChannel();
     loadCol(col).then(m => s.reset(m)).catch(e => onErr && onErr(e));
@@ -147,7 +156,7 @@
           id = id || hex(10);
           return {
             id,
-            async set(body) { const { error } = await sb.from('docs').upsert({ col, id, data: JSON.parse(JSON.stringify(body)) }); if (error) throw err(error); },
+            async set(body) { if (col === 'ref') throw Object.assign(new Error('read only'), { code: 'not_granted' }); const { error } = await sb.from('docs').upsert({ col, id, data: JSON.parse(JSON.stringify(body)) }); if (error) throw err(error); },
             async update(body) { const cur = await this.get(); await this.set({ ...(cur.data() || {}), ...body }); },
             async delete() { const { error } = await sb.from('docs').delete().eq('col', col).eq('id', id); if (error) throw err(error); },
             async get() { const { data, error } = await sb.from('docs').select('data').eq('col', col).eq('id', id).maybeSingle(); if (error) throw err(error); return snapOf(id, data ? data.data : undefined); },

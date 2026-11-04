@@ -171,6 +171,106 @@
             cfg.settings = { sheetId: AT_SHEET_ID_DEFAULT, activeMonth: 'auto', ...((docs && docs.settings) || {}) };
             return cfg;
         };
+
+        // ---------- หลังบ้านชุดเดียวกับเว็บ AT stock (บนเว็บจริง): แคมเปญ Margin สิทธิพิเศษ ค่าจด ประกัน FOC และราคารถ อ่านจาก ref/* ของเว็บ AT stock
+        const AT_STOCK_KEYS = ['camp', 'margin', 'priv', 'reg', 'ins', 'foc'];
+        const AT_STOCK_DOC = { camp: 'campaigns', margin: 'margins', priv: 'privileges', reg: 'fees', ins: 'fees', foc: 'foc' };
+        const AT_STOCK_PAGE = { camp: 'หลังบ้าน → ตารางแคมเปญรายเดือน (แท็บ แคมเปญ Honda)', margin: 'หลังบ้าน → ตารางแคมเปญรายเดือน (แท็บ Margin มาตรฐาน)', priv: 'หลังบ้าน → ตารางแคมเปญรายเดือน (แท็บ สิทธิพิเศษ Honda)', reg: 'หลังบ้าน → ค่าจดทะเบียน / ประกัน / FOC', ins: 'หลังบ้าน → ค่าจดทะเบียน / ประกัน / FOC', foc: 'หลังบ้าน → ค่าจดทะเบียน / ประกัน / FOC' };
+        const atPctTxt = (v) => (Math.round(Number(v || 0) * 1000) / 10) + '%';
+        // แถวของเว็บ AT stock → แถวแบบชีต (ลำดับคอลัมน์เดียวกับแท็บในชีต ที่ใบเสนอราคาอ่านอยู่แล้ว)
+        const atStockToSheet = {
+            camp: (x) => [x.month, x.book_from || '', x.book_to || '', x.deliver_by || '', x.id, x.key, x.group || '', x.grade || '', x.no ?? '', x.name || '', x.rate || '', x.sup || 0, x.ins ?? '', x.excl || '', x.ref || '', x.active === false ? 'N' : 'Y'],
+            margin: (x) => [x.month, x.model || x.mkey || '', atPctTxt(x.cash), atPctTxt(x.fin), x.step1 || 0, x.step2 || 0, x.note || '', x.active === false ? 'N' : 'Y'],
+            priv: (x) => [x.month, x.priv, x.name || '', x.mkey || '', x.model || '', x.a1 || 0, x.a2 || 0, x.into || '', x.cond || '', x.active === false ? 'FALSE' : 'TRUE']
+        };
+        // ราคารถ: รุ่น/เกรดในใบเสนอราคา → ใบราคา Honda ในเว็บ AT stock [รุ่น, เกรด, ปีรุ่น, ชุดราคา (cur = ราคาปัจจุบัน, old = ราคาเดิม/ราคาช่วงแนะนำ)]
+        const AT_PRICE_MAP = {
+            'New City': { 'Turbo S': ['CITY', 'S', 2027, 'old'], 'e:HEV V': ['CITY e:HEV', 'e:HEV V', 2027, 'old'], 'e:HEV SV (ภายในสีดำ)': ['CITY e:HEV', 'e:HEV SV', 2027, 'old'], 'e:HEV SV (ภายในสีเทาแพลทินัม)': ['CITY e:HEV', 'e:HEV SV', 2027, 'old'], 'e:HEV RS': ['CITY e:HEV', 'e:HEV RS', 2027, 'old'] },
+            'New City Regular': { 'S': ['CITY', 'S', 2027, 'cur'], 'e:HEV V': ['CITY e:HEV', 'e:HEV V', 2027, 'cur'], 'e:HEV SV (ภายในสีดำ)': ['CITY e:HEV', 'e:HEV SV', 2027, 'cur'], 'e:HEV SV (ภายในสีเทาแพลทินัม)': ['CITY e:HEV', 'e:HEV SV', 2027, 'cur'], 'e:HEV RS': ['CITY e:HEV', 'e:HEV RS', 2027, 'cur'] },
+            'New City Hatchback': { 'Turbo S': ['CITY HATCHBACK', 'S', 2027, 'old'], 'e:HEV V': ['CITY HATCHBACK e:HEV', 'e:HEV V', 2027, 'old'], 'e:HEV SV': ['CITY HATCHBACK e:HEV', 'e:HEV SV', 2027, 'old'], 'e:HEV RS': ['CITY HATCHBACK e:HEV', 'e:HEV RS', 2027, 'old'] },
+            'New City Hatchback Regular': { 'S': ['CITY HATCHBACK', 'S', 2027, 'cur'], 'e:HEV V': ['CITY HATCHBACK e:HEV', 'e:HEV V', 2027, 'cur'], 'e:HEV SV': ['CITY HATCHBACK e:HEV', 'e:HEV SV', 2027, 'cur'], 'e:HEV RS': ['CITY HATCHBACK e:HEV', 'e:HEV RS', 2027, 'cur'] },
+            'Civic eHEV': { 'e:HEV EL+': ['CIVIC e:HEV', 'e:HEV EL+', 2027, 'cur'], 'e:HEV RS': ['CIVIC e:HEV', 'e:HEV RS', 2027, 'cur'] },
+            'Civic eHEV EL': { 'e:HEV EL': ['CIVIC e:HEV', 'e:HEV EL', 2027, 'cur'] },
+            'HR-V eHEV': { 'e:HEV EL': ['HR-V e:HEV', 'e:HEV EL', 2026, 'old'], 'e:HEV RS': ['HR-V e:HEV', 'e:HEV RS', 2026, 'old'], 'e:HEV E (New Price)': ['HR-V e:HEV', 'e:HEV E', 2026, 'cur'], 'e:HEV EL (New Price)': ['HR-V e:HEV', 'e:HEV EL', 2026, 'cur'], 'e:HEV HuNT (New Price)': ['HR-V e:HEV', 'e:HEV HuNT', 2026, 'cur'], 'e:HEV RS (New Price)': ['HR-V e:HEV', 'e:HEV RS', 2026, 'cur'] },
+            'CR-V eHEV': { 'e:HEV E': ['CR-V e:HEV', 'e:HEV E', 2026, 'old'], 'e:HEV RS': ['CR-V e:HEV', 'e:HEV RS', 2026, 'old'], 'e:HEV E (New Price)': ['CR-V e:HEV', 'e:HEV E', 2026, 'cur'], 'e:HEV ES (New Price)': ['CR-V e:HEV', 'e:HEV ES', 2026, 'cur'], 'e:HEV HuNT (New Price)': ['CR-V e:HEV', 'e:HEV HuNT', 2026, 'cur'], 'e:HEV RS (New Price)': ['CR-V e:HEV', 'e:HEV RS', 2026, 'cur'], 'e:HEV RS 4WD (New Price)': ['CR-V e:HEV', 'e:HEV RS 4WD', 2026, 'cur'] },
+            'Accord eHEV': { 'e:HEV RS': ['ACCORD e:HEV', 'e:HEV RS', 2025, 'cur'], 'e:HEV E (New Price)': ['ACCORD e:HEV', 'e:HEV E', 2026, 'cur'], 'e:HEV EL (New Price)': ['ACCORD e:HEV', 'e:HEV EL', 2026, 'cur'], 'e:HEV RS (New Price)': ['ACCORD e:HEV', 'e:HEV RS', 2026, 'cur'] },
+            'eN2': { 'e:N2': ['e:N2', 'e:N2', 2026, 'cur'] },
+            'StepWgn eHEV': { 'e:HEV SPADA': ['STEP WGN e:HEV', 'e:HEV SPADA', 2026, 'cur'] }
+        };
+        // ชื่อสีในใบเสนอราคา → รหัสสีในใบราคา Honda
+        const AT_COLOR_CODE = [
+            [/ทาฟเฟต้า|taffeta/i, 'TTW'], [/แพลทินัม|platinum white/i, 'PMW'], [/เมทิเออรอยด์|เมทิออรอยด์|meteoroid/i, 'MTG'], [/ดำคริสตัล|crystal black/i, 'CBL'],
+            [/บริลเลียนท์|sporty blue/i, 'BSB'], [/แดงเบลซิ/i, 'BZR'], [/เออร์เบิน หลังคาดำ/i, 'UBB'], [/เออร์เบิน|urban gray/i, 'UBG'], [/แคนยอน|canyon/i, 'CYB'],
+            [/lunar|ลูน่า/i, 'LUS'], [/ignite/i, 'IRB'], [/sunlight/i, 'PSW'], [/sand khaki/i, 'SKC'], [/ไดมอนด์|diamond/i, 'DMD'], [/twilight/i, 'TWB']
+        ];
+        const atColorCode = (name) => { const hit = AT_COLOR_CODE.find(([re]) => re.test(String(name || ''))); return hit ? hit[1] : ''; };
+        // เก็บราคาเดิมในโค้ดไว้ (ใช้เมื่อใบราคาในเว็บ AT stock ไม่มีรุ่น/เกรดนั้น)
+        const AT_GRADES_BASE = JSON.parse(JSON.stringify(GRADES_DATA));
+        const AT_COLORS_BASE = JSON.parse(JSON.stringify(MODEL_COLORS));
+        const AT_PRICE_STATUS = { on: false, matched: 0, missing: [], issue: null };
+        const cfgApplyPrices = (catalog) => {
+            Object.keys(AT_GRADES_BASE).forEach(mk => {
+                (GRADES_DATA[mk] || []).forEach((g, i) => { const b = AT_GRADES_BASE[mk][i]; if (b && b.name === g.name) g.price = b.price; });
+                (MODEL_COLORS[mk] || []).forEach((c, i) => { const b = (AT_COLORS_BASE[mk] || [])[i]; if (b && b.name === c.name) { c.price = b.price; if (b.priceByGrade) c.priceByGrade = { ...b.priceByGrade }; else delete c.priceByGrade; } });
+            });
+            AT_PRICE_STATUS.on = false; AT_PRICE_STATUS.matched = 0; AT_PRICE_STATUS.missing = []; AT_PRICE_STATUS.issue = null;
+            const prices = catalog && Array.isArray(catalog.prices) ? catalog.prices : null;
+            if (!prices || !prices.length) return;
+            AT_PRICE_STATUS.on = true; AT_PRICE_STATUS.issue = catalog.price_issue || null;
+            Object.keys(AT_PRICE_MAP).forEach(mk => {
+                const colors = MODEL_COLORS[mk] || [];
+                (GRADES_DATA[mk] || []).forEach(g => {
+                    const m = AT_PRICE_MAP[mk][g.name];
+                    if (!m) { AT_PRICE_STATUS.missing.push(`${mk} · ${g.name}`); return; }
+                    const rows = prices.filter(p => p.model === m[0] && p.grade === m[1] && Number(p.year) === m[2] && (p.tier || 'cur') === m[3] && Number(p.price) > 0);
+                    if (!rows.length) { AT_PRICE_STATUS.missing.push(`${mk} · ${g.name}`); return; }
+                    const base = Math.min(...rows.map(p => Number(p.price)));
+                    g.price = base;
+                    colors.filter(c => !c.grades || c.grades.includes(g.name)).forEach(c => {
+                        const hit = rows.find(p => p.color === atColorCode(c.name));
+                        if (!hit) return;
+                        c.priceByGrade = { ...(c.priceByGrade || {}), [g.name]: Number(hit.price) - base };
+                    });
+                    AT_PRICE_STATUS.matched++;
+                });
+            });
+        };
+        // ค่าจด / เบี้ยประกัน จากเว็บ AT stock ({reg: {กลุ่ม: [บุคคล, นิติ]}, ins: {กลุ่ม: {1: [..], 2: [..], 3: [..]}}}) → แถวแบบชีต
+        const atFeesToRows = (fees) => {
+            const fmt = (n) => (n === undefined || n === null || n === '') ? '' : String(n);
+            const reg = (AT_SNAPSHOT.reg || []).map(r => { const v = fees.reg && fees.reg[r[1]]; return v ? [r[0], r[1], fmt(v[0]), fmt(v[1]), ...r.slice(4)] : r.slice(); });
+            const ins = (AT_SNAPSHOT.ins || []).map(r => {
+                const v = fees.ins && fees.ins[r[2]] && fees.ins[r[2]][String(r[4])];
+                if (!v) return r.slice();
+                const y = [0, 1, 2].map(i => fmt(v[i]));
+                const total = v.reduce((s, x) => s + (Number(x) || 0), 0);
+                return [fees.month || r[0], r[1], r[2], r[3], r[4], ...y, String(Math.round(total * 100) / 100), r[9] || 'Y', r[10] || ''];
+            });
+            return { reg, ins };
+        };
+        // stock = { campaigns, margins, privileges, fees, foc, catalog } (เอกสารของเว็บ AT stock หรือไฟล์ที่ติดมากับเว็บ)
+        const cfgUseStock = (cfg, stock) => {
+            cfg.stockOn = false;
+            if (!stock) return cfg;
+            const take = (k, doc) => {
+                if (!doc || !Array.isArray(doc.rows) || !doc.rows.length) return;
+                cfg[k] = doc.rows.map(x => cfgRowFromArray(AT_TABLES[k].cols, atStockToSheet[k](x)));
+                cfg.src[k] = 'stock'; cfg.at[k] = doc.at || ''; cfg.stockOn = true;
+            };
+            take('camp', stock.campaigns); take('margin', stock.margins); take('priv', stock.privileges);
+            if (stock.fees && (stock.fees.reg || stock.fees.ins)) {
+                const f = atFeesToRows(stock.fees);
+                cfg.reg = f.reg.map(a => cfgRowFromArray(AT_TABLES.reg.cols, a)); cfg.ins = f.ins.map(a => cfgRowFromArray(AT_TABLES.ins.cols, a));
+                cfg.src.reg = cfg.src.ins = stock.fees.__file ? 'stockfile' : 'stock'; cfg.at.reg = cfg.at.ins = stock.fees.at || ''; cfg.stockOn = true;
+            }
+            if (stock.foc && Array.isArray(stock.foc.rows) && Array.isArray(stock.foc.cols)) {
+                const ix = AT_TABLES.foc.cols.map(c => stock.foc.cols.indexOf(c));
+                cfg.foc = stock.foc.rows.map(r => Object.fromEntries(AT_TABLES.foc.cols.map((c, i) => [c, c === 'active' ? (ix[i] >= 0 ? cfgStr(r[ix[i]]) || 'Y' : 'Y') : cfgStr(ix[i] >= 0 ? r[ix[i]] : '')])));
+                cfg.src.foc = stock.foc.__file ? 'stockfile' : 'stock'; cfg.at.foc = stock.foc.at || ''; cfg.focSrc = stock.foc.src || 'เว็บ AT stock'; cfg.stockOn = true;
+            }
+            cfg.catalog = stock.catalog || null;
+            return cfg;
+        };
         // ใช้ตารางกับเครื่องคำนวณ (แทนค่าในตัวแปรกลางเดิม: OPTION_DATA, RATE_TABLE_MAP, Margin, สิทธิพิเศษ, ค่าจด, ประกัน, FOC)
         const cfgApply = (cfg) => {
             const months = cfgMonthsOf(cfg.camp.filter(r => cfgOn(r.active)));
@@ -265,6 +365,7 @@
                 return o;
             });
             AT_FOC_ITEMS.splice(0, AT_FOC_ITEMS.length, ...items);
+            cfgApplyPrices(cfg.catalog);
             AT_GIFT_QUICK.splice(0, AT_GIFT_QUICK.length, ...(cfg.gifts || []).filter(r => cfgStr(r.label) && cfgOn(r.active)).map(r => {
                 const fix = /^fix/i.test(cfgStr(r.mode)) || /ทุน\s*fix|คงที่/.test(cfgStr(r.mode));
                 return { l: cfgStr(r.label), c: fix ? cfgNum(r.cost) : undefined, q: fix ? '' : cfgStr(r.q), std: /^(y|yes|ใช่|1|true)$/i.test(cfgStr(r.std)) };
@@ -341,7 +442,27 @@
                 })();
                 return () => { cancelled = true; clearTimeout(timer); if (unsub) unsub(); if (unsubReq) unsubReq(); if (unsubMine) unsubMine(); };
             }, []);
-            const cfg = useMemo(() => cfgBuild(docs), [docs]);
+            // บนเว็บจริง: อ่านหลังบ้านของเว็บ AT stock (ref/*) + ไฟล์ค่าจด/FOC ที่ติดมากับเว็บเมื่อยังไม่เคยแก้ในหลังบ้าน
+            const [stock, setStock] = useState(null);
+            useEffect(() => {
+                if (!window.__QWEB) return;
+                let off = null, cancelled = false;
+                const files = {};
+                const loadFile = async (k) => { try { const r = await fetch('../' + k + '.json', { cache: 'no-cache' }); if (r.ok) files[k] = { ...(await r.json()), __file: true }; } catch (e) { /* ไม่มีไฟล์ */ } };
+                (async () => {
+                    await Promise.all([loadFile('fees'), loadFile('foc')]);
+                    let db = null;
+                    try { db = await window.claude.use('db'); } catch (e) { db = null; }
+                    if (!db || cancelled) { if (!cancelled) setStock({ ...files }); return; }
+                    off = db.collection('atref').onSnapshot(snap => {
+                        const m = { ...files };
+                        snap.docs.forEach(d => { m[d.id] = d.data(); });
+                        setStock(m);
+                    }, () => setStock({ ...files }));
+                })();
+                return () => { cancelled = true; if (off) off(); };
+            }, []);
+            const cfg = useMemo(() => cfgUseStock(cfgBuild(docs), stock), [docs, stock]);
             const month = useMemo(() => cfgApply(cfg), [cfg]);
             const staffMe = useMemo(() => cfg.staff.find(s => s && s.active !== false && ((viewer.key && s.key === viewer.key) || (viewer.id && s.uid === viewer.id))) || null, [cfg, viewer.key, viewer.id]);
             // เว็บจริง (Supabase): ผู้ดูแล = ผู้บริหารในตาราง members เท่านั้น · ใน claude.ai: เจ้าของ หรือ staff ที่ตั้งเป็นผู้ดูแล
@@ -383,5 +504,5 @@
                 await dbRef.current.collection('staffreq').doc(req.id).delete();
             };
             const rejectReq = async (req) => { await dbRef.current.collection('staffreq').doc(req.id).delete(); };
-            return { cfg, month, ready, dbOk, viewer, staffMe, isAdmin, realAdmin, viewAs, setViewAs, canWrite, saveTable, saveFoc, resetTable, saveStaff, saveSettings, reqs, myReq, requestLink, approveReq, rejectReq, version: docs };
+            return { cfg, month, ready, dbOk, viewer, staffMe, isAdmin, realAdmin, viewAs, setViewAs, canWrite, saveTable, saveFoc, resetTable, saveStaff, saveSettings, reqs, myReq, requestLink, approveReq, rejectReq, version: [docs, stock] };
         };

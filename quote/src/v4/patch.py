@@ -470,6 +470,10 @@ rep("            const editGiftCost = (i, value) => { const v = [...giftValues];
 assert s.count('{GIFT_QUICK.') == 2
 s = s.replace('{GIFT_QUICK.', '{AT_GIFT_QUICK.')
 
+
+# ---------- 7g. car price from the grade table (ราคาจากใบราคาในเว็บ AT stock เมื่อมี)
+rep("            const carPrice = grade.price;", "            const carPrice = (GRADES_DATA[MODEL_MAPPING[uiModel]] || []).find(g => g.name === grade.name)?.price ?? grade.price;")
+
 # ---------- 8. formal black-and-white sales summary
 a = s.index('                        {/* Hidden Sales Summary Card */}')
 b = s.index('                    </div>\n\n                </div>\n            );\n        };\n\n        const root')

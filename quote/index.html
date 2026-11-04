@@ -4797,6 +4797,154 @@ const cfgBuild = (docs) => {
   cfg.settings = { sheetId: AT_SHEET_ID_DEFAULT, activeMonth: "auto", ...docs && docs.settings || {} };
   return cfg;
 };
+const AT_STOCK_KEYS = ["camp", "margin", "priv", "reg", "ins", "foc"];
+const AT_STOCK_DOC = { camp: "campaigns", margin: "margins", priv: "privileges", reg: "fees", ins: "fees", foc: "foc" };
+const AT_STOCK_PAGE = { camp: "หลังบ้าน → ตารางแคมเปญรายเดือน (แท็บ แคมเปญ Honda)", margin: "หลังบ้าน → ตารางแคมเปญรายเดือน (แท็บ Margin มาตรฐาน)", priv: "หลังบ้าน → ตารางแคมเปญรายเดือน (แท็บ สิทธิพิเศษ Honda)", reg: "หลังบ้าน → ค่าจดทะเบียน / ประกัน / FOC", ins: "หลังบ้าน → ค่าจดทะเบียน / ประกัน / FOC", foc: "หลังบ้าน → ค่าจดทะเบียน / ประกัน / FOC" };
+const atPctTxt = (v) => Math.round(Number(v || 0) * 1000) / 10 + "%";
+const atStockToSheet = {
+  camp: (x) => [x.month, x.book_from || "", x.book_to || "", x.deliver_by || "", x.id, x.key, x.group || "", x.grade || "", x.no ?? "", x.name || "", x.rate || "", x.sup || 0, x.ins ?? "", x.excl || "", x.ref || "", x.active === false ? "N" : "Y"],
+  margin: (x) => [x.month, x.model || x.mkey || "", atPctTxt(x.cash), atPctTxt(x.fin), x.step1 || 0, x.step2 || 0, x.note || "", x.active === false ? "N" : "Y"],
+  priv: (x) => [x.month, x.priv, x.name || "", x.mkey || "", x.model || "", x.a1 || 0, x.a2 || 0, x.into || "", x.cond || "", x.active === false ? "FALSE" : "TRUE"]
+};
+const AT_PRICE_MAP = {
+  "New City": { "Turbo S": ["CITY", "S", 2027, "old"], "e:HEV V": ["CITY e:HEV", "e:HEV V", 2027, "old"], "e:HEV SV (ภายในสีดำ)": ["CITY e:HEV", "e:HEV SV", 2027, "old"], "e:HEV SV (ภายในสีเทาแพลทินัม)": ["CITY e:HEV", "e:HEV SV", 2027, "old"], "e:HEV RS": ["CITY e:HEV", "e:HEV RS", 2027, "old"] },
+  "New City Regular": { S: ["CITY", "S", 2027, "cur"], "e:HEV V": ["CITY e:HEV", "e:HEV V", 2027, "cur"], "e:HEV SV (ภายในสีดำ)": ["CITY e:HEV", "e:HEV SV", 2027, "cur"], "e:HEV SV (ภายในสีเทาแพลทินัม)": ["CITY e:HEV", "e:HEV SV", 2027, "cur"], "e:HEV RS": ["CITY e:HEV", "e:HEV RS", 2027, "cur"] },
+  "New City Hatchback": { "Turbo S": ["CITY HATCHBACK", "S", 2027, "old"], "e:HEV V": ["CITY HATCHBACK e:HEV", "e:HEV V", 2027, "old"], "e:HEV SV": ["CITY HATCHBACK e:HEV", "e:HEV SV", 2027, "old"], "e:HEV RS": ["CITY HATCHBACK e:HEV", "e:HEV RS", 2027, "old"] },
+  "New City Hatchback Regular": { S: ["CITY HATCHBACK", "S", 2027, "cur"], "e:HEV V": ["CITY HATCHBACK e:HEV", "e:HEV V", 2027, "cur"], "e:HEV SV": ["CITY HATCHBACK e:HEV", "e:HEV SV", 2027, "cur"], "e:HEV RS": ["CITY HATCHBACK e:HEV", "e:HEV RS", 2027, "cur"] },
+  "Civic eHEV": { "e:HEV EL+": ["CIVIC e:HEV", "e:HEV EL+", 2027, "cur"], "e:HEV RS": ["CIVIC e:HEV", "e:HEV RS", 2027, "cur"] },
+  "Civic eHEV EL": { "e:HEV EL": ["CIVIC e:HEV", "e:HEV EL", 2027, "cur"] },
+  "HR-V eHEV": { "e:HEV EL": ["HR-V e:HEV", "e:HEV EL", 2026, "old"], "e:HEV RS": ["HR-V e:HEV", "e:HEV RS", 2026, "old"], "e:HEV E (New Price)": ["HR-V e:HEV", "e:HEV E", 2026, "cur"], "e:HEV EL (New Price)": ["HR-V e:HEV", "e:HEV EL", 2026, "cur"], "e:HEV HuNT (New Price)": ["HR-V e:HEV", "e:HEV HuNT", 2026, "cur"], "e:HEV RS (New Price)": ["HR-V e:HEV", "e:HEV RS", 2026, "cur"] },
+  "CR-V eHEV": { "e:HEV E": ["CR-V e:HEV", "e:HEV E", 2026, "old"], "e:HEV RS": ["CR-V e:HEV", "e:HEV RS", 2026, "old"], "e:HEV E (New Price)": ["CR-V e:HEV", "e:HEV E", 2026, "cur"], "e:HEV ES (New Price)": ["CR-V e:HEV", "e:HEV ES", 2026, "cur"], "e:HEV HuNT (New Price)": ["CR-V e:HEV", "e:HEV HuNT", 2026, "cur"], "e:HEV RS (New Price)": ["CR-V e:HEV", "e:HEV RS", 2026, "cur"], "e:HEV RS 4WD (New Price)": ["CR-V e:HEV", "e:HEV RS 4WD", 2026, "cur"] },
+  "Accord eHEV": { "e:HEV RS": ["ACCORD e:HEV", "e:HEV RS", 2025, "cur"], "e:HEV E (New Price)": ["ACCORD e:HEV", "e:HEV E", 2026, "cur"], "e:HEV EL (New Price)": ["ACCORD e:HEV", "e:HEV EL", 2026, "cur"], "e:HEV RS (New Price)": ["ACCORD e:HEV", "e:HEV RS", 2026, "cur"] },
+  eN2: { "e:N2": ["e:N2", "e:N2", 2026, "cur"] },
+  "StepWgn eHEV": { "e:HEV SPADA": ["STEP WGN e:HEV", "e:HEV SPADA", 2026, "cur"] }
+};
+const AT_COLOR_CODE = [
+  [/ทาฟเฟต้า|taffeta/i, "TTW"],
+  [/แพลทินัม|platinum white/i, "PMW"],
+  [/เมทิเออรอยด์|เมทิออรอยด์|meteoroid/i, "MTG"],
+  [/ดำคริสตัล|crystal black/i, "CBL"],
+  [/บริลเลียนท์|sporty blue/i, "BSB"],
+  [/แดงเบลซิ/i, "BZR"],
+  [/เออร์เบิน หลังคาดำ/i, "UBB"],
+  [/เออร์เบิน|urban gray/i, "UBG"],
+  [/แคนยอน|canyon/i, "CYB"],
+  [/lunar|ลูน่า/i, "LUS"],
+  [/ignite/i, "IRB"],
+  [/sunlight/i, "PSW"],
+  [/sand khaki/i, "SKC"],
+  [/ไดมอนด์|diamond/i, "DMD"],
+  [/twilight/i, "TWB"]
+];
+const atColorCode = (name) => {
+  const hit = AT_COLOR_CODE.find(([re]) => re.test(String(name || "")));
+  return hit ? hit[1] : "";
+};
+const AT_GRADES_BASE = JSON.parse(JSON.stringify(GRADES_DATA));
+const AT_COLORS_BASE = JSON.parse(JSON.stringify(MODEL_COLORS));
+const AT_PRICE_STATUS = { on: false, matched: 0, missing: [], issue: null };
+const cfgApplyPrices = (catalog) => {
+  Object.keys(AT_GRADES_BASE).forEach((mk) => {
+    (GRADES_DATA[mk] || []).forEach((g, i) => {
+      const b = AT_GRADES_BASE[mk][i];
+      if (b && b.name === g.name)
+        g.price = b.price;
+    });
+    (MODEL_COLORS[mk] || []).forEach((c, i) => {
+      const b = (AT_COLORS_BASE[mk] || [])[i];
+      if (b && b.name === c.name) {
+        c.price = b.price;
+        if (b.priceByGrade)
+          c.priceByGrade = { ...b.priceByGrade };
+        else
+          delete c.priceByGrade;
+      }
+    });
+  });
+  AT_PRICE_STATUS.on = false;
+  AT_PRICE_STATUS.matched = 0;
+  AT_PRICE_STATUS.missing = [];
+  AT_PRICE_STATUS.issue = null;
+  const prices = catalog && Array.isArray(catalog.prices) ? catalog.prices : null;
+  if (!prices || !prices.length)
+    return;
+  AT_PRICE_STATUS.on = true;
+  AT_PRICE_STATUS.issue = catalog.price_issue || null;
+  Object.keys(AT_PRICE_MAP).forEach((mk) => {
+    const colors = MODEL_COLORS[mk] || [];
+    (GRADES_DATA[mk] || []).forEach((g) => {
+      const m = AT_PRICE_MAP[mk][g.name];
+      if (!m) {
+        AT_PRICE_STATUS.missing.push(`${mk} · ${g.name}`);
+        return;
+      }
+      const rows = prices.filter((p) => p.model === m[0] && p.grade === m[1] && Number(p.year) === m[2] && (p.tier || "cur") === m[3] && Number(p.price) > 0);
+      if (!rows.length) {
+        AT_PRICE_STATUS.missing.push(`${mk} · ${g.name}`);
+        return;
+      }
+      const base = Math.min(...rows.map((p) => Number(p.price)));
+      g.price = base;
+      colors.filter((c) => !c.grades || c.grades.includes(g.name)).forEach((c) => {
+        const hit = rows.find((p) => p.color === atColorCode(c.name));
+        if (!hit)
+          return;
+        c.priceByGrade = { ...c.priceByGrade || {}, [g.name]: Number(hit.price) - base };
+      });
+      AT_PRICE_STATUS.matched++;
+    });
+  });
+};
+const atFeesToRows = (fees) => {
+  const fmt = (n) => n === undefined || n === null || n === "" ? "" : String(n);
+  const reg = (AT_SNAPSHOT.reg || []).map((r) => {
+    const v = fees.reg && fees.reg[r[1]];
+    return v ? [r[0], r[1], fmt(v[0]), fmt(v[1]), ...r.slice(4)] : r.slice();
+  });
+  const ins = (AT_SNAPSHOT.ins || []).map((r) => {
+    const v = fees.ins && fees.ins[r[2]] && fees.ins[r[2]][String(r[4])];
+    if (!v)
+      return r.slice();
+    const y = [0, 1, 2].map((i) => fmt(v[i]));
+    const total = v.reduce((s, x) => s + (Number(x) || 0), 0);
+    return [fees.month || r[0], r[1], r[2], r[3], r[4], ...y, String(Math.round(total * 100) / 100), r[9] || "Y", r[10] || ""];
+  });
+  return { reg, ins };
+};
+const cfgUseStock = (cfg, stock) => {
+  cfg.stockOn = false;
+  if (!stock)
+    return cfg;
+  const take = (k, doc) => {
+    if (!doc || !Array.isArray(doc.rows) || !doc.rows.length)
+      return;
+    cfg[k] = doc.rows.map((x) => cfgRowFromArray(AT_TABLES[k].cols, atStockToSheet[k](x)));
+    cfg.src[k] = "stock";
+    cfg.at[k] = doc.at || "";
+    cfg.stockOn = true;
+  };
+  take("camp", stock.campaigns);
+  take("margin", stock.margins);
+  take("priv", stock.privileges);
+  if (stock.fees && (stock.fees.reg || stock.fees.ins)) {
+    const f = atFeesToRows(stock.fees);
+    cfg.reg = f.reg.map((a) => cfgRowFromArray(AT_TABLES.reg.cols, a));
+    cfg.ins = f.ins.map((a) => cfgRowFromArray(AT_TABLES.ins.cols, a));
+    cfg.src.reg = cfg.src.ins = stock.fees.__file ? "stockfile" : "stock";
+    cfg.at.reg = cfg.at.ins = stock.fees.at || "";
+    cfg.stockOn = true;
+  }
+  if (stock.foc && Array.isArray(stock.foc.rows) && Array.isArray(stock.foc.cols)) {
+    const ix = AT_TABLES.foc.cols.map((c) => stock.foc.cols.indexOf(c));
+    cfg.foc = stock.foc.rows.map((r) => Object.fromEntries(AT_TABLES.foc.cols.map((c, i) => [c, c === "active" ? ix[i] >= 0 ? cfgStr(r[ix[i]]) || "Y" : "Y" : cfgStr(ix[i] >= 0 ? r[ix[i]] : "")])));
+    cfg.src.foc = stock.foc.__file ? "stockfile" : "stock";
+    cfg.at.foc = stock.foc.at || "";
+    cfg.focSrc = stock.foc.src || "เว็บ AT stock";
+    cfg.stockOn = true;
+  }
+  cfg.catalog = stock.catalog || null;
+  return cfg;
+};
 const cfgApply = (cfg) => {
   const months = cfgMonthsOf(cfg.camp.filter((r) => cfgOn(r.active)));
   const want = /^\d{4}-\d{2}$/.test(cfg.settings.activeMonth || "") ? cfg.settings.activeMonth : cfgThisMonth();
@@ -4906,6 +5054,7 @@ const cfgApply = (cfg) => {
     return o;
   });
   AT_FOC_ITEMS.splice(0, AT_FOC_ITEMS.length, ...items);
+  cfgApplyPrices(cfg.catalog);
   AT_GIFT_QUICK.splice(0, AT_GIFT_QUICK.length, ...(cfg.gifts || []).filter((r) => cfgStr(r.label) && cfgOn(r.active)).map((r) => {
     const fix = /^fix/i.test(cfgStr(r.mode)) || /ทุน\s*fix|คงที่/.test(cfgStr(r.mode));
     return { l: cfgStr(r.label), c: fix ? cfgNum(r.cost) : undefined, q: fix ? "" : cfgStr(r.q), std: /^(y|yes|ใช่|1|true)$/i.test(cfgStr(r.std)) };
@@ -5044,7 +5193,47 @@ const useAtConfig = () => {
         unsubMine();
     };
   }, []);
-  const cfg = useMemo(() => cfgBuild(docs), [docs]);
+  const [stock, setStock] = useState(null);
+  useEffect(() => {
+    if (!window.__QWEB)
+      return;
+    let off = null, cancelled = false;
+    const files = {};
+    const loadFile = async (k) => {
+      try {
+        const r = await fetch("../" + k + ".json", { cache: "no-cache" });
+        if (r.ok)
+          files[k] = { ...await r.json(), __file: true };
+      } catch (e) {}
+    };
+    (async () => {
+      await Promise.all([loadFile("fees"), loadFile("foc")]);
+      let db = null;
+      try {
+        db = await window.claude.use("db");
+      } catch (e) {
+        db = null;
+      }
+      if (!db || cancelled) {
+        if (!cancelled)
+          setStock({ ...files });
+        return;
+      }
+      off = db.collection("atref").onSnapshot((snap) => {
+        const m = { ...files };
+        snap.docs.forEach((d) => {
+          m[d.id] = d.data();
+        });
+        setStock(m);
+      }, () => setStock({ ...files }));
+    })();
+    return () => {
+      cancelled = true;
+      if (off)
+        off();
+    };
+  }, []);
+  const cfg = useMemo(() => cfgUseStock(cfgBuild(docs), stock), [docs, stock]);
   const month = useMemo(() => cfgApply(cfg), [cfg]);
   const staffMe = useMemo(() => cfg.staff.find((s) => s && s.active !== false && (viewer.key && s.key === viewer.key || viewer.id && s.uid === viewer.id)) || null, [cfg, viewer.key, viewer.id]);
   const realAdmin = !!(viewer.isOwner || !window.__QWEB && staffMe && staffMe.role === "admin");
@@ -5096,7 +5285,7 @@ const useAtConfig = () => {
   const rejectReq = async (req) => {
     await dbRef.current.collection("staffreq").doc(req.id).delete();
   };
-  return { cfg, month, ready, dbOk, viewer, staffMe, isAdmin, realAdmin, viewAs, setViewAs, canWrite, saveTable, saveFoc, resetTable, saveStaff, saveSettings, reqs, myReq, requestLink, approveReq, rejectReq, version: docs };
+  return { cfg, month, ready, dbOk, viewer, staffMe, isAdmin, realAdmin, viewAs, setViewAs, canWrite, saveTable, saveFoc, resetTable, saveStaff, saveSettings, reqs, myReq, requestLink, approveReq, rejectReq, version: [docs, stock] };
 };
 const giftAutoKind = (g) => {
   const t = String(g || "");
@@ -5182,12 +5371,14 @@ const adminFmt = (k, v) => {
   return cfgStr(v) || "–";
 };
 const AdminPanel = ({ api }) => {
-  const { cfg, canWrite } = api;
+  const { cfg } = api;
   const [sec, setSec] = useState("campaign");
   const [sub, setSub] = useState("camp");
   const [fsub, setFsub] = useState("reg");
   const listKey = sec === "campaign" ? sub : sec === "fees" ? fsub : sec;
   const def = ADMIN_LISTS[listKey];
+  const stockOwned = !!(cfg.stockOn && AT_STOCK_KEYS.includes(listKey) && /^stock/.test(cfg.src[listKey] || ""));
+  const canWrite = api.canWrite && !stockOwned;
   const allRows = !def ? [] : listKey === "foc" ? cfg.foc : Array.isArray(cfg[listKey]) ? cfg[listKey] : [];
   const months = useMemo(() => [...new Set(allRows.map((r) => r.month).filter(Boolean))].sort().reverse(), [allRows]);
   const [month, setMonth] = useState(api.month || "");
@@ -5261,14 +5452,16 @@ const AdminPanel = ({ api }) => {
     };
     try {
       const data = {};
-      for (const k of AT_TABLE_ORDER) {
+      for (const k of AT_TABLE_ORDER.filter((k) => !(cfg.stockOn && AT_STOCK_KEYS.includes(k)))) {
         setPull({ busy: true, step: AT_TABLES[k].tab });
         data[k] = cfgParseTab(k, await get(AT_TABLES[k].tab, PULL_RANGES[k]));
       }
-      setPull({ busy: true, step: "อุปกรณ์แท้ / อุปกรณ์เทียบเคียง / DVP Package" });
-      const g = await get("อุปกรณ์แท้", "A1:M3000"), a = await get("อุปกรณ์เทียบเคียง", "A1:N4000"), d = await get("DVP Package", "A1:I1500");
-      data.foc = cfgFocFromSheet(g, a, d);
-      data.focParts = { genuine: data.foc.filter((x) => /^แท้/.test(x.src)).length, atg: data.foc.filter((x) => /^ATG/.test(x.src)).length, dvp: data.foc.filter((x) => /^DVP/.test(x.src)).length };
+      if (!cfg.stockOn) {
+        setPull({ busy: true, step: "อุปกรณ์แท้ / อุปกรณ์เทียบเคียง / DVP Package" });
+        const g = await get("อุปกรณ์แท้", "A1:M3000"), a = await get("อุปกรณ์เทียบเคียง", "A1:N4000"), d = await get("DVP Package", "A1:I1500");
+        data.foc = cfgFocFromSheet(g, a, d);
+        data.focParts = { genuine: data.foc.filter((x) => /^แท้/.test(x.src)).length, atg: data.foc.filter((x) => /^ATG/.test(x.src)).length, dvp: data.foc.filter((x) => /^DVP/.test(x.src)).length };
+      }
       data.counts = counts;
       setPull({ data, at: new Date });
     } catch (e) {
@@ -5283,7 +5476,7 @@ const AdminPanel = ({ api }) => {
     setPull({ ...pull, saving: true });
     try {
       for (const k of AT_TABLE_ORDER)
-        if (data[k] && data[k].length)
+        if (data[k] && data[k].length && !(cfg.stockOn && AT_STOCK_KEYS.includes(k)))
           await api.saveTable(k, data[k], stamp);
       if (data.foc && data.foc.length)
         await api.saveFoc(data.foc, stamp);
@@ -5428,7 +5621,7 @@ const AdminPanel = ({ api }) => {
     },
     className: `shrink-0 px-3 sm:px-4 py-2.5 text-sm font-bold border-b-[3px] ${cur === k ? "border-red-600 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-800"}`
   }, label);
-  const srcText = (k) => cfg.src[k] === "web" ? `แก้ล่าสุดในหลังบ้าน ${cfg.at[k] ? new Date(cfg.at[k]).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }) : ""}` : `ใช้ข้อมูลที่ฝังมากับเว็บ (ดึงจากชีต ${new Date(AT_SNAPSHOT.at).toLocaleDateString("th-TH", { dateStyle: "medium" })})`;
+  const srcText = (k) => cfg.src[k] === "stock" ? `ใช้ข้อมูลจากเว็บ AT stock${cfg.at[k] ? " · แก้ล่าสุด " + new Date(cfg.at[k]).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }) : ""}` : cfg.src[k] === "stockfile" ? "ใช้ไฟล์ที่ติดมากับเว็บ AT stock" : cfg.src[k] === "web" ? `แก้ล่าสุดในหลังบ้าน ${cfg.at[k] ? new Date(cfg.at[k]).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }) : ""}` : `ใช้ข้อมูลที่ฝังมากับเว็บ (ดึงจากชีต ${new Date(AT_SNAPSHOT.at).toLocaleDateString("th-TH", { dateStyle: "medium" })})`;
   const field = ([k, label, type]) => {
     const v = edit.row[k] ?? "";
     const set = (val) => setEdit({ ...edit, row: { ...edit.row, [k]: val } });
@@ -5498,7 +5691,15 @@ const AdminPanel = ({ api }) => {
     await run(() => api.saveStaff(rows), s.index >= 0 ? "บันทึกผู้ใช้แล้ว" : "เพิ่มผู้ใช้แล้ว");
     setStaffEdit(null);
   };
-  const readOnlyNote = !canWrite && /* @__PURE__ */ React.createElement("div", {
+  const stockNote = stockOwned && /* @__PURE__ */ React.createElement("div", {
+    className: "rounded-xl border border-blue-200 bg-blue-50 text-blue-900 text-xs px-3 py-2 leading-relaxed"
+  }, /* @__PURE__ */ React.createElement("i", {
+    className: "fa-solid fa-link mr-1"
+  }), "ข้อมูลส่วนนี้ใช้ชุดเดียวกับเว็บ AT stock · แก้ที่ ", /* @__PURE__ */ React.createElement("a", {
+    href: "../",
+    className: "font-bold underline"
+  }, "เว็บ AT stock"), " → ", AT_STOCK_PAGE[listKey], " แล้วใบเสนอราคาเปลี่ยนตามทันที", cfg.src[listKey] === "stockfile" ? " · ตอนนี้ใช้ไฟล์ที่ติดมากับเว็บ AT stock (ยังไม่เคยแก้ในหลังบ้าน)" : "");
+  const readOnlyNote = !stockOwned && !canWrite && /* @__PURE__ */ React.createElement("div", {
     className: "rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs px-3 py-2"
   }, /* @__PURE__ */ React.createElement("i", {
     className: "fa-solid fa-lock mr-1"
@@ -5523,7 +5724,7 @@ const AdminPanel = ({ api }) => {
     className: "text-sm text-red-700"
   }, pull.err), pull.data && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", {
     className: "grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-sm"
-  }, [...AT_TABLE_ORDER, "foc"].map((k) => {
+  }, [...AT_TABLE_ORDER, "foc"].filter((k) => pull.data[k]).map((k) => {
     const n = (pull.data[k] || []).length, cur = (k === "foc" ? cfg.foc : cfg[k]).length;
     return /* @__PURE__ */ React.createElement("div", {
       key: k,
@@ -5643,9 +5844,9 @@ const AdminPanel = ({ api }) => {
     onChange: (e) => setQ(e.target.value),
     placeholder: "ค้นหาในเดือนนี้",
     className: "w-full pl-8 pr-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-red-500"
-  })), /* @__PURE__ */ React.createElement("p", {
+  })), stockNote, /* @__PURE__ */ React.createElement("p", {
     className: "text-xs text-gray-500"
-  }, cfg.settings.pulledAt ? `ดึงจากชีตล่าสุด ${new Date(cfg.settings.pulledAt).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })} · ` : "", srcText(listKey), " · ชีต: ", /* @__PURE__ */ React.createElement("a", {
+  }, cfg.settings.pulledAt ? `ดึงจากชีตล่าสุด ${new Date(cfg.settings.pulledAt).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })} · ` : "", srcText(listKey), stockOwned ? "" : /* @__PURE__ */ React.createElement(React.Fragment, null, " · ชีต:"), " ", !stockOwned && /* @__PURE__ */ React.createElement("a", {
     href: `https://docs.google.com/spreadsheets/d/${cfg.settings.sheetId}/edit`,
     target: "_blank",
     rel: "noopener",
@@ -5843,9 +6044,14 @@ const AdminPanel = ({ api }) => {
     className: "px-4 py-2 rounded-xl bg-gray-900 text-white text-sm font-bold disabled:opacity-50"
   }, /* @__PURE__ */ React.createElement("i", {
     className: "fa-solid fa-rotate mr-1"
-  }), "ดึงข้อมูลทั้งหมดจากชีต"), /* @__PURE__ */ React.createElement("span", {
+  }), cfg.stockOn ? "ดึงดอกเบี้ยจากชีต" : "ดึงข้อมูลทั้งหมดจากชีต"), /* @__PURE__ */ React.createElement("span", {
     className: "text-xs text-gray-500"
-  }, cfg.settings.pulledAt ? `ดึงจากชีตล่าสุด ${new Date(cfg.settings.pulledAt).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}` : "ยังไม่เคยดึงจากชีตในเว็บ (ใช้ข้อมูลที่ฝังมา)")), /* @__PURE__ */ React.createElement("p", {
+  }, cfg.settings.pulledAt ? `ดึงจากชีตล่าสุด ${new Date(cfg.settings.pulledAt).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}` : "ยังไม่เคยดึงจากชีตในเว็บ (ใช้ข้อมูลที่ฝังมา)")), cfg.stockOn ? /* @__PURE__ */ React.createElement("p", {
+    className: "text-xs text-gray-500"
+  }, "ปุ่มนี้ดึงเฉพาะแท็บ ดอกเบี้ย และ ผูกดอกเบี้ย (ใช้บัญชี Google ของบริษัท) · แคมเปญ Margin สิทธิพิเศษ ค่าจด ประกัน FOC และราคารถ ใช้ชุดเดียวกับเว็บ AT stock ให้ดึงจากชีตที่ ", /* @__PURE__ */ React.createElement("a", {
+    href: "../",
+    className: "underline font-bold"
+  }, "เว็บ AT stock")) : /* @__PURE__ */ React.createElement("p", {
     className: "text-xs text-gray-500"
   }, "ปุ่มดึงจากชีตใช้ Google Sheets ที่เชื่อมไว้ในบัญชี claude.ai ของคนที่กด · ดึงแท็บ แคมเปญ Honda, Margin มาตรฐาน, สิทธิพิเศษ Honda, ดอกเบี้ย, ผูกดอกเบี้ย, ค่าจดทะเบียน, ประกันภัย, อุปกรณ์แท้, อุปกรณ์เทียบเคียง และ DVP Package · หรือดาวน์โหลดแท็บเป็น CSV แล้วกด “นำเข้า CSV” ในตารางนั้น")), /* @__PURE__ */ React.createElement("div", {
     className: "bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
@@ -5853,7 +6059,13 @@ const AdminPanel = ({ api }) => {
     className: "px-4 py-3 font-bold text-gray-800 border-b border-gray-100"
   }, "แหล่งข้อมูลแต่ละตาราง"), /* @__PURE__ */ React.createElement("div", {
     className: "divide-y divide-gray-100"
-  }, [...AT_TABLE_ORDER, "foc", ...AT_TABLE_WEB].map((k) => /* @__PURE__ */ React.createElement("div", {
+  }, cfg.stockOn && /* @__PURE__ */ React.createElement("div", {
+    className: "px-4 py-2.5 flex flex-wrap items-center gap-2 text-sm"
+  }, /* @__PURE__ */ React.createElement("span", {
+    className: "font-bold text-gray-800 w-48"
+  }, "ราคารถ / ราคาสี"), /* @__PURE__ */ React.createElement("span", {
+    className: "text-xs text-gray-500 flex-1"
+  }, AT_PRICE_STATUS.on ? `ใบราคา Honda ในเว็บ AT stock${AT_PRICE_STATUS.issue && AT_PRICE_STATUS.issue.no ? " (Issued No. " + AT_PRICE_STATUS.issue.no + ")" : ""} · ตรง ${AT_PRICE_STATUS.matched} เกรด${AT_PRICE_STATUS.missing.length ? " · ใช้ราคาในโค้ด: " + AT_PRICE_STATUS.missing.join(", ") : ""}` : "ยังไม่มีใบราคาในเว็บ AT stock · ใช้ราคาในโค้ด")), [...AT_TABLE_ORDER, "foc", ...AT_TABLE_WEB].map((k) => /* @__PURE__ */ React.createElement("div", {
     key: k,
     className: "px-4 py-2.5 flex flex-wrap items-center gap-2 text-sm"
   }, /* @__PURE__ */ React.createElement("span", {
@@ -10829,7 +11041,7 @@ const App = () => {
         setColor(currentAvailableColors[0]);
     }
   }, [currentAvailableColors]);
-  const carPrice = grade.price;
+  const carPrice = (GRADES_DATA[MODEL_MAPPING[uiModel]] || []).find((g) => g.name === grade.name)?.price ?? grade.price;
   const colorPriceVal = getColorPrice(color, grade.name);
   const totalPrice = carPrice + colorPriceVal;
   const netPrice = totalPrice + priceAdjustment;
