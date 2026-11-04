@@ -11,19 +11,20 @@ function adminGifts() {
   const g = gfState(), can = adminWrite(), rows = gfRows(), d = S.ref.get('gifts') || {};
   const src = d.at ? `แก้ล่าสุด ${fmtD(d.at)}` : 'ยังไม่เคยบันทึกในเว็บ';
   const inp = (i, c, w, ph) => `<input class="${w}" data-gf="${i}.${c}" value="${esc(rows[i][c] ?? '')}" ${ph ? `placeholder="${esc(ph)}"` : ''} ${can ? '' : 'disabled'} style="background:transparent;border:1px solid var(--line);border-radius:6px;padding:4px 6px">`;
-  return `<div class="flex flex-wrap items-center gap-2 mb-2"><h2 class="font-medium">รายการของแถมที่ใช้บ่อย</h2><span class="text-xs text-muted">${esc(src)} · ${rows.length} รายการ · ใช้ร่วมกับหน้าใบเสนอราคา แก้ที่นี่ใบเสนอราคาเห็นเหมือนกัน</span><span class="flex-1"></span>${can ? '<button class="btn btn-ghost btn-sm" data-act="gf-add">+ เพิ่มรายการ</button><button class="btn btn-red btn-sm" data-act="gf-save">บันทึกรายการที่ใช้บ่อย</button>' : ''}</div>
-  <p class="text-xs text-muted mb-2">วิธีคิดทุน: <b>fix</b> = ใส่ทุนเป็นตัวเลขคงที่ (0 = ไม่มีต้นทุน เช่น ฟรีเช็กระยะ) · <b>foc</b> = ไปหาทุนจากรายการ FOC ด้วยคำค้น (คั่นหลายคำด้วย |) · ติ๊ก "เริ่มต้น" = ถูกเลือกไว้ให้เองเมื่อเปิดใบเสนอราคา · เอาติ๊ก "ใช้งาน" ออก = ซ่อนโดยไม่ลบ</p>
+  return `<div class="flex flex-wrap items-center gap-2 mb-2"><h2 class="font-medium">รายการของแถมที่ใช้บ่อย</h2><span class="text-xs text-muted">${esc(src)} · ${rows.length} รายการ · ใช้ร่วมกับหน้าใบเสนอราคา แก้ที่นี่ใบเสนอราคาเห็นเหมือนกัน</span><span class="flex-1"></span><input type="search" class="w-40" placeholder="ค้นหา" data-gf-q value="${esc(g.q || '')}" aria-label="ค้นหา"><button class="btn btn-ghost btn-sm" data-act="gf-csv">ดาวน์โหลด Excel (CSV)</button>${can ? '<button class="btn btn-ghost btn-sm" data-act="gf-add">+ เพิ่มรายการ</button><button class="btn btn-red btn-sm" data-act="gf-save">บันทึกรายการที่ใช้บ่อย</button>' : ''}</div>
+  <p class="text-xs text-muted mb-2"><b>ทุน fix</b> = ใส่ทุนตามที่กำหนด (0 = ไม่มีต้นทุน เช่น ฟรีเช็กระยะ) · <b>เลือกจาก FOC</b> = ดึงทุนจากรายการ FOC ของรุ่นนั้น ด้วยคำค้น (หลายคำคั่นด้วย | เช่น ม่าน|บังแดด) ว่าง = ใช้ชื่อรายการ · รายการเริ่มต้น = ใส่ให้อัตโนมัติในใบเสนอราคาใหม่ · เอาติ๊ก "ใช้งาน" ออก = ซ่อนโดยไม่ลบ · ชื่อรายการขึ้นบนปุ่มและในใบเสนอราคา</p>
   ${g.note ? `<p class="text-sm mb-2 p-2 rounded-lg" style="background:var(--surface-2)">${esc(g.note)}</p>` : ''}
-  <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl text-sm"><thead><tr><th>รายการ</th><th>วิธีคิดทุน</th><th class="text-right">ทุน fix (บาท)</th><th>คำค้นใน FOC</th><th>เริ่มต้น</th><th>ใช้งาน</th><th></th></tr></thead><tbody>
-    ${rows.map((r, i) => `<tr><td>${inp(i, 'label', 'w-72')}</td>
-      <td><select data-gf="${i}.mode" ${can ? '' : 'disabled'}><option value="fix" ${r.mode === 'fix' ? 'selected' : ''}>fix</option><option value="foc" ${r.mode === 'foc' ? 'selected' : ''}>foc</option></select></td>
+  <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl text-sm"><thead><tr><th>รายการ</th><th>วิธีคิดทุน</th><th class="text-right">ทุน fix (บาท)</th><th>คำค้นใน FOC</th><th>รายการเริ่มต้น</th><th>ใช้งาน</th><th></th></tr></thead><tbody>
+    ${rows.map((r, i) => ({ r, i })).filter(({ r }) => !g.q || [r.label, r.q].join(' ').toLowerCase().includes(String(g.q).toLowerCase())).map(({ r, i }) => `<tr><td>${inp(i, 'label', 'w-72')}</td>
+      <td><select data-gf="${i}.mode" ${can ? '' : 'disabled'}><option value="fix" ${r.mode === 'fix' ? 'selected' : ''}>ทุน fix</option><option value="foc" ${r.mode === 'foc' ? 'selected' : ''}>เลือกจาก FOC</option></select></td>
       <td class="text-right">${r.mode === 'fix' ? inp(i, 'cost', 'w-24 text-right', '0') : '<span class="text-muted">–</span>'}</td>
       <td>${r.mode === 'foc' ? inp(i, 'q', 'w-48', 'เช่น ฟิล์ม|3M') : '<span class="text-muted">–</span>'}</td>
       <td class="text-center"><input type="checkbox" data-gf="${i}.std" ${r.std ? 'checked' : ''} ${can ? '' : 'disabled'} aria-label="เริ่มต้น"></td>
       <td class="text-center"><input type="checkbox" data-gf="${i}.active" ${r.active ? 'checked' : ''} ${can ? '' : 'disabled'} aria-label="ใช้งาน"></td>
-      <td>${can ? `<button class="btn btn-ghost btn-sm" data-act="gf-del" data-i="${i}" aria-label="ลบรายการ">×</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="text-muted">ยังไม่มีรายการ</td></tr>'}</tbody></table></div>`;
+      <td>${can ? `<button class="btn btn-ghost btn-sm" data-act="gf-del" data-i="${i}" aria-label="ลบรายการ">×</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="text-muted">ไม่พบรายการ</td></tr>'}</tbody></table></div>`;
 }
 Object.assign(ACTIONS, {
+  async 'gf-csv'() { const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"'; const t = ['รายการ,วิธีคิดทุน,ทุน fix (บาท),คำค้นในรายการ FOC,รายการเริ่มต้น,ใช้งาน', ...gfRows().map(r => [r.label, r.mode === 'fix' ? 'ทุน fix' : 'เลือกจาก FOC', r.mode === 'fix' ? r.cost : '', r.q, r.std ? 'Y' : '', r.active ? 'Y' : 'N'].map(q).join(','))].join('\r\n'); await docSave(docName('AT Honda ของแถมใช้บ่อย', todayISO()) + '.csv', new Blob(['\ufeff' + t], { type: 'text/csv;charset=utf-8' })); },
   'gf-add'() { if (!adminWrite()) return; gfRows().push({ label: '', mode: 'fix', cost: 0, q: '', std: false, active: true }); gfState().note = 'เพิ่มแถวใหม่ท้ายตารางแล้ว ใส่ชื่อรายการแล้วกดบันทึก'; render(); },
   'gf-del'(el) { if (!adminWrite()) return; const i = Number(el.dataset.i), r = gfRows(); if (r[i]) { r.splice(i, 1); gfState().note = 'ลบแล้ว · ยังไม่บันทึก'; render(); } },
   async 'gf-save'() {
@@ -33,5 +34,5 @@ Object.assign(ACTIONS, {
     if (await write('ref', 'gifts', doc)) { S.ref.set('gifts', doc); g.rows = null; g.note = ''; toast(`บันทึกรายการที่ใช้บ่อย ${objs.length} รายการแล้ว`); render(); }
   }
 });
-document.addEventListener('input', ev => { const t = ev.target; if (!t || !t.dataset || !t.dataset.gf || !S.gf || !S.gf.rows) return; const [i, c] = t.dataset.gf.split('.'), r = S.gf.rows[Number(i)]; if (r && (c === 'label' || c === 'cost' || c === 'q')) r[c] = t.value; });
+document.addEventListener('input', ev => { const t0 = ev.target; if (t0 && t0.dataset && 'gfQ' in t0.dataset) { gfState().q = t0.value; render(); return; } const t = ev.target; if (!t || !t.dataset || !t.dataset.gf || !S.gf || !S.gf.rows) return; const [i, c] = t.dataset.gf.split('.'), r = S.gf.rows[Number(i)]; if (r && (c === 'label' || c === 'cost' || c === 'q')) r[c] = t.value; });
 document.addEventListener('change', ev => { const t = ev.target; if (!t || !t.dataset || !t.dataset.gf || !S.gf || !S.gf.rows) return; const [i, c] = t.dataset.gf.split('.'), r = S.gf.rows[Number(i)]; if (!r) return; if (c === 'std' || c === 'active') r[c] = t.checked; else if (c === 'mode') { r.mode = t.value; render(); } });

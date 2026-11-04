@@ -235,7 +235,7 @@ const poChargeNote = x => x.cpay ? (x.cpart ? 'เรียกเก็บบา
 const POFREQ = [{ l: 'ฟิล์ม Xtra Cole', q: 'xtra cole' }, { l: 'พ่นกันสนิม 1 ครั้งก่อนส่งมอบ' }, { l: 'เคลือบสี 1 ครั้งก่อนส่งมอบ' }, { l: 'พ่นฆ่าเชื้อโรคก่อนส่งมอบ' }, { l: 'พรมปูพื้น', q: 'พรมปูพื้น' }, { l: 'ผ้ายางปูพื้น', q: 'ผ้ายาง' },
   { l: 'ถาดท้ายฮอนด้า', q: 'ถาดท้าย' }, { l: 'บัตรน้ำมัน' }, { l: 'เซ็นเซอร์ถอย',q:'สัญญาณกะระยะหลัง' }, { l: 'กล้องหน้า', q: 'กล้อง' }, { l: 'ชุดเซฟตี้', q: 'safety set' }, { l: 'ฟรีเช็กระยะค่าแรง ค่าอะไหล่ 5ปี หรือ 100,000 กม.' }, { l: 'ฟรีเช็กระยะค่าแรง ค่าอะไหล่3ปี หรือ 60,000 กม.' }];
 // the frequent list: the back-office list (ref/gifts, shared with the quotation page) when it has rows, otherwise the built-in one above
-function poFreq() { const r = ((S.ref.get('gifts') || {}).rows || []).filter(x => x && String(x.label || '').trim() && x.active !== false); return r.length ? r.map(x => /^fix/i.test(x.mode || '') ? { l: x.label, c: Number(x.cost) || 0 } : { l: x.label, q: String(x.q || '').trim() || undefined }) : POFREQ; }
+function poFreq() { const r = ((S.ref.get('gifts') || {}).rows || []).filter(x => x && String(x.label || '').trim() && x.active !== false); return r.length ? r.map(x => /^fix/i.test(x.mode || '') ? { l: x.label, c: Number(x.cost) || 0 } : { l: x.label, q: String(x.q || '').trim() || x.label }) : POFREQ; }
 const poPart = x => [x.part || x.vendor || '', x.ptag || ''].filter(Boolean).join(' ');
 const poStd = a => ['รับประกันคุณภาพรถ 3 ปี หรือ 100,000 กม.', 'บริการช่วยเหลือฉุกเฉิน 24 ชม. 3 ปี หรือ 100,000 กม.', 'ฟรีค่าแรงเช็คระยะ 10,000–20,000 กม.', ...(/e:HEV/i.test(a.model || '') ? ['รับประกันแบตเตอรี่ไฮบริด 10 ปี', 'รับประกันระบบไฮบริด 5 ปี'] : [])];
 const UCARE = 'Ultimate Care รับประกันคุณภาพเพิ่ม 2 ปี หรือ 40,000 กม.';
