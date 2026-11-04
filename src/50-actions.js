@@ -820,6 +820,7 @@ const ACTIONS = {
   'po-del'(el) { const it = S.modal.po.items, x = it[Number(el.dataset.i)]; if (x && x.grp) S.modal.po.items = it.filter(i => i.grp !== x.grp); else it.splice(Number(el.dataset.i), 1); render(); },
   'po-quick'(el) {
     const f = poFreq()[Number(el.dataset.i)]; if (!f || !S.modal.po) return;
+    if (poUlt({ name: f.l })) { S.modal.po.items.push({ name: f.l, part: '', vendor: '', cat: 'ใช้บ่อย', cost: f.c || '', sale: '', qty: 1, custom: true, ult: true }); render(); return; }
     if (f.q) { S.modal.poq = f.q; render(); return; }
     S.modal.po.items.push({ name: f.l, part: '', vendor: '', cat: 'ใช้บ่อย', cost: f.c || 0, sale: f.c || 0, qty: 1, custom: true }); render();
   },
@@ -829,6 +830,8 @@ const ACTIONS = {
     if (!a || !po) return;
     if (!stepAllowed(a, 'po') || poLocked(a) || !(stepOpen(a, 'po') || a.flow.done.po || a.flow.poSkip || S.modal.ret)) { toast('ทำใบสั่งแต่งรถ ได้ก่อนส่งมอบ (ข้ามขั้นก่อนหน้าได้)', 'bad'); return; }
     const items = po.items.map(x => ({ ...x, name: String(x.name || '').trim(), qty: Math.max(1, parseInt(x.qty, 10) || 1) })).filter(x => x.name);
+    const noUlt = items.find(x => poUlt(x) && !x.hon && !(Number(x.cost) > 0)); if (noUlt) { toast('Ultimate Care ที่ AT แถม ต้องใส่มูลค่า (ทุน) · ถ้า Honda แถม ให้ติ๊ก "Honda แถม" แทน', 'bad'); return; }
+    items.forEach(x => { if (x.hon) { x.cost = 0; x.sale = 0; if (!/Honda แถม/.test(x.name)) x.name += ' (Honda แถม)'; } });
     if (!items.length) { toast('ใส่รายการแต่งอย่างน้อย 1 รายการ (ถ้าไม่มีแต่ง ใส่ "ไม่มีรายการแต่ง")', 'bad'); return; }
     const prev = a.rec.flow && a.rec.flow.po;
     // an edit keeps the earlier version's summary (who, when, items) as history
