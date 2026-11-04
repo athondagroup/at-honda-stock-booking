@@ -54,6 +54,8 @@
             const fileRef = useRef(null);
             // ---------- ดึงข้อมูลจาก Google Sheet (ผ่าน Google Sheets ที่เชื่อมใน claude.ai ของผู้กด)
             const [pull, setPull] = useState(null);
+            const [members, setMembers] = useState(null);
+            useEffect(() => { if (sec !== 'staff' || !cfg.roster || !window.__QWEB || !window.__QWEB.members) return; let on = true; window.__QWEB.members().then(m => on && setMembers(m || []), () => on && setMembers([])); return () => { on = false; }; }, [sec, !!cfg.roster]);
             const PULL_RANGES = { camp: 'A1:P1500', margin: 'A1:H600', priv: 'A1:J600', rates: 'A1:H1500', bind: 'A1:F600', reg: 'A1:G120', ins: 'A1:K600' };
             const mcpErrText = (e) => {
                 const c = e && e.code;
@@ -385,7 +387,35 @@
                         </>
                     )}
 
-                    {sec === 'staff' && (
+                    {sec === 'staff' && cfg.roster && (
+                        <div className="space-y-4">
+                            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">ที่ปรึกษาการขาย</h2>
+                            <div className="rounded-xl border border-blue-200 bg-blue-50 text-blue-900 text-xs px-3 py-2 leading-relaxed"><i className="fa-solid fa-link mr-1"></i>ชื่อ สาขา และสถานะใช้งาน มาจากรายชื่อเซลล์ของ <a href="../" className="font-bold underline">เว็บ AT stock</a> · เซลล์ที่ลาออกเข้าใบเสนอราคาไม่ได้ · อีเมลเข้าระบบเพิ่มที่เว็บ AT stock → หลังบ้าน → ผู้ใช้งานเว็บ (เลือกชื่อเซลล์ให้ตรง) · หน้านี้ใส่เบอร์โทรและ LINE ที่ขึ้นในใบเสนอราคา</div>
+                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-50 text-gray-600 text-xs"><tr><th className="py-2.5 px-3 text-left">ชื่อเซลล์</th><th className="py-2.5 px-3 text-left w-16">สาขา</th><th className="py-2.5 px-3 text-left w-24">สถานะ</th><th className="py-2.5 px-3 text-left">อีเมลเข้าระบบ</th><th className="py-2.5 px-3 text-left w-40">เบอร์โทร</th><th className="py-2.5 px-3 text-left w-40">LINE ID</th></tr></thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {cfg.roster.map(r => {
+                                            const c = cfg.contacts[r.name] || {};
+                                            const mails = (members || []).filter(m => m.sales_name === r.name && m.active).map(m => m.email);
+                                            const inp = (k, ph) => <input key={k + (c[k] || '')} disabled={!api.canWrite || r.left} defaultValue={c[k] || ''} placeholder={ph} onBlur={e => { const v = e.target.value.trim(); if (v !== (c[k] || '')) run(() => api.saveContact(r.name, { [k]: v }), `บันทึก${k === 'phone' ? 'เบอร์' : ' LINE'} ${r.name} แล้ว`); }} className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm disabled:bg-gray-50" />;
+                                            return (
+                                                <tr key={r.name} className={r.left ? 'text-gray-400' : ''}>
+                                                    <td className="py-2 px-3 font-bold">{r.name}</td>
+                                                    <td className="py-2 px-3">{r.br || '–'}</td>
+                                                    <td className="py-2 px-3">{r.left ? <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-500">ลาออก</span> : <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-50 text-green-700 border border-green-200">ใช้งาน</span>}</td>
+                                                    <td className="py-2 px-3 text-xs">{!window.__QWEB ? <span className="text-gray-400">ดูได้บนเว็บจริง</span> : members === null ? '…' : mails.length ? mails.join(', ') : <span className="text-amber-700">ยังไม่มีอีเมล</span>}</td>
+                                                    <td className="py-2 px-3">{inp('phone', 'เบอร์โทร')}</td>
+                                                    <td className="py-2 px-3">{inp('line', 'LINE ID')}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                    {sec === 'staff' && !cfg.roster && (
                         <>
                             <div>
                                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">ผู้ใช้งาน</h2>
@@ -438,12 +468,10 @@
                         <div className="space-y-4">
                             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">ตั้งค่า</h2>
                             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-3">
-                                <label className="block text-sm font-bold text-gray-700">เดือนแคมเปญที่ใช้ในใบเสนอราคา
-                                    <select disabled={!canWrite || busy} value={cfg.settings.activeMonth || 'auto'} onChange={e => run(() => api.saveSettings({ activeMonth: e.target.value }), 'บันทึกแล้ว')} className="mt-1 block w-full sm:w-80 border border-gray-200 rounded-xl px-3 py-2 text-base bg-white">
-                                        <option value="auto">อัตโนมัติ (เดือนปัจจุบัน ถ้าไม่มีใช้เดือนล่าสุด) · ตอนนี้ {cfgMonthText(api.month)}</option>
-                                        {cfgMonthsOf(cfg.camp).slice().reverse().map(m => <option key={m} value={m}>{cfgMonthText(m)}</option>)}
-                                    </select>
-                                </label>
+                                <div className="text-sm font-bold text-gray-700">เดือนที่ใช้ในใบเสนอราคา
+                                    <p className="mt-1 text-sm font-normal text-gray-700">ใช้เดือนปัจจุบัน ({cfgMonthText(cfgThisMonth())}) เท่านั้น · ตารางไหนยังไม่อัปเดตเดือนนี้ ใช้เดือนล่าสุดของตารางนั้น</p>
+                                    <p className="mt-1 text-xs font-normal text-gray-500">ตอนนี้ใช้: แคมเปญ {cfgMonthText((AT_ACTIVE.months || {}).camp)} · Margin {cfgMonthText((AT_ACTIVE.months || {}).margin)} · สิทธิพิเศษ {cfgMonthText((AT_ACTIVE.months || {}).priv)} · เบี้ยประกัน {cfgMonthText((AT_ACTIVE.months || {}).ins)}</p>
+                                </div>
                                 {AT_ACTIVE.warn && <p className="text-xs text-amber-700">{AT_ACTIVE.warn}</p>}
                                 <label className="block text-sm font-bold text-gray-700">Google Sheet ต้นทาง (ID)
                                     <input disabled={!canWrite} defaultValue={cfg.settings.sheetId} onBlur={e => e.target.value.trim() && e.target.value.trim() !== cfg.settings.sheetId && run(() => api.saveSettings({ sheetId: e.target.value.trim() }), 'บันทึกแล้ว')} className="mt-1 block w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono" />

@@ -169,6 +169,7 @@
             const st = (docs && docs.staff && Array.isArray(docs.staff.rows)) ? docs.staff.rows : [];
             cfg.staff = st.filter(Boolean);
             cfg.settings = { sheetId: AT_SHEET_ID_DEFAULT, activeMonth: 'auto', ...((docs && docs.settings) || {}) };
+            cfg.contacts = (docs && docs.contacts && docs.contacts.map) || {};
             return cfg;
         };
 
@@ -273,16 +274,22 @@
                 cfg.gifts = stock.gifts.rows.map(o => cfgRowFromArray(AT_TABLES.gifts.cols, [o.label, o.mode, o.cost ?? '', o.q || '', o.std ? 'Y' : '', o.active === false ? 'N' : 'Y']));
                 cfg.src.gifts = 'stock'; cfg.at.gifts = stock.gifts.at || '';
             }
+            if (stock.sales && Array.isArray(stock.sales.list)) {
+                cfg.roster = stock.sales.list.filter(x => x && x.name).map(x => ({ name: String(x.name), br: x.br || '', left: !!x.left }))
+                    .sort((a, b) => (a.left - b.left) || String(a.br).localeCompare(String(b.br)) || a.name.localeCompare(b.name, 'th'));
+                cfg.staff = []; // ที่ปรึกษา = รายชื่อเซลล์ของเว็บ AT stock (ไม่ต้องผูกบัญชีในหน้านี้)
+            }
             cfg.catalog = stock.catalog || null;
             return cfg;
         };
         // ใช้ตารางกับเครื่องคำนวณ (แทนค่าในตัวแปรกลางเดิม: OPTION_DATA, RATE_TABLE_MAP, Margin, สิทธิพิเศษ, ค่าจด, ประกัน, FOC)
         const cfgApply = (cfg) => {
             const months = cfgMonthsOf(cfg.camp.filter(r => cfgOn(r.active)));
-            const want = /^\d{4}-\d{2}$/.test(cfg.settings.activeMonth || '') ? cfg.settings.activeMonth : cfgThisMonth();
+            const want = cfgThisMonth(); // เดือนปัจจุบันเท่านั้น · ตารางไหนยังไม่มีเดือนนี้ ใช้เดือนล่าสุดของตารางนั้น
             const month = cfgPickMonth(months, want);
             AT_ACTIVE.month = month;
-            AT_ACTIVE.warn = month && month !== want ? `ยังไม่มีแคมเปญเดือน ${want} ในหลังบ้าน · ใช้ของเดือน ${month}` : '';
+            AT_ACTIVE.warn = month && month !== want ? `ยังไม่มีแคมเปญเดือน ${cfgMonthText(want)} · ใช้ของเดือน ${cfgMonthText(month)}` : '';
+            AT_ACTIVE.months = { camp: month };
             AT_ACTIVE.labels = {};
             const byMkey = {};
             cfg.camp.filter(r => cfgOn(r.active) && r.month === month).forEach(r => {
@@ -320,7 +327,7 @@
             });
             // Margin มาตรฐาน
             const mRows = cfg.margin.filter(r => cfgOn(r.active));
-            const mMonth = cfgPickMonth(cfgMonthsOf(mRows), month || cfgThisMonth());
+            const mMonth = cfgPickMonth(cfgMonthsOf(mRows), want); AT_ACTIVE.months.margin = mMonth;
             Object.keys(AT_MARGIN_STD).forEach(k => delete AT_MARGIN_STD[k]);
             Object.assign(AT_MARGIN_STD, JSON.parse(JSON.stringify(AT_MARGIN_STD_BASE)));
             const seen = {};
@@ -333,7 +340,7 @@
             AT_ACTIVE.marginMonth = mMonth;
             // สิทธิพิเศษ Honda
             const pRows = cfg.priv.filter(r => cfgOn(r.active));
-            const pMonth = cfgPickMonth(cfgMonthsOf(pRows), month || cfgThisMonth());
+            const pMonth = cfgPickMonth(cfgMonthsOf(pRows), want); AT_ACTIVE.months.priv = pMonth;
             AT_ACTIVE.privRows = pRows.filter(r => r.month === pMonth);
             AT_ACTIVE.privMonth = pMonth;
             AT_PRIV.gtg = {}; AT_PRIV.ln = {};
@@ -352,7 +359,7 @@
             // เบี้ยประกัน
             AT_FEES.ins = JSON.parse(JSON.stringify(AT_FEES_BASE.ins));
             const iRows = cfg.ins.filter(r => cfgOn(r.active));
-            const iMonth = cfgPickMonth(cfgMonthsOf(iRows), month || cfgThisMonth());
+            const iMonth = cfgPickMonth(cfgMonthsOf(iRows), want); AT_ACTIVE.months.ins = iMonth;
             iRows.filter(r => r.month === iMonth && r.grp).forEach(r => {
                 const y = String(Math.max(1, Math.min(3, cfgNum(r.years) || 1)));
                 const t = AT_FEES.ins[r.grp] = AT_FEES.ins[r.grp] || {};
@@ -470,7 +477,17 @@
             }, []);
             const cfg = useMemo(() => cfgUseStock(cfgBuild(docs), stock), [docs, stock]);
             const month = useMemo(() => cfgApply(cfg), [cfg]);
-            const staffMe = useMemo(() => cfg.staff.find(s => s && s.active !== false && ((viewer.key && s.key === viewer.key) || (viewer.id && s.uid === viewer.id))) || null, [cfg, viewer.key, viewer.id]);
+            const staffMe = useMemo(() => {
+                if (cfg.roster && window.__QWEB) {
+                    const q = window.__QWEB;
+                    if (q.role !== 'sales') return null;
+                    const r = cfg.roster.find(x => x.name === q.salesName);
+                    if (!r || r.left) return null;
+                    const c = (cfg.contacts || {})[r.name] || {};
+                    return { name: r.name, phone: c.phone || '', line: c.line || '', role: 'sales', branch: r.br, active: true };
+                }
+                return cfg.staff.find(s => s && s.active !== false && ((viewer.key && s.key === viewer.key) || (viewer.id && s.uid === viewer.id))) || null;
+            }, [cfg, viewer.key, viewer.id]);
             // เว็บจริง (Supabase): ผู้ดูแล = ผู้บริหารในตาราง members เท่านั้น · ใน claude.ai: เจ้าของ หรือ staff ที่ตั้งเป็นผู้ดูแล
             const realAdmin = !!(window.__QPREVIEW || viewer.isOwner || (!window.__QWEB && staffMe && staffMe.role === 'admin'));
             const isAdmin = realAdmin && viewAs !== 'sales';
@@ -506,6 +523,7 @@
                 else await remove(key);
             };
             const saveStaff = async (rows) => write('staff', { rows, at: new Date().toISOString(), by });
+            const saveContact = async (name, patch) => { const map = { ...(cfg.contacts || {}) }; map[name] = { ...(map[name] || {}), ...patch }; return write('contacts', { map, at: new Date().toISOString(), by }); };
             const saveSettings = async (patch) => write('settings', { ...cfg.settings, ...patch, at: new Date().toISOString(), by });
             // ขอผูกบัญชี: ที่ปรึกษาใส่อีเมลที่ลงทะเบียนไว้ → ผู้ดูแลกดอนุมัติในหลังบ้าน
             const requestLink = async (email, name) => {
@@ -519,5 +537,5 @@
                 await dbRef.current.collection('staffreq').doc(req.id).delete();
             };
             const rejectReq = async (req) => { await dbRef.current.collection('staffreq').doc(req.id).delete(); };
-            return { cfg, month, ready, dbOk, viewer, staffMe, isAdmin, realAdmin, viewAs, setViewAs, canWrite, saveTable, saveFoc, resetTable, saveStaff, saveSettings, reqs, myReq, requestLink, approveReq, rejectReq, version: [docs, stock] };
+            return { cfg, month, ready, dbOk, viewer, staffMe, isAdmin, realAdmin, viewAs, setViewAs, canWrite, saveTable, saveFoc, resetTable, saveStaff, saveContact, saveSettings, reqs, myReq, requestLink, approveReq, rejectReq, version: [docs, stock] };
         };

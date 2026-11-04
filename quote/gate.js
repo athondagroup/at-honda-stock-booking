@@ -75,6 +75,12 @@
       done();
     };
   }
+  function showSalesOff(email, name, left) {
+    screen(`<p class="gate-msg">${left ? `<b>${esc(name)}</b> ลาออกแล้วในรายชื่อเซลล์` : name ? `ไม่พบชื่อ <b>${esc(name)}</b> ในรายชื่อเซลล์` : `อีเมล <b>${esc(email)}</b> ยังไม่ได้เลือกชื่อเซลล์`}</p><p class="gate-note">ใบเสนอราคาใช้ได้เฉพาะเซลล์ที่ยังใช้งานในรายชื่อเซลล์ของเว็บ AT stock · แจ้งผู้ดูแลระบบ</p>
+      <div class="gate-row"><button class="gate-btn" id="g-retry">ลองอีกครั้ง</button><button class="gate-btn gate-ghost" id="g-out">ใช้อีเมลอื่น</button></div>`);
+    document.getElementById('g-retry').onclick = () => location.reload();
+    document.getElementById('g-out').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+  }
   function showWaiting(email) {
     screen(`<p class="gate-msg">อีเมล <b>${esc(email)}</b> ยังไม่มีสิทธิ์ใช้งาน</p><p class="gate-note">แจ้งผู้ดูแลระบบให้เพิ่มอีเมลนี้ที่เว็บ AT stock (หลังบ้าน → ผู้ใช้งานเว็บ) แล้วกดเข้าใหม่</p>
       <div class="gate-row"><button class="gate-btn" id="g-retry">ลองอีกครั้ง</button><button class="gate-btn gate-ghost" id="g-out">ใช้อีเมลอื่น</button></div>`);
@@ -85,8 +91,8 @@
   // ---- db: the page's collection names → rows of public.docs
   // atref = หลังบ้านของเว็บ AT stock (อ่านอย่างเดียว เฉพาะตารางที่ใบเสนอราคาใช้ ไม่โหลดประวัติการแก้)
   const COL = { config: 'qcfg', quotes: 'quotes', staffreq: 'qreq', atref: 'ref' };
-  const REF_IDS = ['campaigns', 'margins', 'privileges', 'fees', 'foc', 'catalog', 'gifts'];
-  const REF_FIELDS = 'id,at:data->at,rows:data->rows,prices:data->prices,price_issue:data->price_issue,reg:data->reg,ins:data->ins,month:data->month,cols:data->cols,src:data->src';
+  const REF_IDS = ['campaigns', 'margins', 'privileges', 'fees', 'foc', 'catalog', 'gifts', 'sales'];
+  const REF_FIELDS = 'id,list:data->list,at:data->at,rows:data->rows,prices:data->prices,price_issue:data->price_issue,reg:data->reg,ins:data->ins,month:data->month,cols:data->cols,src:data->src';
   const colOf = name => { const c = COL[name]; if (!c) throw Object.assign(new Error('collection ' + name), { code: 'invalid_argument' }); return c; };
   const hex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, '0')).join('');
   const err = (e, code) => Object.assign(new Error(e && e.message || code), { code: code || (e && /row-level security|permission|violates/i.test(e.message || '') ? 'not_granted' : /too large|payload/i.test(e && e.message || '') ? 'invalid_argument' : 'unavailable') });
@@ -202,7 +208,8 @@
     gate.hidden = true; gate.innerHTML = '';
     const email = session.user.email.toLowerCase(), isExec = m.role === 'exec';
     const me = { id: session.user.id, name: m.name || email, email, isOwner: isExec, canEdit: isExec };
-    window.__QWEB = { email, role: m.role, branch: m.branch || '', salesName: m.sales_name || '', name: m.name || '', logout: async () => { await sb.auth.signOut(); location.reload(); } };
+    window.__QWEB = { email, role: m.role, branch: m.branch || '', salesName: m.sales_name || '', name: m.name || '', logout: async () => { await sb.auth.signOut(); location.reload(); },
+      members: async () => { const { data, error } = await sb.from('members').select('email,name,role,branch,sales_name,active'); if (error) throw err(error); return data || []; } };
     const user = { async me() { return me; }, async id() { return me.id; }, isOwner: () => isExec, canEdit: () => isExec };
     const caps = { db, user, downloads, mcp };
     window.claude = { use: async n => caps[n] || null };
@@ -221,6 +228,13 @@
     try { await sb.rpc('claim_member'); } catch (e) { /* names only */ }
     const { data: m } = await sb.from('members').select('*').eq('email', session.user.email.toLowerCase()).maybeSingle();
     if (!m || !m.active) { showWaiting(session.user.email); return; }
+    // เซลล์: ต้องมีชื่อในรายชื่อเซลล์ของเว็บ AT stock และยังไม่ลาออก (รายชื่อเซลล์เป็นตัวกำหนดว่าใช้งานได้ไหม)
+    if (m.role === 'sales') {
+      let roster = null;
+      try { const { data: r } = await sb.from('docs').select('list:data->list').eq('col', 'ref').eq('id', 'sales').maybeSingle(); roster = r && Array.isArray(r.list) ? r.list : null; } catch (e) { roster = null; }
+      const me = roster ? roster.find(x => x && x.name === m.sales_name) : null;
+      if (roster && (!me || me.left)) { showSalesOff(session.user.email, m.sales_name, !!(me && me.left)); return; }
+    }
     const em = session.user.email.toLowerCase(), meta = session.user.user_metadata || {};
     if (!meta.pw_set && (session.user.app_metadata || {}).provider !== 'google' && localStorage.getItem('ath-pw-skip') !== em) { showSetPass(em, () => start(session, m)); return; }
     start(session, m);
