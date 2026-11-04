@@ -49,6 +49,11 @@ open(os.path.join(DIST, 'index.html'), 'w', encoding='utf8').write(page)
 for f in ['gate.js', 'sw.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'foc.json', 'fees.json']:
     shutil.copy(os.path.join(WEB, f), os.path.join(DIST, f))
 open(os.path.join(DIST, '.nojekyll'), 'w').write('')
+# ใบเสนอราคา (Sale Calculator): หน้าที่สร้างไว้แล้วใน quote/ ใช้ล็อกอินเดียวกัน (quote/src/README.md)
+if os.path.exists(os.path.join(ROOT, 'quote', 'index.html')):
+    os.makedirs(os.path.join(DIST, 'quote'), exist_ok=True)
+    for f in ['index.html', 'gate.js']:
+        shutil.copy(os.path.join(ROOT, 'quote', f), os.path.join(DIST, 'quote', f))
 open(os.path.join(DIST, 'version.json'), 'w').write(json.dumps({'v': BUILD}))
 open(os.path.join(DIST, 'check.js'), 'w', encoding='utf8').write("(() => {\n'use strict';\n" + js + '})();\n')
 r = subprocess.run(['node', '--check', os.path.join(DIST, 'check.js')], capture_output=True, text=True)
