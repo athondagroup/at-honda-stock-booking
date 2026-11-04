@@ -495,10 +495,31 @@ rep("            const needLink = atCfg.viewer.loaded &&", """            const 
             }, [atCfg.ready, atCfg.viewer.id, !!(atCfg.myProfile && atCfg.myProfile.phone)]);
             const needLink = atCfg.viewer.loaded &&""")
 
+
+# ---------- 7i. AT Honda logos (header: colour · documents: black, no background) + model name without the price-period suffix
+import base64 as _b64
+_L = lambda n: 'data:image/png;base64,' + _b64.b64encode(open(os.path.join(D, '..', 'logo', n), 'rb').read()).decode()
+LOGO_CONST = "        const AT_LOGO_COLOR = '" + _L('logo_color.png') + "';\n        const AT_LOGO_BLACK = '" + _L('logo_black.png') + "';\n" \
+    "        // ชื่อรุ่นในเอกสาร (ใบเสนอราคา / ใบจอง / ใบสรุป): ตัดวงเล็บช่วงราคา-แคมเปญออก เช่น \"City (ราคาช่วงแนะนำ – แคมเปญ พ.ย.–ธ.ค.)\" → \"City\"\n" \
+    "        const uiModelShort = (m) => String(uiModelLabel(m) || m || '').replace(/\\s*\\(.*\\)\\s*$/, '').replace(/\\s+ราคา(ช่วงแนะนำ|แนะนำ|ปกติ)[\\s\\S]*$/, '').trim();\n"
+_a = '        const AT_POFREQ = ['
+assert s.count(_a) == 1
+s = s.replace(_a, LOGO_CONST + _a)
+rep('<div className="w-9 h-9 sm:w-10 sm:h-10 bg-honda rounded-lg flex items-center justify-center text-white shrink-0"><HondaNextLogo color="#ffffff" size={25} showWord={false} /></div>',
+    '<img src={AT_LOGO_COLOR} alt="AT Honda Automobile Group" className="h-10 sm:h-12 w-auto shrink-0" />')
+_old = '<div className="w-11 h-11 sm:w-14 sm:h-14 bg-red-50 rounded-2xl flex items-center justify-center shrink-0"><HondaNextLogo color="#000000" size={37} showWord={false} /></div>'
+assert s.count(_old) == 3, s.count(_old)
+s = s.replace(_old, '<img src={AT_LOGO_BLACK} alt="AT Honda" className="h-12 sm:h-16 w-auto shrink-0" />')
+rep("""<select id="q-model" value={uiModel} onChange={(e) => setUiModel(e.target.value)} className={`${QSEL} text-lg`}>{UI_MODELS.map(m => <option key={m} value={m}>{uiModelLabel(m)}</option>)}</select>""",
+    """<div className="relative min-w-0"><div className={`${QSEL} text-lg flex items-center gap-2 pointer-events-none`}><span className="truncate flex-1">{uiModelShort(uiModel)}</span><i data-html2canvas-ignore="true" className="fa-solid fa-chevron-down text-[11px] text-gray-400"></i></div><select id="q-model" aria-label="รุ่น" value={uiModel} onChange={(e) => setUiModel(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer">{UI_MODELS.map(m => <option key={m} value={m}>{uiModelLabel(m)}</option>)}</select></div>""")
+rep("setPendingFileName(name || `${uiModel} ${grade?.name || ''}`.trim());", "setPendingFileName(name || `${uiModelShort(uiModel)} ${grade?.name || ''}`.trim());")
+
 # ---------- 8. formal black-and-white sales summary
 a = s.index('                        {/* Hidden Sales Summary Card */}')
 b = s.index('                    </div>\n\n                </div>\n            );\n        };\n\n        const root')
 s = s[:a] + rd('summary.jsx') + s[b:]
 
+# 7i (ต่อ): ใบสรุปการขายใช้ชื่อรุ่นแบบสั้น
+rep("<td style={{ width: '34%' }}>{uiModelLabel(uiModel)}</td>", "<td style={{ width: '34%' }}>{uiModelShort(uiModel)}</td>")
 open(out, 'w', encoding='utf-8').write(s)
 print('patched', len(s))
