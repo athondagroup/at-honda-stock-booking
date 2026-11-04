@@ -5,6 +5,13 @@ const FEE_GRP = { city: 'City / City e:HEV', cityTurbo: 'City Turbo', cityHb: 'C
 function feState() { return S.fe = S.fe || { tab: 'reg', q: '', code: '', add: {}, show: 60 }; }
 function feFees() { const f = feState(); if (!f.fees) f.fees = JSON.parse(JSON.stringify(refStatic('fees') || { reg: {}, ins: {} })); f.fees.reg = f.fees.reg || {}; f.fees.ins = f.fees.ins || {}; return f.fees; }
 function feFoc() { const f = feState(); if (!f.foc) { const d = refStatic('foc') || { cols: ['model', 'cat', 'part', 'vendor', 'name', 'cost', 'sale', 'note', 'pieces', 'src'], rows: [] }; f.foc = JSON.parse(JSON.stringify(d)); } return f.foc; }
+function feUc() { const f = feState(); if (!f.uc) { const d = S.ref.get('ucare') || refStatic('ucare') || { rows: [] }; f.uc = JSON.parse(JSON.stringify(d)); } f.uc.rows = f.uc.rows || []; return f.uc; }
+function feUcTable(can) {
+  const d = feUc(), inp = (i, c, w) => `<input type="number" min="0" class="${w}" data-fe-uc="${i}.${c}" value="${esc(d.rows[i][c] ?? '')}" ${can ? '' : 'disabled'} style="background:transparent;border:1px solid var(--line);border-radius:6px;padding:4px 6px">`;
+  return `<p class="text-xs text-muted mb-2">Honda Ultimate Care (โปรแกรมแท้ Honda) ขยายรับประกันอีก 2 ปี หรือ 40,000 กม. · ราคาขายรวม VAT ใช้เป็นมูลค่าในใบสั่งแต่งรถเหมือน FOC · ติ๊ก "ใช้งาน" เฉพาะระดับที่ขายอยู่ (ตอนนี้ระดับอัลติเมท 1) · ถ้า Honda แถม ให้ติ๊ก "Honda แถม" ในใบสั่งแต่งรถ ไม่ต้องใส่มูลค่า</p>
+  <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl text-sm"><thead><tr><th>รหัส</th><th>รุ่น</th><th>ระดับ / เงื่อนไขอายุรถ</th><th class="text-right">ก่อน VAT</th><th class="text-right">ราคาขายรวม VAT</th><th>ใช้งาน</th></tr></thead><tbody>
+    ${d.rows.map((r, i) => `<tr><td class="code text-xs">${esc(r.code)}</td><td>${esc(r.model)} <span class="text-xs text-muted">${esc(r.engine)}${r.note ? ' · ' + esc(r.note) : ''}</span></td><td class="text-xs">${esc(r.level)}<br>${esc(r.cond)}</td><td class="text-right">${inp(i, 'before', 'w-24 text-right')}</td><td class="text-right">${inp(i, 'price', 'w-24 text-right')}</td><td class="text-center"><input type="checkbox" data-fe-uc="${i}.active" ${r.active !== false ? 'checked' : ''} ${can ? '' : 'disabled'} aria-label="ใช้งาน"></td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ยังไม่มีข้อมูล กด ดึงจากชีต</td></tr>'}</tbody></table></div>`;
+}
 const feN = v => { const n = Number(String(v ?? '').replace(/,/g, '')); return Number.isFinite(n) ? n : 0; };
 function feRegTable(can) {
   const f = feFees(), keys = Object.keys(FEE_GRP).filter(k => f.reg[k]).concat(Object.keys(f.reg).filter(k => !FEE_GRP[k]));
@@ -49,10 +56,10 @@ function feFocTable(can) {
 }
 function adminFees() {
   const f = feState(), can = adminWrite(), tb = (id, t) => `<button type="button" class="tab" aria-selected="${f.tab === id}" data-act="fe-tab" data-t="${id}">${t}</button>`;
-  const body = f.tab === 'ins' ? feInsTable(can) : f.tab === 'foc' ? feFocTable(can) : feRegTable(can);
-  const d = S.ref.get(f.tab === 'foc' ? 'foc' : 'fees') || {}, src = d.at ? `แก้ล่าสุดในเว็บ ${fmtD(d.at)}` : 'ยังใช้ข้อมูลที่แนบมากับเว็บ (ดึงจากชีต)';
-  return `<div class="flex flex-wrap items-center gap-2 mb-3"><div class="tabs" role="tablist">${tb('reg', 'ค่าจดทะเบียน')}${tb('ins', 'เบี้ยประกัน')}${tb('foc', 'รายการ FOC')}</div>
-    <span class="text-xs text-muted">${esc(src)}</span><span class="flex-1"></span><button class="btn btn-ghost btn-sm" data-act="fe-export">ดาวน์โหลด Excel</button>${can ? `<button class="btn btn-ghost btn-sm" data-act="fe-pull" ${f.busy ? 'disabled' : ''}>${f.busy ? 'กำลังดึง…' : 'ดึงจากชีต'}</button>` : ''}${can ? `<label class="btn btn-ghost btn-sm relative">อัปโหลด Excel ที่แก้แล้ว<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-fefile="1" class="absolute inset-0 opacity-0 cursor-pointer" aria-label="อัปโหลดไฟล์ Excel"></label>` : ''}${can ? `<button class="btn btn-red btn-sm" data-act="fe-save">บันทึก${f.tab === 'foc' ? 'รายการ FOC' : f.tab === 'ins' ? 'เบี้ยประกัน' : 'ค่าจดทะเบียน'}</button>` : ''}</div>${f.note ? `<p class="text-sm mb-2 p-2 rounded-lg" style="background:var(--surface-2)">${esc(f.note)}</p>` : ''}${body}`;
+  const body = f.tab === 'uc' ? feUcTable(can) : f.tab === 'ins' ? feInsTable(can) : f.tab === 'foc' ? feFocTable(can) : feRegTable(can);
+  const d = S.ref.get(f.tab === 'foc' ? 'foc' : f.tab === 'uc' ? 'ucare' : 'fees') || {}, src = d.at ? `แก้ล่าสุดในเว็บ ${fmtD(d.at)}` : 'ยังใช้ข้อมูลที่แนบมากับเว็บ (ดึงจากชีต)';
+  return `<div class="flex flex-wrap items-center gap-2 mb-3"><div class="tabs" role="tablist">${tb('reg', 'ค่าจดทะเบียน')}${tb('ins', 'เบี้ยประกัน')}${tb('foc', 'รายการ FOC')}${tb('uc', 'Ultimate Care')}</div>
+    <span class="text-xs text-muted">${esc(src)}</span><span class="flex-1"></span>${f.tab === 'uc' ? '' : '<button class="btn btn-ghost btn-sm" data-act="fe-export">ดาวน์โหลด Excel</button>'}${can ? `<button class="btn btn-ghost btn-sm" data-act="fe-pull" ${f.busy ? 'disabled' : ''}>${f.busy ? 'กำลังดึง…' : 'ดึงจากชีต'}</button>` : ''}${can && f.tab !== 'uc' ? `<label class="btn btn-ghost btn-sm relative">อัปโหลด Excel ที่แก้แล้ว<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-fefile="1" class="absolute inset-0 opacity-0 cursor-pointer" aria-label="อัปโหลดไฟล์ Excel"></label>` : ''}${can ? `<button class="btn btn-red btn-sm" data-act="fe-save">บันทึก${f.tab === 'foc' ? 'รายการ FOC' : f.tab === 'uc' ? 'Ultimate Care' : f.tab === 'ins' ? 'เบี้ยประกัน' : 'ค่าจดทะเบียน'}</button>` : ''}</div>${f.note ? `<p class="text-sm mb-2 p-2 rounded-lg" style="background:var(--surface-2)">${esc(f.note)}</p>` : ''}${body}`;
 }
 const FE_SHEET = { reg: 'ค่าจดทะเบียน', ins: 'เบี้ยประกัน', foc: 'รายการ FOC' };
 const FE_FOCCOLS = [['model', 'รหัสรุ่น'], ['cat', 'หมวด'], ['name', 'ชื่อรายการ'], ['part', 'หมายเลขอะไหล่'], ['vendor', 'ผู้ขาย'], ['cost', 'ทุน FOC'], ['sale', 'ราคาขาย'], ['note', 'หมายเหตุ'], ['pieces', 'ชิ้นส่วนในชุด (อย่าแก้ ถ้าไม่จำเป็น)'], ['src', 'ที่มา']];
@@ -140,6 +147,12 @@ async function fePull() {
       for (const r of b) { if (!r.some(x => String(x ?? '').trim())) { if (Object.keys(reg).length) break; continue; } const k = String(r[1] ?? '').trim(); if (!k || reg[k] || !feOn(r[5])) continue; reg[k] = [feN(r[2]), feN(r[3])]; if (JSON.stringify(cur[k] || []) !== JSON.stringify(reg[k])) n++; }
       if (!Object.keys(reg).length) throw new Error('empty');
       feFees().reg = reg; f.note = `ดึงจากชีตแล้ว: ${Object.keys(reg).length} รุ่น เปลี่ยน ${n} รุ่น · ยังไม่บันทึก ตรวจแล้วกด "บันทึกค่าจดทะเบียน"`;
+    } else if (f.tab === 'uc') {
+      const v = await feSheetRows('Ultimate Care', 'J', 200), b = feBody(v, 'รหัส'); if (!b) throw new Error('head');
+      const rows = b.filter(r => String(r[0] ?? '').trim()).map(r => { const c = r.map(x => String(x ?? '').trim()); return { code: c[0], grp: c[1], model: c[2], engine: c[3], level: c[4], cond: c[5], before: feN(c[6]), price: feN(c[7]) || Math.round(feN(c[6]) * 1.07), active: feOn(c[8]), note: c[9] || '' }; });
+      if (!rows.length) throw new Error('empty');
+      const old = new Map(feUc().rows.map(r => [r.code, JSON.stringify([r.price, r.active !== false])])); let n = 0; rows.forEach(r => { if (old.get(r.code) !== JSON.stringify([r.price, r.active])) n++; });
+      feUc().rows = rows; f.note = `ดึงจากชีตแล้ว: Ultimate Care ${rows.length} แถว (ใช้งาน ${rows.filter(r => r.active).length}) เปลี่ยน ${n} แถว · ยังไม่บันทึก ตรวจแล้วกด "บันทึก Ultimate Care"`;
     } else if (f.tab === 'ins') {
       const v = await feSheetRows(FE_SRC_TAB.ins, 'K', 400), b = feBody(v, 'เดือนแคมเปญ'); if (!b) throw new Error('head');
       const rows = b.filter(r => r.some(x => String(x ?? '').trim()) && /^\d{4}-\d{2}$/.test(String(r[0]).trim()) && feOn(r[9])), mon = rows.map(r => String(r[0]).trim()).sort().pop();
@@ -172,6 +185,11 @@ Object.assign(ACTIONS, {
   },
   async 'fe-save'() {
     if (!adminWrite()) return; const f = feState();
+    if (f.tab === 'uc') {
+      const d = feUc(), rows = d.rows.map(r => ({ ...r, before: feN(r.before), price: feN(r.price), active: r.active !== false })), prev = S.ref.get('ucare') || {}, a = actor(), doc = { ...prev, src: d.src || prev.src || '', rows, at: a.at, log: [...(prev.log || []).slice(-50), { ...a, n: rows.length }] };
+      if (await write('ref', 'ucare', doc)) { S.ref.set('ucare', doc); f.uc = null; f.note = ''; toast(`บันทึก Ultimate Care ${rows.length} แถวแล้ว`); render(); }
+      return;
+    }
     if (f.tab === 'foc') {
       const d = feFoc(), ci = Object.fromEntries(d.cols.map((c, i) => [c, i])); d.rows.forEach(r => { r[ci.cost] = feN(r[ci.cost]); r[ci.sale] = feN(r[ci.sale]); });
       const prev = S.ref.get('foc') || {}, doc = { ...d, at: new Date().toISOString(), log: [...(prev.log || []).slice(-50), { ...actor(), n: d.rows.length }] };
@@ -188,7 +206,8 @@ document.addEventListener('input', ev => {
   const t = ev.target; if (!t || !t.dataset || !S.fe) return;
   if (t.dataset.fe) { const p = t.dataset.fe.split('.'), f = feFees(); let o = f[p[0]]; for (let i = 1; i < p.length - 1; i++) { if (o[p[i]] === undefined) o[p[i]] = []; o = o[p[i]]; } o[p[p.length - 1]] = t.value; }
   else if (t.dataset.feMeta) feFees()[t.dataset.feMeta] = t.value;
+  else if (t.dataset.feUc) { const [i, c] = t.dataset.feUc.split('.'), r = feUc().rows[Number(i)]; if (r && (c === 'before' || c === 'price')) r[c] = t.value; }
   else if (t.dataset.feFoc) { const [i, c] = t.dataset.feFoc.split('.'), d = feFoc(), k = d.cols.indexOf(c); if (d.rows[Number(i)] && k >= 0) d.rows[Number(i)][k] = t.value; }
   else if (t.dataset.feAdd) { S.fe.add = S.fe.add || {}; S.fe.add[t.dataset.feAdd] = t.value; }
 });
-document.addEventListener('change', ev => { const t = ev.target; if (t && t.dataset && t.dataset.fefile) { const f = t.files && t.files[0]; t.value = ''; if (f && adminWrite()) feImport(f); return; } if (t && t.dataset && t.dataset.feQ && S.fe) { S.fe[t.dataset.feQ] = t.value; S.fe.show = 60; render(); } });
+document.addEventListener('change', ev => { const t = ev.target; if (t && t.dataset && t.dataset.feUc && S.fe) { const [i, c] = t.dataset.feUc.split('.'), r = feUc().rows[Number(i)]; if (r && c === 'active') r.active = t.checked; return; } if (t && t.dataset && t.dataset.fefile) { const f = t.files && t.files[0]; t.value = ''; if (f && adminWrite()) feImport(f); return; } if (t && t.dataset && t.dataset.feQ && S.fe) { S.fe[t.dataset.feQ] = t.value; S.fe.show = 60; render(); } });

@@ -820,7 +820,7 @@ const ACTIONS = {
   'po-del'(el) { const it = S.modal.po.items, x = it[Number(el.dataset.i)]; if (x && x.grp) S.modal.po.items = it.filter(i => i.grp !== x.grp); else it.splice(Number(el.dataset.i), 1); render(); },
   'po-quick'(el) {
     const f = poFreq()[Number(el.dataset.i)]; if (!f || !S.modal.po) return;
-    if (poUlt({ name: f.l })) { S.modal.po.items.push({ name: f.l, part: '', vendor: '', cat: 'ใช้บ่อย', cost: f.c || '', sale: '', qty: 1, custom: true, ult: true }); render(); return; }
+    if (poUlt({ name: f.l })) { const u = ucFor(atById(S.modal.id)), pr = u ? Number(u.price) || 0 : 0; S.modal.po.items.push({ name: u ? `Ultimate Care ${u.level} · ${u.engine}` : f.l, part: u ? u.code : '', vendor: 'Honda', cat: 'Ultimate Care', cost: pr || f.c || '', sale: pr || '', qty: 1, custom: true, ult: true }); if (!u) toast('ไม่พบราคา Ultimate Care ของรุ่นนี้ในหลังบ้าน ใส่มูลค่าเอง', 'bad'); render(); return; }
     if (f.q) { S.modal.poq = f.q; render(); return; }
     S.modal.po.items.push({ name: f.l, part: '', vendor: '', cat: 'ใช้บ่อย', cost: f.c || 0, sale: f.c || 0, qty: 1, custom: true }); render();
   },

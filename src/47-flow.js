@@ -238,6 +238,13 @@ const POFREQ = [{ l: 'ฟิล์ม Xtra Cole', q: 'xtra cole' }, { l: 'พ่
 function poFreq() { const r = ((S.ref.get('gifts') || {}).rows || []).filter(x => x && String(x.label || '').trim() && x.active !== false); return r.length ? r.map(x => /^fix/i.test(x.mode || '') ? { l: x.label, c: Number(x.cost) || 0 } : { l: x.label, q: String(x.q || '').trim() || x.label }) : POFREQ; }
 // Ultimate Care as a line of the order: AT pays → it needs its value (ทุน); Honda gives it → tick the box instead of keying a value
 const poUlt = x => !!(x && (x.ult || /ultimate\s*care/i.test(x.name || '')));
+// Ultimate Care price list (ref/ucare, from the sheet tab "Ultimate Care"): the active row that fits the car's family and engine
+function ucRows() { const d = S.ref.get('ucare') || refStatic('ucare') || {}; return (d.rows || []).filter(r => r && r.active !== false); }
+function ucFor(a) {
+  if (!a) return null; const m = String(a.model || '').toUpperCase(), fam = { cityTurbo: 'city', civic15: 'civic', crv15: 'crv', accord15: 'accord', civicEL: 'civic' }, g = feeGrp(a, 'reg'), key = fam[g] || g, hev = /E:HEV|E:N2|STEP/.test(m);
+  const hit = ucRows().filter(r => String(r.grp || '').split(',').map(x => x.trim()).includes(key) && (/hev|^ev/i.test(String(r.engine || '')) === hev));
+  return hit[0] || null;
+}
 const poPart = x => [x.part || x.vendor || '', x.ptag || ''].filter(Boolean).join(' ');
 const poStd = a => ['รับประกันคุณภาพรถ 3 ปี หรือ 100,000 กม.', 'บริการช่วยเหลือฉุกเฉิน 24 ชม. 3 ปี หรือ 100,000 กม.', 'ฟรีค่าแรงเช็คระยะ 10,000–20,000 กม.', ...(/e:HEV/i.test(a.model || '') ? ['รับประกันแบตเตอรี่ไฮบริด 10 ปี', 'รับประกันระบบไฮบริด 5 ปี'] : [])];
 const UCARE = 'Ultimate Care รับประกันคุณภาพเพิ่ม 2 ปี หรือ 40,000 กม.';
@@ -248,6 +255,7 @@ function poDraft(a) {
 }
 function poDraftFees(a, p) { poAuto(a, p).forEach(x => { if (x.fee && x.def && (p.ac[x.key] === undefined || p.ac[x.key] === '')) p.ac[x.key] = x.def; }); return p; }
 function poEditor(m, a, D) {
+  ucRows();   // starts loading the Ultimate Care list so the button finds the price
   const po = m.po, codes = [...(MODEL_CODES[a.model] || []), 'OT', 'ALL'];
   const cat = focCatalog();
   const q = (m.poq || '').trim().toLowerCase();
@@ -278,7 +286,7 @@ function poEditor(m, a, D) {
       <div class="text-sm p-3 rounded-lg" style="background:var(--surface-2)">ทุน FOC รวม <b class="num">${money(cost)}</b> บาท · ราคาขาย <b class="num">${money(sale)}</b> บาท
         ${focBudget ? ` · FOC ในใบจอง ${money(focBudget)} บาท → <b style="color:var(--${cost > focBudget ? 'bad' : 'good'})">${cost > focBudget ? 'เกิน' : 'เหลือ'} ${money(Math.abs(focBudget - cost))}</b>` : ''}</div>
       <div class="text-sm p-3 rounded-lg border border-line"><div class="font-medium mb-1">รายการมาตรฐานที่มากับตัวรถ</div><ul class="list-disc pl-5">${poStd(a).map(t => `<li>${esc(t)}</li>`).join('')}</ul>
-        <label class="flex items-center gap-2 mt-2"><input type="checkbox" data-modal="po.ucare" ${po.ucare ? 'checked' : ''} ${ro ? 'disabled' : ''}> ${esc(UCARE)}</label></div>
+        </div>
       <div class="field"><label for="po-note">หมายเหตุ</label><input id="po-note" data-modal="po.note" value="${esc(po.note)}" ${ro ? 'disabled' : ''}></div>
       <div class="flex flex-wrap gap-2">${ro ? '' : `<button class="btn btn-red" data-act="po-save" data-id="${esc(a.id)}">บันทึกใบสั่งแต่งรถ</button><button class="btn btn-ghost" data-act="po-custom">+ เพิ่มรายการเอง</button>`}<button class="btn btn-ghost" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button></div>
     </div>
