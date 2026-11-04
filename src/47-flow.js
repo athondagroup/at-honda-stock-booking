@@ -249,7 +249,7 @@ function poEditor(m, a, D) {
   const po = m.po, codes = [...(MODEL_CODES[a.model] || []), 'OT', 'ALL'];
   const cat = focCatalog();
   const q = (m.poq || '').trim().toLowerCase();
-  const hits = cat.filter(x => codes.includes(x.model) && (!q || q.split('|').filter(Boolean).some(w => x.name.toLowerCase().includes(w) || (x.part || '').toLowerCase().includes(w) || (x.cat || '').toLowerCase().includes(w)))).sort((x, y) => (/^(DVP|แพ็คเกจ)/.test(y.cat || '')) - (/^(DVP|แพ็คเกจ)/.test(x.cat || ''))).slice(0, 60);
+  const hits = cat.filter(x => codes.includes(x.model) && (!q || q.split('|').map(w => w.trim()).filter(Boolean).some(w => x.name.toLowerCase().includes(w) || (x.part || '').toLowerCase().includes(w) || (x.cat || '').toLowerCase().includes(w)))).sort((x, y) => (/^(DVP|แพ็คเกจ)/.test(y.cat || '')) - (/^(DVP|แพ็คเกจ)/.test(x.cat || ''))).slice(0, 60);
   const cost = poAutoCost(a, po) + po.items.reduce((n, x) => n + (x.cpay ? 0 : (Number(x.cost) || 0) * (Number(x.qty) || 1)), 0);
   const sale = po.items.reduce((n, x) => n + (Number(x.sale) || 0) * (Number(x.qty) || 1), 0);
   const focBudget = Number(a.rec.foc_total) || 0;
