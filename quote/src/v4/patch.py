@@ -521,5 +521,24 @@ s = s[:a] + rd('summary.jsx') + s[b:]
 
 # 7i (ต่อ): ใบสรุปการขายใช้ชื่อรุ่นแบบสั้น
 rep("<td style={{ width: '34%' }}>{uiModelLabel(uiModel)}</td>", "<td style={{ width: '34%' }}>{uiModelShort(uiModel)}</td>")
+# 7j: ชื่อรุ่นแบบสั้นทุกหน้าที่ออกให้ลูกค้า / ชื่อไฟล์ / ข้อความแจ้ง (ค่าที่เลือกและการคำนวณยังใช้ชื่อเต็ม)
+for _o, _n in [('${uiModel} ${grade', '${uiModelShort(uiModel)} ${grade'), ('${uiModel}_${grade', '${uiModelShort(uiModel)}_${grade'),
+               ('{e.uiModel}', '{uiModelShort(e.uiModel)}'), ('{q.uiModel}', '{uiModelShort(q.uiModel)}'),
+               ('{item.data.uiModel}', '{uiModelShort(item.data.uiModel)}'), ('{item.model}', '{uiModelShort(item.model)}'),
+               ('<span className="text-xl font-bold">{uiModel}', '<span className="text-xl font-bold">{uiModelShort(uiModel)}')]:
+    assert _o in s, _o
+    s = s.replace(_o, _n)
+s = s.replace('<i data-html2canvas-ignore="true" className="fa-solid fa-chevron-down', '<i className="hide-in-image fa-solid fa-chevron-down')
+# ใบเปรียบเทียบ: ตัวหนังสือหัวตารางและแถวชัดขึ้น
+rep('<span className="text-[11px] font-light text-gray-300">ข้อเสนอ {idx + 1}</span>', '<span className="text-[11px] font-semibold text-red-300">ข้อเสนอ {idx + 1}</span>')
+rep('<span className="text-xs font-light text-gray-300">{uiModelShort(q.uiModel)}</span>', '<span className="text-sm font-semibold text-white">{uiModelShort(q.uiModel)}</span>')
+# แชร์ไม่ได้ (เช่น เปิดใน claude.ai หรือเบราว์เซอร์ที่ไม่รองรับ) → บันทึกไฟล์แทน
+rep("""                    } else {
+                        alert("อุปกรณ์นี้ไม่รองรับการแชร์ไฟล์โดยตรง กรุณาใช้ปุ่ม 'บันทึก (Download)'");
+                    }
+                } catch (e) { alert("แชร์ไม่ได้: " + e.message); }""", """                    } else {
+                        await handleManualDownload();
+                    }
+                } catch (e) { if (e && e.name === 'AbortError') return; await handleManualDownload(); }""")
 open(out, 'w', encoding='utf-8').write(s)
 print('patched', len(s))

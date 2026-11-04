@@ -139,6 +139,7 @@
     --font-weight-light: 300;
     --font-weight-normal: 400;
     --font-weight-medium: 500;
+    --font-weight-semibold: 600;
     --font-weight-bold: 700;
     --font-weight-black: 900;
     --tracking-tight: -0.025em;
@@ -1598,6 +1599,10 @@
   .font-normal {
     --tw-font-weight: var(--font-weight-normal);
     font-weight: var(--font-weight-normal);
+  }
+  .font-semibold {
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
   }
   .tracking-tight {
     --tw-tracking: var(--tracking-tight);
@@ -6817,10 +6822,12 @@ const ImagePreviewModal = ({ imageUrl, name, onClose, onCreateSalesSummary, canC
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: "เอกสาร AT Honda", text: `เอกสารคุณ ${name}` });
       } else {
-        alert("อุปกรณ์นี้ไม่รองรับการแชร์ไฟล์โดยตรง กรุณาใช้ปุ่ม 'บันทึก (Download)'");
+        await handleManualDownload();
       }
     } catch (e) {
-      alert("แชร์ไม่ได้: " + e.message);
+      if (e && e.name === "AbortError")
+        return;
+      await handleManualDownload();
     }
   };
   return /* @__PURE__ */ React.createElement("div", {
@@ -10650,7 +10657,7 @@ const HistoryModal = ({ history, onLoad, onDelete, onClose, onToggleStar, onEdit
     className: "flex items-center gap-1"
   }, /* @__PURE__ */ React.createElement("i", {
     className: "fa-solid fa-car text-red-500/70"
-  }), " ", item.data.uiModel, " ", item.data.grade.name), /* @__PURE__ */ React.createElement("span", null, new Date(item.createdAt).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" }))))), /* @__PURE__ */ React.createElement("div", {
+  }), " ", uiModelShort(item.data.uiModel), " ", item.data.grade.name), /* @__PURE__ */ React.createElement("span", null, new Date(item.createdAt).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" }))))), /* @__PURE__ */ React.createElement("div", {
     className: "flex gap-2 mt-3 pt-3 border-t border-gray-50 items-center h-10"
   }, /* @__PURE__ */ React.createElement("button", {
     onClick: () => onLoad(item),
@@ -11837,13 +11844,13 @@ const App = () => {
       }
     });
     setSavedQuotes([...savedQuotes, snapshot]);
-    alert(`เพิ่ม ${uiModel} ${grade?.name || ""} ลงเปรียบเทียบแล้ว (${savedQuotes.length + 1}/5) ดูที่แถบเปรียบเทียบ`);
+    alert(`เพิ่ม ${uiModelShort(uiModel)} ${grade?.name || ""} ลงเปรียบเทียบแล้ว (${savedQuotes.length + 1}/5) ดูที่แถบเปรียบเทียบ`);
   };
   const handleRemoveSavedQuote = (id) => {
     setSavedQuotes(savedQuotes.filter((q) => q.id !== id));
   };
   const handleSaveData = async (name) => {
-    const nm = (name || "").trim() || (customerName || "").trim() || `${uiModel} ${grade.name}`;
+    const nm = (name || "").trim() || (customerName || "").trim() || `${uiModelShort(uiModel)} ${grade.name}`;
     const where = await quoteLog.add({ uid: atCfg.viewer.id || "", kind: "saved", name: nm, ...quoteSummary(), hasBooking: !!bookingData, data: collectState() });
     setShowActionModal(false);
     alert(where === "db" ? `บันทึก "${nm}" แล้ว เปิดได้ที่ “ใบที่บันทึก” และแถบรายงาน` : `บันทึก "${nm}" ไว้ในเครื่องนี้แล้ว`);
@@ -11859,7 +11866,7 @@ const App = () => {
   };
   const history = useMemo(() => quoteLog.entries.filter((e) => e.data && (atCfg.isAdmin || e.uid && e.uid === atCfg.viewer.id)).map((e) => ({
     id: e.id,
-    name: e.name || e.customerName || `${e.uiModel} ${e.grade}`,
+    name: e.name || e.customerName || `${uiModelShort(e.uiModel)} ${e.grade}`,
     isStarred: !!e.isStarred,
     data: e.data,
     createdAt: new Date(e.at)
@@ -11979,7 +11986,7 @@ const App = () => {
       alert("กรุณาสร้างใบจองก่อน เพื่อยืนยันเงื่อนไขการขาย เช่น ซื้อสด/ผ่อน ไฟแนนซ์ และจำนวนงวด");
       return;
     }
-    const docName = name && name.trim() ? name.trim() : bookingData.customerName || `${uiModel} ${grade?.name || ""}`.trim();
+    const docName = name && name.trim() ? name.trim() : bookingData.customerName || `${uiModelShort(uiModel)} ${grade?.name || ""}`.trim();
     setPendingFileName(docName);
     setShowActionModal(false);
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -12017,7 +12024,7 @@ const App = () => {
     }
     const nextBookingData = { ...formData, purchaseType: finalPurchaseType, isCash: finalPurchaseType === "cash" };
     setBookingData(nextBookingData);
-    setPendingFileName(formData.customerName || pendingFileName || `${uiModel} ${grade?.name || ""}`.trim());
+    setPendingFileName(formData.customerName || pendingFileName || `${uiModelShort(uiModel)} ${grade?.name || ""}`.trim());
     if (formData.customerName && !customerName)
       setCustomerName(formData.customerName);
     quoteLog.add({
@@ -12264,7 +12271,7 @@ const App = () => {
   const bankLabelNow = financeType === "cash" ? "-" : !hasPromoRateForCurrentCampaign && financeType === "standard" ? BANK_LABELS[selectedBank] || selectedBank : "HLTC / Honda Leasing";
   const interestDiscountInfo = resolveInterestDiscounts({ mKey: selectedModelKey, mode: activeInterestMode, selectedBank, customerType, isBeg: paymentType === "beginning", isSpecialOcc, isHondaLoyalty, isHondaCareSupport });
   const downInputValue = manualDownAmount !== null ? manualDownAmount : Math.round(netPrice * downPct / 100) === 0 ? "" : Math.round(netPrice * downPct / 100);
-  const quoteFileName = (customerName || "").trim() || `${uiModel} ${grade?.name || ""}`.trim();
+  const quoteFileName = (customerName || "").trim() || `${uiModelShort(uiModel)} ${grade?.name || ""}`.trim();
   const collectState = () => ({
     uiModel,
     grade,
@@ -12459,7 +12466,7 @@ const App = () => {
       paymentType
     }), ...prev]);
     window.scrollTo({ top: 0, behavior: "smooth" });
-    alert(`เพิ่ม ${uiModel} ${grade?.name || ""} ลงตารางดอกเบี้ยแล้ว`);
+    alert(`เพิ่ม ${uiModelShort(uiModel)} ${grade?.name || ""} ลงตารางดอกเบี้ยแล้ว`);
   };
   const compareTerms = useMemo(() => {
     const s = new Set;
@@ -12652,7 +12659,7 @@ const App = () => {
     previewType,
     canCreateSalesSummary: !!bookingData,
     onCreateSalesSummary: async () => {
-      const docName = pendingFileName || bookingData?.customerName || `${uiModel} ${grade?.name || ""}`.trim();
+      const docName = pendingFileName || bookingData?.customerName || `${uiModelShort(uiModel)} ${grade?.name || ""}`.trim();
       setShowImagePreview(false);
       await handleCreateSalesSummary(docName);
     },
@@ -12668,7 +12675,7 @@ const App = () => {
     loading: historyLoading
   }), showStickerModal && /* @__PURE__ */ React.createElement(StickerBuilderModal, {
     initialSource: viewMode === "table" ? "comparison" : viewMode === "compare_saved" ? "saved" : "quotation",
-    defaultFileName: pendingFileName || `${uiModel}_${grade?.name || ""}_Sticker`,
+    defaultFileName: pendingFileName || `${uiModelShort(uiModel)}_${grade?.name || ""}_Sticker`,
     compareDownOptions: selectedDownPcts,
     sourceAvailability: { quotation: 1, comparison: compareList.length, saved: savedQuotes.length },
     getSourceCards: buildStickerSourceCards,
@@ -12809,8 +12816,7 @@ const App = () => {
   }, /* @__PURE__ */ React.createElement("span", {
     className: "truncate flex-1"
   }, uiModelShort(uiModel)), /* @__PURE__ */ React.createElement("i", {
-    "data-html2canvas-ignore": "true",
-    className: "fa-solid fa-chevron-down text-[11px] text-gray-400"
+    className: "hide-in-image fa-solid fa-chevron-down text-[11px] text-gray-400"
   })), /* @__PURE__ */ React.createElement("select", {
     id: "q-model",
     "aria-label": "รุ่น",
@@ -13879,7 +13885,7 @@ const App = () => {
     }, /* @__PURE__ */ React.createElement("div", {
       className: "grid grid-cols-1 md:grid-cols-12 gap-2 items-center"
     }, /* @__PURE__ */ React.createElement("select", {
-      value: item.model,
+      value: uiModelShort(item.model),
       onChange: (e) => {
         const nextModel = e.target.value;
         const nextMKey = MODEL_MAPPING[nextModel];
@@ -14070,7 +14076,7 @@ const App = () => {
       className: "flex flex-col"
     }, /* @__PURE__ */ React.createElement("span", {
       className: "font-bold text-lg"
-    }, item.model, " ", item.grade), item.color && /* @__PURE__ */ React.createElement("span", {
+    }, uiModelShort(item.model), " ", item.grade), item.color && /* @__PURE__ */ React.createElement("span", {
       className: "text-xs text-gray-300"
     }, item.color.name)), /* @__PURE__ */ React.createElement("div", {
       className: "text-right"
@@ -14308,10 +14314,10 @@ const App = () => {
   }, /* @__PURE__ */ React.createElement("div", {
     className: "flex flex-col items-end"
   }, /* @__PURE__ */ React.createElement("span", {
-    className: "text-[11px] font-light text-gray-300"
+    className: "text-[11px] font-semibold text-red-300"
   }, "ข้อเสนอ ", idx + 1), /* @__PURE__ */ React.createElement("span", {
-    className: "text-xs font-light text-gray-300"
-  }, q.uiModel), /* @__PURE__ */ React.createElement("span", {
+    className: "text-sm font-semibold text-white"
+  }, uiModelShort(q.uiModel)), /* @__PURE__ */ React.createElement("span", {
     className: "font-bold text-base"
   }, q.grade?.name || q.grade), /* @__PURE__ */ React.createElement("span", {
     className: "text-[10px] mt-1 px-1.5 rounded bg-white/15"
@@ -14680,7 +14686,7 @@ const App = () => {
     className: "min-w-0"
   }, /* @__PURE__ */ React.createElement("div", {
     className: "font-bold text-gray-800 truncate"
-  }, e.uiModel, " ", /* @__PURE__ */ React.createElement("span", {
+  }, uiModelShort(e.uiModel), " ", /* @__PURE__ */ React.createElement("span", {
     className: "text-red-600"
   }, e.grade)), /* @__PURE__ */ React.createElement("div", {
     className: "text-xs text-gray-500 truncate"
@@ -14761,7 +14767,7 @@ const App = () => {
     className: "py-2 px-3"
   }, /* @__PURE__ */ React.createElement("div", {
     className: "font-bold text-gray-800"
-  }, e.uiModel, " ", /* @__PURE__ */ React.createElement("span", {
+  }, uiModelShort(e.uiModel), " ", /* @__PURE__ */ React.createElement("span", {
     className: "text-red-600"
   }, e.grade)), /* @__PURE__ */ React.createElement("div", {
     className: "text-[11px] text-gray-500"
@@ -14921,7 +14927,7 @@ const App = () => {
     className: "text-base text-gray-500"
   }, "รุ่น (Model)"), /* @__PURE__ */ React.createElement("span", {
     className: "text-xl font-bold"
-  }, uiModel)), /* @__PURE__ */ React.createElement("div", {
+  }, uiModelShort(uiModel))), /* @__PURE__ */ React.createElement("div", {
     className: "flex justify-between"
   }, /* @__PURE__ */ React.createElement("span", {
     className: "text-base text-gray-500"
