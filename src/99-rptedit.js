@@ -32,10 +32,19 @@ document.addEventListener('click', e => { const t = e.target.closest && e.target
 document.addEventListener('scroll', optPopHide, true);
 
 // Honda's money against what the web has for the same car (the admin's pick counts)
+// a delivered car with no booking in the web (an old car: only DL and Honda's file know it): the campaign option is matched to the file by itself (4/11)
+function rptNoBkHit(r, D) {
+  try {
+    if (!r || !r.opt) return null;
+    const i = D.invByVin.get(r.vin); if (!i || i.company || !i.idate || !rptWebDelivered(D, r.vin)) return null;
+    const x = { model: i.model || r.name, grade: i.grade, color: i.color, cash: !i.fin, bookDate: null, inv: i.idate, adv: false };
+    return rptSuggestOne(campOptions(x).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)), r.opt, r.camp, x.model);
+  } catch (e) { return null; }
+}
 function rptMoneyCheck(r, a, D, pr) {
   const T = (t, s) => pr ? s : chip(s, t);
   const d = a && a.rec && a.rec.deal;
-  if (!a) return { html: T('muted', 'ไม่พบใบจองที่ผูกกับ VIN นี้'), tone: 'muted' };
+  if (!a) { const nb = rptNoBkHit(r, D); if (nb) return { html: T('good', 'ไม่มีใบจอง · จับคู่ตามไฟล์ Honda') + (pr ? ' ' + campFull(nb) : `<div class="text-xs mt-1">${esc(campFull(nb))}</div>`), tone: 'good' }; return { html: T('muted', 'ไม่พบใบจองที่ผูกกับ VIN นี้'), tone: 'muted' }; }
   // the web has no sale terms yet: pick the campaign here and the option's money shows (kept in the report only, 26/10)
   if (!d || !d.at) return rptPickBox(r.vin, a, D, r.opt, r.camp, r.hasPay ? r.pay : 0, pr);
   const x = termsCtxAt(a, D), opts = campOptions(x).opts, out = [];
@@ -101,7 +110,9 @@ async function rptAutoRun(rep) {
   const D = derive(), rows = rptRows(rep).filter(r => r.hasDir), byVin = rptByVin(D);
   const cur = S.ref.get('honda_pay') || { v: {} }, picks = { ...(cur.picks || {}) }, apply = []; let nPick = 0;
   for (const r of rows) {
-    const a = byVin.get(r.vin); if (!a || !rptEditCan(a.br) || !dealAdmin(a) || !r.opt) continue;
+    const a = byVin.get(r.vin);
+    if (!a) { if (r.opt && !picks[r.vin] && rptEditCan(r.br)) { const nb = rptNoBkHit(r, D); if (nb) { picks[r.vin] = { cid: nb.value, name: campFull(nb), sup: Number(nb.sup) || 0, auto: true, nobk: true, ...actor() }; nPick++; } } continue; }
+    if (!rptEditCan(a.br) || !dealAdmin(a) || !r.opt) continue;
     const d = a.rec && a.rec.deal, opts = campOptions(termsCtxAt(a, D)).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value));
     const hit = rptSuggestOne(opts, r.opt, r.camp, a.model); if (!hit) continue;
     if (!d || !d.at) { if (!picks[r.vin]) { picks[r.vin] = { cid: hit.value, name: campFull(hit), sup: Number(hit.sup) || 0, auto: true, ...actor() }; nPick++; } }

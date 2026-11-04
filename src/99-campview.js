@@ -14,17 +14,19 @@ function ccData(D) {
     const f = fileBy.get(vin) || null, a = at.get(vin), d = a && a.rec && a.rec.deal, pk = picks[vin], delivered = rptWebDelivered(D, vin);
     const row = f ? { ...f } : { vin, br: i.br, name: (a && a.model) || i.model || '', camp: '', opt: '', st: delivered ? 'DELIVERED' : 'ALLOCATED', date: i.idate, hasDir: false, hasPay: false, pay: 0, est: 0, acts: [], actAmt: 0, toDel: false };
     const real = d && d.at && d.campaign_id && !['pending', 'none'].includes(d.campaign_id);
+    const nb = !a && f ? rptNoBkHit(f, D) : null;
     const re = !f ? ccReissue(D, vin, i, a, { cust: a ? a.cust : i.cust }) : null, reK = re && ['same', 'new', 'unk'].includes(re.kind) ? re.kind : '';
-    if (!row.pay && !row.est && real) row.est = Number(d.margin_honda) || 0;      // the admin's campaign: its money from the sale terms
+    if (!row.pay && !row.est && real) row.est = Number(d.margin_honda) || 0;
+    else if (!row.pay && !row.est && nb) row.est = Number(nb.sup) || 0;   // no booking: the campaign matched to the file      // the admin's campaign: its money from the sale terms
     if (reK) { row.opt = re.opt; row.camp = re.camp; row.pay = 0; row.est = 0; row.actAmt = 0; row.acts = []; row.hasDir = !!re.opt; }   // money and option belong to the old month
     row.tot = row.pay + row.est + row.actAmt;
-    const nouse = !real && d && d.at && d.campaign_id === 'none', src = real ? 'admin' : pk && pk.cid ? 'file' : nouse ? 'nouse' : '', pend = !src && !!d && d.campaign_id === 'pending';
+    const nouse = !real && d && d.at && d.campaign_id === 'none', src = real ? 'admin' : pk && pk.cid ? 'file' : nb ? 'file' : nouse ? 'nouse' : '', pend = !src && !!d && d.campaign_id === 'pending';
     const mc = rptMoneyCheck(row, a, D, false), mism = !!(f && f.opt && real && campFeats(d.campaign) !== campFeats(f.opt));
     // the campaign that fits the option written in Honda's file (only for the admin who may apply it)
     let sug = null;
     if ((!src || mism) && a && f && f.opt && rptEditCan(a.br) && dealAdmin(a)) { const opts = campOptions(termsCtxAt(a, D)).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)); sug = rptSuggestOne(opts, f.opt, f.camp, a.model); }
     const why = src || pend ? '' : !a ? 'ไม่พบใบจองที่ผูกกับ VIN นี้' : !d ? 'ใบจองยังไม่มีเงื่อนไขการขาย' : !d.at ? 'เงื่อนไขการขายยังไม่ได้บันทึก' : 'ยังไม่ได้เลือกแคมเปญในเงื่อนไขการขาย';
-    list.push({ vin, br: i.br, row, a, inv: i, delivered, adv: !delivered, src, pend, why, re: reK, reFrom: reK ? re.from : '', prov: !!re && re.kind === 'prov', miss: !!re && re.kind === 'miss', missWhy: re && re.kind === 'miss' ? re.why : [], nochoose: !src && !pend, mism, sug, money: mc, cust: a ? a.cust : i.cust || '' });
+    list.push({ nb: nb ? campFull(nb) : '', vin, br: i.br, row, a, inv: i, delivered, adv: !delivered, src, pend, why, re: reK, reFrom: reK ? re.from : '', prov: !!re && re.kind === 'prov', miss: !!re && re.kind === 'miss', missWhy: re && re.kind === 'miss' ? re.why : [], nochoose: !src && !pend, mism, sug, money: mc, cust: a ? a.cust : i.cust || '' });
   });
   // in Honda's file for the period but not among the web's invoices of the period: no invoice in the web at all, or invoiced on another date
   const extra = fileRows.filter(r => !inv.has(r.vin)).map(r => { const a = at.get(r.vin), w = D.invByVin.get(r.vin), wd = w && w.idate ? String(w.idate).slice(0, 10) : '';
@@ -117,7 +119,7 @@ function ccCarsTable(C, D) {
   const base = F === 'extra' ? C.extra : F === '' ? [...L, ...C.extra] : L.filter(x => F === 'chosen' ? !!x.src : F === 'pend' ? x.pend : F === 'nochoose' ? x.nochoose : F === 'adv' ? x.adv : F === 're' ? !!x.re : F === 'miss' ? x.miss : F === 'prov' ? x.prov : x.mism);
   const show = base, canSug = show.filter(x => x.sug), nSel = Object.keys(sel).filter(v => sel[v] && L.some(x => x.vin === v && x.sug)).length;
   const srcChip0 = x => x.extra ? chip('มีในไฟล์ ไม่มีใบกำกับในช่วงนี้', 'warn') : x.mism ? chip('เว็บไม่ตรงไฟล์', 'bad') : x.src === 'admin' ? chip('แอดมินเลือก', 'neutral') : x.re ? chip('ออกใหม่ · ไฟล์เดือน ' + x.reFrom, x.re === 'new' ? 'neutral' : 'good') : x.miss ? chip('ไม่มีในรายงาน Honda', 'bad') : x.prov ? chip('ชั่วคราว รอไฟล์', 'warn') : x.src === 'nouse' ? chip('ไม่ใช้แคมเปญ', 'neutral') : x.src === 'file' ? chip('จับคู่จากไฟล์', 'good') : x.pend ? chip('รอเลือกแคมเปญ', 'warn') : chip('ยังไม่เลือก', 'muted') + (x.why ? `<div class="text-xs text-muted">${esc(x.why)}</div>` : '');
-  const srcChip = x => srcChip0(x) + (x.re ? `<div class="text-xs text-muted">${esc(ccReNote(x))}</div>` : x.miss ? `<div class="text-xs" style="color:var(--bad)">${esc(x.missWhy.join(' / '))}</div>` : '');
+  const srcChip = x => srcChip0(x) + (x.nb ? `<div class="text-xs text-muted">ไม่มีใบจอง · ${esc(x.nb)}</div>` : '') + (x.re ? `<div class="text-xs text-muted">${esc(ccReNote(x))}</div>` : x.miss ? `<div class="text-xs" style="color:var(--bad)">${esc(x.missWhy.join(' / '))}</div>` : '');
   const SUG = /<button[^>]*data-act="(?:rpt-pick-use|rpt-confirm)"[^>]*>[^<]*<\/button>/;
   const body = show.map(x => { const r = x.row;
     // the "use the suggested" button goes on the same line as แก้ไข / เงิน Honda
