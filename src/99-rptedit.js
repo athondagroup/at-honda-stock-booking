@@ -33,18 +33,26 @@ document.addEventListener('scroll', optPopHide, true);
 
 // Honda's money against what the web has for the same car (the admin's pick counts)
 // a delivered car with no booking in the web (an old car: only DL and Honda's file know it): the campaign option is matched to the file by itself (4/11)
-function rptNoBkHit(r, D) {
+function rptNoBkHit(r, D, why) {
+  const no = t => { if (why) why.t = t; return null; };
   try {
-    if (!r || !r.opt) return null;
-    const i = D.invByVin.get(r.vin); if (!i || i.company || !i.idate || !rptWebDelivered(D, r.vin)) return null;
+    if (!r || !r.opt) return no('ไฟล์ Honda ไม่มีทางเลือกของคันนี้');
+    const i = D.invByVin.get(r.vin); if (!i || i.company || !i.idate) return no('ไม่มีใบกำกับใน DL');
+    if (!rptWebDelivered(D, r.vin)) return no('ยังไม่ส่งมอบ จึงยังไม่จับคู่อัตโนมัติ');
     const x = { model: i.model || r.name, grade: i.grade, color: i.color, cash: !i.fin, bookDate: null, inv: i.idate, adv: false };
-    return rptSuggestOne(campOptions(x).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)), r.opt, r.camp, x.model);
-  } catch (e) { return null; }
+    if (!x.model) return no('ใบกำกับใน DL ไม่มีรุ่น');
+    const all = campOptions(x).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value));
+    if (!all.length) return no(`ไม่พบแคมเปญของ ${x.model}${x.grade ? ' ' + x.grade : ''} เดือน ${fmtM(String(i.idate).slice(0, 7))} ในตารางแคมเปญ`);
+    const l = rptSugScored(all, r.opt, r.camp);
+    if (!l.length) return no(`ทางเลือกในไฟล์ไม่ตรงกับแคมเปญใดในตาราง (${all.length} ตัวเลือก) · เลือกเองที่ปุ่ม แก้ไข`);
+    const h = rptSuggestOne(all, r.opt, r.camp, x.model);
+    return h || no(`ตรงกับหลายแคมเปญเท่ากัน (${l.length} ตัว) · เลือกเองที่ปุ่ม แก้ไข`);
+  } catch (e) { return no('จับคู่ไม่ได้: ' + (e.message || e)); }
 }
 function rptMoneyCheck(r, a, D, pr) {
   const T = (t, s) => pr ? s : chip(s, t);
   const d = a && a.rec && a.rec.deal;
-  if (!a) { const nb = rptNoBkHit(r, D); if (nb) return { html: T('good', 'ไม่มีใบจอง · จับคู่ตามไฟล์ Honda') + (pr ? ' ' + campFull(nb) : `<div class="text-xs mt-1">${esc(campFull(nb))}</div>`), tone: 'good' }; return { html: T('muted', 'ไม่พบใบจองที่ผูกกับ VIN นี้'), tone: 'muted' }; }
+  if (!a) { const wy = {}, nb = rptNoBkHit(r, D, wy); if (nb) return { html: T('good', 'ไม่มีใบจอง · จับคู่ตามไฟล์ Honda') + (pr ? ' ' + campFull(nb) : `<div class="text-xs mt-1">${esc(campFull(nb))}</div>`), tone: 'good' }; return { html: T('muted', 'ไม่พบใบจองที่ผูกกับ VIN นี้') + (wy.t ? (pr ? ' · ' + wy.t : `<div class="text-xs text-muted mt-1">จับคู่ตามไฟล์ไม่ได้: ${esc(wy.t)}</div>`) : ''), tone: 'muted' }; }
   // the web has no sale terms yet: pick the campaign here and the option's money shows (kept in the report only, 26/10)
   if (!d || !d.at) return rptPickBox(r.vin, a, D, r.opt, r.camp, r.hasPay ? r.pay : 0, pr);
   const x = termsCtxAt(a, D), opts = campOptions(x).opts, out = [];
