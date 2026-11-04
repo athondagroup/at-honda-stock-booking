@@ -234,6 +234,8 @@ const poChargeNote = x => x.cpay ? (x.cpart ? 'เรียกเก็บบา
 // the items sold most often: a chip searches the FOC list (q) or adds a typed line (cost can be filled in) (31/10)
 const POFREQ = [{ l: 'ฟิล์ม Xtra Cole', q: 'xtra cole' }, { l: 'พ่นกันสนิม 1 ครั้งก่อนส่งมอบ' }, { l: 'เคลือบสี 1 ครั้งก่อนส่งมอบ' }, { l: 'พ่นฆ่าเชื้อโรคก่อนส่งมอบ' }, { l: 'พรมปูพื้น', q: 'พรมปูพื้น' }, { l: 'ผ้ายางปูพื้น', q: 'ผ้ายาง' },
   { l: 'ถาดท้ายฮอนด้า', q: 'ถาดท้าย' }, { l: 'บัตรน้ำมัน' }, { l: 'เซ็นเซอร์ถอย',q:'สัญญาณกะระยะหลัง' }, { l: 'กล้องหน้า', q: 'กล้อง' }, { l: 'ชุดเซฟตี้', q: 'safety set' }, { l: 'ฟรีเช็กระยะค่าแรง ค่าอะไหล่ 5ปี หรือ 100,000 กม.' }, { l: 'ฟรีเช็กระยะค่าแรง ค่าอะไหล่3ปี หรือ 60,000 กม.' }];
+// the frequent list: the back-office list (ref/gifts, shared with the quotation page) when it has rows, otherwise the built-in one above
+function poFreq() { const r = ((S.ref.get('gifts') || {}).rows || []).filter(x => x && String(x.label || '').trim() && x.active !== false); return r.length ? r.map(x => /^fix/i.test(x.mode || '') ? { l: x.label, c: Number(x.cost) || 0 } : { l: x.label, q: String(x.q || '').trim() || undefined }) : POFREQ; }
 const poPart = x => [x.part || x.vendor || '', x.ptag || ''].filter(Boolean).join(' ');
 const poStd = a => ['รับประกันคุณภาพรถ 3 ปี หรือ 100,000 กม.', 'บริการช่วยเหลือฉุกเฉิน 24 ชม. 3 ปี หรือ 100,000 กม.', 'ฟรีค่าแรงเช็คระยะ 10,000–20,000 กม.', ...(/e:HEV/i.test(a.model || '') ? ['รับประกันแบตเตอรี่ไฮบริด 10 ปี', 'รับประกันระบบไฮบริด 5 ปี'] : [])];
 const UCARE = 'Ultimate Care รับประกันคุณภาพเพิ่ม 2 ปี หรือ 40,000 กม.';
@@ -247,7 +249,7 @@ function poEditor(m, a, D) {
   const po = m.po, codes = [...(MODEL_CODES[a.model] || []), 'OT', 'ALL'];
   const cat = focCatalog();
   const q = (m.poq || '').trim().toLowerCase();
-  const hits = cat.filter(x => codes.includes(x.model) && (!q || x.name.toLowerCase().includes(q) || (x.part || '').toLowerCase().includes(q) || (x.cat || '').toLowerCase().includes(q))).sort((x, y) => (/^(DVP|แพ็คเกจ)/.test(y.cat || '')) - (/^(DVP|แพ็คเกจ)/.test(x.cat || ''))).slice(0, 60);
+  const hits = cat.filter(x => codes.includes(x.model) && (!q || q.split('|').filter(Boolean).some(w => x.name.toLowerCase().includes(w) || (x.part || '').toLowerCase().includes(w) || (x.cat || '').toLowerCase().includes(w)))).sort((x, y) => (/^(DVP|แพ็คเกจ)/.test(y.cat || '')) - (/^(DVP|แพ็คเกจ)/.test(x.cat || ''))).slice(0, 60);
   const cost = poAutoCost(a, po) + po.items.reduce((n, x) => n + (x.cpay ? 0 : (Number(x.cost) || 0) * (Number(x.qty) || 1)), 0);
   const sale = po.items.reduce((n, x) => n + (Number(x.sale) || 0) * (Number(x.qty) || 1), 0);
   const focBudget = Number(a.rec.foc_total) || 0;
@@ -279,7 +281,7 @@ function poEditor(m, a, D) {
       <div class="flex flex-wrap gap-2">${ro ? '' : `<button class="btn btn-red" data-act="po-save" data-id="${esc(a.id)}">บันทึกใบสั่งแต่งรถ</button><button class="btn btn-ghost" data-act="po-custom">+ เพิ่มรายการเอง</button>`}<button class="btn btn-ghost" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button></div>
     </div>
     <div class="flex flex-col gap-2">
-      <div><div class="text-xs text-muted mb-1">ใช้บ่อย</div><div class="flex flex-wrap gap-1">${POFREQ.map((f, i) => `<button class="btn btn-ghost btn-sm" data-act="po-quick" data-i="${i}" ${ro ? 'disabled' : ''}>${esc(f.l)}</button>`).join('')}</div></div>
+      <div><div class="text-xs text-muted mb-1">ใช้บ่อย</div><div class="flex flex-wrap gap-1">${poFreq().map((f, i) => `<button class="btn btn-ghost btn-sm" data-act="po-quick" data-i="${i}" ${ro ? 'disabled' : ''}>${esc(f.l)}</button>`).join('')}</div></div>
       <div class="field"><label for="po-q">ค้นหาในรายการ FOC (${cat.length ? cat.length + ' รายการ' : 'ยังไม่มีรายการ'})</label><input id="po-q" type="search" data-modal="poq" value="${esc(m.poq || '')}" placeholder="เช่น ฟิล์ม, พรม, 08P"></div>
       <div class="flex flex-col gap-1 max-h-[55vh] overflow-auto pr-1">${hits.map(x => `<button class="pick text-left text-sm" data-act="po-add" data-name="${esc(x.name)}" ${ro ? 'disabled' : ''}>
         <span class="flex-1 min-w-0">${esc(x.name)}<span class="block text-xs text-muted">${esc(x.cat || '')} · ${esc(x.part || x.vendor || '')} · ทุน ${money(x.cost)} · ขาย ${money(x.sale)}${x.note ? `<span class="block">${esc(x.note)}</span>` : ''}</span></span></button>`).join('') || `<p class="text-sm text-muted">${cat.length ? 'ไม่พบรายการที่ค้นหา' : 'รายการ FOC ยังไม่ได้นำเข้า'}</p>`}</div>
