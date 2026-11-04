@@ -90,7 +90,7 @@
 
   // ---- db: the page's collection names → rows of public.docs
   // atref = หลังบ้านของเว็บ AT stock (อ่านอย่างเดียว เฉพาะตารางที่ใบเสนอราคาใช้ ไม่โหลดประวัติการแก้)
-  const COL = { config: 'qcfg', quotes: 'quotes', staffreq: 'qreq', atref: 'ref' };
+  const COL = { config: 'qcfg', quotes: 'quotes', staffreq: 'qreq', atref: 'ref', profiles: 'qprof' };
   const REF_IDS = ['campaigns', 'margins', 'privileges', 'fees', 'foc', 'catalog', 'gifts', 'sales'];
   const REF_FIELDS = 'id,list:data->list,at:data->at,rows:data->rows,prices:data->prices,price_issue:data->price_issue,reg:data->reg,ins:data->ins,month:data->month,cols:data->cols,src:data->src';
   const colOf = name => { const c = COL[name]; if (!c) throw Object.assign(new Error('collection ' + name), { code: 'invalid_argument' }); return c; };

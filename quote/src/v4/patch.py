@@ -474,6 +474,27 @@ s = s.replace('{GIFT_QUICK.', '{AT_GIFT_QUICK.')
 # ---------- 7g. car price from the grade table (ราคาจากใบราคาในเว็บ AT stock เมื่อมี)
 rep("            const carPrice = grade.price;", "            const carPrice = (GRADES_DATA[MODEL_MAPPING[uiModel]] || []).find(g => g.name === grade.name)?.price ?? grade.price;")
 
+
+# ---------- 7h. my profile (ข้อมูลของฉัน): header button on the website; sales fill their phone / LINE themselves
+PROF_BTN = """{window.__QWEB && (
+    <button type="button" onClick={() => setShowProfile(true)} title="ข้อมูลของฉัน (เบอร์โทร / LINE)" aria-label="ข้อมูลของฉัน" className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${atCfg.myProfile && atCfg.myProfile.phone ? 'bg-gray-100 text-gray-700' : 'bg-amber-100 text-amber-700 ring-2 ring-amber-300'}`}><i className="fa-solid fa-user"></i></button>
+)}
+{showProfile && <ProfileModal api={atCfg} onClose={() => setShowProfile(false)} />}
+"""
+_a = '<button onClick={() => setShowHistory(true)} className="h-10 min-w-10'
+assert s.count(_a) == 1
+s = s.replace(_a, PROF_BTN + '                                ' + _a)
+rep("            const needLink = atCfg.viewer.loaded &&", """            const [showProfile, setShowProfile] = useState(false);
+            // เซลล์ที่ยังไม่ได้ใส่เบอร์: เปิด "ข้อมูลของฉัน" ให้ครั้งเดียวต่อเครื่อง
+            useEffect(() => {
+                if (!window.__QWEB || window.__QWEB.role !== 'sales' || !atCfg.ready || !atCfg.viewer.id) return;
+                if (atCfg.myProfile && atCfg.myProfile.phone) return;
+                const k = 'at_q_prof_ask_' + atCfg.viewer.id;
+                let asked = false; try { asked = localStorage.getItem(k) === '1'; localStorage.setItem(k, '1'); } catch (e) { asked = false; }
+                if (!asked) setShowProfile(true);
+            }, [atCfg.ready, atCfg.viewer.id, !!(atCfg.myProfile && atCfg.myProfile.phone)]);
+            const needLink = atCfg.viewer.loaded &&""")
+
 # ---------- 8. formal black-and-white sales summary
 a = s.index('                        {/* Hidden Sales Summary Card */}')
 b = s.index('                    </div>\n\n                </div>\n            );\n        };\n\n        const root')

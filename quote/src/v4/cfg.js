@@ -405,6 +405,7 @@
         // ข้อมูลหลังบ้าน + ผู้ใช้ที่เปิดหน้านี้
         const useAtConfig = () => {
             const [docs, setDocs] = useState({});
+            const [profiles, setProfiles] = useState({});
             const [ready, setReady] = useState(false);
             const [dbOk, setDbOk] = useState(false);
             const [viewer, setViewer] = useState({ loaded: false, id: '', email: '', key: '', isOwner: false, canEdit: false, name: '' });
@@ -414,7 +415,7 @@
             const [myReq, setMyReq] = useState(null);
             const dbRef = useRef(null);
             useEffect(() => {
-                let unsub = null, unsubReq = null, unsubMine = null, cancelled = false;
+                let unsub = null, unsubReq = null, unsubMine = null, unsubProf = null, cancelled = false;
                 const timer = setTimeout(() => setReady(true), 10000);
                 (async () => {
                     let db = null;
@@ -423,6 +424,7 @@
                     if (!db) { clearTimeout(timer); setReady(true); return; }
                     dbRef.current = db;
                     setDbOk(true);
+                    if (window.__QWEB) { try { unsubProf = db.collection('profiles').onSnapshot(snap => { const m = {}; snap.docs.forEach(d => { m[d.id] = d.data(); }); setProfiles(m); }, () => {}); } catch (e) { /* ไม่มีโปรไฟล์ */ } }
                     unsub = db.collection('config').onSnapshot(snap => {
                         clearTimeout(timer);
                         const m = {};
@@ -452,7 +454,7 @@
                         }
                     }
                 })();
-                return () => { cancelled = true; clearTimeout(timer); if (unsub) unsub(); if (unsubReq) unsubReq(); if (unsubMine) unsubMine(); };
+                return () => { cancelled = true; clearTimeout(timer); if (unsub) unsub(); if (unsubReq) unsubReq(); if (unsubMine) unsubMine(); if (unsubProf) unsubProf(); };
             }, []);
             // บนเว็บจริง: อ่านหลังบ้านของเว็บ AT stock (ref/*) + ไฟล์ค่าจด/FOC ที่ติดมากับเว็บเมื่อยังไม่เคยแก้ในหลังบ้าน
             const [stock, setStock] = useState(null);
@@ -483,11 +485,11 @@
                     if (q.role !== 'sales') return null;
                     const r = cfg.roster.find(x => x.name === q.salesName);
                     if (!r || r.left) return null;
-                    const c = (cfg.contacts || {})[r.name] || {};
+                    const c = profiles[viewer.id] || {};
                     return { name: r.name, phone: c.phone || '', line: c.line || '', role: 'sales', branch: r.br, active: true };
                 }
                 return cfg.staff.find(s => s && s.active !== false && ((viewer.key && s.key === viewer.key) || (viewer.id && s.uid === viewer.id))) || null;
-            }, [cfg, viewer.key, viewer.id]);
+            }, [cfg, viewer.key, viewer.id, profiles]);
             // เว็บจริง (Supabase): ผู้ดูแล = ผู้บริหารในตาราง members เท่านั้น · ใน claude.ai: เจ้าของ หรือ staff ที่ตั้งเป็นผู้ดูแล
             const realAdmin = !!(window.__QPREVIEW || viewer.isOwner || (!window.__QWEB && staffMe && staffMe.role === 'admin'));
             const isAdmin = realAdmin && viewAs !== 'sales';
@@ -523,6 +525,14 @@
                 else await remove(key);
             };
             const saveStaff = async (rows) => write('staff', { rows, at: new Date().toISOString(), by });
+            const myProfile = (viewer.id && profiles[viewer.id]) || null;
+            const saveProfile = async (patch) => {
+                if (!dbRef.current || !viewer.id) throw new Error('ยังไม่ได้เข้าสู่ระบบ');
+                const q = window.__QWEB || {}, cur = myProfile || {}, at = new Date().toISOString();
+                const next = { email: q.email || '', name: q.name || viewer.name || '', role: q.role || '', salesName: q.salesName || '', phone: cfgStr(patch.phone ?? cur.phone), line: cfgStr(patch.line ?? cur.line) };
+                const log = [...(cur.log || []), { at, phone: next.phone, line: next.line }].slice(-30);
+                await dbRef.current.collection('profiles').doc(viewer.id).set({ ...next, log, at, created: cur.created || at });
+            };
             const saveContact = async (name, patch) => { const map = { ...(cfg.contacts || {}) }; map[name] = { ...(map[name] || {}), ...patch }; return write('contacts', { map, at: new Date().toISOString(), by }); };
             const saveSettings = async (patch) => write('settings', { ...cfg.settings, ...patch, at: new Date().toISOString(), by });
             // ขอผูกบัญชี: ที่ปรึกษาใส่อีเมลที่ลงทะเบียนไว้ → ผู้ดูแลกดอนุมัติในหลังบ้าน
@@ -537,5 +547,5 @@
                 await dbRef.current.collection('staffreq').doc(req.id).delete();
             };
             const rejectReq = async (req) => { await dbRef.current.collection('staffreq').doc(req.id).delete(); };
-            return { cfg, month, ready, dbOk, viewer, staffMe, isAdmin, realAdmin, viewAs, setViewAs, canWrite, saveTable, saveFoc, resetTable, saveStaff, saveContact, saveSettings, reqs, myReq, requestLink, approveReq, rejectReq, version: [docs, stock] };
+            return { cfg, month, ready, dbOk, viewer, staffMe, isAdmin, realAdmin, viewAs, setViewAs, canWrite, saveTable, saveFoc, resetTable, saveStaff, saveContact, saveSettings, profiles, myProfile, saveProfile, reqs, myReq, requestLink, approveReq, rejectReq, version: [docs, stock] };
         };

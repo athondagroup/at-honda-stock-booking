@@ -390,23 +390,24 @@
                     {sec === 'staff' && cfg.roster && (
                         <div className="space-y-4">
                             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">ที่ปรึกษาการขาย</h2>
-                            <div className="rounded-xl border border-blue-200 bg-blue-50 text-blue-900 text-xs px-3 py-2 leading-relaxed"><i className="fa-solid fa-link mr-1"></i>ชื่อ สาขา และสถานะใช้งาน มาจากรายชื่อเซลล์ของ <a href="../" className="font-bold underline">เว็บ AT stock</a> · เซลล์ที่ลาออกเข้าใบเสนอราคาไม่ได้ · อีเมลเข้าระบบเพิ่มที่เว็บ AT stock → หลังบ้าน → ผู้ใช้งานเว็บ (เลือกชื่อเซลล์ให้ตรง) · หน้านี้ใส่เบอร์โทรและ LINE ที่ขึ้นในใบเสนอราคา</div>
+                            <div className="rounded-xl border border-blue-200 bg-blue-50 text-blue-900 text-xs px-3 py-2 leading-relaxed"><i className="fa-solid fa-link mr-1"></i>ชื่อ สาขา และสถานะใช้งาน มาจากรายชื่อเซลล์ของ <a href="../" className="font-bold underline">เว็บ AT stock</a> · เซลล์ที่ลาออกเข้าใบเสนอราคาไม่ได้ · อีเมลเข้าระบบเพิ่มที่เว็บ AT stock → หลังบ้าน → ผู้ใช้งานเว็บ (เลือกชื่อเซลล์ให้ตรง) · เบอร์โทรและ LINE เซลล์ใส่เองที่ “ข้อมูลของฉัน” (ปุ่มรูปคนมุมขวาบน)</div>
                             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead className="bg-gray-50 text-gray-600 text-xs"><tr><th className="py-2.5 px-3 text-left">ชื่อเซลล์</th><th className="py-2.5 px-3 text-left w-16">สาขา</th><th className="py-2.5 px-3 text-left w-24">สถานะ</th><th className="py-2.5 px-3 text-left">อีเมลเข้าระบบ</th><th className="py-2.5 px-3 text-left w-40">เบอร์โทร</th><th className="py-2.5 px-3 text-left w-40">LINE ID</th></tr></thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {cfg.roster.map(r => {
-                                            const c = cfg.contacts[r.name] || {};
+                                            const prof = Object.values(api.profiles || {}).filter(x => x && x.salesName === r.name).sort((x, y) => String(y.at || '').localeCompare(String(x.at || '')))[0] || {};
+                                            const c = { phone: prof.phone || (cfg.contacts[r.name] || {}).phone || '', line: prof.line || (cfg.contacts[r.name] || {}).line || '' };
                                             const mails = (members || []).filter(m => m.sales_name === r.name && m.active).map(m => m.email);
-                                            const inp = (k, ph) => <input key={k + (c[k] || '')} disabled={!api.canWrite || r.left} defaultValue={c[k] || ''} placeholder={ph} onBlur={e => { const v = e.target.value.trim(); if (v !== (c[k] || '')) run(() => api.saveContact(r.name, { [k]: v }), `บันทึก${k === 'phone' ? 'เบอร์' : ' LINE'} ${r.name} แล้ว`); }} className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm disabled:bg-gray-50" />;
+                                            const inp = (k) => c[k] ? <span>{c[k]}</span> : <span className="text-xs text-amber-700">{r.left ? '–' : 'เซลล์ยังไม่ได้ใส่'}</span>;
                                             return (
                                                 <tr key={r.name} className={r.left ? 'text-gray-400' : ''}>
                                                     <td className="py-2 px-3 font-bold">{r.name}</td>
                                                     <td className="py-2 px-3">{r.br || '–'}</td>
                                                     <td className="py-2 px-3">{r.left ? <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-500">ลาออก</span> : <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-50 text-green-700 border border-green-200">ใช้งาน</span>}</td>
                                                     <td className="py-2 px-3 text-xs">{!window.__QWEB ? <span className="text-gray-400">ดูได้บนเว็บจริง</span> : members === null ? '…' : mails.length ? mails.join(', ') : <span className="text-amber-700">ยังไม่มีอีเมล</span>}</td>
-                                                    <td className="py-2 px-3">{inp('phone', 'เบอร์โทร')}</td>
-                                                    <td className="py-2 px-3">{inp('line', 'LINE ID')}</td>
+                                                    <td className="py-2 px-3">{inp('phone')}</td>
+                                                    <td className="py-2 px-3">{inp('line')}</td>
                                                 </tr>
                                             );
                                         })}
@@ -567,6 +568,55 @@
                             </div>
                         </div>
                     )}
+                </div>
+            );
+        };
+
+        // ---------- ข้อมูลของฉัน (บนเว็บจริง): ทุกคนใส่เบอร์โทรและ LINE ของตัวเอง · เซลล์ใช้ขึ้นในใบเสนอราคา
+        const ProfileModal = ({ api, onClose }) => {
+            const q = window.__QWEB || {}, me = api.myProfile || {};
+            const [phone, setPhone] = useState(me.phone || '');
+            const [line, setLine] = useState(me.line || '');
+            const [busy, setBusy] = useState(false);
+            const [msg, setMsg] = useState('');
+            const roleTh = { sales: 'เซลล์', admin: 'แอดมินสาขา', aum: 'ผู้จัดการ (PSC, ATE)', nuch: 'ผู้จัดการ (SPH, KPA)', exec: 'ผู้บริหาร' }[q.role] || q.role || '–';
+            const roster = (api.cfg.roster || []).find(x => x.name === q.salesName);
+            const save = async () => {
+                if (!phone.trim()) { setMsg('ใส่เบอร์โทรก่อน'); return; }
+                setBusy(true); setMsg('');
+                try { await api.saveProfile({ phone: phone.trim(), line: line.trim() }); setMsg('บันทึกแล้ว · ใบเสนอราคาใช้ข้อมูลนี้ทันที'); } catch (e) { setMsg('บันทึกไม่สำเร็จ: ' + ((e && e.message) || '')); }
+                setBusy(false);
+            };
+            const row = (l, v) => <div className="flex justify-between gap-3 py-1.5 border-b border-gray-100 text-sm"><span className="text-gray-500">{l}</span><span className="font-bold text-gray-900 text-right">{v || '–'}</span></div>;
+            return (
+                <div className="fixed inset-0 z-[80] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+                    <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()} role="dialog" aria-label="ข้อมูลของฉัน">
+                        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between"><h3 className="font-bold text-gray-900 text-lg">ข้อมูลของฉัน</h3><button type="button" onClick={onClose} className="w-9 h-9 rounded-full bg-gray-100 text-gray-600" aria-label="ปิด"><i className="fa-solid fa-xmark"></i></button></div>
+                        <div className="px-5 py-4 space-y-4">
+                            <div>
+                                {row('ชื่อในใบเสนอราคา', q.role === 'sales' ? q.salesName : (q.name || q.email))}
+                                {row('อีเมลเข้าระบบ', q.email)}
+                                {row('บทบาท', roleTh)}
+                                {row('สาขา', (roster && roster.br) || q.branch)}
+                                {q.role === 'sales' && row('สถานะในรายชื่อเซลล์', roster ? (roster.left ? 'ลาออก' : 'ใช้งาน') : 'ไม่พบชื่อ')}
+                                <p className="text-[11px] text-gray-400 mt-1">ชื่อ สาขา และสถานะ แก้ที่เว็บ AT stock (รายชื่อเซลล์ / ผู้ใช้งานเว็บ)</p>
+                            </div>
+                            <label className="block text-xs font-bold text-gray-600">เบอร์โทรศัพท์ (ขึ้นในใบเสนอราคา)
+                                <input type="tel" inputMode="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="เช่น 081-234-5678" className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-base outline-none focus:border-red-500" />
+                            </label>
+                            <label className="block text-xs font-bold text-gray-600">LINE ID (ขึ้นในใบเสนอราคา)
+                                <input value={line} onChange={e => setLine(e.target.value)} placeholder="เช่น at.honda.beer" className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-base outline-none focus:border-red-500" />
+                            </label>
+                            {msg && <p className={`text-sm ${/ไม่สำเร็จ|ก่อน/.test(msg) ? 'text-red-600' : 'text-green-700'}`}>{msg}</p>}
+                            <button type="button" disabled={busy} onClick={save} className="w-full py-3 rounded-xl bg-red-600 text-white font-bold disabled:opacity-50">{busy ? 'กำลังบันทึก…' : 'บันทึกข้อมูลของฉัน'}</button>
+                            {(me.log || []).length > 0 && (
+                                <details className="text-xs text-gray-500">
+                                    <summary className="cursor-pointer">ประวัติการแก้ ({me.log.length} ครั้ง)</summary>
+                                    <ul className="mt-2 space-y-1">{me.log.slice().reverse().map((x, i) => <li key={i}>{new Date(x.at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })} · {x.phone || '–'} · LINE {x.line || '–'}</li>)}</ul>
+                                </details>
+                            )}
+                        </div>
+                    </div>
                 </div>
             );
         };

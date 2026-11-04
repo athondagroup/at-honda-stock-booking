@@ -375,6 +375,9 @@
   .z-\[70\] {
     z-index: 70;
   }
+  .z-\[80\] {
+    z-index: 80;
+  }
   .z-\[90\] {
     z-index: 90;
   }
@@ -2099,9 +2102,6 @@
   .active\:bg-red-50:active {
     background-color: var(--color-red-50);
   }
-  .disabled\:bg-gray-50:disabled {
-    background-color: var(--color-gray-50);
-  }
   .disabled\:opacity-40:disabled {
     opacity: 40%;
   }
@@ -2171,6 +2171,9 @@
     }
     .sm\:max-w-lg {
       max-width: var(--container-lg);
+    }
+    .sm\:max-w-md {
+      max-width: var(--container-md);
     }
     .sm\:min-w-\[150px\] {
       min-width: 150px;
@@ -5102,6 +5105,7 @@ const cfgEmailHint = (email) => {
 };
 const useAtConfig = () => {
   const [docs, setDocs] = useState({});
+  const [profiles, setProfiles] = useState({});
   const [ready, setReady] = useState(false);
   const [dbOk, setDbOk] = useState(false);
   const [viewer, setViewer] = useState({ loaded: false, id: "", email: "", key: "", isOwner: false, canEdit: false, name: "" });
@@ -5122,7 +5126,7 @@ const useAtConfig = () => {
   const [myReq, setMyReq] = useState(null);
   const dbRef = useRef(null);
   useEffect(() => {
-    let unsub = null, unsubReq = null, unsubMine = null, cancelled = false;
+    let unsub = null, unsubReq = null, unsubMine = null, unsubProf = null, cancelled = false;
     const timer = setTimeout(() => setReady(true), 1e4);
     (async () => {
       let db = null;
@@ -5140,6 +5144,17 @@ const useAtConfig = () => {
       }
       dbRef.current = db;
       setDbOk(true);
+      if (window.__QWEB) {
+        try {
+          unsubProf = db.collection("profiles").onSnapshot((snap) => {
+            const m = {};
+            snap.docs.forEach((d) => {
+              m[d.id] = d.data();
+            });
+            setProfiles(m);
+          }, () => {});
+        } catch (e) {}
+      }
       unsub = db.collection("config").onSnapshot((snap) => {
         clearTimeout(timer);
         const m = {};
@@ -5205,6 +5220,8 @@ const useAtConfig = () => {
         unsubReq();
       if (unsubMine)
         unsubMine();
+      if (unsubProf)
+        unsubProf();
     };
   }, []);
   const [stock, setStock] = useState(null);
@@ -5261,11 +5278,11 @@ const useAtConfig = () => {
       const r = cfg.roster.find((x) => x.name === q.salesName);
       if (!r || r.left)
         return null;
-      const c = (cfg.contacts || {})[r.name] || {};
+      const c = profiles[viewer.id] || {};
       return { name: r.name, phone: c.phone || "", line: c.line || "", role: "sales", branch: r.br, active: true };
     }
     return cfg.staff.find((s) => s && s.active !== false && (viewer.key && s.key === viewer.key || viewer.id && s.uid === viewer.id)) || null;
-  }, [cfg, viewer.key, viewer.id]);
+  }, [cfg, viewer.key, viewer.id, profiles]);
   const realAdmin = !!(window.__QPREVIEW || viewer.isOwner || !window.__QWEB && staffMe && staffMe.role === "admin");
   const isAdmin = realAdmin && viewAs !== "sales";
   const canWrite = !!dbRef.current && isAdmin && (viewer.isOwner || viewer.canEdit);
@@ -5314,6 +5331,15 @@ const useAtConfig = () => {
       await remove(key);
   };
   const saveStaff = async (rows) => write("staff", { rows, at: new Date().toISOString(), by });
+  const myProfile = viewer.id && profiles[viewer.id] || null;
+  const saveProfile = async (patch) => {
+    if (!dbRef.current || !viewer.id)
+      throw new Error("ยังไม่ได้เข้าสู่ระบบ");
+    const q = window.__QWEB || {}, cur = myProfile || {}, at = new Date().toISOString();
+    const next = { email: q.email || "", name: q.name || viewer.name || "", role: q.role || "", salesName: q.salesName || "", phone: cfgStr(patch.phone ?? cur.phone), line: cfgStr(patch.line ?? cur.line) };
+    const log = [...cur.log || [], { at, phone: next.phone, line: next.line }].slice(-30);
+    await dbRef.current.collection("profiles").doc(viewer.id).set({ ...next, log, at, created: cur.created || at });
+  };
   const saveContact = async (name, patch) => {
     const map = { ...cfg.contacts || {} };
     map[name] = { ...map[name] || {}, ...patch };
@@ -5334,7 +5360,7 @@ const useAtConfig = () => {
   const rejectReq = async (req) => {
     await dbRef.current.collection("staffreq").doc(req.id).delete();
   };
-  return { cfg, month, ready, dbOk, viewer, staffMe, isAdmin, realAdmin, viewAs, setViewAs, canWrite, saveTable, saveFoc, resetTable, saveStaff, saveContact, saveSettings, reqs, myReq, requestLink, approveReq, rejectReq, version: [docs, stock] };
+  return { cfg, month, ready, dbOk, viewer, staffMe, isAdmin, realAdmin, viewAs, setViewAs, canWrite, saveTable, saveFoc, resetTable, saveStaff, saveContact, saveSettings, profiles, myProfile, saveProfile, reqs, myReq, requestLink, approveReq, rejectReq, version: [docs, stock] };
 };
 const giftAutoKind = (g) => {
   const t = String(g || "");
@@ -5988,7 +6014,7 @@ const AdminPanel = ({ api }) => {
   }), "ชื่อ สาขา และสถานะใช้งาน มาจากรายชื่อเซลล์ของ ", /* @__PURE__ */ React.createElement("a", {
     href: "../",
     className: "font-bold underline"
-  }, "เว็บ AT stock"), " · เซลล์ที่ลาออกเข้าใบเสนอราคาไม่ได้ · อีเมลเข้าระบบเพิ่มที่เว็บ AT stock → หลังบ้าน → ผู้ใช้งานเว็บ (เลือกชื่อเซลล์ให้ตรง) · หน้านี้ใส่เบอร์โทรและ LINE ที่ขึ้นในใบเสนอราคา"), /* @__PURE__ */ React.createElement("div", {
+  }, "เว็บ AT stock"), " · เซลล์ที่ลาออกเข้าใบเสนอราคาไม่ได้ · อีเมลเข้าระบบเพิ่มที่เว็บ AT stock → หลังบ้าน → ผู้ใช้งานเว็บ (เลือกชื่อเซลล์ให้ตรง) · เบอร์โทรและ LINE เซลล์ใส่เองที่ “ข้อมูลของฉัน” (ปุ่มรูปคนมุมขวาบน)"), /* @__PURE__ */ React.createElement("div", {
     className: "bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-auto"
   }, /* @__PURE__ */ React.createElement("table", {
     className: "w-full text-sm"
@@ -6009,20 +6035,12 @@ const AdminPanel = ({ api }) => {
   }, "LINE ID"))), /* @__PURE__ */ React.createElement("tbody", {
     className: "divide-y divide-gray-100"
   }, cfg.roster.map((r) => {
-    const c = cfg.contacts[r.name] || {};
+    const prof = Object.values(api.profiles || {}).filter((x) => x && x.salesName === r.name).sort((x, y) => String(y.at || "").localeCompare(String(x.at || "")))[0] || {};
+    const c = { phone: prof.phone || (cfg.contacts[r.name] || {}).phone || "", line: prof.line || (cfg.contacts[r.name] || {}).line || "" };
     const mails = (members || []).filter((m) => m.sales_name === r.name && m.active).map((m) => m.email);
-    const inp = (k, ph) => /* @__PURE__ */ React.createElement("input", {
-      key: k + (c[k] || ""),
-      disabled: !api.canWrite || r.left,
-      defaultValue: c[k] || "",
-      placeholder: ph,
-      onBlur: (e) => {
-        const v = e.target.value.trim();
-        if (v !== (c[k] || ""))
-          run(() => api.saveContact(r.name, { [k]: v }), `บันทึก${k === "phone" ? "เบอร์" : " LINE"} ${r.name} แล้ว`);
-      },
-      className: "w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm disabled:bg-gray-50"
-    });
+    const inp = (k) => c[k] ? /* @__PURE__ */ React.createElement("span", null, c[k]) : /* @__PURE__ */ React.createElement("span", {
+      className: "text-xs text-amber-700"
+    }, r.left ? "–" : "เซลล์ยังไม่ได้ใส่");
     return /* @__PURE__ */ React.createElement("tr", {
       key: r.name,
       className: r.left ? "text-gray-400" : ""
@@ -6044,9 +6062,9 @@ const AdminPanel = ({ api }) => {
       className: "text-amber-700"
     }, "ยังไม่มีอีเมล")), /* @__PURE__ */ React.createElement("td", {
       className: "py-2 px-3"
-    }, inp("phone", "เบอร์โทร")), /* @__PURE__ */ React.createElement("td", {
+    }, inp("phone")), /* @__PURE__ */ React.createElement("td", {
       className: "py-2 px-3"
-    }, inp("line", "LINE ID")));
+    }, inp("line")));
   }))))), sec === "staff" && !cfg.roster && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", {
     className: "text-2xl sm:text-3xl font-bold text-gray-900"
   }, "ผู้ใช้งาน"), /* @__PURE__ */ React.createElement("p", {
@@ -6345,6 +6363,92 @@ const AdminPanel = ({ api }) => {
     onClick: saveStaffEdit,
     className: "px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold"
   }, "บันทึก")))));
+};
+const ProfileModal = ({ api, onClose }) => {
+  const q = window.__QWEB || {}, me = api.myProfile || {};
+  const [phone, setPhone] = useState(me.phone || "");
+  const [line, setLine] = useState(me.line || "");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const roleTh = { sales: "เซลล์", admin: "แอดมินสาขา", aum: "ผู้จัดการ (PSC, ATE)", nuch: "ผู้จัดการ (SPH, KPA)", exec: "ผู้บริหาร" }[q.role] || q.role || "–";
+  const roster = (api.cfg.roster || []).find((x) => x.name === q.salesName);
+  const save = async () => {
+    if (!phone.trim()) {
+      setMsg("ใส่เบอร์โทรก่อน");
+      return;
+    }
+    setBusy(true);
+    setMsg("");
+    try {
+      await api.saveProfile({ phone: phone.trim(), line: line.trim() });
+      setMsg("บันทึกแล้ว · ใบเสนอราคาใช้ข้อมูลนี้ทันที");
+    } catch (e) {
+      setMsg("บันทึกไม่สำเร็จ: " + (e && e.message || ""));
+    }
+    setBusy(false);
+  };
+  const row = (l, v) => /* @__PURE__ */ React.createElement("div", {
+    className: "flex justify-between gap-3 py-1.5 border-b border-gray-100 text-sm"
+  }, /* @__PURE__ */ React.createElement("span", {
+    className: "text-gray-500"
+  }, l), /* @__PURE__ */ React.createElement("span", {
+    className: "font-bold text-gray-900 text-right"
+  }, v || "–"));
+  return /* @__PURE__ */ React.createElement("div", {
+    className: "fixed inset-0 z-[80] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4",
+    onClick: onClose
+  }, /* @__PURE__ */ React.createElement("div", {
+    className: "bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto",
+    onClick: (e) => e.stopPropagation(),
+    role: "dialog",
+    "aria-label": "ข้อมูลของฉัน"
+  }, /* @__PURE__ */ React.createElement("div", {
+    className: "px-5 py-4 border-b border-gray-100 flex items-center justify-between"
+  }, /* @__PURE__ */ React.createElement("h3", {
+    className: "font-bold text-gray-900 text-lg"
+  }, "ข้อมูลของฉัน"), /* @__PURE__ */ React.createElement("button", {
+    type: "button",
+    onClick: onClose,
+    className: "w-9 h-9 rounded-full bg-gray-100 text-gray-600",
+    "aria-label": "ปิด"
+  }, /* @__PURE__ */ React.createElement("i", {
+    className: "fa-solid fa-xmark"
+  }))), /* @__PURE__ */ React.createElement("div", {
+    className: "px-5 py-4 space-y-4"
+  }, /* @__PURE__ */ React.createElement("div", null, row("ชื่อในใบเสนอราคา", q.role === "sales" ? q.salesName : q.name || q.email), row("อีเมลเข้าระบบ", q.email), row("บทบาท", roleTh), row("สาขา", roster && roster.br || q.branch), q.role === "sales" && row("สถานะในรายชื่อเซลล์", roster ? roster.left ? "ลาออก" : "ใช้งาน" : "ไม่พบชื่อ"), /* @__PURE__ */ React.createElement("p", {
+    className: "text-[11px] text-gray-400 mt-1"
+  }, "ชื่อ สาขา และสถานะ แก้ที่เว็บ AT stock (รายชื่อเซลล์ / ผู้ใช้งานเว็บ)")), /* @__PURE__ */ React.createElement("label", {
+    className: "block text-xs font-bold text-gray-600"
+  }, "เบอร์โทรศัพท์ (ขึ้นในใบเสนอราคา)", /* @__PURE__ */ React.createElement("input", {
+    type: "tel",
+    inputMode: "tel",
+    value: phone,
+    onChange: (e) => setPhone(e.target.value),
+    placeholder: "เช่น 081-234-5678",
+    className: "mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-base outline-none focus:border-red-500"
+  })), /* @__PURE__ */ React.createElement("label", {
+    className: "block text-xs font-bold text-gray-600"
+  }, "LINE ID (ขึ้นในใบเสนอราคา)", /* @__PURE__ */ React.createElement("input", {
+    value: line,
+    onChange: (e) => setLine(e.target.value),
+    placeholder: "เช่น at.honda.beer",
+    className: "mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-base outline-none focus:border-red-500"
+  })), msg && /* @__PURE__ */ React.createElement("p", {
+    className: `text-sm ${/ไม่สำเร็จ|ก่อน/.test(msg) ? "text-red-600" : "text-green-700"}`
+  }, msg), /* @__PURE__ */ React.createElement("button", {
+    type: "button",
+    disabled: busy,
+    onClick: save,
+    className: "w-full py-3 rounded-xl bg-red-600 text-white font-bold disabled:opacity-50"
+  }, busy ? "กำลังบันทึก…" : "บันทึกข้อมูลของฉัน"), (me.log || []).length > 0 && /* @__PURE__ */ React.createElement("details", {
+    className: "text-xs text-gray-500"
+  }, /* @__PURE__ */ React.createElement("summary", {
+    className: "cursor-pointer"
+  }, "ประวัติการแก้ (", me.log.length, " ครั้ง)"), /* @__PURE__ */ React.createElement("ul", {
+    className: "mt-2 space-y-1"
+  }, me.log.slice().reverse().map((x, i) => /* @__PURE__ */ React.createElement("li", {
+    key: i
+  }, new Date(x.at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }), " · ", x.phone || "–", " · LINE ", x.line || "–")))))));
 };
 const formatCurrency = (num) => {
   if (num === null || num === undefined || num === "")
@@ -12075,6 +12179,23 @@ const App = () => {
   useEffect(() => {
     setFocExpense((prev) => Number(prev) === Number(totalFocExpense) ? prev : totalFocExpense);
   }, [totalFocExpense]);
+  const [showProfile, setShowProfile] = useState(false);
+  useEffect(() => {
+    if (!window.__QWEB || window.__QWEB.role !== "sales" || !atCfg.ready || !atCfg.viewer.id)
+      return;
+    if (atCfg.myProfile && atCfg.myProfile.phone)
+      return;
+    const k = "at_q_prof_ask_" + atCfg.viewer.id;
+    let asked = false;
+    try {
+      asked = localStorage.getItem(k) === "1";
+      localStorage.setItem(k, "1");
+    } catch (e) {
+      asked = false;
+    }
+    if (!asked)
+      setShowProfile(true);
+  }, [atCfg.ready, atCfg.viewer.id, !!(atCfg.myProfile && atCfg.myProfile.phone)]);
   const needLink = atCfg.viewer.loaded && !atCfg.staffMe && atCfg.cfg.staff.length > 0 && !atCfg.isAdmin;
   const consultantLocked = !!atCfg.staffMe || needLink;
   const [linkEmail, setLinkEmail] = useState("");
@@ -12499,7 +12620,18 @@ const App = () => {
     onClick: () => atCfg.setViewAs(k),
     "aria-pressed": atCfg.viewAs === k,
     className: `px-2.5 sm:px-3 py-1.5 rounded-full transition ${atCfg.viewAs === k ? k === "admin" ? "bg-gray-900 text-white" : "bg-red-600 text-white" : "text-gray-600"}`
-  }, l))), /* @__PURE__ */ React.createElement("button", {
+  }, l))), window.__QWEB && /* @__PURE__ */ React.createElement("button", {
+    type: "button",
+    onClick: () => setShowProfile(true),
+    title: "ข้อมูลของฉัน (เบอร์โทร / LINE)",
+    "aria-label": "ข้อมูลของฉัน",
+    className: `h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${atCfg.myProfile && atCfg.myProfile.phone ? "bg-gray-100 text-gray-700" : "bg-amber-100 text-amber-700 ring-2 ring-amber-300"}`
+  }, /* @__PURE__ */ React.createElement("i", {
+    className: "fa-solid fa-user"
+  })), showProfile && /* @__PURE__ */ React.createElement(ProfileModal, {
+    api: atCfg,
+    onClose: () => setShowProfile(false)
+  }), /* @__PURE__ */ React.createElement("button", {
     onClick: () => setShowHistory(true),
     className: "h-10 min-w-10 px-3 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center justify-center gap-2 text-xs font-bold transition",
     title: "เปิดใบเสนอราคาที่บันทึกไว้"
