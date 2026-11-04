@@ -33,41 +33,18 @@ document.addEventListener('scroll', optPopHide, true);
 
 // Honda's money against what the web has for the same car (the admin's pick counts)
 // a delivered car with no booking in the web (an old car: only DL and Honda's file know it): the campaign option is matched to the file by itself (4/11)
-// campaign options for a car with no booking: the invoice's month / model in the campaign table (the pick list of the edit window)
-function rptNoBkOpts(vin, D) {
-  const i = D.invByVin.get(vin); if (!i || !i.idate) return null;
-  const x = { model: i.model || '', grade: i.grade, color: i.color, cash: !i.fin, bookDate: null, inv: i.idate, adv: false };
-  if (!x.model) return null;
-  return { x, opts: rptVariantFit(x, campOptions(x).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value))) };
-}
-// the car's own variant (DRIVAL / e:HEV / the rest) narrows the table's groups that share one model key (City Hatchback: e:HEV, Turbo, DRIVAL); no variant fits → keep all
-const rptVar = t => { t = String(t || '').toUpperCase(); return /DRIVAL/.test(t) ? 'drival' : /HEV/.test(t) ? 'hev' : 'std'; };
-function rptVariantFit(x, opts) {
-  const v = rptVar((x.model || '') + ' ' + (x.grade || '')), fit = opts.filter(y => rptVar((y.gname || '') + ' ' + (y.grade || '')) === v);
-  return fit.length ? fit : opts;
-}
-function rptNoBkHit(r, D, why) {
-  const no = t => { if (why) why.t = t; return null; };
+function rptNoBkHit(r, D) {
   try {
-    if (!r || !r.opt) return no('ไฟล์ Honda ไม่มีทางเลือกของคันนี้');
-    const i = D.invByVin.get(r.vin); if (!i || i.company || !i.idate) return no('ไม่มีใบกำกับใน DL');
-    if (!rptWebDelivered(D, r.vin)) return no('ยังไม่ส่งมอบ จึงยังไม่จับคู่อัตโนมัติ');
+    if (!r || !r.opt) return null;
+    const i = D.invByVin.get(r.vin); if (!i || i.company || !i.idate || !rptWebDelivered(D, r.vin)) return null;
     const x = { model: i.model || r.name, grade: i.grade, color: i.color, cash: !i.fin, bookDate: null, inv: i.idate, adv: false };
-    if (!x.model) return no('ใบกำกับใน DL ไม่มีรุ่น');
-    const all = rptVariantFit(x, campOptions(x).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)));
-    const pk = (((S.ref.get('honda_pay') || {}).picks || {})[r.vin]) || null, pkOpt = pk && pk.cid ? all.find(y => y.value === pk.cid) : null;
-    if (pkOpt) return pkOpt;   // the admin's own pick (edit window) wins
-    if (!all.length) return no(`ไม่พบแคมเปญของ ${x.model}${x.grade ? ' ' + x.grade : ''} เดือน ${fmtM(String(i.idate).slice(0, 7))} ในตารางแคมเปญ`);
-    const l = rptSugScored(all, r.opt, r.camp);
-    if (!l.length) return no(`ทางเลือกในไฟล์ไม่ตรงกับแคมเปญใดในตาราง (${all.length} ตัวเลือก) · เลือกเองที่ปุ่ม แก้ไข`);
-    const h = rptSuggestOne(all, r.opt, r.camp, x.model, r.hasPay ? r.pay : 0);
-    return h || no(`ตรงกับหลายแคมเปญเท่ากัน (${l.length} ตัว) · เลือกเองที่ปุ่ม แก้ไข`);
-  } catch (e) { return no('จับคู่ไม่ได้: ' + (e.message || e)); }
+    return rptSuggestOne(campOptions(x).opts.filter(y => y.ok && !['pending', 'none', 'other'].includes(y.value)), r.opt, r.camp, x.model);
+  } catch (e) { return null; }
 }
 function rptMoneyCheck(r, a, D, pr) {
   const T = (t, s) => pr ? s : chip(s, t);
   const d = a && a.rec && a.rec.deal;
-  if (!a) { const wy = {}, nb = rptNoBkHit(r, D, wy); if (nb) return { html: T('good', 'ไม่มีใบจอง · จับคู่ตามไฟล์ Honda') + (pr ? ' ' + campFull(nb) : `<div class="text-xs mt-1">${esc(campFull(nb))}</div>`), tone: 'good' }; return { html: T('muted', 'ไม่พบใบจองที่ผูกกับ VIN นี้') + (wy.t ? (pr ? ' · ' + wy.t : `<div class="text-xs text-muted mt-1">จับคู่ตามไฟล์ไม่ได้: ${esc(wy.t)}</div>`) : ''), tone: 'muted' }; }
+  if (!a) { const nb = rptNoBkHit(r, D); if (nb) return { html: T('good', 'ไม่มีใบจอง · จับคู่ตามไฟล์ Honda') + (pr ? ' ' + campFull(nb) : `<div class="text-xs mt-1">${esc(campFull(nb))}</div>`), tone: 'good' }; return { html: T('muted', 'ไม่พบใบจองที่ผูกกับ VIN นี้'), tone: 'muted' }; }
   // the web has no sale terms yet: pick the campaign here and the option's money shows (kept in the report only, 26/10)
   if (!d || !d.at) return rptPickBox(r.vin, a, D, r.opt, r.camp, r.hasPay ? r.pay : 0, pr);
   const x = termsCtxAt(a, D), opts = campOptions(x).opts, out = [];
@@ -117,15 +94,13 @@ function rptSugScored(opts, optText, camp) {
 }
 function rptSuggest(opts, optText, camp) { return rptSugScored(opts, optText, camp).map(x => x[0]); }
 // the one clear match, or null when none or several fit equally (then the admin picks)
-function rptSuggestOne(opts, optText, camp, model, pay) {
+function rptSuggestOne(opts, optText, camp, model) {
   const l = rptSugScored(opts, optText, camp); if (!l.length) return null;
   let ties = l.filter(x => x[1] === l[0][1]).map(x => x[0]); if (ties.length === 1) return ties[0];
   // same text in several groups (booking month / invoice month, City / City Hatchback): keep the car's own model, then accept when the baht is the same
   const mt = String(model || '').toUpperCase(), hb = /HATCHBACK/.test(mt), w = mt.split(' ')[0];
   const fit = ties.filter(y => { const g = String(y.group || '').toUpperCase(); return (!w || g.includes(w)) && /HATCHBACK/.test(g) === hb; });
   if (fit.length) ties = fit;
-  // still several with different baht: the baht Honda paid in the file decides (e.g. City Hatchback e:HEV 50,000 vs Turbo / DRIVAL 70,000)
-  if (ties.length > 1 && Number(pay) > 0) { const pm = ties.filter(y => Math.abs((Number(y.sup) || 0) - Number(pay)) < 1); if (pm.length) ties = pm; }
   return ties.length === 1 || ties.every(y => (Number(y.sup) || 0) === (Number(ties[0].sup) || 0)) ? ties[0] : null;
 }
 // the file is matched to the campaigns by itself (26/10): no sale terms yet → kept as the car's pick in the report; sale terms with no campaign → written into them.
@@ -171,20 +146,14 @@ function rptPickBox(vin, a, D, optText, camp, pay, pr) {
 function rptEditOpen(vin, cid) {
   const ms = rptMonths(), rep = (ms.includes(S.filters.rptRep) ? S.filters.rptRep : '') || (rptAll()[vin] || {}).rep || ms[0] || '', rows = rptRows(rep), r = rows.find(x => x.vin === vin) || { vin, acts: [], opt: '', pay: 0, hasPay: false, br: myBranch() || '', camp: '', name: '' };
   const a = rptByVin(derive()).get(vin), d = a && a.rec && a.rec.deal;
-  S.modal = { kind: 'rptedit', vin, rep, a: a ? a.id : '', cid: cid || (d && d.campaign_id) || '', opt: r.opt || '', amt: r.hasPay ? String(r.pay) : '', acts: (r.acts || []).map(x => ({ name: x.name, amt: String(x.amt ?? '') })), setMargin: !!(d && r.hasPay && Math.abs((Number(d.margin_honda) || 0) - r.pay) >= 1), why: '', st: r.st || '', br: r.br || (a && a.br) || '', hasDir: !!r.hasDir, nbcid: ((((S.ref.get('honda_pay') || {}).picks || {})[vin]) || {}).cid || '', nbcid0: ((((S.ref.get('honda_pay') || {}).picks || {})[vin]) || {}).cid || '' };
+  S.modal = { kind: 'rptedit', vin, rep, a: a ? a.id : '', cid: cid || (d && d.campaign_id) || '', opt: r.opt || '', amt: r.hasPay ? String(r.pay) : '', acts: (r.acts || []).map(x => ({ name: x.name, amt: String(x.amt ?? '') })), setMargin: !!(d && r.hasPay && Math.abs((Number(d.margin_honda) || 0) - r.pay) >= 1), why: '', st: r.st || '', br: r.br || (a && a.br) || '', hasDir: !!r.hasDir };
   render();
 }
 function rptEditModal(m, D) {
   const a = m.a ? atById(m.a) : null, d = a && a.rec && a.rec.deal, locked = rptDelivered({ st: m.st }, a);
   const x = a ? termsCtxAt(a, D) : null, opts = x ? campOptions(x).opts.filter(y => y.ok) : [];
   const web = d ? `<div class="field"><label for="re-cid">แคมเปญในเงื่อนไขขาย (เว็บ)</label><select id="re-cid" data-modal="cid"><option value="">– ไม่เปลี่ยน –</option>${opts.map(y => `<option value="${esc(y.value)}" ${m.cid === y.value ? 'selected' : ''}>${esc(campFull(y))}${d.campaign_id === y.value ? ' (ปัจจุบัน)' : ''}</option>`).join('')}</select>
-      <div class="text-xs text-muted mt-1">ตอนนี้: ${esc(d.campaign || '–')} · เงินช่วย Honda ในเว็บ ${money(d.margin_honda || 0)}${d.sales_camp ? ' · เซลล์เลือก: ' + esc(d.sales_camp) : ''}</div></div>` : '<p class="text-sm text-muted">ไม่มีเงื่อนไขขายในเว็บสำหรับ VIN นี้ (แก้ได้เฉพาะข้อมูลที่ Honda จ่าย)</p>' + (() => {
-    const nb = rptNoBkOpts(m.vin, D); if (!nb) return '<p class="text-xs text-muted">ไม่มีใบกำกับใน DL จึงยังไม่มีรายการแคมเปญให้เลือก</p>';
-    const ff = campFeats(m.opt), l = rptSugScored(nb.opts, m.opt, ''), good = new Set(l.map(q => q[0].value));
-    const o = nb.opts, mk = fmtM(String(D.invByVin.get(m.vin).idate).slice(0, 7));
-    return `<div class="field"><label for="re-nb">เลือกแคมเปญ (เดือนออกใบกำกับ ${esc(mk)} · ${esc(nb.x.model)})</label><select id="re-nb" data-modal="nbcid"><option value="">– ยังไม่เลือก –</option>${rptOptHtml(o, m.nbcid)}</select>
-      <div class="text-xs text-muted mt-1">${ff ? (good.size ? 'ทางเลือกที่ตรงกับไฟล์ Honda: ' + l.map(q => esc(campFull(q[0]))).slice(0, 3).join(' | ') : 'ไม่พบแคมเปญที่ตรงกับทางเลือกในไฟล์ เลือกเองได้') : 'เลือกตามทางเลือกที่ Honda จ่าย'}</div></div>`;
-  })();
+      <div class="text-xs text-muted mt-1">ตอนนี้: ${esc(d.campaign || '–')} · เงินช่วย Honda ในเว็บ ${money(d.margin_honda || 0)}${d.sales_camp ? ' · เซลล์เลือก: ' + esc(d.sales_camp) : ''}</div></div>` : '<p class="text-sm text-muted">ไม่มีเงื่อนไขขายในเว็บสำหรับ VIN นี้ (แก้ได้เฉพาะข้อมูลที่ Honda จ่าย)</p>';
   const acts = m.acts.map((q, i) => `<div class="flex gap-2 mb-1"><input class="flex-1 min-w-0" data-modal="acts.${i}.name" value="${esc(q.name)}" placeholder="ชื่อแคมเปญพิเศษ" aria-label="ชื่อแคมเปญพิเศษ"><input class="w-28" type="number" step="0.01" data-modal="acts.${i}.amt" value="${esc(q.amt)}" aria-label="จำนวนเงิน"><button type="button" class="btn btn-ghost btn-sm" data-act="rpt-edit-del" data-i="${i}" aria-label="ลบ">✕</button></div>`).join('');
   const hist = (((S.ref.get('honda_pay') || {}).v || {})[m.vin] || {}).hist || [];
   return `<div class="flex items-start justify-between gap-3 mb-2"><div><h2 class="font-head text-xl font-semibold">แก้ไขแคมเปญ / เงิน</h2>
@@ -230,8 +199,7 @@ Object.assign(ACTIONS, {
     const fa = l => l.map(q => q.name + ' ' + money(q.amt)).join(', ');
     if (fa(old.acts) !== fa(acts)) ch.push({ f: 'แคมเปญพิเศษ', old: fa(old.acts), new: fa(acts) });
     const cidChg = !!(a && d && m.cid && m.cid !== d.campaign_id), marg = !!(d && m.setMargin && Math.abs((Number(d.margin_honda) || 0) - amt) >= 1);
-    const nbChg = !a && (m.nbcid || '') !== (m.nbcid0 || '');
-    if (!ch.length && !cidChg && !marg && !nbChg) { toast('ไม่มีอะไรเปลี่ยน', 'bad'); return; }
+    if (!ch.length && !cidChg && !marg) { toast('ไม่มีอะไรเปลี่ยน', 'bad'); return; }
     if (ch.length) {
       const per = o.per || rptMonth(m.rep);
       Object.assign(o, { br: o.br || m.br, per, model: o.model || (rptAll()[m.vin] || {}).name || '', camp: o.camp || (rptAll()[m.vin] || {}).camp || '', opt_adj: nOpt, opt: o.opt || nOpt, amt, acts, hist: [...(o.hist || []), { ...actor(), reason: why || null, changes: ch }].slice(-50) });
@@ -242,11 +210,6 @@ Object.assign(ACTIONS, {
     else if (marg) {
       const x = termsCtxAt(a, derive()), vals = termsRecord(x, { ...d, margin_honda: String(amt), margin_priv: '' }, d.paint || 0);
       if (!(await saveFlow(a, { deal: { ...d, ...vals, ...actor(), how: locked ? 'แอดมินแก้หลังส่งมอบ (รายงานสรุปแคมเปญ)' : 'แอดมินแก้ (รายงานสรุปแคมเปญ)', why: why || null, hist: [...(d.hist || []), dealOld(d)] } }, 'ปรับเงินช่วย Honda แล้ว'))) return;
-    }
-    if (nbChg) {
-      const D2 = derive(), nb = rptNoBkOpts(m.vin, D2), y = m.nbcid && nb ? nb.opts.find(q => q.value === m.nbcid) : null, c2 = S.ref.get('honda_pay') || { v: {} }, picks = { ...(c2.picks || {}) };
-      if (y) picks[m.vin] = { cid: y.value, name: campFull(y), sup: Number(y.sup) || 0, nobk: true, ...actor() }; else picks[m.vin] = { manual: true, ...actor() };
-      if (!(await write('ref', 'honda_pay', { ...c2, picks }))) return;
     }
     toast('บันทึกแล้ว เก็บประวัติแก้ไขแล้ว'); S.modal = null; render();
   }

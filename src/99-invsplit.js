@@ -54,8 +54,7 @@ function ivsCard(D, E) {
       <div class="flex justify-between py-1"><span>จัดสรรแล้ว รอออกใบกำกับ</span><span class="num text-muted">${ivsNum(V.L.alloc.length, 'alloc')} คัน</span></div>
       <div class="flex justify-between py-1"><span>ส่งมอบในเว็บแล้ว รอเข้า DL</span><span class="num text-muted">${ivsNum(V.L.deliv.length, 'deliv')} คัน</span></div>
       <div class="text-xs text-muted">เมื่อใบกำกับ/DL เข้ามา รถจะย้ายขึ้นไปนับในยอด IDS</div></div>` : '';
-  const open = !!S.filters.ivsMon;
-  const per = many ? `<button type="button" class="mt-3 w-full flex justify-between items-center rounded-lg border border-line px-3 py-2 text-sm font-semibold" style="background:var(--surface-2)" data-act="ivs-mon" aria-expanded="${open}"><span>${open ? 'ซ่อนรายเดือน' : 'ดูรายเดือน'}</span><span>${open ? '▴' : '▾'}</span></button>${open ? `<div class="mt-2 text-sm">${ms.map(m => `<div class="flex justify-between border-t border-line py-1"><span>${esc(fmtM(m.ym))}</span><span class="num ${m.has ? '' : 'text-muted'}">${m.has ? `Honda ${m.honda} · IDS ${m.nNew + m.nBack + m.nOk}` : `รออัปไฟล์ · เว็บ ${m.n}`}</span></div>`).join('')}</div>` : ''}` : '';
+  const per = many ? `<div class="mt-3 text-sm"><div class="text-muted text-xs mb-1">รายเดือน</div>${ms.map(m => `<div class="flex justify-between border-t border-line py-1"><span>${esc(fmtM(m.ym))}</span><span class="num ${m.has ? '' : 'text-muted'}">${m.has ? `Honda ${m.honda} · IDS ${m.nNew + m.nBack + m.nOk}` : `รออัปไฟล์ · เว็บ ${m.n}`}</span></div>`).join('')}</div>` : '';
   return `<section class="bg-surface border border-line rounded-lg p-4 mb-5"><h2 class="font-head font-semibold mb-2">ยอดขาย (ใบกำกับ) · Honda เทียบ IDS</h2><div class="grid md:grid-cols-2 gap-5"><div>${hon}${per}</div><div>${ids}${pend}</div></div>${web}</section>${ivsDrillPanel(V)}`;
 }
 function ivsDrillPanel(V) {
@@ -72,6 +71,5 @@ Object.assign(ACTIONS, {
     const cur = S.ref.get('inv_count') || { v: {} }, m = { ...(cur.v || {}) }, k = vin + '|' + ym;
     if (v === 'clear') delete m[k]; else m[k] = { count: v === '1', reason, ...actor() };
     if (await write('ref', 'inv_count', { ...cur, v: m })) { toast(v === 'clear' ? 'ล้างการตัดสินแล้ว' : v === '1' ? 'บันทึก: นับเป็นยอด' : 'บันทึก: ไม่นับเป็นยอด'); render(); } },
-  'ivs-mon'() { S.filters.ivsMon = !S.filters.ivsMon; render(); },
   'ivs-drill'(el) { S.filters.ivsDrill = el.dataset.k && S.filters.ivsDrill !== el.dataset.k ? el.dataset.k : ''; render(); if (S.filters.ivsDrill) setTimeout(() => { const e = document.getElementById('ivs-drill'); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); }
 });
