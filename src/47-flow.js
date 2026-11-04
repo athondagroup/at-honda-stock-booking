@@ -230,6 +230,7 @@ function poAuto(a, po) {
 }
 const poAutoCost = (a, po) => poAuto(a, po).reduce((n, x) => n + (x.fee ? Number((po.ac || {})[x.key]) || 0 : 0), 0);
 const poCharge = x => x.cpay ? (x.cprice !== undefined && x.cprice !== '' ? Number(x.cprice) || 0 : (/^ATG-/.test(x.part || '') || x.custom ? 0 : Number(x.sale) || 0)) : 0;
+const poFocCost = x => { if (x.hon) return 0; const c = (Number(x.cost) || 0) * (Number(x.qty) || 1); return x.cpay ? (x.cpart ? Math.max(0, c - poCharge(x)) : 0) : c; };
 const poChargeNote = x => x.cpay ? (x.cpart ? 'เรียกเก็บบางส่วน ' : 'ลูกค้าชำระเพิ่ม ') + money(poCharge(x)) : '';
 // the items sold most often: a chip searches the FOC list (q) or adds a typed line (cost can be filled in) (31/10)
 const POFREQ = [{ l: 'ฟิล์ม Xtra Cole', q: 'xtra cole' }, { l: 'พ่นกันสนิม 1 ครั้งก่อนส่งมอบ' }, { l: 'เคลือบสี 1 ครั้งก่อนส่งมอบ' }, { l: 'พ่นฆ่าเชื้อโรคก่อนส่งมอบ' }, { l: 'พรมปูพื้น', q: 'พรมปูพื้น' }, { l: 'ผ้ายางปูพื้น', q: 'ผ้ายาง' },
@@ -260,7 +261,7 @@ function poEditor(m, a, D) {
   const cat = focCatalog();
   const q = (m.poq || '').trim().toLowerCase();
   const hits = cat.filter(x => codes.includes(x.model) && (!q || q.split('|').map(w => w.trim()).filter(Boolean).some(w => x.name.toLowerCase().includes(w) || (x.part || '').toLowerCase().includes(w) || (x.cat || '').toLowerCase().includes(w)))).sort((x, y) => (/^(DVP|แพ็คเกจ)/.test(y.cat || '')) - (/^(DVP|แพ็คเกจ)/.test(x.cat || ''))).slice(0, 60);
-  const cost = poAutoCost(a, po) + po.items.reduce((n, x) => n + (x.cpay || x.hon ? 0 : (Number(x.cost) || 0) * (Number(x.qty) || 1)), 0);
+  const cost = poAutoCost(a, po) + po.items.reduce((n, x) => n + poFocCost(x), 0);
   const sale = po.items.reduce((n, x) => n + (Number(x.sale) || 0) * (Number(x.qty) || 1), 0);
   const focBudget = Number(a.rec.foc_total) || 0;
   const ro = poLocked(a) || !stepAllowed(a, 'po');
