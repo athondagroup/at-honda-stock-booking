@@ -139,7 +139,6 @@
     --font-weight-light: 300;
     --font-weight-normal: 400;
     --font-weight-medium: 500;
-    --font-weight-semibold: 600;
     --font-weight-bold: 700;
     --font-weight-black: 900;
     --tracking-tight: -0.025em;
@@ -343,14 +342,8 @@
   .bottom-0 {
     bottom: 0px;
   }
-  .left-0 {
-    left: 0px;
-  }
   .left-3 {
     left: calc(var(--spacing) * 3);
-  }
-  .z-10 {
-    z-index: 10;
   }
   .z-20 {
     z-index: 20;
@@ -517,6 +510,9 @@
   .hidden {
     display: none;
   }
+  .inline {
+    display: inline;
+  }
   .inline-block {
     display: inline-block;
   }
@@ -528,6 +524,9 @@
   }
   .h-2 {
     height: calc(var(--spacing) * 2);
+  }
+  .h-2\.5 {
+    height: calc(var(--spacing) * 2.5);
   }
   .h-4 {
     height: calc(var(--spacing) * 4);
@@ -603,6 +602,9 @@
   }
   .w-2 {
     width: calc(var(--spacing) * 2);
+  }
+  .w-2\.5 {
+    width: calc(var(--spacing) * 2.5);
   }
   .w-4 {
     width: calc(var(--spacing) * 4);
@@ -718,17 +720,11 @@
   .min-w-\[7rem\] {
     min-width: 7rem;
   }
-  .min-w-\[130px\] {
-    min-width: 130px;
-  }
   .min-w-\[180px\] {
     min-width: 180px;
   }
   .min-w-\[200px\] {
     min-width: 200px;
-  }
-  .min-w-\[560px\] {
-    min-width: 560px;
   }
   .min-w-\[880px\] {
     min-width: 880px;
@@ -738,9 +734,6 @@
   }
   .shrink-0 {
     flex-shrink: 0;
-  }
-  .border-collapse {
-    border-collapse: collapse;
   }
   .-translate-y-1\/2 {
     --tw-translate-y: calc(calc(1 / 2 * 100%) * -1);
@@ -766,9 +759,6 @@
   }
   .resize-y {
     resize: vertical;
-  }
-  .list-decimal {
-    list-style-type: decimal;
   }
   .appearance-none {
     appearance: none;
@@ -853,11 +843,6 @@
   }
   .gap-10 {
     gap: calc(var(--spacing) * 10);
-  }
-  :where(.space-y-0\.5 > :not(:last-child)) {
-    --tw-space-y-reverse: 0;
-    margin-block-start: calc(calc(var(--spacing) * 0.5) * var(--tw-space-y-reverse));
-    margin-block-end: calc(calc(var(--spacing) * 0.5) * calc(1 - var(--tw-space-y-reverse)));
   }
   :where(.space-y-1 > :not(:last-child)) {
     --tw-space-y-reverse: 0;
@@ -975,12 +960,6 @@
   .rounded-t-2xl {
     border-top-left-radius: var(--radius-2xl);
     border-top-right-radius: var(--radius-2xl);
-  }
-  .rounded-tl-xl {
-    border-top-left-radius: var(--radius-xl);
-  }
-  .rounded-tr-xl {
-    border-top-right-radius: var(--radius-xl);
   }
   .border {
     border-style: var(--tw-border-style);
@@ -1169,16 +1148,8 @@
     background-color: rgba(239, 246, 255, 0.1);
     
   }
-  .bg-blue-50\/20 {
-    background-color: rgba(239, 246, 255, 0.2);
-    
-  }
   .bg-blue-50\/30 {
     background-color: rgba(239, 246, 255, 0.3);
-    
-  }
-  .bg-blue-50\/50 {
-    background-color: rgba(239, 246, 255, 0.5);
     
   }
   .bg-blue-100 {
@@ -1303,10 +1274,6 @@
   }
   .bg-white {
     background-color: var(--color-white);
-  }
-  .bg-white\/15 {
-    background-color: rgba(255, 255, 255, 0.15);
-    
   }
   .bg-white\/20 {
     background-color: rgba(255, 255, 255, 0.2);
@@ -1488,8 +1455,8 @@
   .pb-44 {
     padding-bottom: calc(var(--spacing) * 44);
   }
-  .pl-4 {
-    padding-left: calc(var(--spacing) * 4);
+  .pl-2 {
+    padding-left: calc(var(--spacing) * 2);
   }
   .pl-8 {
     padding-left: calc(var(--spacing) * 8);
@@ -1599,10 +1566,6 @@
   .font-normal {
     --tw-font-weight: var(--font-weight-normal);
     font-weight: var(--font-weight-normal);
-  }
-  .font-semibold {
-    --tw-font-weight: var(--font-weight-semibold);
-    font-weight: var(--font-weight-semibold);
   }
   .tracking-tight {
     --tw-tracking: var(--tracking-tight);
@@ -2025,9 +1988,6 @@
     .hover\:bg-red-100:hover {
       background-color: var(--color-red-100);
     }
-    .hover\:bg-red-500:hover {
-      background-color: var(--color-red-500);
-    }
     .hover\:bg-red-600:hover {
       background-color: var(--color-red-600);
     }
@@ -2036,10 +1996,6 @@
     }
     .hover\:bg-white\/10:hover {
       background-color: rgba(255, 255, 255, 0.1);
-    }
-    
-    .hover\:bg-white\/25:hover {
-      background-color: rgba(255, 255, 255, 0.25);
     }
     
     .hover\:from-violet-700:hover {
@@ -2173,9 +2129,6 @@
     }
     .sm\:max-w-md {
       max-width: var(--container-md);
-    }
-    .sm\:min-w-\[150px\] {
-      min-width: 150px;
     }
     .sm\:flex-none {
       flex: none;
@@ -6451,6 +6404,253 @@ const ProfileModal = ({ api, onClose }) => {
   }, me.log.slice().reverse().map((x, i) => /* @__PURE__ */ React.createElement("li", {
     key: i
   }, new Date(x.at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }), " · ", x.phone || "–", " · LINE ", x.line || "–")))))));
+};
+const A4C_COLORS = ["#b91c1c", "#1e3a8a", "#065f46", "#7c2d12", "#4c1d95"];
+const A4C_CSS = `
+.a4c{width:794px;height:1123px;background:#fff;box-sizing:border-box;padding:22px 26px 16px;display:flex;flex-direction:column;overflow:hidden;position:relative;color:#111827;font-family:'Prompt','Noto Sans Thai',sans-serif;font-size:calc(12.5px * var(--k,1))}
+.a4c *{box-sizing:border-box}.a4c>*{flex-shrink:0}
+.a4c-bar{position:absolute;left:0;right:0;top:0;height:5px;background:linear-gradient(90deg,#b91c1c,#ef4444,#b91c1c)}
+.a4c-hd{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-bottom:.6em;border-bottom:1.5px solid #111827}
+.a4c-hd .b{display:flex;gap:.8em;align-items:center}.a4c-hd h1{margin:0;font-size:1.55em;line-height:1.1;font-weight:700}.a4c-hd p{margin:0;font-size:.95em;font-weight:600;color:#374151}
+.a4c-hd .c{text-align:right;font-size:.9em;line-height:1.4;color:#374151}.a4c-hd .c b{font-size:1.05em;color:#111}
+.a4c-grid{display:grid}
+.a4c-cards{gap:6px;margin-top:.6em}.a4c-card{border-radius:8px;color:#fff;padding:.45em .7em;min-width:0}
+.a4c-card .t{font-size:.84em;opacity:.95}.a4c-card .g{font-size:1.05em;line-height:1.25}.a4c-card .g b{font-size:1.2em}
+.a4c-tbl{margin-top:.5em;border:1px solid #d1d5db;border-radius:8px;overflow:hidden}
+.a4c-r{border-top:1px solid #e5e7eb;align-items:center}.a4c-r:first-child{border-top:none}
+.a4c-r>div{padding:.28em .7em;text-align:right;font-variant-numeric:tabular-nums;min-width:0}
+.a4c-r>.l{text-align:left;font-weight:600;color:#1f2937;background:#f3f4f6;font-size:.96em;white-space:nowrap}
+.a4c-r.em>div{font-size:1.12em}.a4c-m{font-size:1.12em;font-weight:700}.a4c small{font-size:.76em;color:#4b5563;font-weight:500}
+.a4c-sh{background:#e5e7eb;font-size:.92em;font-weight:700;padding:.25em .7em;border-top:1px solid #d1d5db}
+.a4c-sh small{font-weight:500}
+.a4c-tot{background:#111827;color:#fff}.a4c-tot>.l{background:#111827;color:#fff}.a4c-tot>div{font-size:1.28em;font-weight:800;padding:.45em .7em}
+.a4c-gift>div{text-align:left;align-self:start;padding:.4em .6em}.a4c-gift>.l{align-self:stretch}
+.a4c ol{list-style:decimal;margin:0;padding-left:1.9em;font-size:.84em;line-height:1.32;color:#1f2937}.a4c-cnt{font-size:.76em;color:#6b7280;margin-top:2px}
+.a4c-bad{color:#dc2626;font-size:.8em;font-weight:700;white-space:normal}
+.a4c-ft{margin-top:auto;padding-top:.6em;font-size:.76em;color:#4b5563;line-height:1.45}
+`;
+const CompareA4Sheet = ({ quotes, terms, consultant, h, sheetId }) => {
+  const ref = useRef(null);
+  const [k, setK] = useState(1);
+  const fc = (v) => h.formatCurrency(v);
+  const cols = `104px repeat(${quotes.length}, minmax(0, 1fr))`;
+  const isCash = (q) => q.financeType === "cash";
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el)
+      return;
+    const fits = (v) => {
+      el.style.setProperty("--k", String(v));
+      return el.scrollHeight - el.clientHeight <= 1;
+    };
+    let kk = 1;
+    if (!fits(1)) {
+      let lo = 0.5, hi = 1;
+      for (let i = 0;i < 9; i++) {
+        const mid = (lo + hi) / 2;
+        if (fits(mid))
+          lo = mid;
+        else
+          hi = mid;
+      }
+      kk = lo;
+      fits(kk);
+    }
+    if (Math.abs(kk - k) > 0.001)
+      setK(kk);
+  });
+  const row = (label, cells, cls = "") => /* @__PURE__ */ React.createElement("div", {
+    className: `a4c-grid a4c-r ${cls}`,
+    style: { gridTemplateColumns: cols }
+  }, /* @__PURE__ */ React.createElement("div", {
+    className: "l"
+  }, label), cells);
+  const cell = (q, node) => /* @__PURE__ */ React.createElement("div", {
+    key: q.id
+  }, node);
+  const color = (i) => A4C_COLORS[i % A4C_COLORS.length];
+  const expRows = [{ l: "ค่ามัดจำป้ายแดง", k: "redPlate" }, { l: "ค่าอุปกรณ์ตกแต่ง", k: "accessories" }, { l: "VAT", k: "vatDiscount" }, { l: "อื่นๆ (บวก)", k: "othersAdd" }].filter((r) => quotes.some((q) => h.getExpenseValue(q.expenses?.[r.k]) > 0));
+  const dedRows = [{ l: "ส่วนลดเงินสด", k: "cashDiscount" }, { l: "หัก มัดจำ", k: "deposit" }, { l: "หัก อื่นๆ", k: "othersDeduct" }].filter((r) => quotes.some((q) => h.getExpenseValue(q.expenses?.[r.k]) > 0));
+  const anyFin = quotes.some((q) => !isCash(q));
+  const anyDSP = quotes.some((q) => q.isDSP || q.financeType === "dsp");
+  const anyExtra = quotes.some((q) => (q.extraItems || []).length);
+  const bank = [...new Set(quotes.filter((q) => !isCash(q)).map((q) => q.bankLabel).filter(Boolean))];
+  const today = new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" });
+  return /* @__PURE__ */ React.createElement("div", {
+    id: sheetId,
+    ref,
+    className: "a4c",
+    style: { "--k": k }
+  }, /* @__PURE__ */ React.createElement("div", {
+    className: "a4c-bar"
+  }), /* @__PURE__ */ React.createElement("div", {
+    className: "a4c-hd"
+  }, /* @__PURE__ */ React.createElement("div", {
+    className: "b"
+  }, /* @__PURE__ */ React.createElement(HondaNextLogo, {
+    color: "#000000",
+    size: 38,
+    showWord: false
+  }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h1", null, "AT Honda Group"), /* @__PURE__ */ React.createElement("p", null, "ใบเปรียบเทียบข้อเสนอ"))), /* @__PURE__ */ React.createElement("div", {
+    className: "c"
+  }, consultant.name && /* @__PURE__ */ React.createElement("b", null, consultant.name), consultant.phone && /* @__PURE__ */ React.createElement(React.Fragment, null, " · ", consultant.phone), consultant.line && /* @__PURE__ */ React.createElement(React.Fragment, null, " · ", /* @__PURE__ */ React.createElement("span", {
+    style: { color: "#15803d" }
+  }, "LINE ", consultant.line)), /* @__PURE__ */ React.createElement("br", null), today)), /* @__PURE__ */ React.createElement("div", {
+    className: "a4c-grid a4c-cards",
+    style: { gridTemplateColumns: cols }
+  }, /* @__PURE__ */ React.createElement("div", null), quotes.map((q, i) => /* @__PURE__ */ React.createElement("div", {
+    key: q.id,
+    className: "a4c-card",
+    style: { background: color(i) }
+  }, /* @__PURE__ */ React.createElement("div", {
+    className: "t"
+  }, "ข้อเสนอ ", i + 1, " · ", h.custFinLabel(q.financeLabel || (isCash(q) ? "ซื้อสด" : q.isDSP ? "Double Smile Plus" : "ผ่อน"))), /* @__PURE__ */ React.createElement("div", {
+    className: "g"
+  }, h.uiModelShort(q.uiModel), " ", /* @__PURE__ */ React.createElement("b", null, q.grade?.name || q.grade)), /* @__PURE__ */ React.createElement("div", {
+    className: "t"
+  }, q.color?.name || "-")))), /* @__PURE__ */ React.createElement("div", {
+    className: "a4c-tbl"
+  }, row("ราคารถ", quotes.map((q) => cell(q, fc(q.totalPrice)))), quotes.some((q) => Number(q.priceAdjustment)) && row("ส่วนลด / ซับดาวน์", quotes.map((q) => cell(q, Number(q.priceAdjustment) ? fc(q.priceAdjustment) : "–"))), row("ราคาสุทธิ", quotes.map((q, i) => cell(q, /* @__PURE__ */ React.createElement("b", {
+    style: { color: color(i) }
+  }, fc(q.netPrice)))), "em"), anyFin && row("เงินดาวน์", quotes.map((q) => cell(q, isCash(q) ? "–" : /* @__PURE__ */ React.createElement(React.Fragment, null, fc(q.downAmount), " ", /* @__PURE__ */ React.createElement("small", null, q.downPct, "%"))))), anyFin && row("ยอดจัด", quotes.map((q) => cell(q, isCash(q) ? "–" : fc(q.financeAmount)))), anyFin && /* @__PURE__ */ React.createElement("div", {
+    className: "a4c-sh"
+  }, "ค่างวดต่อเดือน", bank.length ? ` · ${bank.join(" / ")}` : "", " ", /* @__PURE__ */ React.createElement("small", null, "(ดอกเบี้ย · ดอกเบี้ยรวมตลอดสัญญา)")), anyFin && terms.map((t) => row(`${t} งวด`, quotes.map((q, i) => {
+    const r = q.installments?.[t];
+    if (isCash(q))
+      return cell(q, "–");
+    if (r?.invalid)
+      return cell(q, /* @__PURE__ */ React.createElement("span", {
+        className: "a4c-bad"
+      }, r.invalidReason || "ไม่เข้าเงื่อนไข"));
+    if (!(r && r.monthly > 0))
+      return cell(q, "–");
+    return cell(q, /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", {
+      className: "a4c-m",
+      style: { color: color(i) }
+    }, fc(r.monthly)), " ", /* @__PURE__ */ React.createElement("small", {
+      style: { display: quotes.length >= 4 ? "block" : "inline" }
+    }, r.rate, "%", r.totalInterest > 0 ? ` · รวม ${fc(r.totalInterest)}` : "", q.isDSP && r.balloon > 0 ? ` · ก้อนสุดท้าย ${fc(r.balloon)}` : "")));
+  }))), /* @__PURE__ */ React.createElement("div", {
+    className: "a4c-sh"
+  }, "ค่าใช้จ่ายวันรับรถ"), row("ค่าเบี้ยประกันภัย", quotes.map((q) => {
+    const t = h.quoteInsuranceText(q);
+    return cell(q, /^\d/.test(String(t)) ? fc(t) : /* @__PURE__ */ React.createElement("span", {
+      style: { color: /แถม/.test(String(t)) ? "#15803d" : undefined, fontWeight: /แถม/.test(String(t)) ? 700 : 400 }
+    }, t));
+  })), row("ค่าจดทะเบียน", quotes.map((q) => cell(q, h.quoteRegistrationText(q)))), expRows.map((r) => /* @__PURE__ */ React.createElement(React.Fragment, {
+    key: r.k
+  }, row(r.k === "othersAdd" ? quotes.find((q) => q.expenses?.othersAddLabel)?.expenses?.othersAddLabel || r.l : r.l, quotes.map((q) => cell(q, h.getExpenseValue(q.expenses?.[r.k]) > 0 ? fc(q.expenses[r.k]) : "–"))))), dedRows.map((r) => /* @__PURE__ */ React.createElement(React.Fragment, {
+    key: r.k
+  }, row(r.l, quotes.map((q) => cell(q, h.getExpenseValue(q.expenses?.[r.k]) > 0 ? /* @__PURE__ */ React.createElement("span", {
+    style: { color: "#15803d" }
+  }, "-", fc(q.expenses[r.k])) : "–"))))), row("รวมจ่ายวันรับรถ", quotes.map((q) => cell(q, fc(q.totalOnDelivery))), "a4c-tot"), /* @__PURE__ */ React.createElement("div", {
+    className: "a4c-sh"
+  }, "ของแถม"), /* @__PURE__ */ React.createElement("div", {
+    className: "a4c-grid a4c-r a4c-gift",
+    style: { gridTemplateColumns: cols }
+  }, /* @__PURE__ */ React.createElement("div", {
+    className: "l"
+  }, "รายการ"), quotes.map((q) => /* @__PURE__ */ React.createElement("div", {
+    key: q.id
+  }, (q.gifts || []).length ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("ol", null, q.gifts.map((g, i) => /* @__PURE__ */ React.createElement("li", {
+    key: i
+  }, g))), /* @__PURE__ */ React.createElement("div", {
+    className: "a4c-cnt"
+  }, q.gifts.length, " รายการ")) : "–"))), anyExtra && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", {
+    className: "a4c-sh"
+  }, "อุปกรณ์ซื้อเพิ่มเติม"), /* @__PURE__ */ React.createElement("div", {
+    className: "a4c-grid a4c-r a4c-gift",
+    style: { gridTemplateColumns: cols }
+  }, /* @__PURE__ */ React.createElement("div", {
+    className: "l"
+  }, "รายการ"), quotes.map((q) => /* @__PURE__ */ React.createElement("div", {
+    key: q.id
+  }, (q.extraItems || []).length ? /* @__PURE__ */ React.createElement("ol", null, q.extraItems.map((x, i) => /* @__PURE__ */ React.createElement("li", {
+    key: i
+  }, x.name, Number(x.price) ? ` · ${fc(x.price)}` : ""))) : "–"))))), /* @__PURE__ */ React.createElement("div", {
+    className: "a4c-ft"
+  }, "*ค่างวดและอัตราดอกเบี้ยเป็นการประมาณการ อาจเปลี่ยนแปลงตามเงื่อนไขไฟแนนซ์และแคมเปญ ณ วันที่จอง", anyDSP ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("br", null), DSP_EXTENSION_NOTE) : null));
+};
+const CompareA4View = ({ quotes, terms, consultant, h, onEdit, onRemove, onGoQuote }) => {
+  const wrap = useRef(null);
+  const [w, setW] = useState(794);
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el)
+      return;
+    const fit = () => setW(Math.min(794, el.clientWidth));
+    fit();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(fit) : null;
+    if (ro)
+      ro.observe(el);
+    else
+      window.addEventListener("resize", fit);
+    return () => {
+      if (ro)
+        ro.disconnect();
+      else
+        window.removeEventListener("resize", fit);
+    };
+  }, []);
+  if (!quotes.length)
+    return /* @__PURE__ */ React.createElement("div", {
+      className: "bg-white rounded-2xl card-shadow p-6 text-center"
+    }, /* @__PURE__ */ React.createElement("i", {
+      className: "fa-solid fa-scale-balanced text-4xl text-gray-300 mb-4"
+    }), /* @__PURE__ */ React.createElement("p", {
+      className: "text-gray-600 font-bold mb-1"
+    }, "ยังไม่มีใบเสนอราคาที่เลือกไว้"), /* @__PURE__ */ React.createElement("p", {
+      className: "text-sm text-gray-500 mb-3"
+    }, "ทำใบเสนอราคา แล้วกด “เพิ่มลงเปรียบเทียบ” ด้านล่างของแถบเสนอราคา"), /* @__PURE__ */ React.createElement("button", {
+      type: "button",
+      onClick: onGoQuote,
+      className: "px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold"
+    }, "ไปที่แถบเสนอราคา"));
+  const s = w / 794;
+  return /* @__PURE__ */ React.createElement("div", {
+    className: "space-y-3"
+  }, /* @__PURE__ */ React.createElement("style", null, A4C_CSS), /* @__PURE__ */ React.createElement("div", {
+    className: "flex flex-wrap gap-2"
+  }, quotes.map((q, i) => /* @__PURE__ */ React.createElement("div", {
+    key: q.id,
+    className: "flex items-center gap-2 bg-white rounded-xl border border-gray-200 pl-2 pr-1 py-1 text-xs"
+  }, /* @__PURE__ */ React.createElement("span", {
+    className: "w-2.5 h-2.5 rounded-full",
+    style: { background: A4C_COLORS[i % A4C_COLORS.length] }
+  }), /* @__PURE__ */ React.createElement("span", {
+    className: "font-bold text-gray-800"
+  }, "ข้อเสนอ ", i + 1, " · ", h.uiModelShort(q.uiModel), " ", q.grade?.name || q.grade), q.data && /* @__PURE__ */ React.createElement("button", {
+    type: "button",
+    onClick: () => onEdit(q),
+    className: "px-2 py-1 rounded-lg bg-gray-100 font-bold text-gray-700"
+  }, "แก้ไข"), /* @__PURE__ */ React.createElement("button", {
+    type: "button",
+    onClick: () => onRemove(q.id),
+    className: "px-2 py-1 rounded-lg bg-gray-100 font-bold text-red-600"
+  }, "เอาออก")))), /* @__PURE__ */ React.createElement("div", {
+    ref: wrap,
+    className: "w-full"
+  }, /* @__PURE__ */ React.createElement("div", {
+    className: "mx-auto rounded-xl overflow-hidden card-shadow",
+    style: { width: 794 * s, height: 1123 * s }
+  }, /* @__PURE__ */ React.createElement("div", {
+    style: { transform: `scale(${s})`, transformOrigin: "top left", width: 794, height: 1123 }
+  }, /* @__PURE__ */ React.createElement(CompareA4Sheet, {
+    quotes,
+    terms,
+    consultant,
+    h,
+    sheetId: "compare-saved-card"
+  })))), /* @__PURE__ */ React.createElement("div", {
+    "aria-hidden": "true",
+    style: { position: "fixed", left: -1e4, top: 0, width: 794, height: 1123, pointerEvents: "none" }
+  }, /* @__PURE__ */ React.createElement(CompareA4Sheet, {
+    quotes,
+    terms,
+    consultant,
+    h,
+    sheetId: "compare-a4-capture"
+  })));
 };
 const formatCurrency = (num) => {
   if (num === null || num === undefined || num === "")
@@ -11891,7 +12091,11 @@ const App = () => {
         ignoreElements: (el) => el.classList.contains("hide-in-image"),
         onclone: (doc) => {
           const el = doc.getElementById(elementId);
-          if (el) {
+          if (el && elementId === "compare-a4-capture") {
+            el.parentNode.style.left = "0";
+            el.style.width = "794px";
+            el.style.height = "1123px";
+          } else if (el) {
             el.classList.remove("card-shadow");
             el.style.boxShadow = "none";
             el.style.margin = "0";
@@ -11943,7 +12147,7 @@ const App = () => {
     }
   };
   const handleSaveImage = async (name) => {
-    const elementId = viewMode === "compare_saved" ? "compare-saved-card" : "quotation-card";
+    const elementId = viewMode === "compare_saved" ? "compare-a4-capture" : "quotation-card";
     const element = document.getElementById(elementId);
     if (!element)
       return;
@@ -14257,251 +14461,15 @@ const App = () => {
     type: "button",
     onClick: () => setConfirmClearCompare(true),
     className: "px-3 py-2 rounded-xl bg-white border border-gray-200 text-xs font-bold text-red-500"
-  }, "ล้างทั้งหมด"))), /* @__PURE__ */ React.createElement("div", {
-    id: "compare-saved-card",
-    className: "bg-white rounded-2xl card-shadow overflow-hidden relative print-area flex flex-col"
-  }, /* @__PURE__ */ React.createElement("div", {
-    className: "h-2 bg-gradient-to-r from-red-700 via-red-500 to-red-700"
-  }), /* @__PURE__ */ React.createElement("div", {
-    className: "p-3 sm:p-5 md:p-6 flex-1"
-  }, /* @__PURE__ */ React.createElement("div", {
-    className: "flex flex-col md:flex-row justify-between items-start gap-3 border-b border-gray-100 pb-3 mb-3"
-  }, /* @__PURE__ */ React.createElement("div", {
-    className: "flex items-center gap-4"
-  }, /* @__PURE__ */ React.createElement("div", {
-    className: "w-11 sm:w-14 flex items-center justify-center shrink-0"
-  }, /* @__PURE__ */ React.createElement(HondaNextLogo, {
-    color: "#000000",
-    size: 44,
-    showWord: false
-  })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", {
-    className: "text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight"
-  }, "AT Honda Group"), /* @__PURE__ */ React.createElement("p", {
-    className: "text-base text-gray-500 font-medium"
-  }, "ใบเปรียบเทียบข้อเสนอ"), customerName && /* @__PURE__ */ React.createElement("p", {
-    className: "text-base text-gray-700 mt-0.5"
-  }, "เรียน คุณ ", /* @__PURE__ */ React.createElement("b", null, customerName)))), /* @__PURE__ */ React.createElement("div", {
-    className: "text-right text-sm text-gray-500 self-end md:self-start"
-  }, /* @__PURE__ */ React.createElement("p", {
-    className: "font-bold text-gray-800 text-base"
-  }, consultantName || ""), /* @__PURE__ */ React.createElement("p", null, consultantPhone), consultantLine && /* @__PURE__ */ React.createElement("p", {
-    className: "text-green-600"
-  }, "Line: ", consultantLine), /* @__PURE__ */ React.createElement("p", {
-    className: "text-xs text-gray-400 mt-1"
-  }, new Date().toLocaleDateString("th-TH", { dateStyle: "long" })))), savedQuotes.length === 0 ? /* @__PURE__ */ React.createElement("div", {
-    className: "text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-200"
-  }, /* @__PURE__ */ React.createElement("i", {
-    className: "fa-solid fa-scale-balanced text-4xl text-gray-300 mb-4"
-  }), /* @__PURE__ */ React.createElement("p", {
-    className: "text-gray-600 font-bold mb-1"
-  }, "ยังไม่มีใบเสนอราคาที่เลือกไว้"), /* @__PURE__ */ React.createElement("p", {
-    className: "text-sm text-gray-500 mb-3"
-  }, "ทำใบเสนอราคา แล้วกด “เพิ่มลงเปรียบเทียบ” ด้านล่างของแถบเสนอราคา"), /* @__PURE__ */ React.createElement("button", {
-    type: "button",
-    onClick: () => setViewMode("quotation"),
-    className: "px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold"
-  }, "ไปที่แถบเสนอราคา")) : /* @__PURE__ */ React.createElement("div", {
-    className: "table-responsive"
-  }, /* @__PURE__ */ React.createElement("table", {
-    className: `w-full text-xs sm:text-sm border-collapse ${savedQuotes.length > 1 ? "min-w-[560px]" : ""}`
-  }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", {
-    className: "bg-gray-900 text-white"
-  }, /* @__PURE__ */ React.createElement("th", {
-    className: "py-3 px-2 sm:px-3 text-left w-28 sm:w-40 sticky left-0 bg-gray-900 z-10 rounded-tl-xl"
-  }, "รายการ"), savedQuotes.map((q, idx) => /* @__PURE__ */ React.createElement("th", {
-    key: q.id,
-    className: `py-3 px-2 sm:px-3 text-right min-w-[130px] sm:min-w-[150px] align-top ${idx === savedQuotes.length - 1 ? "rounded-tr-xl" : ""}`
-  }, /* @__PURE__ */ React.createElement("div", {
-    className: "flex flex-col items-end"
-  }, /* @__PURE__ */ React.createElement("span", {
-    className: "text-[11px] font-semibold text-red-300"
-  }, "ข้อเสนอ ", idx + 1), /* @__PURE__ */ React.createElement("span", {
-    className: "text-sm font-semibold text-white"
-  }, uiModelShort(q.uiModel)), /* @__PURE__ */ React.createElement("span", {
-    className: "font-bold text-base"
-  }, q.grade?.name || q.grade), /* @__PURE__ */ React.createElement("span", {
-    className: "text-[10px] mt-1 px-1.5 rounded bg-white/15"
-  }, custFinLabel(q.financeLabel || (q.financeType === "cash" ? "ซื้อสด" : q.isDSP ? "Double Smile Plus" : "ผ่อน")))), /* @__PURE__ */ React.createElement("div", {
-    className: "hide-in-image no-print flex justify-end gap-1 mt-2"
-  }, q.data && /* @__PURE__ */ React.createElement("button", {
-    type: "button",
-    onClick: () => handleLoad({ data: q.data }),
-    className: "px-2 py-0.5 rounded bg-white/15 hover:bg-white/25 text-[10px] font-bold"
-  }, "แก้ไข"), /* @__PURE__ */ React.createElement("button", {
-    type: "button",
-    onClick: () => handleRemoveSavedQuote(q.id),
-    className: "px-2 py-0.5 rounded bg-white/15 hover:bg-red-500 text-[10px] font-bold"
-  }, "เอาออก")))))), /* @__PURE__ */ React.createElement("tbody", {
-    className: "divide-y divide-gray-100"
-  }, /* @__PURE__ */ React.createElement("tr", {
-    className: "bg-gray-50"
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-2 px-3 font-bold text-gray-600 sticky left-0 bg-gray-50 border-r"
-  }, "สีรถ"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-2 px-3 text-right text-xs text-gray-600"
-  }, q.color?.name || "-"))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    className: "py-2 px-3 font-bold text-gray-800 sticky left-0 bg-white border-r"
-  }, "ราคารถ"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-2 px-3 text-right font-bold"
-  }, formatCurrency(q.totalPrice)))), /* @__PURE__ */ React.createElement("tr", {
-    className: "bg-blue-50/30"
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-2 px-3 font-bold text-blue-800 sticky left-0 bg-blue-50/30 border-r"
-  }, "ส่วนลด / ซับดาวน์"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-2 px-3 text-right font-bold text-blue-600"
-  }, Number(q.priceAdjustment) > 0 ? `+${formatCurrency(q.priceAdjustment)}` : formatCurrency(q.priceAdjustment || 0)))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    className: "py-2 px-3 font-bold text-gray-800 sticky left-0 bg-white border-r"
-  }, "ราคาสุทธิ"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-2 px-3 text-right font-bold text-gray-900"
-  }, formatCurrency(q.netPrice)))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    className: "py-2 px-3 font-bold text-gray-700 sticky left-0 bg-white border-r"
-  }, "ไฟแนนซ์"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-2 px-3 text-right text-xs text-gray-700 whitespace-normal"
-  }, q.financeType === "cash" ? "-" : q.bankLabel || "-"))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    className: "py-2 px-3 font-bold text-gray-800 sticky left-0 bg-white border-r"
-  }, "เงินดาวน์"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-2 px-3 text-right font-bold text-blue-700"
-  }, q.financeType === "cash" ? "-" : `${formatCurrency(q.downAmount)} (${parseFloat(Number(q.downPct).toFixed(2))}%)`))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    className: "py-2 px-3 font-bold text-gray-800 sticky left-0 bg-white border-r"
-  }, "ยอดจัด"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-2 px-3 text-right font-bold"
-  }, q.financeType === "cash" ? "-" : formatCurrency(q.financeAmount)))), compareTerms.map((t) => /* @__PURE__ */ React.createElement(React.Fragment, {
-    key: t
-  }, /* @__PURE__ */ React.createElement("tr", {
-    className: "bg-gray-900"
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-1 px-3 font-bold text-white text-xs sticky left-0 bg-gray-900",
-    colSpan: savedQuotes.length + 1
-  }, "ผ่อน ", t, " งวด")), /* @__PURE__ */ React.createElement("tr", {
-    className: "hover:bg-gray-50"
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-2 px-3 text-gray-800 font-bold sticky left-0 bg-white border-r"
-  }, "ค่างวด / เดือน"), savedQuotes.map((q) => {
-    const r = q.installments?.[t];
-    return /* @__PURE__ */ React.createElement("td", {
-      key: q.id,
-      className: "py-2 px-3 text-right font-bold"
-    }, q.financeType === "cash" ? "-" : r?.invalid ? /* @__PURE__ */ React.createElement("span", {
-      className: "text-[10px] text-red-500 font-bold whitespace-normal"
-    }, r.invalidReason || "ไม่เข้าเงื่อนไข") : r && r.monthly > 0 ? /* @__PURE__ */ React.createElement("span", {
-      className: "text-lg text-gray-800"
-    }, formatCurrency(r.monthly)) : "-", q.financeType !== "cash" && r && !r.invalid && r.monthly > 0 && /* @__PURE__ */ React.createElement("span", {
-      className: "text-[10px] text-gray-400 block font-normal"
-    }, "(", r.rate, "%)"));
-  })), savedQuotes.some((q) => q.isDSP && q.installments?.[t]?.balloon > 0) && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("tr", {
-    className: "bg-blue-50/50"
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-1.5 px-3 text-blue-900 text-xs font-bold sticky left-0 bg-blue-50 border-r"
-  }, "ชำระก้อนสุดท้าย"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-1.5 px-3 text-right text-sm text-blue-800 font-bold"
-  }, q.isDSP && q.installments?.[t]?.balloon > 0 ? formatCurrency(q.installments[t].balloon) : "-"))), [12, 24, 36].map((m) => /* @__PURE__ */ React.createElement("tr", {
-    key: m,
-    className: "bg-blue-50/20"
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-1 px-3 text-gray-500 text-[11px] sticky left-0 bg-white border-r"
-  }, "หรือ ผ่อนต่อ ", m, " งวด"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-1 px-3 text-right text-sm text-gray-600"
-  }, q.isDSP && q.installments?.[t]?.[`ext${m}`] > 0 ? formatCurrency(q.installments[t][`ext${m}`]) : "-"))))))), /* @__PURE__ */ React.createElement("tr", {
-    className: "bg-gray-100"
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-1.5 px-3 font-bold text-gray-700 text-xs sticky left-0 bg-gray-100",
-    colSpan: savedQuotes.length + 1
-  }, "ค่าใช้จ่ายวันรับรถ")), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    className: "py-1.5 px-3 text-gray-600 sticky left-0 bg-white border-r"
-  }, "ค่าเบี้ยประกันภัย"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-1.5 px-3 text-right text-gray-700"
-  }, /^\d/.test(String(quoteInsuranceText(q))) ? formatCurrency(quoteInsuranceText(q)) : /* @__PURE__ */ React.createElement("span", {
-    className: "text-green-600 italic"
-  }, quoteInsuranceText(q))))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    className: "py-1.5 px-3 text-gray-600 sticky left-0 bg-white border-r"
-  }, "ค่าจดทะเบียน"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-1.5 px-3 text-right text-gray-700"
-  }, quoteRegistrationText(q)))), [{ l: "ค่ามัดจำป้ายแดง", k: "redPlate" }, { l: "ค่าอุปกรณ์ตกแต่ง", k: "accessories" }, { l: "VAT", k: "vatDiscount" }, { l: "อื่นๆ (บวก)", k: "othersAdd" }].filter((row) => savedQuotes.some((q) => getExpenseValue(q.expenses?.[row.k]) > 0)).map((row) => /* @__PURE__ */ React.createElement("tr", {
-    key: row.k
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-1.5 px-3 text-gray-600 sticky left-0 bg-white border-r"
-  }, row.k === "othersAdd" ? savedQuotes.find((q) => q.expenses?.othersAddLabel)?.expenses?.othersAddLabel || row.l : row.l), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-1.5 px-3 text-right text-gray-700"
-  }, formatCurrency(q.expenses?.[row.k]))))), [{ l: "ส่วนลดเงินสด", k: "cashDiscount" }, { l: "หัก มัดจำ", k: "deposit" }, { l: "หัก อื่นๆ", k: "othersDeduct" }].filter((row) => savedQuotes.some((q) => getExpenseValue(q.expenses?.[row.k]) > 0)).map((row) => /* @__PURE__ */ React.createElement("tr", {
-    key: row.k
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-1.5 px-3 text-green-600 sticky left-0 bg-white border-r"
-  }, row.l), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-1.5 px-3 text-right text-green-600"
-  }, getExpenseValue(q.expenses?.[row.k]) > 0 ? `-${formatCurrency(q.expenses[row.k])}` : "-")))), /* @__PURE__ */ React.createElement("tr", {
-    className: "bg-gray-900 text-white"
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-3 px-3 font-bold text-sm sticky left-0 bg-gray-900 border-r border-gray-700"
-  }, "รวมจ่ายวันรับรถ"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-3 px-3 text-right font-bold text-xl"
-  }, formatCurrency(q.totalOnDelivery)))), /* @__PURE__ */ React.createElement("tr", {
-    className: "bg-gray-100"
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-1.5 px-3 font-bold text-gray-700 text-xs sticky left-0 bg-gray-100",
-    colSpan: savedQuotes.length + 1
-  }, /* @__PURE__ */ React.createElement("i", {
-    className: "fa-solid fa-gift mr-1"
-  }), "รายการของแถม")), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    className: "py-2 px-3 text-gray-600 sticky left-0 bg-white border-r align-top"
-  }, "ของแถม"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-2 px-3 align-top text-left"
-  }, q.gifts && q.gifts.length ? /* @__PURE__ */ React.createElement("ol", {
-    className: "list-decimal pl-4 space-y-0.5 text-[11px] text-gray-700 whitespace-normal"
-  }, q.gifts.map((g, i) => /* @__PURE__ */ React.createElement("li", {
-    key: i
-  }, g))) : /* @__PURE__ */ React.createElement("span", {
-    className: "text-xs text-gray-400"
-  }, "-")))), savedQuotes.some((q) => (q.extraItems || []).length) && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("tr", {
-    className: "bg-gray-100"
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-1.5 px-3 font-bold text-gray-700 text-xs sticky left-0 bg-gray-100",
-    colSpan: savedQuotes.length + 1
-  }, /* @__PURE__ */ React.createElement("i", {
-    className: "fa-solid fa-cart-plus mr-1"
-  }), "อุปกรณ์ซื้อเพิ่มเติม")), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    className: "py-2 px-3 text-gray-600 sticky left-0 bg-white border-r align-top"
-  }, "รายการ"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-2 px-3 align-top text-left"
-  }, (q.extraItems || []).length ? /* @__PURE__ */ React.createElement("ol", {
-    className: "list-decimal pl-4 space-y-0.5 text-[11px] text-gray-700 whitespace-normal"
-  }, q.extraItems.map((x, i) => /* @__PURE__ */ React.createElement("li", {
-    key: i
-  }, x.name, " ", /* @__PURE__ */ React.createElement("b", null, formatCurrency(x.price))))) : /* @__PURE__ */ React.createElement("span", {
-    className: "text-xs text-gray-400"
-  }, "-"))))), /* @__PURE__ */ React.createElement("tr", {
-    className: "bg-gray-100"
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-1.5 px-3 font-bold text-gray-700 text-xs sticky left-0 bg-gray-100",
-    colSpan: savedQuotes.length + 1
-  }, "ดอกเบี้ยรวมตลอดสัญญา")), compareTerms.map((t) => /* @__PURE__ */ React.createElement("tr", {
-    key: `int-${t}`
-  }, /* @__PURE__ */ React.createElement("td", {
-    className: "py-1.5 px-3 text-gray-600 text-xs sticky left-0 bg-white border-r"
-  }, t, " งวด"), savedQuotes.map((q) => /* @__PURE__ */ React.createElement("td", {
-    key: q.id,
-    className: "py-1.5 px-3 text-right text-sm text-red-600 font-bold"
-  }, q.financeType === "cash" ? "-" : q.installments?.[t]?.totalInterest > 0 ? formatCurrency(q.installments[t].totalInterest) : "-")))))), savedQuotes.some((q) => q.isDSP || q.financeType === "dsp") && /* @__PURE__ */ React.createElement("div", {
-    className: "mt-2 text-right text-[10px] text-gray-500 italic"
-  }, DSP_EXTENSION_NOTE))), /* @__PURE__ */ React.createElement("div", {
-    className: "at-bottom-strip mt-auto",
-    "aria-hidden": "true"
-  }))), viewMode === "report" && !atCfg.isAdmin && /* @__PURE__ */ React.createElement("div", {
+  }, "ล้างทั้งหมด"))), /* @__PURE__ */ React.createElement(CompareA4View, {
+    quotes: savedQuotes,
+    terms: compareTerms,
+    consultant: { name: consultantName, phone: consultantPhone, line: consultantLine },
+    onEdit: (q) => handleLoad({ data: q.data }),
+    onRemove: handleRemoveSavedQuote,
+    onGoQuote: () => setViewMode("quotation"),
+    h: { quoteInsuranceText, quoteRegistrationText, getExpenseValue, custFinLabel, formatCurrency, uiModelShort }
+  })), viewMode === "report" && !atCfg.isAdmin && /* @__PURE__ */ React.createElement("div", {
     className: "max-w-xl mx-auto text-center py-16 text-gray-500"
   }, "รายงานสำหรับผู้ดูแลระบบ"), viewMode === "report" && atCfg.isAdmin && /* @__PURE__ */ React.createElement("div", {
     className: "max-w-7xl mx-auto space-y-4"

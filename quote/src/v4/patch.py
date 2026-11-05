@@ -35,7 +35,7 @@ helpers = '''
         const custFinLabel = (l) => l === 'ดอกเบี้ยแคมเปญ' ? 'ผ่อนชำระ' : (l || '');
 '''
 anchor = '            return { entries, mode, ready, add, update, remove };\n        };\n'
-rep(anchor, anchor + cfg_js + helpers + rd('admin.jsx'))
+rep(anchor, anchor + cfg_js + helpers + rd('admin.jsx') + rd('compare_a4.jsx'))
 rep("                    <span className=\"text-[10px] text-slate-400\">Margin มาตรฐาน เดือน {fmtMonth(AT_MARGIN_MONTH)}",
     "                    <span className=\"text-[10px] text-slate-400\">Margin มาตรฐาน เดือน {fmtMonth(AT_ACTIVE.marginMonth || AT_MARGIN_MONTH)}", 0) if False else None
 resub(r'Margin มาตรฐาน เดือน \{fmtMonth\(AT_MARGIN_MONTH\)\} · ตาราง AT สต็อก', 'Margin มาตรฐาน เดือน {fmtMonth(AT_ACTIVE.marginMonth || AT_MARGIN_MONTH)} · ตารางหลังบ้าน')
@@ -540,5 +540,15 @@ rep("""                    } else {
                         await handleManualDownload();
                     }
                 } catch (e) { if (e && e.name === 'AbortError') return; await handleManualDownload(); }""")
+# 7k: ใบเปรียบเทียบแบบ A4 (แทนตารางเดิม) · บันทึกรูปจากแผ่น A4 ขนาดจริงที่ซ่อนไว้นอกจอ
+_st = s.index('<div id="compare-saved-card" className="bg-white rounded-2xl card-shadow overflow-hidden relative print-area flex flex-col">')
+_endtok = '<div className="at-bottom-strip mt-auto" aria-hidden="true"></div>\n                            </div>'
+_en = s.index(_endtok, _st) + len(_endtok)
+s = s[:_st] + """<CompareA4View quotes={savedQuotes} terms={compareTerms} consultant={{ name: consultantName, phone: consultantPhone, line: consultantLine }} onEdit={(q) => handleLoad({ data: q.data })} onRemove={handleRemoveSavedQuote} onGoQuote={() => setViewMode('quotation')} h={{ quoteInsuranceText, quoteRegistrationText, getExpenseValue, custFinLabel, formatCurrency, uiModelShort }} />""" + s[_en:]
+rep("const elementId = viewMode === 'compare_saved' ? 'compare-saved-card' : 'quotation-card';", "const elementId = viewMode === 'compare_saved' ? 'compare-a4-capture' : 'quotation-card';")
+rep("""                            if (el) {
+                                el.classList.remove('card-shadow');""", """                            if (el && elementId === 'compare-a4-capture') { el.parentNode.style.left = '0'; el.style.width = '794px'; el.style.height = '1123px'; }
+                            else if (el) {
+                                el.classList.remove('card-shadow');""")
 open(out, 'w', encoding='utf-8').write(s)
 print('patched', len(s))
