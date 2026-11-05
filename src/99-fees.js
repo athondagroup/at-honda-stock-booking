@@ -105,10 +105,14 @@ const FE_SRC_TAB = { reg: 'ค่าจดทะเบียน', ins: 'ปร�
 function feModelCode(text) { const t = String(text || '').toUpperCase(); return /HATCH|HATCB|\bHB\b/.test(t) ? 'CH' : /CITY/.test(t) ? 'CT' : /CIVIC/.test(t) ? 'CV' : /ACCORD/.test(t) ? 'AC' : /CR-?V/.test(t) ? 'CR' : /HR-?V/.test(t) ? 'HR' : /BR-?V/.test(t) ? 'BR' : /E:?N2/.test(t) ? 'EN' : /STEP/.test(t) ? 'SW' : /JAZZ/.test(t) ? 'JZ' : 'OT'; }
 const feOn = v => !/^(n|no|false|0|ไม่|ปิด|off)$/i.test(String(v ?? '').trim());
 async function feSheetRows(tab, last, max) {
+  // pages of 150 rows; a page that starts past the end of the sheet makes Google answer "exceeds grid limits" -> that is the end of the data, not a failure
   const out = [], size = 150;
   for (let r = 1; r < (max || 6000); r += size) {
-    const p = await cdbCall('get_values', { spreadsheetId: cdbSheetId(), range: `'${tab}'!A${r}:${last}${r + size - 1}` });
-    const v = p && Array.isArray(p.values) ? p.values : null; if (!v) throw new Error('shape');
+    let p;
+    try { p = await cdbCall('get_values', { spreadsheetId: cdbSheetId(), range: `'${tab}'!A${r}:${last}${r + size - 1}` }); }
+    catch (e) { if (r > 1 && /grid limits|exceeds|out of range|parse range/i.test(String((e && (e.message || e.error || e.code)) || e))) break; throw e; }
+    if (!p) throw new Error('shape');
+    const v = Array.isArray(p.values) ? p.values : [];
     for (let k = 0; k < size; k++) out.push(v[k] || []);
     if (!v.length) break;
   }
@@ -168,7 +172,7 @@ async function fePull() {
       dd.rows = x.rows; f.show = 60;
       f.note = `ดึงจากชีตแล้ว: ${x.rows.length} รายการ (เดิม ${old.size}) · แถวใหม่หรือที่แก้ ${x.rows.length - same}${x.skipped ? ` · ข้ามรายการที่ชีตตั้งไม่ใช้งาน ${x.skipped} รายการ` : ''} · ยังไม่บันทึก ตรวจแล้วกด "บันทึกรายการ FOC"`;
     }
-  } catch (e) { f.note = e && e.code === 'nomcp' ? 'มุมมองนี้ยังไม่ได้เชื่อม Google Sheets ใช้ดาวน์โหลด/อัปโหลด Excel แทน' : 'ดึงจากชีตไม่ได้ (ชีตเปลี่ยนรูปแบบ หรือยังไม่ได้อนุญาต Google Sheets) ข้อมูลเดิมยังอยู่ครบ'; }
+  } catch (e) { f.note = e && e.code === 'nomcp' ? 'มุมมองนี้ยังไม่ได้เชื่อม Google Sheets ใช้ดาวน์โหลด/อัปโหลด Excel แทน' : 'ดึงจากชีตไม่ได้ (ชีตเปลี่ยนรูปแบบ หรือยังไม่ได้อนุญาต Google Sheets) ข้อมูลเดิมยังอยู่ครบ' + (e && (e.message || e.code) ? ' · สาเหตุ: ' + String(e.message || e.code).replace(/\s+/g, ' ').slice(0, 140) : ''); }
   f.busy = 0; render();
 }
 Object.assign(ACTIONS, {
