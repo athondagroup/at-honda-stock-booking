@@ -106,7 +106,7 @@ function feModelCode(text) { const t = String(text || '').toUpperCase(); return 
 const feOn = v => !/^(n|no|false|0|ไม่|ปิด|off)$/i.test(String(v ?? '').trim());
 async function feSheetRows(tab, last, max) {
   // 1) ask column A alone (open-ended, so it never runs past the grid) to learn how many rows hold data; 2) read only those rows in pages of 150
-  const out = [], size = 150, q = `'${tab}'`;
+  const out = [], size = 60, q = `'${tab}'`;
   const pa = await cdbCall('get_values', { spreadsheetId: cdbSheetId(), range: `${q}!A:A` });
   if (!pa) throw new Error('shape');
   const n = Math.min(Array.isArray(pa.values) ? pa.values.length : 0, max || 6000);
@@ -142,6 +142,12 @@ function feFocFromSheet(g, a, d) {
   flush();
   return { rows: out, skipped: skipped.n };
 }
+// the runtime's tool_error carries the sheet's own message in e.result, not always in e.message
+function feErrText(e) {
+  let t = [e && e.code, e && e.message].filter((x, i, a) => x && a.indexOf(x) === i).join(' ');
+  try { const r = e && e.result; if (r) { const c = Array.isArray(r.content) ? r.content.map(x => x && x.text).filter(Boolean).join(' ') : ''; t += ' ' + (c || JSON.stringify(r)); } } catch (x) { /* keep */ }
+  return t.replace(/\s+/g, ' ').trim().slice(0, 220);
+}
 async function fePull() {
   const f = feState(); if (!adminWrite() || f.busy) return; f.busy = 1; f.note = 'กำลังดึงจาก Google Sheet…'; render();
   try {
@@ -172,7 +178,7 @@ async function fePull() {
       dd.rows = x.rows; f.show = 60;
       f.note = `ดึงจากชีตแล้ว: ${x.rows.length} รายการ (เดิม ${old.size}) · แถวใหม่หรือที่แก้ ${x.rows.length - same}${x.skipped ? ` · ข้ามรายการที่ชีตตั้งไม่ใช้งาน ${x.skipped} รายการ` : ''} · ยังไม่บันทึก ตรวจแล้วกด "บันทึกรายการ FOC"`;
     }
-  } catch (e) { f.note = e && e.code === 'nomcp' ? 'มุมมองนี้ยังไม่ได้เชื่อม Google Sheets ใช้ดาวน์โหลด/อัปโหลด Excel แทน' : 'ดึงจากชีตไม่ได้ (ชีตเปลี่ยนรูปแบบ หรือยังไม่ได้อนุญาต Google Sheets) ข้อมูลเดิมยังอยู่ครบ' + (e && (e.message || e.detail || e.code) ? ' · สาเหตุ: ' + String([e.code, e.message || e.detail].filter((x, i, arr) => x && arr.indexOf(x) === i).join(' ')||'').replace(/\s+/g, ' ').slice(0, 140) : ''); }
+  } catch (e) { f.note = e && e.code === 'nomcp' ? 'มุมมองนี้ยังไม่ได้เชื่อม Google Sheets ใช้ดาวน์โหลด/อัปโหลด Excel แทน' : 'ดึงจากชีตไม่ได้ (ชีตเปลี่ยนรูปแบบ หรือยังไม่ได้อนุญาต Google Sheets) ข้อมูลเดิมยังอยู่ครบ' + (feErrText(e) ? ' · สาเหตุ: ' + feErrText(e) : ''); }
   f.busy = 0; render();
 }
 Object.assign(ACTIONS, {
