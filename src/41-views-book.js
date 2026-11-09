@@ -335,10 +335,10 @@ function viewQuota(D) {
   ${list.length ? `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl">
     <thead><tr><th>Ref. Number</th><th>เดือนส่ง</th><th>สาขา</th><th>รุ่น / เกรด / สี</th><th>สถานะ</th><th>หมายเลขตัวถัง</th>${isSales() ? '' : '<th>ใบจองที่จับคู่ / ชื่อลูกค้า</th>'}<th>ล็อก</th><th></th></tr></thead>
     <tbody>${list.map(q => `<tr>
-      <td class="code nowrap">${esc(q.ref)}</td><td class="num nowrap">${fmtM(q.m)}${q.week ? ` <span class="text-xs text-muted">W${q.week}</span>` : ''}</td><td><b>${esc(q.br)}</b></td>
+      <td class="nowrap"><button class="code underline decoration-dotted" data-act="quota-open" data-ref="${esc(q.ref)}" title="ดูรายละเอียด Quota นี้">${esc(q.ref)}</button></td><td class="num nowrap">${fmtM(q.m)}${q.week ? ` <span class="text-xs text-muted">W${q.week}</span>` : ''}</td><td><b>${esc(q.br)}</b></td>
       <td class="nowrap">${specLabel(q.spec)}</td><td>${statusChip(QUOTA_STATUS, q.st)}</td><td class="code text-xs nowrap">${esc(q.vin || '–')}</td>
       ${isSales() ? '' : `<td style="min-width:150px">${q.booking ? `<span class="code text-xs">${esc(q.bk)}</span> ${custCell(q.booking.cust, q.booking.owner, { seed: q.booking.seed })}<div class="text-xs text-muted">${esc(q.booking.owner || '')}</div>` : q.atb ? `<span class="code text-xs">${esc(q.atb.no || 'ใบจองเว็บ')}</span> ${custCell(q.atb.cust, q.atb.sales)}<div class="text-xs text-muted">${esc(q.atb.sales || '')} · ใบจองในเว็บ</div>`
-        : q.lock ? `<span class="text-sm">${lockText(q.lock)}</span>`
+        : q.lock || (q.temps || []).length ? quotaHolders(q)
         : q.car && q.car.status && q.car.status !== 'free' ? `<span class="text-sm">${esc((CAR_STATUS[q.car.status] || [q.car.status])[0])}${q.car.cust ? ' · ' + esc(q.car.cust) : ''}</span>`
         : q.branchHold ? `<span class="text-muted">กันไว้ให้สาขา ${q.branchHold}</span>` : '<span class="text-muted">ยังว่าง</span>'}</td>`}
       <td class="text-sm">${q.lock ? lockText(q.lock) : ''}${q.temps.length ? `<div>${chip(`ล็อกชั่วคราว ${q.temps.length} คน`, 'warn')}</div>` : ''}</td>

@@ -24,13 +24,23 @@ function carWhyBox(c, D, inv, bk, hideCust) {
   return `<div class="p-3 rounded-lg text-sm mb-3" style="background:var(--surface-2)"><b>รถคันนี้ติดอะไร:</b> ${t}${advT}
     ${bk && (!isSales() || isMine(bk.sales)) ? `<div class="mt-1"><button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(bk.id)}">เปิดใบจอง ${esc(bk.cust)}</button></div>` : ''}</div>`;
 }
+// who holds a quota slot (9/11): seller + customer of each lock / temporary lock; sales see names only on their own
+function quotaHolders(q) {
+  const ls = [q.lock, ...(q.temps || [])].filter(Boolean);
+  return ls.map(l => {
+    const own = !isSales() || isMine(l.owner), cust = l.booking ? l.booking.cust : l.prospect;
+    const kind = l.type === 'dealer' ? 'ดีลเลอร์ ' + esc(l.dealer_name || '') : l.type === 'temp' ? 'ล็อกชั่วคราว' : 'ล็อกให้ใบจอง';
+    const st = l.status === 'pending' ? ' (รออนุมัติ)' : l.status === 'allocated' ? ' (จัดสรรแล้ว)' : '';
+    return `<div class="text-xs" style="color:var(--warn)">${kind}${st}${own ? ` · ${esc(l.owner || l.sales_nick || '')}${cust ? ' · ลูกค้า ' + esc(cust) : ''}` : ''}</div>`;
+  }).join('');
+}
 function specQuotaModal(m, D) {
   const qs = D.quota.filter(q => q.open && q.spec === m.key && inBr(q)).sort((a, b) => String(a.m || '').localeCompare(String(b.m || '')) || String(a.ref).localeCompare(String(b.ref)));
   const p = perms(), s = D.specs[m.key] && specView(D.specs[m.key], specPool(D));
   return `<div class="flex items-start justify-between gap-3 mb-2"><div><h2 class="font-head text-xl font-semibold">Quota ว่าง</h2><p class="text-sm text-muted">${specLabel(m.key)}${s ? ` · รอรถ ${s.waiting} · ว่าง ${s.free}` : ''}</p></div><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
-  <p class="text-xs text-muted mb-2">Quota ว่าง = รถที่จะเข้า (Honda จัดให้แล้ว) ยังไม่มีใบจอง ไม่มีล็อก · ขอล็อกคิวให้ใบจองได้เลย ผู้จัดการอนุมัติเหมือนล็อกรถปกติ</p>
+  <p class="text-xs text-muted mb-2">Quota ว่าง = รถที่จะเข้า (Honda จัดให้แล้ว) ยังไม่มีใบจอง ไม่มีล็อก (ล็อกชั่วคราวยังขอคิวต่อได้) · กดเลข Ref เพื่อดูรายละเอียด · ขอล็อกคิวให้ใบจองได้เลย ผู้จัดการอนุมัติเหมือนล็อกรถปกติ</p>
   <div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>Ref</th><th>เดือนส่ง</th><th>สาขา</th><th>สถานะ</th><th></th></tr></thead><tbody>
-    ${qs.map(q => `<tr><td class="code nowrap">${esc(q.ref)}</td><td class="nowrap">${q.m ? fmtM(q.m) : '–'}</td><td>${esc(q.br)}</td><td>${statusChip(QUOTA_STATUS, q.st)}${q.vin ? `<div class="text-xs code">${esc(q.vin)}</div>` : ''}${(q.temps || []).length ? `<div class="text-xs" style="color:var(--warn)">มีล็อกชั่วคราว ${q.temps.length}</div>` : ''}</td>
+    ${qs.map(q => `<tr><td class="nowrap"><button class="code underline decoration-dotted" data-act="quota-open" data-ref="${esc(q.ref)}" title="ดูรายละเอียด Quota นี้">${esc(q.ref)}</button></td><td class="nowrap">${q.m ? fmtM(q.m) : '–'}</td><td>${esc(q.br)}</td><td>${statusChip(QUOTA_STATUS, q.st)}${q.vin ? `<div class="text-xs code">${esc(q.vin)}</div>` : ''}${quotaHolders(q)}</td>
       <td class="text-right">${p.write && p.request ? `<button class="btn btn-red btn-sm" data-act="lock-open" data-ref="${esc(q.ref)}">ขอล็อกคิว</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">ไม่มี Quota ว่างของสเปกนี้</td></tr>'}</tbody></table></div>`;
 }
 Object.assign(ACTIONS, {
