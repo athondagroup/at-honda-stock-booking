@@ -68,9 +68,15 @@ function carModal(m, D) {
   const bk = D.at.find(a => !a.cancelled && ((a.match && a.match.vin === c.vin) || (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin === c.vin)));
   const row = (k, v) => v === null || v === undefined || v === '' ? '' : `<tr><td class="text-muted nowrap">${k}</td><td>${v}</td></tr>`;
   const ls = carLocks(c, D), hist = carHist(c.vin, D);
-  return `<div class="flex items-start justify-between gap-3 mb-2"><div><h2 class="font-head text-xl font-semibold"><span class="code">${esc(c.vin)}</span></h2>
-      <div class="mt-1 flex flex-wrap gap-2">${c.status === 'temp' ? chip('ล็อกชั่วคราว (แซงได้)', 'warn') : carStChip(c)} ${c.fromInv ? '' : tempChip(c)} ${chip(`${c.br} ${BR[c.br]?.name || ''}`, 'neutral')}</div>${c.fromInv ? '<p class="text-xs text-muted mt-1">รถคันนี้ไม่อยู่ในไฟล์ Stock IDS แล้ว (ออกใบกำกับแล้ว) แสดงข้อมูลจากไฟล์ DL</p>' : ''}</div>
-    ${m.back ? '<button class="btn btn-dark btn-sm" data-act="car-back">← กลับ</button>' : '<button class="btn btn-ghost btn-sm" data-act="close">ปิด</button>'}</div>
+  // top of the card (9/11): the three numbers a manager sends on to the sales, in one place, copied in one press
+  const idCell = (lab, v) => `<div class="min-w-0"><div class="text-xs text-muted">${lab}</div><div class="code font-semibold text-base break-all">${v ? esc(v) : '<span class="text-muted">–</span>'}</div></div>`;
+  return `<div class="rounded-lg p-3 mb-3 border border-line" style="background:var(--surface-2)">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${idCell('เลขตัวถัง (VIN)', c.vin)}${idCell('เลขเครื่องยนต์', c.engine)}${idCell('Model code', c.mcode)}</div>
+      <div class="mt-3 flex flex-wrap gap-2"><button class="btn btn-red btn-sm" data-act="car-copy" data-vin="${esc(c.vin)}">คัดลอกข้อมูลรถ</button><button class="btn btn-ghost btn-sm" data-act="car-copy" data-vin="${esc(c.vin)}" data-only="vin">คัดลอก VIN</button>
+      ${m.back ? '<button class="btn btn-dark btn-sm" data-act="car-back">← กลับ</button>' : '<button class="btn btn-ghost btn-sm" data-act="close">ปิด</button>'}</div></div>
+    <div class="flex items-start justify-between gap-3 mb-2"><div><h2 class="font-head text-xl font-semibold">${specLabel(c.spec)}</h2>
+      <div class="mt-1 flex flex-wrap gap-2">${c.status === 'temp' ? chip('ล็อกชั่วคราว (แซงได้)', 'warn') : carStChip(c)}${c.kind ? ' ' + chip(FREE_KINDS[c.kind], c.kind === 'adv' ? 'ink' : 'warn') : ''} ${c.fromInv ? '' : tempChip(c)} ${chip(`${c.br} ${BR[c.br]?.name || ''}`, 'neutral')}</div>${c.fromInv ? '<p class="text-xs text-muted mt-1">รถคันนี้ไม่อยู่ในไฟล์ Stock IDS แล้ว (ออกใบกำกับแล้ว) แสดงข้อมูลจากไฟล์ DL</p>' : ''}</div>
+    </div>
   ${carWhyBox(c, D, inv, bk, hideCust)}
   ${spBox(c, D)}${rptBox(c)}${carCampBox(c, bk)}
   <div class="grid md:grid-cols-2 gap-5">
@@ -155,6 +161,16 @@ Object.assign(ACTIONS, {
   'specnet'(el) { S.modal = { kind: 'specnet', key: el.dataset.key }; render(); },
   'specq-open'(el) { S.modal = { kind: 'specq', key: el.dataset.key }; render(); },
   // opened from another window (e.g. checking a delivery note): keep that window to go back to
+  // the car's numbers as text for LINE: VIN, engine, model code, then model / grade / colour · branch (lines with no value are left out)
+  'car-copy'(el) {
+    const c = carFull(el.dataset.vin, derive()); if (!c) return;
+    const txt = el.dataset.only === 'vin' ? c.vin : [`VIN: ${c.vin}`, c.engine ? `เลขเครื่อง: ${c.engine}` : '', c.mcode ? `Model code: ${c.mcode}` : '',
+      `${[c.model, c.grade, c.color].filter(Boolean).join(' ')} · ${c.br || ''}`].filter(Boolean).join('\n');
+    const done = () => toast(el.dataset.only === 'vin' ? 'คัดลอก VIN แล้ว' : 'คัดลอกข้อมูลรถแล้ว');
+    const fallback = () => { const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+      let ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; } ta.remove(); ok ? done() : toast('คัดลอกไม่ได้ในเครื่องนี้: ' + txt.replace(/\n/g, ' · '), 'bad'); };
+    try { navigator.clipboard.writeText(txt).then(done, fallback); } catch (e) { fallback(); }
+  },
   'car-open'(el) { const back = S.modal && S.modal.kind !== 'car' ? S.modal : null; S.modal = { kind: 'car', vin: el.dataset.vin, back }; render(); },
   'car-back'() { S.modal = (S.modal && S.modal.back) || null; render(); }
 });
