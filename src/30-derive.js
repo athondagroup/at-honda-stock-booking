@@ -129,7 +129,8 @@ function deriveNow() {
     if (b && car.fromBr && b.br && b.br !== car.br) b = null;
     car.bk = car.bk || car.bkno || b?.no || null;
     car.cust = car.cust || b?.cust || null;
-    car.sales = b?.sales || null;
+    // once invoiced, IDS drops the booking from its Booking report: the seller then comes from the invoice (DL) (9/11)
+    car.sales = b?.sales || (!car.advFake && inv0 && !inv0.company && inv0.sales) || null;
     cars.set(car.vin, car);
   });
   const removed = [];
@@ -181,17 +182,19 @@ function deriveNow() {
   const M = matchForms(at, idsB, [...cars.values()], X.inv);
   const idsByKey = new Map(idsB.map(b => [b.key, b]));
   for (const [k, a] of M.idsCx) a.idsLeftKey = k;
+  for (const [k, a] of M.idsGone || []) a.idsGoneKey = k;
   for (const a of at) {
     a.match = M.result.get(a.key) || null;
     a.near = M.near.get(a.key) || null;
     a.dupAsk = M.dupAsk.get(a.key) || null;
     a.idsLeft = a.idsLeftKey ? idsByKey.get(a.idsLeftKey) || null : null;
+    a.idsGone = a.idsGoneKey ? idsByKey.get(a.idsGoneKey) || null : null;   // cancelled here and already 'waiting to be cancelled' in IDS
     const bk = a.match && a.match.recs.find(r => r.kind === 'booking');
     a.ids = bk ? idsByKey.get(bk.key) : null;
     // matched to an IDS booking whose name is spelt differently: IDS is the reference, the form's spelling is kept beside it
     if (a.ids && a.ids.cust && normName(a.ids.cust) !== normName(a.cust)) { a.custForm = a.cust; a.cust = a.ids.cust; }
     if (!a.no && a.match) a.no = a.match.no;
-    a.idsSales = a.match ? a.match.idsSales : a.idsLeft ? a.idsLeft.sales || null : null;
+    a.idsSales = a.match ? a.match.idsSales : a.idsLeft ? a.idsLeft.sales || null : a.idsGone ? a.idsGone.sales || null : null;
     // IDS is the reference for model / grade / colour; the booking keeps its place in the queue and nobody retypes it.
     // Any difference in model / grade / colour is shown side by side for a person to confirm first (still in progress);
     // delivered bookings take the IDS values straight away.
@@ -241,6 +244,12 @@ function deriveNow() {
   at.forEach(a => { if (a.near) a.near.forEach(h => { h.other = h.usedBy ? atByKey.get(h.usedBy) || null : null; }); });
   const atByIds = new Map(at.filter(a => a.ids && !a.cancelled).map(a => [a.ids.key, a]));
 
+  // still no seller on a car that a web booking holds (allocated or matched): the web booking's seller (9/11)
+  for (const a of at) {
+    if (a.cancelled || a.demo) continue;
+    const v = (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || (a.match && a.match.vin), car = v && cars.get(v);
+    if (car && !car.sales && !car.advFake && a.sales) car.sales = a.sales;
+  }
   // queue rows: IDS bookings (linked to their AT form when found) + AT bookings not yet in IDS
   const bookings = [];
   // the form was cancelled in the web but IDS still has the booking: it leaves the queue, the IDS admin is told to cancel it in IDS (2/11)
@@ -393,6 +402,9 @@ function deriveNow() {
   for (const c of cars.values()) if (c.ref) stockByRef.set(c.ref, c);
   const bkByRef = new Map();
   bookings.forEach(b => { if (b.ref) bkByRef.set(b.ref, b); if (b.ws) bkByRef.set(b.ws, b); });
+  // a quota whose car or booking number was taken by a web booking (allocated in the booking, or the web booking's number) is not free (9/11)
+  const atByVin = new Map(), atByNo = new Map();
+  at.forEach(a => { if (a.cancelled || a.demo) return; const v = (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || (a.match && a.match.vin); if (v) atByVin.set(v, a); if (a.no) atByNo.set(String(a.no), a); });
   const quota = X.quota.map(q => {
     const car = (q.vin && cars.get(q.vin)) || stockByRef.get(q.ref) || null;
     const vin = q.vin || car?.vin || null;
@@ -400,10 +412,11 @@ function deriveNow() {
     // received into this system (or in the IDS stock) counts as arrived even if the quota file is older (13/10)
     const st = car && (st0 === 'waiting' || st0 === 'vin') ? (invByVin.get(car.vin) ? 'sold' : 'arrived') : st0;
     const b = (q.bk && bkByNo.get(q.bk)) || bkByRef.get(q.ref) || (vin ? bkByVin.get(vin) : null) || null;
+    const atb = (vin && atByVin.get(vin)) || (q.bk && atByNo.get(String(q.bk))) || (b && b.no && atByNo.get(String(b.no))) || null;
     const ls = lockStateOf(['R:' + q.ref, vin ? 'V:' + vin : null].filter(Boolean));
     const branchHold = q.vnote && BR[q.vnote.toUpperCase()] ? q.vnote.toUpperCase() : null;
-    return { ...q, vin, st, car, booking: b, bk: q.bk || b?.no || null, spec: specKey(q.model, q.grade, q.color), lock: ls.hard, temps: ls.temps, branchHold,
-      open: (st === 'waiting' || st === 'vin') && !(q.bk || b) && !ls.hard };
+    return { ...q, vin, st, car, booking: b, atb, bk: q.bk || b?.no || atb?.no || null, spec: specKey(q.model, q.grade, q.color), lock: ls.hard, temps: ls.temps, branchHold,
+      open: (st === 'waiting' || st === 'vin') && !(q.bk || b || atb) && !ls.hard && !(car && car.status && car.status !== 'free') };
   });
 
   // per spec summary

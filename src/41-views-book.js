@@ -9,7 +9,7 @@ const atVisible = a => isSales() ? isMine(a.sales) : S.role.role === 'admin' ? a
 const monthStartISO = () => todayISO().slice(0, 8) + '01';
 function matchChip(a) {
   const m = a.match;
-  if (a.cancelled) return a.idsLeft ? chip(`ยกเลิกแล้ว · IDS ยังมีใบจอง ${a.idsLeft.no || ''} รอยกเลิกใน IDS`, 'warn') : chip('ยกเลิก', 'muted');
+  if (a.cancelled) return a.idsLeft ? chip(`ยกเลิกแล้ว · IDS ยังมีใบจอง ${a.idsLeft.no || ''} รอยกเลิกใน IDS`, 'warn') : a.idsGone ? chip(`ยกเลิก · IDS ${a.idsGone.no || ''} รอยกเลิกออกจากระบบแล้ว`, 'muted') : chip('ยกเลิก', 'muted');
   if (!m) {
     if (a.demo) return chip('รถทดลองขับ', 'muted');
     if (a.flow.history) return chip('ส่งมอบแล้ว (ฟอร์มเดิม)', 'muted');
@@ -45,7 +45,7 @@ function bookRows(D) {
   const rows = [], used = new Set();
   for (const a of D.at) {
     if (a.demo) continue;
-    const ib = a.ids || a.idsLeft;   // a cancelled booking keeps its IDS booking that is still open (one row, not two)
+    const ib = a.ids || a.idsLeft || a.idsGone;   // a cancelled booking keeps its IDS booking that is still open (one row, not two)
     if (ib) used.add(ib.key);
     ((a.match && a.match.alt) || []).forEach(x => used.add(x.key)); ((a.rec && a.rec.ids_alt) || []).forEach(k => used.add(k));   // the old number IDS replaced: same booking, no second row
     rows.push({ key: a.key, a, b: ib || null, row: a.row, date: a.date, no: a.no, cust: a.cust, owner: a.sales, idsSales: a.idsSales, br: a.br, spec: a.spec, model: a.model, vin: a.match && a.match.vin });
@@ -337,7 +337,10 @@ function viewQuota(D) {
     <tbody>${list.map(q => `<tr>
       <td class="code nowrap">${esc(q.ref)}</td><td class="num nowrap">${fmtM(q.m)}${q.week ? ` <span class="text-xs text-muted">W${q.week}</span>` : ''}</td><td><b>${esc(q.br)}</b></td>
       <td class="nowrap">${specLabel(q.spec)}</td><td>${statusChip(QUOTA_STATUS, q.st)}</td><td class="code text-xs nowrap">${esc(q.vin || '–')}</td>
-      ${isSales() ? '' : `<td style="min-width:150px">${q.booking ? `<span class="code text-xs">${esc(q.bk)}</span> ${custCell(q.booking.cust, q.booking.owner, { seed: q.booking.seed })}<div class="text-xs text-muted">${esc(q.booking.owner || '')}</div>` : q.branchHold ? `<span class="text-muted">กันไว้ให้สาขา ${q.branchHold}</span>` : '<span class="text-muted">ยังว่าง</span>'}</td>`}
+      ${isSales() ? '' : `<td style="min-width:150px">${q.booking ? `<span class="code text-xs">${esc(q.bk)}</span> ${custCell(q.booking.cust, q.booking.owner, { seed: q.booking.seed })}<div class="text-xs text-muted">${esc(q.booking.owner || '')}</div>` : q.atb ? `<span class="code text-xs">${esc(q.atb.no || 'ใบจองเว็บ')}</span> ${custCell(q.atb.cust, q.atb.sales)}<div class="text-xs text-muted">${esc(q.atb.sales || '')} · ใบจองในเว็บ</div>`
+        : q.lock ? `<span class="text-sm">${lockText(q.lock)}</span>`
+        : q.car && q.car.status && q.car.status !== 'free' ? `<span class="text-sm">${esc((CAR_STATUS[q.car.status] || [q.car.status])[0])}${q.car.cust ? ' · ' + esc(q.car.cust) : ''}</span>`
+        : q.branchHold ? `<span class="text-muted">กันไว้ให้สาขา ${q.branchHold}</span>` : '<span class="text-muted">ยังว่าง</span>'}</td>`}
       <td class="text-sm">${q.lock ? lockText(q.lock) : ''}${q.temps.length ? `<div>${chip(`ล็อกชั่วคราว ${q.temps.length} คน`, 'warn')}</div>` : ''}</td>
       <td class="text-right nowrap">${!p.write || !p.request ? '' : (q.open || quotaQueue(q)) ? `<button class="btn btn-ghost btn-sm" data-act="lock-open" data-ref="${esc(q.ref)}">${q.open ? 'ล็อก' : 'ขอคิวต่อ'}</button>`
         : q.car && !q.booking && carLockable(q.car) ? `<button class="btn btn-ghost btn-sm" data-act="lock-open" data-vin="${esc(q.car.vin)}">${q.car.status === 'pending' ? 'ขอคิวต่อ' : 'ล็อกรถคันนี้'}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`

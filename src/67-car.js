@@ -127,14 +127,14 @@ function qRowVals(b) {
 }
 function qTableBody(m, D) {
   const f = m.qf || {}, so = m.qs || { c: 'pos', d: 1 };
-  let rows = D.bookings.filter(b => b.spec === m.key && b.state === 'waiting').map(b => ({ b, v: qRowVals(b) }));
+  let rows = D.bookings.filter(b => b.spec === m.key && b.state === 'waiting' && inBr(b)).map(b => ({ b, v: qRowVals(b) }));
   rows = rows.filter(r => QCOLS.every(([k]) => !f[k] || String(k === 'date' ? fmtD(r.v.date) : r.v[k]).toLowerCase().includes(f[k].toLowerCase())));
   rows.sort((x, y) => { const a = x.v[so.c], c = y.v[so.c]; return (typeof a === 'number' ? a - c : String(a).localeCompare(String(c))) * so.d || x.v.pos - y.v.pos; });
   return `<tbody id="q-tb">${rows.map(({ b, v }) => `<tr><td>${chip('คิวที่ ' + v.pos, 'warn')}</td><td class="num">${fmtD(v.date)}</td><td>${custCell(b.cust, b.owner, { seed: b.seed })}</td><td>${esc(v.sales)}</td><td>${esc(v.br)}</td><td class="code">${esc(v.no) || '<span style="color:var(--warn)">ยังไม่มี</span>'}</td><td>${esc(v.dep)}${b.app && (!isSales() || isMine(b.owner)) ? ` <button class="underline text-xs" data-act="at-open" data-id="${esc(b.app.id)}">เปิดใบจอง</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="text-muted p-3">ไม่พบตามตัวกรอง</td></tr>'}</tbody>`;
 }
-function qCount(m, D) { const n = D.bookings.filter(b => b.spec === m.key && b.state === 'waiting').length; const t = (qTableBody(m, D).match(/<tr>/g) || []).length; return (m.qf && Object.values(m.qf).some(Boolean)) ? `แสดง ${t} จาก ${n} ใบ` : `${n} ใบ`; }
+function qCount(m, D) { const n = D.bookings.filter(b => b.spec === m.key && b.state === 'waiting' && inBr(b)).length; const t = (qTableBody(m, D).match(/<tr>/g) || []).length; return (m.qf && Object.values(m.qf).some(Boolean)) ? `แสดง ${t} จาก ${n} ใบ` : `${n} ใบ`; }
 function specQueueModal(m, D) {
-  const s = D.specs[m.key] || { waiting: 0, free: 0, incoming: 0 }, so = m.qs || { c: 'pos', d: 1 }, f = m.qf || {};
+  const s = D.specs[m.key] ? specView(D.specs[m.key], specPool(D)) : { waiting: 0, free: 0, incoming: 0 }, so = m.qs || { c: 'pos', d: 1 }, f = m.qf || {};
   return `<div class="flex items-start justify-between gap-3 mb-2"><div><h2 class="font-head text-xl font-semibold">คิวรอรถ · ${specLabel(m.key)}</h2>
     <p class="text-sm text-muted">รอรถ <b class="num" id="q-cnt">${qCount(m, D)}</b> · ว่าง <b class="num">${s.free}</b> คัน · Quota ว่าง <b class="num">${s.incoming}</b> · กดหัวคอลัมน์เพื่อเรียง พิมพ์ในช่องใต้หัวคอลัมน์เพื่อกรอง${isSales() ? ' · เซลล์เห็นชื่อลูกค้าเฉพาะของตัวเอง' : ''}</p></div>
     <button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>

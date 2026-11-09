@@ -124,6 +124,17 @@ function matchForms(at, idsB, cars, inv) {
     if (b) idsCx.set(b.key, a);
   }
   idsOnly = idsOnly.filter(b => !idsCx.has(b.key));
+  // the same, when IDS already shows the booking as 'waiting to be cancelled' (9/11): it is this cancelled form's own IDS record —
+  // one case, not a cancelled form plus a second IDS row; both records are kept and shown together
+  const idsGone = new Map(), goneUsed = new Set();
+  const goneFree = idsB.filter(b => !b.seed && !b.skip && (b.match === 'cancel' || b.ids === CANCEL) && !matchedIds.has(b.key) && !idsCx.has(b.key));
+  for (const a of at) {
+    if (!a.cancelled || a.demo || [...idsCx.values()].includes(a)) continue;
+    const pick = a.rec.match_pick && a.rec.match_pick.key, ak = nameKey(a.cust);
+    const b = goneFree.find(x => !goneUsed.has(x.key) && (x.key === pick || (a.no && x.no === a.no) || (a.rec.booking_no && String(x.no) === String(a.rec.booking_no))))
+      || goneFree.find(x => !goneUsed.has(x.key) && keyScore(ak, nameKey(x.cust)) >= 2 && x.model === a.model && a.date && x.date && Math.abs(daysBetween(a.date, x.date)) <= 25);
+    if (b) { idsGone.set(b.key, a); goneUsed.add(b.key); }
+  }
   // the same customer, model, grade, colour and branch twice in IDS: usually IDS re-issued the booking (e.g. 'postponed' then a new number
   // when the car came). A person confirms: same booking (old number kept as an alias) or two different bookings.
   const isCx = r => !!(r.row && (r.row.match === 'cancel' || r.row.ids === CANCEL));
@@ -161,5 +172,5 @@ function matchForms(at, idsB, cars, inv) {
     for (const r of recs) { if (skip.has(r.key)) continue; const ns = keyScore(ak, r.k); if (ns >= 2) hits.push({ key: r.key, ns, kind: r.kind, br: r.br, no: r.no, inv: r.kind === 'dl' ? r.row.inv : null, date: r.date, ddate: r.ddate || null, name: r.name, model: r.model, grade: r.grade, usedBy: claimedBy.get(r.key) || null }); }
     if (hits.length) near.set(a.key, hits.sort((x, y) => y.ns - x.ns || (y.kind === 'dl') - (x.kind === 'dl')).slice(0, 3));
   }
-  return { result, idsOnly, near, idsCx, dupAsk };
+  return { result, idsOnly, near, idsCx, idsGone, dupAsk };
 }

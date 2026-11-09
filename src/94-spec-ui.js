@@ -25,8 +25,8 @@ function carWhyBox(c, D, inv, bk, hideCust) {
     ${bk && (!isSales() || isMine(bk.sales)) ? `<div class="mt-1"><button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(bk.id)}">เปิดใบจอง ${esc(bk.cust)}</button></div>` : ''}</div>`;
 }
 function specQuotaModal(m, D) {
-  const qs = D.quota.filter(q => q.open && q.spec === m.key && (!S.br || q.br === S.br)).sort((a, b) => String(a.m || '').localeCompare(String(b.m || '')) || String(a.ref).localeCompare(String(b.ref)));
-  const p = perms(), s = D.specs[m.key];
+  const qs = D.quota.filter(q => q.open && q.spec === m.key && inBr(q)).sort((a, b) => String(a.m || '').localeCompare(String(b.m || '')) || String(a.ref).localeCompare(String(b.ref)));
+  const p = perms(), s = D.specs[m.key] && specView(D.specs[m.key], specPool(D));
   return `<div class="flex items-start justify-between gap-3 mb-2"><div><h2 class="font-head text-xl font-semibold">Quota ว่าง</h2><p class="text-sm text-muted">${specLabel(m.key)}${s ? ` · รอรถ ${s.waiting} · ว่าง ${s.free}` : ''}</p></div><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
   <p class="text-xs text-muted mb-2">Quota ว่าง = รถที่จะเข้า (Honda จัดให้แล้ว) ยังไม่มีใบจอง ไม่มีล็อก · ขอล็อกคิวให้ใบจองได้เลย ผู้จัดการอนุมัติเหมือนล็อกรถปกติ</p>
   <div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>Ref</th><th>เดือนส่ง</th><th>สาขา</th><th>สถานะ</th><th></th></tr></thead><tbody>

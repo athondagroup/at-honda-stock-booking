@@ -309,7 +309,7 @@ function netTip(s) {
   return [`ว่างสุทธิ ${netOf(s)} = Stock ว่าง ${s.free} + Quota ว่าง ${s.incoming} − รอรถ ${s.waiting}`, l('Stock ว่าง', s.freeBy), l('Quota ว่าง', s.incomingBy), l('รอรถ', s.waitingBy)].join('\n');
 }
 function specNetModal(m, D) {
-  const s = D.specs[m.key]; if (!s) return '';
+  const s = D.specs[m.key] && specView(D.specs[m.key], specPool(D)); if (!s) return '';
   const row = (t, o, n, sg) => `<tr><td>${t}</td><td class="num text-right font-semibold">${sg}${n}</td><td class="text-sm">${BRS.filter(b => o[b]).map(b => `${b} <b class="num">${o[b]}</b>`).join(' · ') || '<span class="text-muted">–</span>'}</td></tr>`;
   const net = netOf(s);
   return `<div class="flex items-start justify-between gap-3 mb-2"><h2 class="font-head text-xl font-semibold">ว่างสุทธิ · ${specLabel(m.key)}</h2><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
@@ -318,11 +318,22 @@ function specNetModal(m, D) {
   <tr><td><b>ว่างสุทธิ</b></td><td class="num text-right font-semibold" style="color:var(--${net < 0 ? 'bad' : 'good'})">${net}</td><td class="text-xs text-muted">${net < 0 ? 'ติดลบ = ใบจองรอรถมากกว่ารถที่มี' : 'ขายต่อได้อีกจำนวนนี้'}</td></tr></tbody></table>
   <div class="flex justify-end mt-3"><button class="btn btn-ghost" data-act="close">ปิด</button></div>`;
 }
+// one spec row's numbers, counted from the same cars that open under it (selected branch + filters), so a number always matches its list (9/11)
+const specPool = D => { const f = S.filters; return isSales() ? [...D.cars.values()].filter(inBr).filter(c => (!f.model || c.model === f.model) && (!f.sGrade || c.grade === f.sGrade) && (!f.sColor || c.color === f.sColor)) : stockCars(D); };
+function specView(s, pool) {
+  const mine = pool.filter(c => c.spec === s.key), cat = { free: 0, held: 0, lock: 0, company: 0 };
+  mine.forEach(c => { cat[specCat(c.status)]++; });
+  const sumBy = o => Object.entries(o || {}).reduce((n, [b, k]) => n + (inBr({ br: b }) ? k : 0), 0);
+  const v = { ...s, cat, free: mine.filter(c => c.status === 'free').length, waiting: sumBy(s.waitingBy), incoming: sumBy(s.incomingBy) };
+  v.low = v.short = v.waiting > v.free + v.incoming;
+  return v;
+}
 function specTable(cars, D) {
   const f = S.filters, p = perms();
   const brs = S.br ? [S.br] : BRS;
   const pool = isSales() ? [...D.cars.values()].filter(inBr).filter(c => (!f.model || c.model === f.model) && (!f.sGrade || c.grade === f.sGrade) && (!f.sColor || c.color === f.sColor)) : cars;
-  let specs = [...new Set(pool.map(c => c.spec))].map(k => D.specs[k]);
+  const cpool = isSales() ? pool : cars;
+  let specs = [...new Set(pool.map(c => c.spec))].map(k => specView(D.specs[k], cpool));
   if (f.status === 'low') specs = specs.filter(s => s.low);
   else if (f.status) { const ks = new Set(cars.filter(c => c.status === f.status).map(c => c.spec)); specs = specs.filter(s => ks.has(s.key)); }
   const gap = s => s.waiting - s.free - s.incoming, C = s => s.cat || { free: 0, held: 0, lock: 0, company: 0 };
