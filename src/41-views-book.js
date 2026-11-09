@@ -310,6 +310,9 @@ function viewQuota(D) {
   const months = [...new Set(list.map(q => q.m).filter(Boolean))].sort();
   if (f.qm) list = list.filter(q => q.m === f.qm);
   if (f.qModel) list = list.filter(q => q.model === f.qModel);
+  // search by VIN / Ref / booking number (9/11): looks in every status, the archive included
+  const qq = String(f.qq || '').trim().toUpperCase().replace(/\s+/g, '');
+  if (qq) list = list.filter(q => [q.vin, q.ref, q.bk, q.atb && q.atb.no].some(v => v && String(v).toUpperCase().includes(qq)) || (!isSales() && [q.booking && q.booking.cust, q.atb && q.atb.cust].some(v => v && String(v).replace(/\s+/g, '').includes(String(f.qq).replace(/\s+/g, '')))));
   const cnt = {}; list.forEach(q => { cnt[q.st] = (cnt[q.st] || 0) + (q.qty || 1); });
   const live = q => q.st === 'waiting' || q.st === 'vin';
   // arrived and sold quota are already in สต็อก / delivered: kept only in the archive view, so nothing shows twice (13/10)
@@ -319,7 +322,7 @@ function viewQuota(D) {
   else if (f.qs === 'matched') list = list.filter(q => q.bk && live(q));
   else if (f.qs === 'arch') list = list.filter(q => !live(q));
   else if (f.qs) list = list.filter(q => q.st === f.qs);
-  else list = list.filter(live);
+  else if (!qq) list = list.filter(live);
   list.sort((a, b) => (a.m || '').localeCompare(b.m || '') || (a.br || '').localeCompare(b.br || '') || a.spec.localeCompare(b.spec) || a.ref.localeCompare(b.ref));
   return `
   ${pageHead('Quota', isSales() ? 'Quota ที่ยังไม่มีใบจองจับคู่และยังไม่ถูกล็อก เซลล์ขอล็อกได้ ผู้จัดการเป็นคนอนุมัติ' : 'รถที่ Honda จัดสรรให้แต่ละสาขาตามเดือนส่ง พร้อมสถานะ VIN การมาถึงสาขา ใบจองที่จับคู่ และการล็อก')}
@@ -327,6 +330,7 @@ function viewQuota(D) {
   <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
     <div class="field"><label for="f-qmon">เดือนส่ง</label><select id="f-qmon" data-filter="qm"><option value="">ทุกเดือน</option>${months.map(m => `<option value="${m}" ${f.qm === m ? 'selected' : ''}>${fmtM(m)}</option>`).join('')}</select></div>
     ${isSales() ? '' : `<div class="field"><label for="f-qst">สถานะ</label><select id="f-qst" data-filter="qs"><option value="">ทั้งหมด</option><option value="free" ${f.qs === 'free' ? 'selected' : ''}>ยังว่าง (ไม่มีใบจอง ไม่ถูกล็อก)</option><option value="matched" ${f.qs === 'matched' ? 'selected' : ''}>จับคู่ใบจองแล้ว</option>${Object.entries(QUOTA_STATUS).map(([k, v]) => `<option value="${k}" ${f.qs === k ? 'selected' : ''}>${v[0]}${k === 'arrived' || k === 'sold' ? ' (สำรองไว้ดู)' : ''}</option>`).join('')}<option value="arch" ${f.qs === 'arch' ? 'selected' : ''}>ถึงสาขา + ขายแล้ว (สำรองไว้ดู)</option></select></div>`}
+    <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-qq">ค้นหา VIN / Ref / เลขใบจอง${isSales() ? '' : ' / ชื่อลูกค้า'}</label><input id="f-qq" type="search" data-filter="qq" value="${esc(f.qq || '')}" placeholder="เช่น MRHRV5858TT105277 หรือ PSC2690002" autocomplete="off"></div>
     <div class="field"><label for="f-qmod">รุ่น</label><select id="f-qmod" data-filter="qModel"><option value="">ทุกรุ่น</option>${Object.keys(CATALOG).map(m => `<option ${f.qModel === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
   </div>
   ${isSales() ? (() => { const allQ = D.quota.filter(inBr).filter(q => (!f.qm || q.m === f.qm) && (!f.qModel || q.model === f.qModel)); const free = allQ.filter(q => q.open).length; return `<p class="text-sm mb-2">Quota ว่าง <b class="num" style="color:var(--good)">${free}</b> · ติดจองแล้ว <b class="num">${allQ.length - free}</b> (ไม่แสดงชื่อ)</p>`; })() : `<div class="flex flex-wrap gap-2 mb-3 text-sm">${Object.entries(QUOTA_STATUS).map(([k, v]) => qsChip(k, v[0], v[1], cnt[k] || 0, f.qs)).join('')}

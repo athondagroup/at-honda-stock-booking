@@ -12,7 +12,8 @@ function atBranchOf(name) {
   const w = [['ภาษีเจริญ', 'PSC'], ['เอกชัย', 'ATE'], ['บางบอน', 'ATE'], ['สามพราน', 'SPH'], ['กำแพงแสน', 'KPA']].find(([k]) => t.includes(k));
   return w ? w[1] : null;
 }
-function specCat(st) { return st === 'free' ? 'free' : st === 'company' ? 'company' : ['locked', 'pending', 'allocated', 'noted', 'temp'].includes(st) ? 'lock' : 'held'; }
+// ติดจอง = allocated (web or IDS), invoiced / sold with a customer · ล็อก = a queue lock not allocated yet (9/11)
+function specCat(st) { return st === 'free' ? 'free' : st === 'company' ? 'company' : ['locked', 'pending', 'noted', 'temp'].includes(st) ? 'lock' : 'held'; }
 function carStatus(c, inv, bkByVin) {
   if (inv && !inv.company) return inv.ddate ? 'delivered' : 'invoiced';
   if (c.company) return 'company';
@@ -370,9 +371,13 @@ function deriveNow() {
       : (car.st === 'free' && ls.temps.length ? 'temp' : car.st);
     car.assignedTo = assignedBy.get(car.vin) || null;
     if (car.assignedTo && ['free', 'temp', 'noted', 'locked', 'pending'].includes(car.status)) car.status = 'assigned';
+    // the second label of a car (9/11): Advance (invoiced, no customer) · Demo (company car) · คืนรถ — kept whatever its status
+    const spR = car.special && car.special.reason;
+    car.kind = car.advFake || spR === 'adv' ? 'adv' : spR === 'demo' ? 'demo' : spR === 'returned' ? 'ret' : null;
   }
   // special cars (รถพิเศษ) are kept apart from stock: looping over the stock skips them, get/has still find them
-  cars.values = function* () { for (const c of Map.prototype.values.call(this)) if (!c.special) yield c; };
+  // except the ones marked sellable: those are free cars for sale like any other (ว่าง = everything ready to sell, 9/11)
+  cars.values = function* () { for (const c of Map.prototype.values.call(this)) if (!c.special || c.special.sellable === true) yield c; };
   // an IDS booking whose file row has no frame number yet, but the IDS stock already lists a car under its number (or its form
   // matched that car): IDS has allocated it, so it is not waiting for a car (ตกลง 30/10)
   const carByBk = new Map();
@@ -386,8 +391,14 @@ function deriveNow() {
   for (const b of bookings) {
     const l = locks.find(x => x.live && x.type === 'booking' && (x.bkref === b.key || (b.app && x.bkref === b.app.key)));
     b.lock = l || null;
+    // a temporary lock taken for this customer (same seller, spec and name) holds the queue too (9/11)
+    const tl = !l && b.match === 'waiting' && b.state !== 'cxform' ? locks.find(x => x.live && x.type === 'temp' && (x.bkref ? (x.bkref === b.key || (b.app && x.bkref === b.app.key))
+      : x.prospect && x.spec === b.spec && (x.sales || x.owner) === (b.owner || b.sales) && keyScore(nameKey(x.prospect), nameKey(b.cust)) >= 2)) : null;
+    if (tl) b.tempLock = tl;
     if (l) b.state = l.status === 'pending' ? 'pending' : l.status === 'allocated' ? 'allocated' : 'locked';
     else if (b.match === 'cancel') b.state = 'cancel';
+    else if (tl) b.state = 'locked';
+    else if (b.match === 'waiting' && b.app && b.app.rec.flow && b.app.rec.flow.assign && b.app.rec.flow.assign.vin) b.state = 'allocated';
     else if (b.match === 'car') b.state = 'idscar';
     else if (b.match === 'quota') b.state = 'idsquota';
     else b.state = 'waiting';
@@ -416,7 +427,7 @@ function deriveNow() {
     const ls = lockStateOf(['R:' + q.ref, vin ? 'V:' + vin : null].filter(Boolean));
     const branchHold = q.vnote && BR[q.vnote.toUpperCase()] ? q.vnote.toUpperCase() : null;
     return { ...q, vin, st, car, booking: b, atb, bk: q.bk || b?.no || atb?.no || null, spec: specKey(q.model, q.grade, q.color), lock: ls.hard, temps: ls.temps, branchHold,
-      open: (st === 'waiting' || st === 'vin') && !(q.bk || b || atb) && !ls.hard && !(car && car.status && car.status !== 'free') };
+      open: (st === 'waiting' || st === 'vin') && !(q.bk || b || atb) && !ls.hard && !ls.temps.some(t => t.live) && !(car && car.status && car.status !== 'free') };
   });
 
   // per spec summary
@@ -436,6 +447,7 @@ function deriveNow() {
     if ((car.age ?? -1) > (s.maxAge ?? -1)) s.maxAge = car.age;
   }
   bookings.filter(b => b.state === 'waiting').forEach(b => { const s = sp(b.spec); s.waiting++; s.waitingBy[b.br] = (s.waitingBy[b.br] || 0) + 1; });
+  quota.forEach(q => { if ((q.st === 'waiting' || q.st === 'vin') && (q.lock || (q.temps || []).some(t => t.live))) { const s = sp(q.spec); (s.qlocks = s.qlocks || []).push(q); } });
   quota.forEach(q => { if (q.open) { const s = sp(q.spec), n = q.qty || 1; s.incoming += n; s.incomingBy[q.br] = (s.incomingBy[q.br] || 0) + n; } });
   for (const s of Object.values(specs)) {
     s.short = s.waiting > s.free + s.incoming;
