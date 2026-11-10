@@ -49,12 +49,12 @@ function payCostAuto(a) {
 }
 function payCostVals(a, m) {
   const sv = (a.rec.flow || {}).cost || {}, A = payCostAuto(a);
-  if (!m.cost || m.cost.id !== a.id) m.cost = { id: a.id, reg: sv.reg ?? A.regDef ?? '', plate: sv.plate ?? 5000, ins: sv.ins ?? (A.insDef || ''), acc: sv.acc ?? '', plus: (sv.plus || []).map(y => ({ ...y })), minus: (sv.minus || []).map(y => ({ ...y })) };
+  if (!m.cost || m.cost.id !== a.id) m.cost = { id: a.id, reg: sv.reg ?? A.regDef ?? '', plate: sv.plate ?? 5000, ins: sv.ins ?? (A.insDef || ''), acc: sv.acc ?? '', dep: sv.dep ?? (A.deposit || ''), plus: (sv.plus || []).map(y => ({ ...y })), minus: (sv.minus || []).map(y => ({ ...y })) };
   const v = m.cost;
   const plus = [[A.cash ? 'ค่ารถยนต์ (ราคาสุทธิ)' : 'เงินดาวน์', A.main], ...(A.insCredit ? [['ค่าประกันคุ้มครองสินเชื่อ (ชำระวันรับรถ)', A.insCredit]] : []),
     ['ค่าจดทะเบียน', A.regGift ? 0 : num(v.reg)], ['ค่ามัดจำป้ายแดง', num(v.plate)], ['ค่าเบี้ยประกันภัย', A.insGift ? 0 : num(v.ins)],
     ...(A.po ? A.po.map(y => ['อุปกรณ์ · ' + y.l, y.v]) : [['ค่าอุปกรณ์ตกแต่ง', num(v.acc)]]), ...v.plus.map(y => ['อื่น ๆ · ' + (y.l || ''), num(y.v)])];
-  const minus = [...(A.downDisc ? [['ส่วนลดเงินดาวน์', A.downDisc]] : []), ['เงินมัดจำ', A.deposit], ...(A.trade ? [['รถเก่าเทิร์น', A.trade]] : []), ...v.minus.map(y => ['อื่น ๆ · ' + (y.l || ''), num(y.v)])];
+  const minus = [...(A.downDisc ? [['ส่วนลดเงินดาวน์', A.downDisc]] : []), ['เงินมัดจำ', num(v.dep)], ...(A.trade ? [['รถเก่าเทิร์น', A.trade]] : []), ...v.minus.map(y => ['อื่น ๆ · ' + (y.l || ''), num(y.v)])];
   const tp = plus.reduce((n, x) => n + num(x[1]), 0), tm = minus.reduce((n, x) => n + num(x[1]), 0);
   return { A, v, plus, minus, tp, tm, net: tp - tm };
 }
@@ -78,7 +78,7 @@ function payCostBox(a, m) {
     ${list('plus', '+')}
     <div class="flex justify-between font-semibold text-sm pt-2"><span>รวมค่าใช้จ่าย</span><span class="num">${money(tp)}</span></div>
     ${A.downDisc ? row('หัก ส่วนลดเงินดาวน์', ro(A.downDisc, 1), tag('จากเงื่อนไข', 'good')) : ''}
-    ${row('หัก เงินมัดจำ', ro(A.deposit, 1), tag('จากใบจอง', 'good'))}
+    ${row('หัก เงินมัดจำ', inp('dep', 'dep'), !A.deposit ? tag(num(v.dep) ? 'ใส่เอง · ใบจองไม่ระบุยอด' : 'ใบจองไม่ระบุยอด', 'warn') : num(v.dep) === A.deposit ? tag('จากใบจอง', 'good') : tag(`แก้เอง · ใบจอง ${money(A.deposit)}`, 'warn'))}
     ${A.trade ? row('หัก รถเก่าเทิร์น', ro(A.trade, 1), tag('จากรถเก่า', 'good')) : ''}
     ${list('minus', '−')}
     <div class="flex justify-between items-baseline pt-2 mt-1" style="border-top:2px solid var(--fg)"><span class="font-semibold">${A.cash ? 'รวมค่าใช้จ่ายทั้งสิ้น' : 'รวมจ่ายสุทธิ'}</span><b class="num text-xl" style="color:var(--red)">${money(net)}</b></div>
@@ -110,7 +110,9 @@ Object.assign(ACTIONS, {
     const clean = l => l.filter(y => String(y.l || '').trim() || num(y.v)).map(y => ({ l: String(y.l || '').trim(), v: num(y.v) }));
     if ([...v.plus, ...v.minus].some(y => num(y.v) && !String(y.l || '').trim())) { toast('ใส่ชื่อรายการให้ครบ', 'bad'); return; }
     const t = payCostVals(a, S.modal);
-    if (await saveFlow(a, { flow: { cost: { reg: num(v.reg), plate: num(v.plate), ins: num(v.ins), acc: num(v.acc), plus: clean(v.plus), minus: clean(v.minus), total: t.tp, net: t.net, ...actor() } } }, 'บันทึกค่าใช้จ่ายวันรับรถแล้ว')) { S.modal.cost = null; render(); }
+    const dep = num(v.dep), fillDep = !num(a.deposit) && dep > 0;
+    // the booking had no deposit amount: the one typed here fills the booking too (10/11)
+    if (await saveFlow(a, { ...(fillDep ? { deposit: dep, receipt_hist: [...(a.rec.receipt_hist || []), { old: { receipt_no: a.rec.receipt_no || null, deposit: a.rec.deposit || null }, why: 'ใส่ยอดมัดจำจากค่าใช้จ่ายวันรับรถ (ใบจองไม่ระบุยอด)', ...actor() }] } : {}), flow: { cost: { dep, reg: num(v.reg), plate: num(v.plate), ins: num(v.ins), acc: num(v.acc), plus: clean(v.plus), minus: clean(v.minus), total: t.tp, net: t.net, ...actor() } } }, 'บันทึกค่าใช้จ่ายวันรับรถแล้ว')) { S.modal.cost = null; render(); }
   },
   async 'flow-down'(el) {
     const a = atById(el.dataset.id), m = S.modal || {};
