@@ -73,6 +73,7 @@ function carModal(m, D) {
   // top of the card (9/11): the three numbers a manager sends on to the sales, in one place, copied in one press
   const idCell = (lab, v) => `<div class="min-w-0"><div class="text-xs text-muted">${lab}</div><div class="code font-semibold text-base break-all">${v ? esc(v) : '<span class="text-muted">–</span>'}</div></div>`;
   return `<div class="rounded-lg p-3 mb-3 border border-line" style="background:var(--surface-2)">
+      ${c.invMoved ? `<div class="text-sm mb-2" style="color:var(--warn)">สาขา <b>${esc(c.br)}</b> · ย้ายจาก ${esc(c.invMoved.from)} อัตโนมัติ · ออกใบกำกับที่ ${esc(c.invMoved.to)}${c.invMoved.idate ? ' ' + fmtD(c.invMoved.idate) : ''}</div>` : ''}
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${idCell('เลขตัวถัง (VIN)', c.vin)}${idCell('เลขเครื่องยนต์', c.engine)}${idCell('Model code', c.mcode)}</div>
       <div class="mt-3 flex flex-wrap gap-2"><button class="btn btn-red btn-sm" data-act="car-copy" data-vin="${esc(c.vin)}">คัดลอกข้อมูลรถ</button><button class="btn btn-ghost btn-sm" data-act="car-copy" data-vin="${esc(c.vin)}" data-only="vin">คัดลอก VIN</button>
       ${m.back ? '<button class="btn btn-dark btn-sm" data-act="car-back">← กลับ</button>' : '<button class="btn btn-ghost btn-sm" data-act="close">ปิด</button>'}</div></div>

@@ -195,6 +195,12 @@ function deriveNow() {
       cars.set(vin, { vin, br: u.br, model: m || null, grade: g || null, color: c || null, st, prod: x.p || null, bkno: x.bk || null, cust: st === 'invoiced' ? (i.cust || x.cust || null) : x.cust || null,
         gone: { at: u.at, asof: u.asof || null, upload: u.id || null }, src: st === 'review' ? 'ไม่อยู่ในไฟล์ IDS ล่าสุด · รอตรวจ' : 'ออกใบกำกับแล้ว · ไม่อยู่ในไฟล์ Stock IDS ล่าสุด' });
     } }
+  // a car invoiced by a branch is that branch's car (ตกลง 11/11): moved there automatically, the old branch kept as "โอนจาก"
+  for (const car of cars.values()) {
+    const i = invByVin.get(car.vin);
+    if (!i || i.company || i.other || car.special || !BRS.includes(i.br) || i.br === car.br) continue;
+    car.invMoved = { from: car.br, to: i.br, idate: i.idate || null }; car.fromBr = car.fromBr || car.br; car.br = i.br;
+  }
   // IDS is the reference; the keyed date is used only while IDS has none. Car age counts from the production date.
   for (const car of cars.values()) {
     car.prodIds = car.src === 'IDS' ? car.prodIds || null : null;

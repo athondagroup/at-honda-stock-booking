@@ -53,12 +53,13 @@ function ltCell(c, D, p) {
   const warn = L && L.sheet_sync && L.sheet_sync.conflict ? `<div class="text-xs" style="color:var(--bad)">ชีตมี "${esc(L.sheet_sync.current || '')}" ยังไม่ได้เขียน <button class="underline" data-act="lt-force" data-id="${esc(L.id)}">เขียนทับ</button></div>` : '';
   if (t) return `<div class="lt-cell on"><input id="lt-in" class="lt-in" data-lt="${esc(c.vin)}" value="${esc(t.q || '')}" placeholder="ชื่อลูกค้า / เลขใบจอง / เซลล์" autocomplete="off">
     <button class="text-xs underline text-muted" data-act="lt-cancel">ยกเลิก</button>${ltDrop(c, D)}</div>`;
-  if (!L) return `<div class="lt-cell"><input class="lt-in idle" data-lt-open="${esc(c.vin)}" placeholder="พิมพ์ชื่อลูกค้า / เลขใบจอง" readonly></div>`;
+  const gone = !L ? ltGone(c, D) : null;
+  if (!L) return `<div class="lt-cell"><input class="lt-in idle" data-lt-open="${esc(c.vin)}" placeholder="พิมพ์ชื่อลูกค้า / เลขใบจอง" readonly>${gone ? `<div class="text-xs"><button class="underline" style="color:var(--accent, #2563eb)" data-act="lt-undo" data-id="${esc(gone.id)}" title="ปล่อยไปเมื่อ ${fmtDT(gone.rel.at)}">↶ ย้อนกลับ "${esc(ltTextOf(gone))}"</button></div>` : ''}</div>`;
   const txt = `<span class="lt-txt" title="${esc(lockLabel(L))}">${esc(ltTextOf(L))}</span>`;
   const own = ltMine(L);
   return `<div class="lt-cell">${txt} ${own
     ? `<button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="lt-edit" data-vin="${esc(c.vin)}">แก้</button> · <button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="lt-release" data-id="${esc(L.id)}">ปล่อย</button>`
-    : `<button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="lt-ask" data-vin="${esc(c.vin)}">ขอแก้</button>`}${warn}${askTxt}</div>`;
+    : `<button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="lt-ask" data-vin="${esc(c.vin)}">ขอแก้</button>`}${own && L.replaced && ltRecent(L.requested_at) ? ` · <button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="lt-undo" data-id="${esc(L.id)}">↶ ย้อนกลับการแก้</button>` : ''}${warn}${askTxt}</div>`;
 }
 const ltRoleShort = l => String(l.requested_role || '').replace(/\s*\(.*\)$/, '') || 'ผู้จัดการ';
 // ---- write / clear the sheet cell (only on the real web; the preview never touches the real sheet)
@@ -201,3 +202,35 @@ function ltNotices(D, add) {
     }
   }
 }
+
+// ---- undo (11/11): typing makes it easy to let go / change by mistake. Within 24 hours the one who did it puts it back.
+const ltRecent = at => !!at && Date.now() - new Date(at).getTime() < 24 * 3600 * 1000;
+function ltGone(c, D) {
+  if (!S.me || !S.me.id) return null;
+  const xs = D.locks.filter(l => l.vin === c.vin && l.typed && l.status === 'released' && l.rel && ltRecent(l.rel.at) && l.rel.reason !== 'แก้ไขล็อก (พิมพ์ใหม่)' && l.rel.reason !== 'ย้อนกลับการแก้'
+    && ((l.history || []).slice(-1)[0] || {}).by === S.me.id);
+  return xs.sort((a, b) => String(b.rel.at).localeCompare(String(a.rel.at)))[0] || null;
+}
+Object.assign(ACTIONS, {
+  async 'lt-undo'(el) {
+    if (!ltCan()) return;
+    const id = el.dataset.id, l = findLock(id), D = derive(); if (!l) return;
+    if (l.status === 'released') {
+      if (D.locks.some(x => x.id !== id && x.vin === l.vin && x.live)) { toast('ย้อนกลับไม่ได้ รถคันนี้มีล็อกใหม่แล้ว', 'bad'); return; }
+      const cur = { ...l, status: 'approved' }; delete cur.rel; delete cur.sheet_cleared; delete cur.undo;
+      if (!await saveLock(id, cur, 'ย้อนกลับ: ปล่อยล็อก', 'กดผิด')) return;
+      toast(`ย้อนกลับแล้ว ล็อก "${ltTextOf(cur)}" ถึง ${fmtD(cur.end)}`);
+      ltSheet(id, ltTextOf(cur), '');
+      return;
+    }
+    if (l.replaced) {
+      const old = findLock(l.replaced); if (!old) { toast('ไม่พบล็อกเดิม', 'bad'); return; }
+      const now = new Date().toISOString();
+      if (!await saveLock(id, { ...l, status: 'released', rel: { at: now, by: roleLabel(), self: true, reason: 'ย้อนกลับการแก้' }, sheet_cleared: now }, 'ย้อนกลับการแก้', `กลับไปเป็น "${ltTextOf(old)}"`)) return;
+      const back = { ...old, status: 'approved' }; delete back.rel; delete back.sheet_cleared;
+      await saveLock(l.replaced, back, 'ย้อนกลับ: แก้ไขล็อก', 'กดผิด');
+      toast(`ย้อนกลับแล้ว ล็อกกลับเป็น "${ltTextOf(back)}"`);
+      ltSheet(l.replaced, ltTextOf(back), ltTextOf(l));
+    }
+  }
+});
