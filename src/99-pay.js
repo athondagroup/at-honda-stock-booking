@@ -46,7 +46,7 @@ function payCostAuto(a) {
     regGift: gift(d.reg_by) ? d.reg_by : null, regDef: gift(d.reg_by) ? 0 : feeReg(a, d.reg_type),
     insGift: gift(d.ins1_by) ? d.ins1_by : null, insDef: d.ins1_by === 'ลูกค้าซื้อ' ? feeIns(a, 1, d) : 0,
     po: poRows,
-    downDisc: cash ? 0 : num(d.down_disc), deposit: num(a.deposit), trade: r.trade && r.trade.has ? num(r.trade.sale_price) : 0, tradeHas: !!(r.trade && r.trade.has), tradeApp: r.trade && r.trade.has ? num(r.trade.price) : 0
+    downDisc: cash ? 0 : num(d.down_disc), deposit: num(a.deposit), trade: r.trade && r.trade.has && r.trade.deduct !== false ? num(r.trade.sale_price) : 0, tradeNo: !!(r.trade && r.trade.has && r.trade.deduct === false), tradeHas: !!(r.trade && r.trade.has), tradeApp: r.trade && r.trade.has ? num(r.trade.price) : 0
   };
 }
 function payCostVals(a, m) {
@@ -86,7 +86,7 @@ function payCostBox(a, m) {
     <div class="flex justify-between font-semibold text-sm pt-2"><span>รวมค่าใช้จ่าย</span><span class="num">${money(tp)}</span></div>
     ${A.downDisc ? row('หัก ส่วนลดเงินดาวน์', ro(A.downDisc, 1), tag('จากเงื่อนไข', 'good')) : ''}
     ${row('หัก เงินมัดจำ', inp('dep', 'dep'), !A.deposit ? tag(num(v.dep) ? 'ใส่เอง · ใบจองไม่ระบุยอด' : 'ใบจองไม่ระบุยอด', 'warn') : num(v.dep) === A.deposit ? tag('จากใบจอง', 'good') : tag(`แก้เอง · ใบจอง ${money(A.deposit)}`, 'warn'))}
-    ${A.tradeHas ? row('หัก รถเก่าเทิร์น', ro(A.trade, 1), A.trade ? `<span class="text-xs text-muted">ราคาขายให้เต็นท์ (เต็นท์จ่ายให้ศูนย์)${A.tradeApp ? ` · ราคาประเมิน ${money(A.tradeApp)}` : ''}</span>` : '<span class="text-xs" style="color:var(--warn)">ยังไม่ลงราคาขายรถเก่า · ไม่หัก</span>') : ''}
+    ${A.tradeHas ? row('หัก รถเก่าเทิร์น', ro(A.trade, 1), A.trade ? `<span class="text-xs text-muted">ราคาขายให้เต็นท์ (เต็นท์จ่ายให้ศูนย์)${A.tradeApp ? ` · ราคาประเมิน ${money(A.tradeApp)}` : ''}</span>` : (A.tradeNo ? '<span class="text-xs text-muted">เลือกไว้ว่าไม่หักในค่าใช้จ่ายวันรับรถ (แก้ที่รถเก่าเทิร์น)</span>' : '<span class="text-xs" style="color:var(--warn)">ยังไม่ลงราคาขายรถเก่า · ไม่หัก</span>')) : ''}
     ${list('minus', '−')}
     <div class="flex justify-between items-baseline pt-2 mt-1" style="border-top:2px solid var(--fg)"><span class="font-semibold">${A.cash ? 'รวมค่าใช้จ่ายทั้งสิ้น' : 'รวมจ่ายสุทธิ'}</span><b class="num text-xl" style="color:var(--red)">${money(net)}</b></div>
     ${edit ? `<div class="flex items-center gap-2 mt-2"><button class="btn btn-ghost btn-sm" data-act="pc-save" data-id="${esc(a.id)}">บันทึกค่าใช้จ่าย</button><span class="text-xs text-muted">${sv && sv.at ? `บันทึกล่าสุด ${fmtDT(sv.at)}` : 'ยังไม่ได้บันทึก (ตัวเลขข้างบนเป็นค่าตั้งต้น)'}</span></div>` : ''}</div>`;
