@@ -855,10 +855,11 @@ const ACTIONS = {
     if (!plate) { toast('ใส่เลขทะเบียนป้ายแดง', 'bad'); $('#fl-pl')?.focus(); return; }
     if (!validDate(date) || date > todayISO()) { toast('วันที่ส่งมอบต้องไม่เกินวันนี้', 'bad'); return; }
     if (a.date && date < a.date) { toast('วันที่ส่งมอบต้องไม่ก่อนวันจอง', 'bad'); return; }
-    if (!isCash(a.rec) && !finDocsN(a.rec)) { toast('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ (ที่ขั้น "ไฟแนนซ์ผ่าน")', 'bad'); return; }
+    const waive = !isCash(a.rec) && !finDocsN(a.rec) && S.role.role === 'exec';   // the executive may deliver without the finance approval attached (10/11)
+    if (!isCash(a.rec) && !finDocsN(a.rec) && !waive) { toast('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ (ที่ขั้น "ไฟแนนซ์ผ่าน")', 'bad'); return; }
     const tr = await tradeDelivOf(v, tradeCur(a.rec), 'fl', true); if (tr.err) { toast(tr.err, 'bad'); if (tr.id) $('#' + tr.id)?.focus(); return; }
     tradeFilesClear();
-    if (!await saveFlow(a, { trade: tr.rec, flow: { delivered: { ...actor(), date, plate } } }, 'บันทึกส่งมอบแล้ว กรอกข้อมูลค่าคอมแล้วรอผู้จัดการยืนยัน')) return;
+    if (!await saveFlow(a, { trade: tr.rec, flow: { delivered: { ...actor(), date, plate, ...(waive ? { no_fin_doc: true } : {}) } } }, waive ? 'บันทึกส่งมอบแล้ว (ผู้บริหารอนุโลม ยังไม่แนบใบอนุมัติไฟแนนซ์)' : 'บันทึกส่งมอบแล้ว กรอกข้อมูลค่าคอมแล้วรอผู้จัดการยืนยัน')) return;
     for (const l of derive().locks.filter(x => x.live && x.type === 'booking' && (x.bkref === a.key || x.bkref === a.row?.key))) {
       const cur = findLock(l.id); if (!cur) continue;
       cur.status = 'done'; await saveLock(l.id, cur, 'ส่งมอบแล้ว', fmtD(date));
