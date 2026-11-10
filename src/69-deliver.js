@@ -78,11 +78,11 @@ Object.assign(ACTIONS, {
       if (!company) return bad('เลือกบริษัทไฟแนนซ์ที่อนุมัติ', 'cd-fc');
       const docs = [...((f.fin && f.fin.docs) || [])];
       for (const x of S.files.fin) { const id = await storeImage(x.blob); if (id) docs.push(id); }
-      if (!docs.length && S.role.role !== 'exec') return bad('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ');
+      if (!docs.length && !noImgNeed()) return bad('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ');
       patch.fin_status = 'ผ่าน'; patch.finance = company;
       patch.flow.fin = { ...actor(), ok: true, date: t, docs, status: 'ผ่าน', company, via: 'invoice' };
     }
-    if (fl.done.fin && !isCash(r) && !finDocsN(r) && S.role.role !== 'exec') return bad('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ (เปิดใบจอง ขั้น "ไฟแนนซ์ผ่าน")');
+    if (fl.done.fin && !isCash(r) && !finDocsN(r) && !noImgNeed()) return bad('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ (เปิดใบจอง ขั้น "ไฟแนนซ์ผ่าน")');
     const linked = !!carBookingOf(c.vin, D);
     if (!linked) {
       if (c.lock && !(c.lock.bkref === a.key || c.lock.bkref === (a.row && a.row.key))) return bad(`รถคันนี้ล็อกให้ ${c.lock.owner || 'ใบจองอื่น'} อยู่ ปล่อยล็อกก่อน`);

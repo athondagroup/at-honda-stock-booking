@@ -419,7 +419,7 @@ async function runBookingAi() {
 async function saveBooking() {
   const d = S.draft.booking, D = derive(), msg = $('#booking-msg');
   const missing = [];
-  if (!S.files.bk.length) missing.push('หน้าใบจอง (รูป)');
+  if (!S.files.bk.length && !noImgNeed()) missing.push('หน้าใบจอง (รูป)');
   if (!d.booking_date) missing.push('วันที่จอง');
   if (!d.sales) missing.push('ชื่อเซลล์');
   if (d.source === 'อื่น ๆ' && !String(d.source_other || '').trim()) missing.push('แหล่งที่มาอื่น (พิมพ์)');
@@ -855,7 +855,7 @@ const ACTIONS = {
     if (!plate) { toast('ใส่เลขทะเบียนป้ายแดง', 'bad'); $('#fl-pl')?.focus(); return; }
     if (!validDate(date) || date > todayISO()) { toast('วันที่ส่งมอบต้องไม่เกินวันนี้', 'bad'); return; }
     if (a.date && date < a.date) { toast('วันที่ส่งมอบต้องไม่ก่อนวันจอง', 'bad'); return; }
-    const waive = !isCash(a.rec) && !finDocsN(a.rec) && S.role.role === 'exec';   // the executive may deliver without the finance approval attached (10/11)
+    const waive = !isCash(a.rec) && !finDocsN(a.rec) && noImgNeed();   // the executive may deliver without the finance approval attached (10/11)
     if (!isCash(a.rec) && !finDocsN(a.rec) && !waive) { toast('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ (ที่ขั้น "ไฟแนนซ์ผ่าน")', 'bad'); return; }
     const tr = await tradeDelivOf(v, tradeCur(a.rec), 'fl', true); if (tr.err) { toast(tr.err, 'bad'); if (tr.id) $('#' + tr.id)?.focus(); return; }
     tradeFilesClear();

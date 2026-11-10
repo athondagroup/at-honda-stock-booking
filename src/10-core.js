@@ -150,6 +150,8 @@ const canLockMgr = l => perms().approve && lockBrs(l).some(b => mgrBranches().in
 // delivered with another branch's car (e.g. a SPH car): the booking's branch, the sales' branch or the delivering branch is hers
 const adminOwns = a => !!(a && S.role.role === 'admin' && S.role.branch && [a.br, a.salesBr, a.delivBr].includes(S.role.branch));
 const canAllocBr = br => (S.role.role === 'admin' && br === S.role.branch) || canApproveBr(br);
+// the executive does not have to attach photos / documents anywhere (10/11)
+function noImgNeed() { return !!(S.role && S.role.role === 'exec'); }
 function custCell(name, sales, o = {}) {
   if (o.other) return chip('ขายให้สาขาอื่น', 'muted');
   if (o.company) return chip('รถบริษัท', 'muted');

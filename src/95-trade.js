@@ -65,7 +65,7 @@ async function tradeDelivOf(v, cur, idp, need) {
     if (!model) return { err: 'ใส่รุ่นรถเก่า', id: idp + '-tm' };
     if (!(sale > 0)) return { err: 'ใส่ราคาขายรถเก่า', id: idp + '-ts' };
     if (!tent) return { err: 'ใส่ชื่อเต็นท์ที่รับซื้อ', id: idp + '-tt' };
-    if (!have) return { err: 'แนบรูปใบสัญญาซื้อขายรถเก่า', id: null };
+    if (!have && !noImgNeed()) return { err: 'แนบรูปใบสัญญาซื้อขายรถเก่า', id: null };
   }
   const docs = [...((cur && cur.docs) || [])];
   for (const x of S.files.trade) { const id = await storeImage(x.blob); if (id) docs.push(id); }
