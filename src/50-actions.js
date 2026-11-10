@@ -305,12 +305,14 @@ async function saveUploads() {
     const parts = r.src === 'quota' ? r.months.map(m => ({ id: idsDocId('quota', r.br, m), m, rows: r.rows.filter(x => x.m === m) })) : [{ id: idsDocId(r.src, r.br), m: null, rows: r.rows }];
     for (const part of parts) {
       let rows = uplKeepRows(r, part.rows);
+      // "เฉพาะบางคัน" (10/11): the rows of this file go on top of what is stored; the others stay untouched
+      if (uplPartial(r)) { const key = x => r.src === 'stock' ? x.vin : r.src === 'booking' ? String(x.no) : x.ref, m = new Map(unpack(S.ids.get(part.id)).map(x => [key(x), x])); rows.forEach(x => m.set(key(x), { ...(m.get(key(x)) || {}), ...x })); rows = [...m.values()]; }
       const mk = () => ({ src: r.src, br: r.br, m: part.m, asof: r.asof, file: r.file, sheet: r.sheet, n: rows.length, ...pack(r.src, rows), warn: r.warn.slice(0, 20), ...actor() });
       let doc = mk();
       if (utf8len(doc) > 250000) { toast(`ตาราง ${SRC_LABEL[r.src]} ${r.br} ใหญ่เกินที่ต้นแบบเก็บได้`, 'bad'); continue; }
       if (!await write('ids', part.id, doc)) { U.busy = false; render(); return; }
       await write('uploads', newId('uploads'), { src: r.src, br: r.br, m: part.m, asof: r.asof, file: r.file, sheet: r.sheet, n: rows.length,
-        prevN: r.diff ? r.diff.prevN : null, out: r.src === 'stock' || r.src === 'booking' ? (r.diff?.out || []).slice(0, 300) : [], inN: r.diff?.inN || 0, ...actor() });
+        prevN: r.diff ? r.diff.prevN : null, out: !uplPartial(r) && (r.src === 'stock' || r.src === 'booking') ? (r.diff?.out || []).slice(0, 300) : [], inN: r.diff?.inN || 0, mode: uplPartial(r) ? 'partial' : 'full', ...actor() });
       ok++;
     }
   }
@@ -1092,6 +1094,7 @@ document.addEventListener('change', async ev => {
   }
   if (t.dataset.uplOn !== undefined) { const r = S.upl.results[Number(t.dataset.uplOn)]; if (r) r.on = t.checked; render(); return; }
   if (t.dataset.uplKind !== undefined) { const r = S.upl.results[Number(t.dataset.uplKind)]; if (r) { r.kind = t.value; r.nameChoice = null; r.diff = invDiff(r); } render(); return; }
+  if (t.dataset.uplMode !== undefined) { const r = S.upl.results[Number(t.dataset.uplMode)]; if (r) { r.mode = t.value; r.fullOk = false; } render(); return; }
   if (t.dataset.uplName !== undefined) { const r = S.upl.results[Number(t.dataset.uplName)]; if (r) r.nameChoice = t.value; render(); return; }
   if (t.dataset.uplDate !== undefined) { const r = S.upl.results[Number(t.dataset.uplDate)]; if (r && t.value) r.asof = t.value; return; }
   if (t.dataset.filter && RERENDER_ON_CHANGE.has(t.dataset.filter)) { S.filters[t.dataset.filter] = t.value; softRender(); return; }
