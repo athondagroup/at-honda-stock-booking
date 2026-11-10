@@ -623,7 +623,7 @@ const ACTIONS = {
     if ((m.type === 'temp' || m.reason === 'อื่น ๆ') && !(m.note || '').trim()) { toast('ใส่เหตุผลก่อนส่ง (ยังไม่มีใบจอง)', 'bad'); $('#m-note')?.focus(); return; }
     const u = chk.u;
     const b = m.type === 'booking' && m.bkref ? D.bookingByKey.get(m.bkref) : null;
-    const direct = m.type === 'dealer' ? p.approveDealer : p.approve;
+    const direct = p.approve;   // managers / the executive lock at once, dealer trades too (10/11); the branch is told
     const days = LOCK_DAYS_BY[m.type] || 15;
     const owner = m.type === 'booking' ? (b ? b.owner : null) : m.type === 'temp' ? (isSales() ? S.role.sales : m.sales) : null;
     const id = newId('locks'), now = new Date().toISOString();
@@ -636,7 +636,7 @@ const ACTIONS = {
       req_br: (b ? b.br : null) || (owner ? salesBranch(owner) : null) || mgrBranches()[0] || null   // the branch that asked for the lock (a manager can lock a car of any branch)
     };
     const conv = m.convertFrom ? findLock(m.convertFrom) : null;
-    if (direct) { l.status = 'approved'; l.start = todayISO(); l.end = addDays(l.start, days); l.approved_at = now; }
+    if (direct) { l.status = 'approved'; l.start = todayISO(); l.end = addDays(l.start, days); l.approved_at = now; l.notices = [{ k: 'new', at: now, by: S.me.id || null, role: roleLabel() }]; }
     const act = direct ? (m.type === 'temp' ? 'ล็อกชั่วคราว (ผู้จัดการ)' : 'ล็อก (ผู้จัดการ)') : (m.type === 'temp' ? 'ขอล็อกชั่วคราว' : 'ขอล็อก');
     if (!await saveLock(id, l, act, direct ? `หมด ${fmtD(l.end)}` : (l.note || l.reason))) return;
     if (conv) { conv.status = 'converted'; conv.converted_to = id; await saveLock(m.convertFrom, conv, 'ลูกค้ามาจองแล้ว', `เปลี่ยนเป็นล็อกให้ใบจอง${direct ? '' : ' รอผู้จัดการอนุมัติ'}`); }
@@ -648,11 +648,11 @@ const ACTIONS = {
     const cur0 = S.locks.get(el.dataset.id);
     const L0 = derive().locks.find(x => x.id === el.dataset.id);
     if (L0 && L0.idsTook && !L0.idsTook.same) { toast(L0.idsTook.st === 'delivered' ? 'รถคันนี้ส่งมอบแล้ว อนุมัติไม่ได้ กดไม่อนุมัติเพื่อปิดคำขอ' : 'IDS จัดสรรรถคันนี้ให้ใบจองอื่นแล้ว อนุมัติไม่ได้ กดไม่อนุมัติเพื่อปิดคำขอ', 'bad'); return; }
-    if (cur0 && !(cur0.type === 'dealer' ? perms().approveDealer : canLockMgr(lkD(cur0)))) { toast(`อนุมัติได้เฉพาะ${cur0.type === 'dealer' ? 'พี่อั้ม' : MGR_NAME[cur0.car_br] || 'ผู้จัดการสาขานั้น'}`, 'bad'); return; }
+    if (cur0 && !(cur0.approver && S.me && cur0.approver === S.me.id) && !(cur0.type === 'dealer' ? perms().approveDealer : canLockMgr(lkD(cur0)))) { toast(`อนุมัติได้เฉพาะ${cur0.type === 'dealer' ? 'พี่อั้ม' : MGR_NAME[cur0.car_br] || 'ผู้จัดการสาขานั้น'}`, 'bad'); return; }
     const id = el.dataset.id, l = await claimFresh('locks', id, x => x.status === 'pending');
     if (!l) return;
     const D = derive();
-    const hard = D.locks.find(x => x.id !== id && x.live && x.type !== 'temp' && x.status !== 'pending' && sameUnit(x, l, D));
+    const hard = D.locks.find(x => x.id !== id && x.id !== l.replaces && x.live && x.type !== 'temp' && x.status !== 'pending' && sameUnit(x, l, D));
     if (hard) { toast(`หน่วยนี้ล็อกให้ ${hard.owner || hard.dealer_name || 'ใบจองอื่น'} แล้ว`, 'bad'); return; }
     const days = LOCK_DAYS_BY[l.type === 'customer' ? 'booking' : l.type] || 15;
     l.status = 'approved'; l.start = todayISO(); l.end = addDays(l.start, days); l.approved_at = new Date().toISOString();
@@ -663,6 +663,7 @@ const ACTIONS = {
       const side = await settleUnit(derive(), l, id); closed = side.length;
       if (side.length) { const cur = findLock(id); cur.undo = { ...cur.undo, side }; await write('locks', id, cur); }
     }
+    if (l.replaces && typeof ltApproveChange === 'function') await ltApproveChange(id);
     toast(`อนุมัติแล้ว ล็อกถึง ${fmtD(l.end)}${closed ? ` · ปิดคำขออื่นของรถคันนี้ ${closed} รายการให้อัตโนมัติ` : ''}`);
   },
   // put a lock back to where it was before the last action (pressed by mistake)

@@ -18,6 +18,10 @@ const b64url = (b: ArrayBuffer | Uint8Array | string) => {
 };
 const WRITE_SHEETS = ["17pqWhpWAcj_rqg5jkzqCIVCGj3Awno__aqpIUZ_sSI8"];
 const WRITE_ROLES = ["exec", "aum", "nuch", "admin"];
+// the IDS stock sheet: only the booking-no cell of a VIN row, by managers / the executive (stock_cell below)
+const CELL_SHEET = "1pFTMyWnJLJdoeRsNEzENhguOePiYaX8_BsYIypHMMIY";
+const CELL_TABS = ["PSC", "ATE", "SPH", "KPA"];
+const CELL_ROLES = ["exec", "aum", "nuch"];
 async function token(sa: any, write = false) {
   const now = Math.floor(Date.now() / 1000);
   const head = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
@@ -40,6 +44,35 @@ Deno.serve(async (req) => {
   if (body.ping) return out({ ready: !!SA });
   if (!SA) return out({ code: "unavailable" }, 503);
   try {
+    // the lock typed on the stock page (10/11): write ONE cell, the booking-no column of the VIN's row in a branch tab of the IDS
+    // stock sheet. Managers / the executive only. The page sends what it believes the cell holds (expect); a cell changed in the sheet
+    // meanwhile is not overwritten (conflict + what it holds now) unless force.
+    if (body.tool === "stock_cell") {
+      if (!CELL_ROLES.includes(String(m.role || ""))) return out({ code: "not_granted" }, 403);
+      const vin = String(body.vin || "").toUpperCase().trim(), value = String(body.value ?? "").slice(0, 120);
+      if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) return out({ code: "bad_request" }, 400);
+      const tabs = [String(body.br || ""), ...CELL_TABS].filter((x, i, a) => CELL_TABS.includes(x) && a.indexOf(x) === i);
+      const tw = await token(JSON.parse(SA), true);
+      const base = `https://sheets.googleapis.com/v4/spreadsheets/${CELL_SHEET}`;
+      const col = (i: number) => { let s = "", n = i + 1; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; };
+      for (const tab of tabs) {
+        const r = await fetch(`${base}/values/${encodeURIComponent(`'${tab}'!A1:AD800`)}`, { headers: { Authorization: `Bearer ${tw}` } });
+        if (!r.ok) continue;
+        const rows: string[][] = (await r.json()).values || [];
+        const h = rows.findIndex((x) => x.some((v) => String(v).includes("หมายเลขตัวถัง")) && x.some((v) => String(v).includes("เลขที่ใบสั่งจอง")));
+        if (h < 0) continue;
+        const vi = rows[h].findIndex((v) => String(v).includes("หมายเลขตัวถัง")), bi = rows[h].findIndex((v) => String(v).includes("เลขที่ใบสั่งจอง"));
+        const ri = rows.findIndex((x, i) => i > h && String(x[vi] || "").toUpperCase().trim() === vin);
+        if (ri < 0) continue;
+        const cur = String(rows[ri][bi] ?? "").trim(), range = `'${tab}'!${col(bi)}${ri + 1}`;
+        const nrm = (x: unknown) => String(x ?? "").replace(/\s+/g, "");
+        if (!body.force && body.expect !== undefined && nrm(cur) !== nrm(body.expect) && nrm(cur) !== nrm(value)) return out({ code: "conflict", current: cur, range, tab });
+        const w = await fetch(`${base}/values/${encodeURIComponent(range)}?valueInputOption=RAW`, { method: "PUT", headers: { Authorization: `Bearer ${tw}`, "Content-Type": "application/json" }, body: JSON.stringify({ range, majorDimension: "ROWS", values: [[value]] }) });
+        if (!w.ok) { const g = await w.json().catch(() => ({})); console.error("stock_cell", w.status, g && g.error && g.error.message); return out({ code: "tool_error", status: w.status, message: (g && g.error && g.error.message) || "" }, 502); }
+        return out({ ok: true, range, tab, prev: cur, value });
+      }
+      return out({ code: "not_found" });
+    }
     if (body.tool === "update_values" || body.tool === "append_values") {
       if (!WRITE_ROLES.includes(String(m.role || "")) || !WRITE_SHEETS.includes(body.spreadsheetId) || !Array.isArray(body.values) || !body.range) return out({ code: "not_granted" }, 403);
       const tw = await token(JSON.parse(SA), true);

@@ -627,6 +627,7 @@ function buildAlerts(D) {
     const d = m && m.stock ? daysBetween(m.stock.asof, today) : null;
     if (d !== null && d > 3) add('stale:' + br, { br, roles: ['admin'] }, 'muted', `ไฟล์ Stock IDS สาขา ${br} เก่า ${d} วัน`, 'อัปโหลดไฟล์ล่าสุดเพื่อให้การจับคู่และการแจ้งเตือนถูกต้อง', { act: 'go', view: 'upload' });
   }
+  if (typeof ltNotices === 'function') ltNotices(D, add);
   return out;
 }
 const specLabelText = k => { const [m, g, c] = String(k || '?|?|?').split('|'); return `${m} ${gradeShort(m, g)} ${c}`; };
@@ -634,6 +635,8 @@ function myAlerts(D) {
   const r = S.role.role, mine = [];
   for (const a of D.alerts) {
     const t = a.to;
+    // a notice already read (or made by this person) is gone (10/11)
+    if (a.act && a.act.ack && S.me && (a.act.by === S.me.id || ((a.act.acks || {})[S.me.id] || []).includes(String(a.act.id).split('|')[1]))) continue;
     if (r === 'sales') { if (t.roles.includes('sales') && t.sales && t.sales === S.role.sales) mine.push(a); }
     else if (r === 'admin') { if (t.roles.includes('admin') && t.br === S.role.branch) mine.push(a); }
     else if (r === 'aum' || r === 'nuch') { if (t.roles.includes('manager') && (!t.br || MGR_BR[r].includes(t.br))) mine.push(a); }

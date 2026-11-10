@@ -141,7 +141,7 @@ function sheetSyncBox(D) {
     </div></section>`;
 }
 // a request this person can decide: the manager of the car's branch (dealer trades: พี่อั้ม), the executive
-const canDecideLock = l => l.status === 'pending' && perms().write && !(l.idsTook && !l.idsTook.same) && (l.type === 'dealer' ? perms().approveDealer : canLockMgr(l));
+const canDecideLock = l => l.status === 'pending' && perms().write && !(l.idsTook && !l.idsTook.same) && ((l.approver && S.me && l.approver === S.me.id) || (!l.replaces && (l.type === 'dealer' ? perms().approveDealer : canLockMgr(l))));
 // ---------- the locks of one car, handled right from the stock page (approve, pick the booking, extend, release …)
 const carLocks = (c, D) => D.locks.filter(l => (l.vin === c.vin || (!l.vin && c.ref && l.ref === c.ref))
   && (l.live || l.status === 'pending' || (l.idsTook && !l.idsTook.same && l.status === 'approved'))).filter(lockVisible)
