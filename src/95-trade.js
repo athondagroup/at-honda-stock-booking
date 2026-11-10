@@ -18,6 +18,10 @@ function bookTradeRec(d) {
   if (d.trade !== 'yes') return null;
   return { has: true, brand: String(d.t_brand || '').trim(), model: String(d.t_model || '').trim(), year: parseInt(d.t_year, 10) || null, price: num(d.t_price) || null };
 }
+// the old car is keyed in ONE place (10/11): complete = nothing more to key at delivery (the delivery step only shows it);
+// while the delivery step asks for it, the booking's own "รถเก่าเทิร์น" box steps aside
+function tradeComplete(t) { return !!t && (!t.has || !!(t.brand && t.model && num(t.sale_price) > 0 && t.tent && ((t.docs || []).length || noImgNeed()))); }
+function tradeDelivOpen(a) { const fl = a.flow || {}; return !!(perms().write && !a.cancelled && fl.done && !fl.done.delivered && stepAllowed(a, 'delivered') && stepOpen(a, 'delivered')); }
 function tradeCur(r) { return r.trade || (r.flow && r.flow.down && r.flow.down.tradein) || null; }
 function tradeLine(r) {
   const t = tradeCur(r);

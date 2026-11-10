@@ -105,7 +105,7 @@ function atModal(m, D) {
       ${gformBox(m, a)}
       ${a.cancelled ? cancelledBox(m, a) : trInBox(a, D)}
       ${changeBox(m, a)}
-      ${tradeEditBox(m, a)}
+      ${tradeDelivOpen(a) && !tradeComplete(tradeCur(a.rec)) ? '' : tradeEditBox(m, a)}
       ${mergedBox(a, D)}
       ${m.cancel ? cancelPanel(m, a) : ''}
       ${ownerBox(m, a)}
@@ -196,7 +196,7 @@ function flowPanel(m, a, D) {
       <div class="field"><label for="fl-dd" class="req">วันที่ส่งมอบรถ (ลูกค้ารับรถจริง)</label><input id="fl-dd" type="date" data-modal="deliv.date" value="${esc(v.date ?? (fl.deliveredDate || (a.rec.inv_man && a.rec.inv_man.ddate) || ''))}" max="${todayISO()}"></div>
       <div class="field"><label for="fl-pl" class="req">เลขทะเบียนป้ายแดง</label><input id="fl-pl" data-modal="deliv.plate" value="${esc(v.plate ?? dv.plate ?? '')}" placeholder="เช่น ป-1234 นครปฐม" autocomplete="off"></div>
 </div>
-      ${tradeDelivFields('deliv', (m.deliv = m.deliv || tradePre(r)), 'fl', tradeCur(r), true)}
+      ${(m.deliv = m.deliv || tradePre(r), tradeComplete(tradeCur(r)) ? `<div class="mt-2 text-sm">รถเก่าเทิร์น: <b>${esc(tradeLine(r))}</b> <span class="text-xs text-muted">ลงไว้แล้ว ไม่ต้องลงซ้ำ · แก้ที่ "รถเก่าเทิร์น" ในใบจอง</span></div>` : tradeDelivFields('deliv', m.deliv, 'fl', tradeCur(r), true))}
       <button class="btn btn-dark btn-sm mt-2" data-act="flow-deliver" data-id="${esc(a.id)}">บันทึกส่งมอบ</button>`;
   };
   const commBody = () => commForm(a, m, D, fl.done.confirmed || !canEditBooking(a), !fl.done.confirmed);
