@@ -673,6 +673,20 @@ function buildAlerts(D) {
     if (d !== null && d > 3) add('stale:' + br, { br, roles: ['admin'] }, 'muted', `ไฟล์ Stock IDS สาขา ${br} เก่า ${d} วัน`, 'อัปโหลดไฟล์ล่าสุดเพื่อให้การจับคู่และการแจ้งเตือนถูกต้อง', { act: 'go', view: 'upload' });
   }
   if (typeof ltNotices === 'function') ltNotices(D, add);
+  // the same customer name locked / asked for on two cars or quota slots (11/11): the manager of the seller's branch looks
+  { const g = new Map();
+    for (const l of D.locks) {
+      if (!(l.live || l.status === 'pending') || l.type === 'dealer') continue;
+      const t = l.sheet_text && l.sheet_text.includes('/') ? sheetNorm(l.sheet_text) : l.prospect ? sheetNorm(`${l.sales || l.sales_nick || ''}/${l.prospect}`) : '';
+      if (!t || /\/$/.test(t)) continue;
+      (g.get(t) || g.set(t, []).get(t)).push(l);
+    }
+    for (const [t, ls] of g) {
+      const units = [...new Set(ls.map(l => l.vin || 'Quota ' + l.ref))]; if (units.length < 2) continue;
+      const l0 = ls[0], who = l0.sales || l0.owner || null, br = (who && salesBranch(who)) || l0.bk_br || l0.car_br;
+      add('lockdup:' + t, { br, roles: ['manager'] }, 'warn', `ล็อกชื่อซ้ำ ${units.length} คัน: "${l0.sheet_text || l0.prospect}"`,
+        `${ls.map(l => `${l.car_br} ${l.vin || 'Quota ' + l.ref} (${l.status === 'pending' ? 'รออนุมัติ' : 'ล็อกแล้ว'})`).join(' · ')}${who ? ' · เซลล์ ' + who : ''} · เลือกเก็บคันเดียว`, { act: 'go', view: 'lock', sub: 'active', label: 'ดู' });
+    } }
   for (const br of BRS) {
     const n = D.bookings.filter(b => b.br === br && b.state === 'gone');
     if (n.length) add('bkgone:' + br, { br, roles: ['admin', 'manager'] }, 'bad', `ใบจอง IDS ${n.length} ใบ ไม่อยู่ในไฟล์ Booking ล่าสุด · รอตรวจ`,

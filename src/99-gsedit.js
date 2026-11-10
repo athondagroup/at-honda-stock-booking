@@ -17,7 +17,8 @@ async function gseRun() {
     const meta = idsGsPayload(await mcp.callTool('Google Sheets', 'get_spreadsheet', { spreadsheetId: id, fields: ['sheets.properties.title'] }, { cache: false }));
     const titles = ((meta && meta.sheets) || []).map(s => s.properties && s.properties.title).filter(Boolean);
     const tabs = titles.filter(t => /^(PSC|ATE|SPH|KPA)$/.test(t.trim()) || /^\d{1,2}\.\d{4}\s+(PSC|ATE|SPH|KPA)$/.test(t.trim()));
-    const edits = []; let n = 0, newCars = 0;
+    const edits = [], texts = new Map(); let n = 0, newCars = 0;
+    const seen = (t, br, unit) => { const k = sheetNorm(t); if (!k || !t.includes('/')) return; (texts.get(k) || texts.set(k, []).get(k)).push({ br, unit }); };
     for (const t of tabs) {
       const p = idsGsPayload(await mcp.callTool('Google Sheets', 'get_values', { spreadsheetId: id, range: `'${t.replace(/'/g, "''")}'!A1:BZ` }, { cache: false }));
       const r = p && p.values && p.values.length ? IDS.parseSheet(p.values, t, 'Google Sheet') : null;
@@ -26,6 +27,7 @@ async function gseRun() {
       if (r.src === 'stock') {
         const docId = idsDocId('stock', r.br), old = new Map(unpack(S.ids.get(docId)).map(x => [x.vin, x]));
         for (const x of r.rows) {
+          if (x.bknote) seen(x.bknote, r.br, x.vin);
           const o = old.get(x.vin); if (!o) { newCars++; continue; }
           const ch = GSE_STOCK.filter(f => gseN(x[f]) !== gseN(o[f])).map(f => ({ f, from: o[f] ?? null, to: x[f] ?? null }));
           if (ch.length) edits.push({ src: 'stock', docId, br: r.br, key: x.vin, ch });
@@ -34,6 +36,7 @@ async function gseRun() {
         for (const m of r.months || []) {
           const docId = idsDocId('quota', r.br, m), old = new Map(unpack(S.ids.get(docId)).map(x => [x.ref, x]));
           for (const x of r.rows.filter(y => y.m === m)) {
+            if (x.vnote) seen(x.vnote, r.br, 'Quota ' + x.ref);
             const o = old.get(x.ref); if (!o) continue;
             const ch = GSE_QUOTA.filter(f => gseN(x[f]) !== gseN(o[f])).map(f => ({ f, from: o[f] ?? null, to: x[f] ?? null }));
             if (ch.length) edits.push({ src: 'quota', docId, br: r.br, key: x.ref, ch });
@@ -41,6 +44,9 @@ async function gseRun() {
         }
       }
     }
+    // the same name typed on two cars / quota slots: shown on the row, and the manager of the seller's branch is told after saving
+    edits.forEach(e => { e.on = true; const c = e.ch.find(c => c.f === 'bknote' || c.f === 'vnote'); const k = c && c.to ? sheetNorm(c.to) : ''; const me = e.src === 'quota' ? 'Quota ' + e.key : e.key;
+      e.dup = k && texts.has(k) ? texts.get(k).filter(u => u.unit !== me) : []; });
     S.idsGs = { ...S.idsGs, busy: null, edits, newCars, done: edits.length ? null : `ไม่มีช่องที่แก้ในชีต (การจัดสรร / ล็อกคิว ตรงกับเว็บแล้ว)${newCars ? ` · มีรถในชีตที่ยังไม่อยู่ในเว็บ ${newCars} คัน (ใช้ "ดึงจาก Google Sheet" แบบเต็ม)` : ''}` };
     render();
   } catch (e) { S.idsGs = { ...S.idsGs, busy: null, err: `อ่านชีตไม่ได้${e && e.status ? ` (Google ตอบ ${e.status})` : ''}` }; render(); }
@@ -49,13 +55,13 @@ function gseBox() {
   const G = S.idsGs || {}, E = G.edits; if (!E || !E.length) return '';
   const v = x => x === null || x === '' ? '<span class="text-muted">(ว่าง)</span>' : esc(String(x));
   return `<div class="mt-3 p-3 rounded-lg" style="background:var(--surface-2)"><b>ช่องที่แก้ในชีต ${E.length} รายการ</b> <span class="text-sm text-muted">บันทึกแล้วเปลี่ยนเฉพาะช่องเหล่านี้ · ข้อความที่พิมพ์กลายเป็นล็อกตามกติกาเดิม · ช่องที่ถูกลบ ปล่อยล็อกที่มาจากข้อความนั้น</span>
-    <div class="scroll-x mt-2 max-h-80 overflow-auto"><table class="tbl text-sm"><thead><tr><th>สาขา</th><th>รถ / Quota</th><th>ช่อง</th><th>ในเว็บ</th><th>ในชีตตอนนี้</th></tr></thead><tbody>
-    ${E.flatMap(e => e.ch.map(c => `<tr><td>${esc(e.br)}</td><td class="code nowrap">${esc(e.src === 'quota' ? 'Quota ' + e.key : e.key)}</td><td class="nowrap">${GSE_T[c.f] || c.f}</td><td>${v(c.from)}</td><td><b>${v(c.to)}</b></td></tr>`)).join('')}</tbody></table></div>
+    <div class="scroll-x mt-2 max-h-80 overflow-auto"><table class="tbl text-sm"><thead><tr><th><input type="checkbox" data-gseall="1" ${E.every(e => e.on) ? 'checked' : ''} aria-label="เลือกทั้งหมด"></th><th>สาขา</th><th>รถ / Quota</th><th>ช่อง</th><th>ในเว็บ</th><th>ในชีตตอนนี้</th></tr></thead><tbody>
+    ${E.flatMap((e, ei) => e.ch.map((c, ci) => `<tr${e.on ? '' : ' style="opacity:.5"'}><td>${ci ? '' : `<input type="checkbox" data-gse="${ei}" ${e.on ? 'checked' : ''} aria-label="นำเข้า">`}</td><td>${esc(e.br)}</td><td class="code nowrap">${esc(e.src === 'quota' ? 'Quota ' + e.key : e.key)}</td><td class="nowrap">${GSE_T[c.f] || c.f}</td><td>${v(c.from)}</td><td><b>${v(c.to)}</b>${(c.f === 'bknote' || c.f === 'vnote') && e.dup && e.dup.length ? `<div class="text-xs" style="color:var(--bad)">ชื่อซ้ำกับ ${e.dup.map(u => esc(u.br + ' ' + u.unit)).join(', ')}</div>` : ''}</td></tr>`)).join('')}</tbody></table></div>
     ${G.newCars ? `<p class="text-xs text-muted mt-1">มีรถในชีตที่ยังไม่อยู่ในเว็บ ${G.newCars} คัน ไม่ได้เพิ่ม (ใช้ "ดึงจาก Google Sheet" แบบเต็ม)</p>` : ''}
-    <div class="flex gap-2 mt-2"><button class="btn btn-red btn-sm" data-act="gse-save" ${G.saving ? 'disabled' : ''}>${G.saving ? '<span class="spin"></span> กำลังบันทึก…' : `บันทึก ${E.length} รายการ`}</button><button class="btn btn-ghost btn-sm" data-act="gse-cancel">ยกเลิก</button></div></div>`;
+    <div class="flex gap-2 mt-2"><button class="btn btn-red btn-sm" data-act="gse-save" ${G.saving ? 'disabled' : ''}>${G.saving ? '<span class="spin"></span> กำลังบันทึก…' : `นำเข้า ${E.filter(e => e.on).length} รายการที่เลือก`}</button><button class="btn btn-ghost btn-sm" data-act="gse-cancel">ยกเลิก</button></div></div>`;
 }
 async function gseSave() {
-  const G = S.idsGs || {}, E = G.edits; if (!E || !E.length || !perms().write) return;
+  const G = S.idsGs || {}, E = (G.edits || []).filter(e => e.on); if (!E.length || !perms().write) return;
   S.idsGs = { ...G, saving: true }; render();
   const byDoc = new Map(); E.forEach(e => (byDoc.get(e.docId) || byDoc.set(e.docId, []).get(e.docId)).push(e));
   const cleared = [];
@@ -83,4 +89,10 @@ Object.assign(ACTIONS, {
   'gse-run'() { gseRun(); },
   'gse-save'() { gseSave(); },
   'gse-cancel'() { S.idsGs = { ...(S.idsGs || {}), edits: null }; render(); }
+});
+
+document.addEventListener('change', ev => {
+  const t = ev.target, G = S.idsGs; if (!t || !t.dataset || !G || !G.edits) return;
+  if (t.dataset.gse !== undefined) { const e = G.edits[Number(t.dataset.gse)]; if (e) e.on = t.checked; render(); }
+  if (t.dataset.gseall) { G.edits.forEach(e => { e.on = t.checked; }); render(); }
 });

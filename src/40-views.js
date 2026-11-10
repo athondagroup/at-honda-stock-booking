@@ -403,9 +403,9 @@ function carTable(cars, D) {
     <tbody>${list.map(c => `<tr>
       <td class="nowrap xl-pin">${vinLink(c)}${c.ref || c.src !== 'IDS' || c.fromBr ? `<div class="text-xs text-muted">${c.ref ? 'Ref ' + esc(c.ref) : ''}${c.src !== 'IDS' ? (c.ref ? ' · ' : '') + esc(c.src) : ''}${c.fromBr ? ` · โอนจาก ${esc(c.fromBr)}` : ''}</div>` : ''}</td>
       <td class="nowrap">${esc(c.model || '')} <span class="text-muted">${esc(gradeShort(c.model, c.grade) || c.grade || '')}</span></td><td class="nowrap">${esc(c.color || '')}</td>
-      <td class="nowrap">${sales && c.lock ? '' : custCell(c.cust || c.bknote || lc(c), c.sales, { company: c.company || c.status === 'company', seed: c.seed && ['booked', 'noted', 'sold', 'invoiced'].includes(c.status) })}${c.bk ? `<div class="code text-xs text-muted">${esc(c.bk)}</div>` : ''}</td>
+      <td class="nowrap">${sales && c.lock ? '' : custCell(c.cust || c.bknote || (c.assignedTo && c.assignedTo.cust) || lc(c), c.sales || (c.assignedTo && c.assignedTo.sales), { company: c.company || c.status === 'company', seed: c.seed && ['booked', 'noted', 'sold', 'invoiced'].includes(c.status) })}${c.bk || (c.assignedTo && (c.assignedTo.no || c.assignedTo.rec.booking_no)) ? `<div class="code text-xs text-muted">${esc(c.bk || c.assignedTo.no || c.assignedTo.rec.booking_no)}</div>` : c.assignedTo ? '<div class="text-xs text-muted">จัดสรรในเว็บ · ยังไม่มีเลข IDS</div>' : ''}</td>
       <td class="nowrap">${sales ? (c.lock ? `<span class="text-xs">${lockText(c.lock)}</span>` : '') : (ltCan() ? ltCell(c, D, p) : stockActions(c, p, D, 'lock'))}</td>
-      <td class="nowrap">${esc(c.sales || (c.lock && c.lock.owner) || '')}</td>
+      <td class="nowrap">${esc(c.sales || (c.assignedTo && c.assignedTo.sales) || (c.lock && c.lock.owner) || '')}</td>
       <td class="nowrap">${carStatusCell(c, D)}${c.lock ? `<div class="text-xs text-muted">${lockLabel(c.lock)}</div>` : ''}</td>
       <td class="nowrap text-sm">${c.prod ? `<span class="num">${fmtD(c.prod)}</span>${c.prodSrc === 'key' ? ' <span class="text-xs text-muted">คีย์</span>' : ''}${c.prodDiff ? ' <span class="text-xs" style="color:var(--warn)">ไม่ตรง IDS</span>' : ''}` : '<span class="text-xs" style="color:var(--warn)">ยังไม่มี</span>'} ${prodBtn(c)}</td>
       <td class="text-right nowrap">${ageCell(c)}</td><td><b>${esc(c.br)}</b></td>
