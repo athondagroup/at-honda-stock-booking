@@ -51,7 +51,7 @@ function ltCell(c, D, p) {
   const asks = carLocks(c, D).filter(l => l.status === 'pending' && l.replaces);
   const askTxt = asks.length ? `<div class="text-xs" style="color:var(--warn)">${asks.map(l => `${esc(ltRoleShort(l))} ขอแก้เป็น "${esc(ltTextOf(l))}" รอ${esc(l.approver_role || 'คนล็อก')}อนุมัติ`).join('<br>')}</div>` : '';
   const warn = L && L.sheet_sync && L.sheet_sync.conflict ? `<div class="text-xs" style="color:var(--bad)">ชีตมี "${esc(L.sheet_sync.current || '')}" ยังไม่ได้เขียน <button class="underline" data-act="lt-force" data-id="${esc(L.id)}">เขียนทับ</button></div>` : '';
-  if (t) return `<div class="lt-cell"><input id="lt-in" class="lt-in" data-lt="${esc(c.vin)}" value="${esc(t.q || '')}" placeholder="ชื่อลูกค้า / เลขใบจอง / เซลล์" autocomplete="off">
+  if (t) return `<div class="lt-cell on"><input id="lt-in" class="lt-in" data-lt="${esc(c.vin)}" value="${esc(t.q || '')}" placeholder="ชื่อลูกค้า / เลขใบจอง / เซลล์" autocomplete="off">
     <button class="text-xs underline text-muted" data-act="lt-cancel">ยกเลิก</button>${ltDrop(c, D)}</div>`;
   if (!L) return `<div class="lt-cell"><input class="lt-in idle" data-lt-open="${esc(c.vin)}" placeholder="พิมพ์ชื่อลูกค้า / เลขใบจอง" readonly></div>`;
   const txt = `<span class="lt-txt" title="${esc(lockLabel(L))}">${esc(ltTextOf(L))}</span>`;
