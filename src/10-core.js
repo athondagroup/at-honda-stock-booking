@@ -35,12 +35,14 @@ const CAR_STATUS = {
   free: ['ว่าง', 'good'], noted: ['มีชื่อจองไว้', 'warn'], booked: ['จัดสรรแล้ว (IDS)', 'neutral'],
   sold: ['แจ้งขายแล้ว', 'muted'], invoiced: ['ออกใบกำกับแล้ว', 'neutral'], delivered: ['ส่งมอบแล้ว', 'muted'],
   company: ['รถบริษัท', 'muted'], pending: ['รออนุมัติล็อก', 'warn'], locked: ['ล็อกชั่วคราว', 'red'],
+  review: ['รอตรวจ · ไม่อยู่ในไฟล์ IDS ล่าสุด', 'warn'],
   allocated: ['จัดสรรแล้ว (เว็บ) รอไฟล์ IDS', 'ink'], assigned: ['จัดสรรแล้ว รอส่งมอบ', 'ink']
 };
 const QUOTA_STATUS = { waiting: ['รอ VIN', 'neutral'], vin: ['ได้ VIN แล้ว รอรถ', 'warn'], arrived: ['ถึงสาขาแล้ว', 'good'], sold: ['ขายแล้ว', 'muted'] };
 const BOOK_STATE = {
   waiting: ['รอรถ', 'warn'], pending: ['รออนุมัติล็อก', 'warn'], locked: ['ล็อกแล้ว', 'red'], allocated: ['จัดสรรแล้ว', 'ink'],
-  idscar: ['IDS จัดสรรรถแล้ว', 'good'], idsquota: ['IDS จับคู่ Quota', 'neutral'], cancel: ['รอยกเลิก (IDS)', 'muted']
+  idscar: ['IDS จัดสรรรถแล้ว', 'good'], idsquota: ['IDS จับคู่ Quota', 'neutral'], cancel: ['รอยกเลิก (IDS)', 'muted'],
+  gone: ['ไม่อยู่ในไฟล์ IDS ล่าสุด · รอตรวจ', 'warn'], noids: ['ยังไม่มีใน IDS · ไม่นับคิว', 'muted']
 };
 
 // ------------------------------------------------------------------ helpers

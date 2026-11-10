@@ -63,7 +63,7 @@ function bkOutDiff(r, D) {
     else if (a && a.cancelled) why = 'ใบจองในเว็บยกเลิกแล้ว';
     else if (a && a.done) why = 'ส่งมอบแล้วตามข้อมูลในเว็บ';
     else if (a) { why = 'หายจาก IDS: ยกเลิก หรือเปลี่ยนใบจอง ต้องตรวจสอบ'; flag = true; }
-    else why = 'ไม่มีใบจองในเว็บ';
+    else { why = 'ไม่อยู่ในไฟล์ IDS ล่าสุด · ไม่มีใบจองในเว็บ'; flag = true; }
     return { no: b.no, cust: b.cust, sales: b.sales, spec: specKey(b.model, b.grade, b.color), date: b.date, why, flag, atId: a ? a.id : null };
   });
 }
@@ -98,7 +98,7 @@ function bkOutAlloc(o) {
 }
 // the booking is in the current Booking table again (a later upload has it): it never really left
 function bkOutBack(o) { return !!(o && o.no && derive().X.bookings.some(b => String(b.no) === String(o.no))); }
-function bkOutPending(o) { return !!(o && o.flag && !o.res && !bkOutAuto(o) && !bkOutDelivered(o) && !bkOutAlloc(o) && !bkOutBack(o)); }
+function bkOutPending(o) { return !!(o && (o.flag || o.why === 'ไม่มีใบจองในเว็บ') && !o.res && !bkOutAuto(o) && !bkOutDelivered(o) && !bkOutAlloc(o) && !bkOutBack(o)); }
 function bkOutList(u, D) {
   const can = canApproveBr(u.br) && perms().write, F = S.bkOut && S.bkOut.id === u.id ? S.bkOut : { sel: {}, pick: {} };
   const todo = (u.out || []).filter(bkOutPending);
@@ -116,6 +116,9 @@ function bkOutList(u, D) {
     const head = `<div class="flex flex-wrap gap-x-4 items-center">${can && open ? `<input type="checkbox" class="w-4 h-4" data-bkout="${esc(u.id)}" data-i="${i}" ${F.sel[i] ? 'checked' : ''} aria-label="เลือกใบจอง ${esc(o.no)}">` : ''}
       <span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span class="text-muted">${esc(o.sales || '')}</span>
       ${o.res ? `<span style="color:var(--good)">ทำแล้ว: ${esc(o.res.text)}</span><span class="text-xs text-muted">${fmtDT(o.res.at)} ${esc(o.res.role || '')}</span>` : `<span style="color:var(--${o.flag ? 'bad' : 'muted'})">${esc(o.why)}</span>`}</div>`;
+    if (bkOutPending(o) && !a && can) return `<div class="py-2 border-t border-line">${head}<div class="mt-1 flex flex-wrap gap-2 items-center"><span class="text-xs text-muted">ยังไม่หายจากเว็บ (รอตรวจ ไม่นับคิว) จนกว่าจะตอบ</span>
+      <button class="btn btn-ghost btn-sm" data-act="bkout-gone" data-id="${esc(u.id)}" data-i="${i}" data-v="still">ยังจองอยู่ (ไฟล์ไม่ครบ)</button>
+      <button class="btn btn-red btn-sm" data-act="bkout-gone" data-id="${esc(u.id)}" data-i="${i}" data-v="closed">ยกเลิก / ไม่มีแล้ว</button></div></div>`;
     if (!open || !can) return `<div class="py-1">${head}</div>`;
     const sug = bkCands(a, D, false), all = bkCands(a, D, true), pick = F.pick[i] || '';
     const opt = b => `${b.no} · ${b.cust} · ${specLabelText(specKey(b.model, b.grade, b.color))} · ${b.sales || ''} · ${fmtD(b.date)}`;
@@ -190,6 +193,15 @@ Object.assign(ACTIONS, {
   'bkout-all'(el) { const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id); F.sel = {}; if (el.dataset.v && u) (u.out || []).forEach((o, i) => { if (bkOutPending(o)) F.sel[i] = true; }); render(); },
   async 'bkout-cancel'(el) { const o = (S.uploads.get(el.dataset.id) || {}).out?.[Number(el.dataset.i)]; if (!o || !confirm(`ยกเลิกใบจอง ${o.cust || ''} (${o.no}) ในเว็บทันที?`)) return; await bkOutCancel(el.dataset.id, [Number(el.dataset.i)]); },
   async 'bkout-cancel-sel'(el) { const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k] && u && bkOutPending(u.out[Number(k)])).map(Number); if (!idxs.length || !confirm(`ยกเลิกใบจองที่เลือก ${idxs.length} ใบในเว็บทันที?`)) return; await bkOutCancel(el.dataset.id, idxs); },
+  // an IDS booking gone from the file with no web form (10/11): still booked (the file was incomplete) or gone for good
+  async 'bkout-gone'(el) {
+    const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !canApproveBr(u.br) || !bkOutPending(u.out[i])) return;
+    const still = el.dataset.v === 'still';
+    if (await bkOutMark(el.dataset.id, [i], still ? 'ยังจองอยู่ (ไฟล์ IDS ไม่ครบ)' : 'ยกเลิก / ไม่มีใบจองนี้แล้ว')) {
+      const cur = S.uploads.get(el.dataset.id); if (cur && cur.out[i] && cur.out[i].res) { cur.out[i].res.still = still; await write('uploads', el.dataset.id, cur); }
+      toast(still ? 'บันทึกแล้ว: ยังจองอยู่' : 'บันทึกแล้ว: ปิดใบจองนี้'); render();
+    }
+  },
   async 'bkout-keep'(el) {
     const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !canApproveBr(u.br) || !bkOutPending(u.out[i])) return;
     if (await bkOutHold(el.dataset.id, [i], 'ยังเก็บใบจองไว้ ไม่ match รอกรอกฟอร์ม (รถยังผูกอยู่)')) { toast('บันทึกแล้ว: ยังเก็บใบจองไว้ รถไม่ถูกปล่อย'); render(); }
