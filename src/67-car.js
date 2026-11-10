@@ -41,10 +41,12 @@ function carFull(vin, D) {
   if (c0) { const o = fill({ ...c0 }); o.status = kind === 'removed' ? 'removed' : (inv && inv.company ? 'company' : 'delivered'); o.out = kind; return o; }
   // not in stock, not in DL: look for any record that names the car
   const a = D.at.find(x => !x.cancelled && atVin(x) === vin), ib = D.idsB.find(b => b.vin === vin), o = S.vehicles.get(vin);
-  if (!a && !ib && !o) return null;
+  // the car log keeps the model / branch of a car that left the Stock file with no invoice (company / Demon cars, 10/11)
+  const lg = typeof carlogAll === 'function' ? carlogAll().get(vin) : null, e = (lg && lg.e) || {};
+  if (!a && !ib && !o && !lg) return null;
   const src = a || ib || {};
-  return fill({ vin, br: (o && (o.branch || (o.moved && o.moved.to))) || src.br || null, model: src.model || null, grade: src.grade || null, color: src.color || null,
-    status: 'unknown', out: 'unknown', src: 'ไม่อยู่ในไฟล์ Stock และ DL · ข้อมูลจากใบจอง', cust: src.cust || null, bkno: ib ? ib.no : null, fromInv: true });
+  return fill({ vin, br: (o && (o.branch || (o.moved && o.moved.to))) || src.br || e.br || null, model: src.model || e.m || null, grade: src.grade || e.g || null, color: src.color || e.c || null, prod: e.p || null,
+    status: 'unknown', out: 'unknown', src: a || ib ? 'ไม่อยู่ในไฟล์ Stock และ DL · ข้อมูลจากใบจอง' : 'ไม่อยู่ในไฟล์ Stock และ DL · ข้อมูลจากประวัติรถ', cust: src.cust || null, bkno: ib ? ib.no : null, fromInv: true });
 }
 function carStChip(c) { return CAR_STATUS[c.status] ? statusChip(CAR_STATUS, c.status) : chip({ removed: 'นำออกจาก Stock', unknown: 'ไม่อยู่ใน Stock' }[c.status] || c.status || '–', 'muted'); }
 // where the car went / came from: taken out, moved between branches, handed over (data kept in vehicles/<vin> and the DL file)
@@ -78,7 +80,7 @@ function carModal(m, D) {
       <div class="mt-1 flex flex-wrap gap-2">${c.status === 'temp' ? chip('ล็อกชั่วคราว (แซงได้)', 'warn') : carStChip(c)}${c.kind ? ' ' + chip(FREE_KINDS[c.kind], c.kind === 'adv' ? 'ink' : 'warn') : ''} ${c.fromInv ? '' : tempChip(c)} ${chip(`${c.br} ${BR[c.br]?.name || ''}`, 'neutral')}</div>${c.fromInv ? '<p class="text-xs text-muted mt-1">รถคันนี้ไม่อยู่ในไฟล์ Stock IDS แล้ว (ออกใบกำกับแล้ว) แสดงข้อมูลจากไฟล์ DL</p>' : ''}</div>
     </div>
   ${carWhyBox(c, D, inv, bk, hideCust)}
-  ${spBox(c, D)}${rptBox(c)}${carCampBox(c, bk)}
+  ${c.status === 'unknown' && typeof carHistRows === 'function' && typeof carFixBox === 'function' ? (r => r ? carFixBox(r) : '')(carHistRows(D).find(x => x.vin === c.vin)) : ''}${spBox(c, D)}${rptBox(c)}${carCampBox(c, bk)}
   <div class="grid md:grid-cols-2 gap-5">
     <div><table class="tbl text-sm"><tbody>
       ${row('รุ่น เกรด สี', specLabel(c.spec))}

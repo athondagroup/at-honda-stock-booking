@@ -139,11 +139,16 @@ function deriveNow() {
     const car0 = cars.get(vin);
     if (o.added && !car0) cars.set(vin, { ...o.added, vin, st: 'free', src: 'รับเข้าในระบบนี้ รอไฟล์ IDS' });
     // pulled back into stock as a special car (company Advance / Demon / returned by the customer): IDS no longer lists it
-    else if (o.special && !car0 && !o.removed) { const i = invByVin.get(vin) || {}, sp = o.special;
-      cars.set(vin, { vin, br: sp.br || i.br, model: i.model, grade: i.grade, color: i.color, st: spStatus(sp), src: 'ดึงกลับเข้า Stock พิเศษ (ไม่อยู่ในไฟล์ Stock IDS)', special: sp, fromInv: false }); }
+    else if (o.special && !car0 && !o.removed) { const i = invByVin.get(vin) || {}, sp = o.special, e = (!i.model && typeof carlogAll === 'function' && (carlogAll().get(vin) || {}).e) || {};
+      cars.set(vin, { vin, br: sp.br || i.br || e.br, model: i.model || e.m, grade: i.grade || e.g, color: i.color || e.c, st: spStatus(sp), src: 'ดึงกลับเข้า Stock พิเศษ (ไม่อยู่ในไฟล์ Stock IDS)', special: sp, fromInv: false }); }
     // keyed as sold/moved to this branch from another branch's Stock upload: it is this branch's stock until its own IDS file lists the car
     else if (o.moved && !car0 && !o.removed) { const [m, g, c] = String(o.moved.spec || '').split('|'), q = v => (v && v !== '?' ? v : null);
       cars.set(vin, { vin, br: o.moved.to, fromBr: o.moved.from, model: q(m), grade: q(g), color: q(c), st: 'free', note: `โอนจาก ${o.moved.from}`, src: `ย้ายมาจาก ${o.moved.from} รอไฟล์ Stock สาขา ${o.moved.to}` }); }
+    // an Advance invoice with no real customer (the car is free to sell): IDS drops invoiced cars from its Stock file, the car stays
+    // here as a free Advance car while its invoice is not handed over (10/11)
+    else if (o.advance && o.advance.kind === 'fake' && !car0 && !o.removed && !o.special) { const i = invByVin.get(vin), ad = i && !i.ddate && !i.company ? advOf(vin, i) : null;
+      if (ad) cars.set(vin, { vin, br: ad.br || i.br, model: i.model, grade: i.grade, color: i.color, st: 'free', advFake: true, advance: { ...ad, cust: i.cust || null }, advCust: i.cust || null, cust: null, bk: null, bkno: null,
+        src: 'Advance · ออกใบกำกับไว้ก่อน (ไม่อยู่ในไฟล์ Stock IDS)', fromAdv: true }); }
     else if (o.added && car0) car0.received = o.added;
     const car = cars.get(vin);
     if (!car) continue;
