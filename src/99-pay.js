@@ -45,6 +45,8 @@ function payCostAuto(a) {
     insCredit: !cash && d.ins_credit_by === 'pay' ? num(d.ins_credit) : 0,
     regGift: gift(d.reg_by) ? d.reg_by : null, regDef: gift(d.reg_by) ? 0 : feeReg(a, d.reg_type),
     insGift: gift(d.ins1_by) ? d.ins1_by : null, insDef: d.ins1_by === 'ลูกค้าซื้อ' ? feeIns(a, 1, d) : 0,
+    // VAT keyed under "ลูกค้าชำระเพิ่ม" in the sale terms is paid on collection day (11/11)
+    vat: (d.extra_pay || []).filter(y => y && num(y.v) && /vat|แวต|ภาษีมูลค่าเพิ่ม/i.test(String(y.l || ''))).map(y => ({ l: String(y.l || 'VAT'), v: num(y.v) })),
     po: poRows,
     downDisc: cash ? 0 : num(d.down_disc), deposit: num(a.deposit), trade: r.trade && r.trade.has && r.trade.deduct !== false ? num(r.trade.sale_price) : 0, tradeNo: !!(r.trade && r.trade.has && r.trade.deduct === false), tradeHas: !!(r.trade && r.trade.has), tradeApp: r.trade && r.trade.has ? num(r.trade.price) : 0
   };
@@ -60,7 +62,7 @@ function payCostVals(a, m) {
   v.auto = auto;
   const plus = [[A.cash ? 'ค่ารถยนต์ (ราคาสุทธิ)' : 'เงินดาวน์', A.main], ...(A.insCredit ? [['ค่าประกันคุ้มครองสินเชื่อ (ชำระวันรับรถ)', A.insCredit]] : []),
     ['ค่าจดทะเบียน', A.regGift ? 0 : num(v.reg)], ['ค่ามัดจำป้ายแดง', num(v.plate)], ['ค่าเบี้ยประกันภัย', A.insGift ? 0 : num(v.ins)],
-    ...(A.po ? A.po.map(y => ['อุปกรณ์ · ' + y.l, y.v]) : [['ค่าอุปกรณ์ตกแต่ง', num(v.acc)]]), ...v.plus.map(y => ['อื่น ๆ · ' + (y.l || ''), num(y.v)])];
+    ...A.vat.map(y => [y.l, y.v]), ...(A.po ? A.po.map(y => ['อุปกรณ์ · ' + y.l, y.v]) : [['ค่าอุปกรณ์ตกแต่ง', num(v.acc)]]), ...v.plus.map(y => ['อื่น ๆ · ' + (y.l || ''), num(y.v)])];
   const minus = [...(A.downDisc ? [['ส่วนลดเงินดาวน์', A.downDisc]] : []), ['เงินมัดจำ', num(v.dep)], ...(A.trade ? [['รถเก่าเทิร์น (ราคาขายให้เต็นท์)', A.trade]] : []), ...v.minus.map(y => ['อื่น ๆ · ' + (y.l || ''), num(y.v)])];
   const tp = plus.reduce((n, x) => n + num(x[1]), 0), tm = minus.reduce((n, x) => n + num(x[1]), 0);
   return { A, v, plus, minus, tp, tm, net: tp - tm };
@@ -81,6 +83,7 @@ function payCostBox(a, m) {
     ${row('ค่าจดทะเบียน', A.regGift ? `<span class="w-32 text-right">${esc(A.regGift)}</span>` : inp('reg', 'reg'), A.regGift ? '' : tag('ตารางค่าจด', 'good'))}
     ${row('ค่ามัดจำป้ายแดง', inp('plate', 'plate'), tag('ค่าตั้งต้น', 'warn'))}
     ${row('ค่าเบี้ยประกันภัย', A.insGift ? `<span class="w-32 text-right">${esc(A.insGift)} 1 ปี</span>` : inp('ins', 'ins'), A.insGift ? '' : tag('จากเงื่อนไข', 'good'))}
+    ${A.vat.map(y => row(esc(y.l), ro(y.v), tag('จากลูกค้าชำระเพิ่ม (เงื่อนไขการขาย)', 'good'))).join('')}
     ${A.po ? (A.po.length ? A.po.map(y => row('อุปกรณ์ · ' + esc(y.l), ro(y.v), tag('จาก PO', 'good'))).join('') : row('ค่าอุปกรณ์ตกแต่ง', ro(0), tag('จาก PO', 'good'))) : row('ค่าอุปกรณ์ตกแต่ง (ยังไม่มีใบสั่งแต่ง)', inp('acc', 'acc'), '')}
     ${list('plus', '+')}
     <div class="flex justify-between font-semibold text-sm pt-2"><span>รวมค่าใช้จ่าย</span><span class="num">${money(tp)}</span></div>

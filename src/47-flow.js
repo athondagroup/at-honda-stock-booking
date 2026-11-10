@@ -185,7 +185,7 @@ function flowPanel(m, a, D) {
   const delivBody = () => {
     const dv = f.delivered || {};
     if (fl.done.delivered && dv.src === 'IDS' && !dv.plate) return `<div class="text-sm">ส่งมอบแล้วตาม IDS (DL) ${fmtD(dv.date)} · บันทึกเข้าระบบแล้ว</div>${stepAllowed(a, 'delivered') ? `<details class="mt-1"><summary class="text-sm cursor-pointer" style="color:var(--warn)">เพิ่มเลขทะเบียนป้ายแดง (ไม่บังคับ)</summary>${delivForm()}</details>` : ''}${commBody()}`;
-    if (fl.done.delivered) return `<div class="text-sm text-muted">ส่งมอบ ${fmtD(dv.date)} · ป้ายแดง <span class="code">${esc(dv.plate)}</span> · ${who(dv)}${dv.no_fin_doc ? ` · <span style="color:var(--warn)">ผู้บริหารอนุโลม ไม่แนบใบอนุมัติไฟแนนซ์</span>` : ''}</div><div class="text-sm text-muted">รถเก่าเทิร์น: ${esc(tradeLine(r))}</div>${commBody()}`;
+    if (fl.done.delivered) return `<div class="text-sm text-muted">ส่งมอบ ${fmtD(dv.date)} · ป้ายแดง <span class="code">${esc(dv.plate)}</span>${(dv.ins || delivIns(a)) ? ` · ประกัน ${esc([(dv.ins || delivIns(a)).by, (dv.ins || delivIns(a)).kind].filter(Boolean).join(' '))}` : ''} · ${who(dv)}${dv.no_fin_doc ? ` · <span style="color:var(--warn)">ผู้บริหารอนุโลม ไม่แนบใบอนุมัติไฟแนนซ์</span>` : ''}</div><div class="text-sm text-muted">รถเก่าเทิร์น: ${esc(tradeLine(r))}</div>${commBody()}`;
     if (fl.lateUpdate) return `<div class="text-sm">ส่งมอบแล้วตาม IDS (DL) ${fmtD(fl.deliveredDate)}</div>${stepAllowed(a, 'delivered') ? `<details class="mt-1"><summary class="text-sm cursor-pointer" style="color:var(--warn)">เพิ่มเลขทะเบียนป้ายแดง (ไม่บังคับ)</summary>${delivForm()}</details>` : ''}${commBody()}`;
     if (!can('delivered')) return fl.next === 'delivered' && !stepAllowed(a, 'delivered') ? '<div class="text-sm text-muted">รอแอดมินสาขาบันทึกการส่งมอบ</div>' : '';
     return delivForm();
@@ -196,6 +196,7 @@ function flowPanel(m, a, D) {
       <div class="field"><label for="fl-dd" class="req">วันที่ส่งมอบรถ (ลูกค้ารับรถจริง)</label><input id="fl-dd" type="date" data-modal="deliv.date" value="${esc(v.date ?? (fl.deliveredDate || (a.rec.inv_man && a.rec.inv_man.ddate) || ''))}" max="${todayISO()}"></div>
       <div class="field"><label for="fl-pl" class="req">เลขทะเบียนป้ายแดง</label><input id="fl-pl" data-modal="deliv.plate" value="${esc(v.plate ?? dv.plate ?? '')}" placeholder="เช่น ป-1234 นครปฐม" autocomplete="off"></div>
 </div>
+      ${delivInsLine(a)}
       ${(m.deliv = m.deliv || tradePre(r), tradeComplete(tradeCur(r)) ? `<div class="mt-2 text-sm">รถเก่าเทิร์น: <b>${esc(tradeLine(r))}</b> <span class="text-xs text-muted">ลงไว้แล้ว ไม่ต้องลงซ้ำ · แก้ที่ "รถเก่าเทิร์น" ในใบจอง</span></div>` : tradeDelivFields('deliv', m.deliv, 'fl', tradeCur(r), true))}
       <button class="btn btn-dark btn-sm mt-2" data-act="flow-deliver" data-id="${esc(a.id)}">บันทึกส่งมอบ</button>`;
   };
@@ -226,6 +227,12 @@ function feeGrp(a, what) {
   if (m.startsWith('BR-V')) return 'brv';
   if (m.startsWith('WR-V')) return 'wrv';
   return '';
+}
+// the insurance shown at delivery comes from the sale terms (11/11); the insurance / registration lines themselves are on the PO
+function delivIns(a) { const d = (a.rec && a.rec.deal) || {}, r = a.rec || {}; const by = d.ins1_by || r.insurance || '', kind = d.ins1_kind || r.insurance_kind || ''; return by || kind ? { by: by || null, kind: kind || null } : null; }
+function delivInsLine(a) {
+  const x = delivIns(a);
+  return `<div class="mt-2 text-sm">ประกันภัยชั้น 1 + พ.ร.บ.: ${x ? `<b>${esc([x.by, x.kind].filter(Boolean).join(' · '))}</b> <span class="text-xs text-muted">ตามเงื่อนไขการขาย · ประกันภัยและค่าจดทะเบียนอยู่ในใบสั่งแต่งรถ</span>` : '<span style="color:var(--warn)">ยังไม่เลือกประกันในเงื่อนไขการขาย</span>'}</div>`;
 }
 function feeReg(a, type) { const f = refStatic('fees'), r = f && f.reg && f.reg[feeGrp(a, 'reg')]; return r ? r[type === 'นิติบุคคล' ? 1 : 0] : 0; }
 function feeIns(a, yr, d) {

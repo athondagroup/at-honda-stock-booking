@@ -106,7 +106,7 @@ Object.assign(ACTIONS, {
     if (a.date && date < a.date) return bad('วันที่ส่งมอบต้องไม่ก่อนวันจอง', 'cd-dd');
     const tr = await tradeDelivOf(v, tradeCur(r), 'cd', true); if (tr.err) return bad(tr.err, tr.id);
     tradeFilesClear(); patch.trade = tr.rec;
-    patch.flow.delivered = { ...actor(), date, plate, vin: c.vin, inv: (invWaiting(c, D) || {}).inv || null, from: 'stock', ...(!isCash(r) && !((patch.flow.fin && patch.flow.fin.docs) || []).length && !finDocsN(r) ? { no_fin_doc: true } : {}) };
+    patch.flow.delivered = { ...actor(), date, plate, ins: delivIns(a), vin: c.vin, inv: (invWaiting(c, D) || {}).inv || null, from: 'stock', ...(!isCash(r) && !((patch.flow.fin && patch.flow.fin.docs) || []).length && !finDocsN(r) ? { no_fin_doc: true } : {}) };
     if (!await saveFlow(a, patch, `บันทึกส่งมอบ ${c.vin} แล้ว กรอกข้อมูลค่าคอมในใบจอง แล้วรอผู้จัดการยืนยัน`)) return;
     for (const l of derive().locks.filter(x => x.live && x.type === 'booking' && (x.bkref === a.key || x.bkref === a.row?.key))) {
       const cur = findLock(l.id); if (!cur) continue;

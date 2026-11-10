@@ -862,7 +862,7 @@ const ACTIONS = {
     if (!isCash(a.rec) && !finDocsN(a.rec) && !waive) { toast('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ (ที่ขั้น "ไฟแนนซ์ผ่าน")', 'bad'); return; }
     const tr = await tradeDelivOf(v, tradeCur(a.rec), 'fl', true); if (tr.err) { toast(tr.err, 'bad'); if (tr.id) $('#' + tr.id)?.focus(); return; }
     tradeFilesClear();
-    if (!await saveFlow(a, { trade: tr.rec, flow: { delivered: { ...actor(), date, plate, ...(waive ? { no_fin_doc: true } : {}) } } }, waive ? 'บันทึกส่งมอบแล้ว (ผู้บริหารอนุโลม ยังไม่แนบใบอนุมัติไฟแนนซ์)' : 'บันทึกส่งมอบแล้ว กรอกข้อมูลค่าคอมแล้วรอผู้จัดการยืนยัน')) return;
+    if (!await saveFlow(a, { trade: tr.rec, flow: { delivered: { ...actor(), date, plate, ins: delivIns(a), ...(waive ? { no_fin_doc: true } : {}) } } }, waive ? 'บันทึกส่งมอบแล้ว (ผู้บริหารอนุโลม ยังไม่แนบใบอนุมัติไฟแนนซ์)' : 'บันทึกส่งมอบแล้ว กรอกข้อมูลค่าคอมแล้วรอผู้จัดการยืนยัน')) return;
     for (const l of derive().locks.filter(x => x.live && x.type === 'booking' && (x.bkref === a.key || x.bkref === a.row?.key))) {
       const cur = findLock(l.id); if (!cur) continue;
       cur.status = 'done'; await saveLock(l.id, cur, 'ส่งมอบแล้ว', fmtD(date));
