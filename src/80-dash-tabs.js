@@ -63,6 +63,7 @@ function dashBook(D) {
   return `${pageHead('ยอดจอง', `ใบจอง AT Honda ตามวันที่จอง ${fmtD(E.from)} – ${fmtD(E.to)} · ช่วงก่อน ${fmtD(pf)} – ${fmtD(pt)} · สุทธิ = ไม่นับใบที่ยกเลิก`)}
   ${dashTabs()}${periodBar(E)}
   <div class="grid lg:grid-cols-2 gap-5 mb-5">${dCard('สรุปยอดจอง', summary, 'สาขาตามใบจอง · กด "เดือนนี้" เพื่อดูสรุปรายเดือน')}${dCard('🚘 รุ่นที่จอง', modelCard)}</div>
+  ${A.mix3}
   <div class="grid lg:grid-cols-2 gap-5 my-5">${A.cx}${A.fin}</div>`;
 }
 

@@ -208,6 +208,11 @@ function dashAna(D, part) {
     <div>${mixTable(mixOf(curOk, prev, a => finKey(a, D)), 'ไฟแนนซ์ / ซื้อสด')}${dspNote(curOk, a => finKey(a, D))}</div>
     ${mixTable(mixOf(curOk, prev, a => a.rec.source), 'ช่องทางลูกค้า')}
     ${mixTable(mixOf(curOk, prev, a => a.spec ? specLabelText(a.spec) : ''), 'รุ่น เกรด สี (สเปก)')}</div>`, 'เปลี่ยน = เทียบช่วงก่อนหน้าที่ยาวเท่ากัน ใช้ดูว่ารุ่นหรือสีไหนคนจองเพิ่มขึ้นหรือลดลง')}`,
+    // ยอดจอง keeps only these three (10/11)
+    mix3: `${dCard('การจองแยกตามรุ่น เกรด สี ไฟแนนซ์ และช่องทาง', `<div class="grid lg:grid-cols-2 gap-5">
+    <div class="lg:col-span-2">${mixTable(mixOf(curOk, prev, a => a.spec ? specLabelText(a.spec) : ''), 'รุ่น เกรด สี')}</div>
+    <div>${mixTable(mixOf(curOk, prev, a => finKey(a, D)), 'ไฟแนนซ์ / ซื้อสด')}${dspNote(curOk, a => finKey(a, D))}</div>
+    ${mixTable(mixOf(curOk, prev, a => a.rec.source), 'ช่องทางลูกค้า')}</div>`, 'เปลี่ยน = เทียบช่วงก่อนหน้าที่ยาวเท่ากัน')}`,
     rank: `${dCard('อันดับเซลล์', `<div class="scroll-x max-h-96 overflow-auto"><table class="tbl text-sm"><thead><tr><th>เซลล์</th><th class="text-right">จอง</th><th class="text-right">ยกเลิก</th><th class="text-right">% ยกเลิก</th><th class="text-right">ใบกำกับ</th><th class="text-right">ส่งมอบ</th></tr></thead><tbody>
       ${rank.map((p, i) => `<tr><td class="nowrap"><span class="text-muted num">${i + 1}.</span> ${salesName(p.n)}</td><td class="num text-right">${fmtN(p.bk)}</td><td class="num text-right">${fmtN(p.cx)}</td><td class="num text-right" ${pctOf(p.cx, p.bk + p.cx) > 20 ? 'style="color:var(--bad)"' : ''}>${p.bk + p.cx ? pctOf(p.cx, p.bk + p.cx) + '%' : '–'}</td><td class="num text-right">${fmtN(p.inv)}</td><td class="num text-right font-semibold">${fmtN(p.dv)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ไม่มีข้อมูล</td></tr>'}</tbody></table></div>`, 'เรียงตามส่งมอบ · ใบกำกับและส่งมอบนับจากใบจอง AT ที่ผูกกับรถ')}`,
     cx: `${dCard(`ยกเลิก <span class="text-muted text-sm font-normal">${fmtN(cx.length)} ใบ</span>`, `<h3 class="font-medium mb-1 text-sm">เหตุผล</h3>${barList(Object.entries(cxR).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ k, v, pct: pctOf(v, cx.length) })), '--viz-2', 'ใบ')}
