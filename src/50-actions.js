@@ -746,6 +746,8 @@ const ACTIONS = {
     if (v && a.date && v < a.date) { toast('วันนัดรับรถต้องไม่ก่อนวันจอง', 'bad'); return; }
     await saveFlow(a, { delivery_plan: v || null }, v ? `บันทึกวันนัดรับรถ ${fmtD(v)} แล้ว ล็อกจะถือไว้จนส่งมอบ` : 'ลบวันนัดรับรถแล้ว');
   },
+  // admin fix mode for invoiced / delivered bookings (10/11)
+  'flow-fix'(el) { const a = atById(el.dataset.id); if (!a || !fixOk(a) || !S.modal) return; S.modal.fix = S.modal.fix === a.id ? null : a.id; S.modal.se = null; render(); },
   async 'flow-booked'(el) {
     const a = atById(el.dataset.id); if (!a || !canEditBooking(a) || a.flow.done.booked) return;
     const no = String(S.modal.receipt_no || '').trim();
@@ -785,15 +787,17 @@ const ACTIONS = {
     const vin = String(S.modal.assign_vin ?? assignDefault(a, D)).toUpperCase().trim();
     if (!VIN_RE.test(vin)) { toast('เลขตัวถังไม่ถูกต้อง', 'bad'); $('#fl-vin')?.focus(); return; }
     const car = D.cars.get(vin), own = car && car.lock && (car.lock.bkref === a.key || car.lock.bkref === a.row?.key);
-    if (!car && vin !== (a.match && a.match.vin)) { toast('ไม่พบ VIN นี้ในสต็อก', 'bad'); return; }
-    if (car && car.lock && !own) { toast(`รถคันนี้ล็อกให้ ${car.lock.owner || 'ใบจองอื่น'} อยู่`, 'bad'); return; }
-    if (car && !own && !['free', 'temp'].includes(car.status) && vin !== (a.match && a.match.vin)) { toast('รถคันนี้ไม่ว่าง', 'bad'); return; }
+    if (!car && vin !== (a.match && a.match.vin) && !fixOn(a)) { toast('ไม่พบ VIN นี้ในสต็อก', 'bad'); return; }
+    const fx = fixOn(a);
+    if (fx && !car && !carAny(vin, D) && vin !== (a.match && a.match.vin)) { toast('ไม่พบ VIN นี้ในระบบ', 'bad'); return; }
+    if (car && car.lock && !own && !fx) { toast(`รถคันนี้ล็อกให้ ${car.lock.owner || 'ใบจองอื่น'} อยู่`, 'bad'); return; }
+    if (car && !own && !fx && !['free', 'temp'].includes(car.status) && vin !== (a.match && a.match.vin)) { toast('รถคันนี้ไม่ว่าง', 'bad'); return; }
     const off = car && car.spec !== a.spec;
     if (await saveFlow(a, { flow: { assign: { ...actor(), vin, sales: a.sales, spec_differs: off || null } } }, off ? `จัดสรร ${vin} แล้ว (สเปกไม่ตรงใบจอง ตรวจอีกครั้ง)` : `จัดสรร ${vin} ให้ ${a.sales} แล้ว`)) {
       delete S.modal.assign_vin; render();
     }
   },
-  'po-open'(el) { const a = atById(el.dataset.id); if (!a) return; S.modal = { kind: 'at', id: a.id, po: poDraft(a), poq: '' }; render(); },
+  'po-open'(el) { const a = atById(el.dataset.id); if (!a) return; const fix = S.modal && S.modal.fix; S.modal = { kind: 'at', id: a.id, po: poDraft(a), poq: '', ...(fix === a.id ? { fix } : {}) }; render(); },
   'po-back'() { if (S.modal.ret) { S.modal = S.modal.ret; render(); return; } S.modal.po = null; render(); },
   'po-add'(el) {
     const m = S.modal, a = atById(m.id); if (!a || !m.po) return;
@@ -828,7 +832,7 @@ const ACTIONS = {
   async 'po-save'(el) {
     const a = atById(el.dataset.id), po = S.modal.po;
     if (!a || !po) return;
-    if (!stepAllowed(a, 'po') || poLocked(a) || !(stepOpen(a, 'po') || a.flow.done.po || a.flow.poSkip || S.modal.ret)) { toast('ทำใบสั่งแต่งรถ ได้ก่อนส่งมอบ (ข้ามขั้นก่อนหน้าได้)', 'bad'); return; }
+    if (!stepAllowed(a, 'po') || poRO(a) || !(stepOpen(a, 'po') || a.flow.done.po || a.flow.poSkip || S.modal.ret)) { toast('ทำใบสั่งแต่งรถ ได้ก่อนส่งมอบ (ข้ามขั้นก่อนหน้าได้)', 'bad'); return; }
     const items = po.items.map(x => ({ ...x, name: String(x.name || '').trim(), qty: Math.max(1, parseInt(x.qty, 10) || 1) })).filter(x => x.name);
     const noUlt = items.find(x => poUlt(x) && !x.hon && !(Number(x.cost) > 0)); if (noUlt) { toast('Ultimate Care ที่ AT แถม ต้องใส่มูลค่า (ทุน) · ถ้า Honda แถม ให้ติ๊ก "Honda แถม" แทน', 'bad'); return; }
     items.forEach(x => { if (x.hon) { x.cost = 0; x.sale = 0; if (!/Honda แถม/.test(x.name)) x.name += ' (Honda แถม)'; } });
@@ -843,7 +847,7 @@ const ACTIONS = {
   async 'flow-deliver'(el) {
     const D = derive(), a = D.at.find(x => x.id === el.dataset.id);
     const idsDv = a && a.rec.flow && a.rec.flow.delivered && a.rec.flow.delivered.src === 'IDS';
-    if (!a || !(a.flow.next === 'delivered' || a.flow.lateUpdate || idsDv) || !stepAllowed(a, 'delivered')) { toast('ส่งมอบได้หลังบันทึกการชำระดาวน์แล้ว', 'bad'); return; }
+    if (!a || !(a.flow.next === 'delivered' || a.flow.lateUpdate || idsDv || (fixOn(a) && !a.flow.done.delivered)) || !stepAllowed(a, 'delivered')) { toast('ส่งมอบได้หลังบันทึกการชำระดาวน์แล้ว', 'bad'); return; }
     const v = S.modal.deliv || {}, prev = (a.rec.flow && a.rec.flow.delivered) || {};
     const date = v.date ?? (a.flow.deliveredDate || '');
     if (!date) { toast('ใส่วันที่ส่งมอบรถ (วันที่ลูกค้ารับรถจริง)', 'bad'); $('#fl-dd')?.focus(); return; }

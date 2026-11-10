@@ -4,7 +4,7 @@
 const SE_STEPS = ['booked', 'fin', 'down', 'delivered'];
 function stepEditOk(a, k) {
   const fl = a.flow;
-  if (!fl || fl.history || isSales() || !perms().write || a.cancelled || !stepAllowed(a, k)) return false;
+  if (!fl || (fl.history && !fixOn(a)) || isSales() || !perms().write || a.cancelled || !stepAllowed(a, k)) return false;
   return !(fl.done.confirmed && !canApproveBr(a.br));
 }
 function seHistOf(a, k) {

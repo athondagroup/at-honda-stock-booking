@@ -20,7 +20,7 @@ function focCatalog() {
 const canEditBooking = a => isMine(a.sales) || adminOwns(a) || canApproveBr(a.br);
 // a step can be done when it is the next one, or when IDS already delivered the car this month (late update) and the step is still missing:
 // the sales / admin must fill the earlier steps in, nothing else blocks them
-function stepOpen(a, k) { return a.flow.next === k || (k === 'po' && !a.flow.done.po && !a.flow.history) || (!!a.flow.lateUpdate && !a.flow.done[k] && !a.flow.history && k !== 'delivered' && k !== 'confirmed'); }
+function stepOpen(a, k) { return (fixOn(a) && !a.flow.done[k] && k !== 'confirmed') || a.flow.next === k || (k === 'po' && !a.flow.done.po && !a.flow.history) || (!!a.flow.lateUpdate && !a.flow.done[k] && !a.flow.history && k !== 'delivered' && k !== 'confirmed'); }
 function stepAllowed(a, k) {
   const p = perms();
   if (!p.write || a.cancelled) return false;
@@ -29,6 +29,19 @@ function stepAllowed(a, k) {
   if (k === 'assign') return canAllocBr(a.br) || adminOwns(a);
   return canEditBooking(a);
 }
+// admin and up fix the delivery steps of a booking already invoiced (DL) or delivered (10/11): the same forms as before
+// delivery, missing steps can be filled and saved steps changed (old values kept); sales never; after the manager
+// confirmed the commission only the branch manager / executive
+const atInvoiced = a => !!(a && a.match && (a.match.recs || []).some(x => x.kind === 'dl'));
+function fixOk(a) {
+  if (!a || !a.flow || a.cancelled || a.demo || isSales() || !perms().write) return false;
+  if (!(a.done || a.flow.history || a.flow.lateUpdate || a.flow.done.delivered || atInvoiced(a))) return false;
+  if (!(adminOwns(a) || canApproveBr(a.br) || canApproveBr(a.delivBr))) return false;
+  return !(a.flow.done.confirmed && !canApproveBr(a.br));
+}
+function fixOn(a) { return !!(a && S.modal && S.modal.fix === a.id) && fixOk(a); }
+// the PO cannot change after delivery, except in the admin fix mode
+function poRO(a) { return poLocked(a) && !fixOn(a); }
 // the branch manager can allocate a car at any step, without the deposit receipt or the finance approval (13/10)
 function mgrAssign(a) { return !!(a && perms().write && !a.cancelled && !a.done && !a.flow.done.assign && !a.flow.history && canApproveBr(a.br)); }
 // trade-in at the down payment step: has an old car or not, brand / model / year, the price taken in (13/10)
@@ -111,9 +124,11 @@ function atModal(m, D) {
 }
 function flowPanel(m, a, D) {
   const f = a.rec.flow || {}, r = a.rec, fl = a.flow;
-  if (fl.history) return `<div class="p-3 rounded-lg text-sm" style="background:var(--surface-2)">ส่งมอบแล้ว${fl.deliveredDate ? ` ${fmtD(fl.deliveredDate)}` : ''} ก่อนเริ่มใช้ระบบนี้ เก็บไว้เป็นประวัติ</div>${dealBox(a, m, D)}${discBox(a, m, D, 'deliv')}`;
+  const fix = fixOn(a), fixBtn = fixOk(a) ? `<button class="btn ${fix ? 'btn-dark' : 'btn-ghost'} btn-sm" data-act="flow-fix" data-id="${esc(a.id)}">${fix ? 'ปิดโหมดแก้ไข' : 'แก้ไขขั้นตอนส่งมอบ (แอดมิน)'}</button>` : '';
+  const fixNote = fix ? `<div class="p-2 px-3 rounded-lg text-sm mb-2" style="background:var(--warn-soft)"><b>โหมดแก้ไขของแอดมิน</b> · ${a.flow.done.delivered || fl.lateUpdate || fl.history ? 'ส่งมอบแล้ว' : 'ออกใบกำกับแล้ว'}: เติมขั้นที่ยังขาดได้ หรือกด "แก้ไขข้อมูลขั้นนี้" ในขั้นที่ทำแล้ว ค่าเดิมเก็บไว้ในประวัติ</div>` : '';
+  if (fl.history && !fix) return `<div class="p-3 rounded-lg text-sm" style="background:var(--surface-2)">ส่งมอบแล้ว${fl.deliveredDate ? ` ${fmtD(fl.deliveredDate)}` : ''} ก่อนเริ่มใช้ระบบนี้ เก็บไว้เป็นประวัติ${fixBtn ? `<div class="mt-2">${fixBtn}</div>` : ''}</div>${dealBox(a, m, D)}${discBox(a, m, D, 'deliv')}`;
   const step = (k, body) => {
-    const done = fl.done[k] || (k !== 'confirmed' && fl.lateUpdate && FLOW.indexOf(k) <= FLOW.indexOf('delivered'));
+    const done = fl.done[k] || (!fix && k !== 'confirmed' && fl.lateUpdate && FLOW.indexOf(k) <= FLOW.indexOf('delivered'));
     const cur = fl.next === k;
     const skip = k === 'po' && fl.poSkip && !done;
     const icon = skip ? `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:var(--warn-soft, #fde9c8);color:var(--warn)" title="ข้ามไว้ก่อน">–</span>` : done ? `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:var(--good);color:#fff">✓</span>` : `<span class="w-6 h-6 rounded-full grid place-items-center text-xs font-bold" style="background:${cur ? 'var(--warn)' : 'var(--surface-2)'};color:${cur ? '#fff' : 'var(--muted)'}">${FLOW.indexOf(k) + 1}</span>`;
@@ -142,7 +157,7 @@ function flowPanel(m, a, D) {
       <div class="mt-2 flex gap-2"><button class="btn btn-dark btn-sm" data-act="flow-fin" data-id="${esc(a.id)}">บันทึก</button>
       <span class="text-xs text-muted self-center">เลือก "ผ่าน" แล้วไปขั้นถัดไปได้ · ใบอนุมัติแนบภายหลังได้ แต่ต้องแนบก่อนส่งมอบ</span></div>` : ''}${dealBox(a, m, D)}`;
   };
-  const downBody = () => (fl.done.down || payItems(a).length || can('down')) ? payBody(a, m, who, perms().write && (can('down') || (payItems(a).length > 0 && stepAllowed(a, 'down') && !fl.done.delivered))) : '';
+  const downBody = () => (fl.done.down || payItems(a).length || can('down')) ? payBody(a, m, who, perms().write && (can('down') || (payItems(a).length > 0 && stepAllowed(a, 'down') && (!fl.done.delivered || fix)))) : '';
   const assignBody = () => {
     if (fl.done.assign && !(f.assign && f.assign.vin)) return `<div class="text-sm text-muted">IDS จัดสรรรถ <span class="code">${esc(a.match.vin)}</span> ให้ใบจองนี้แล้ว (จากไฟล์ IDS)</div>${bkLocks(a, D)}${swapHist(a)}`;
     if (fl.done.assign) { const ac = D.cars.get(f.assign.vin); return `<div class="text-sm text-muted">รถ <span class="code">${esc(f.assign.vin)}</span>${ac ? ` · ${esc(ac.br)} · ${prodPlain(ac)}` : ''} · ${who(f.assign)}</div>${swapHist(a)}`; }
@@ -159,12 +174,12 @@ function flowPanel(m, a, D) {
       ${bkLocks(a, D)}<div class="text-xs text-muted mt-1">${lockCar ? `รถที่ล็อกไว้ให้ใบจองนี้: ${lockCar.vin} · ${prodPlain(lockCar)}` : matchVin ? `IDS จัดสรรไว้แล้ว: ${matchVin}` : `รถว่างสเปกนี้ ${cands.length} คัน`}</div>${swapHist(a)}`;
   };
   const poBody = () => {
-    const locked = poLocked(a);
+    const locked = poRO(a);
     if (fl.done.po) return `<div class="text-sm text-muted">สั่งแต่ง ${(f.po.items || []).length} รายการ ${fmtD(f.po.date)} · ${who(f.po)}${(f.po.hist || []).length ? ` · แก้ไขแล้ว ${f.po.hist.length} ครั้ง` : ''}</div>
       <div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-ghost btn-sm" data-act="po-open" data-id="${esc(a.id)}">${locked || !stepAllowed(a, 'po') ? 'ดูใบแต่งรถ' : 'แก้ใบแต่งรถ'}</button><button class="btn btn-ghost btn-sm" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button>${discBtn(a, 'po')}</div>${locked ? '<div class="text-xs text-muted mt-1">ส่งมอบแล้ว แก้ใบแต่งรถไม่ได้</div>' : ''}${discBox(a, m, D, 'po')}`;
     if (fl.poSkip) return `<div class="text-sm" style="color:var(--warn)">ข้ามใบสั่งแต่งรถ ไว้ก่อน · ${who(f.po_skip)} ${fmtDT(f.po_skip.at)} · ยังไม่ได้ทำใบสั่งแต่งรถ</div>
       ${stepAllowed(a, 'po') && !locked ? `<div class="mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่งรถ</button></div>` : ''}`;
-    return can('po') ? `<div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่งรถ</button><button class="btn btn-ghost btn-sm" data-act="po-skip" data-id="${esc(a.id)}">ข้ามใบสั่งแต่งรถไปก่อน</button></div>
+    return can('po') ? `<div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่งรถ</button>${poLocked(a) ? '' : `<button class="btn btn-ghost btn-sm" data-act="po-skip" data-id="${esc(a.id)}">ข้ามใบสั่งแต่งรถไปก่อน</button>`}</div>
       <div class="text-xs text-muted mt-1">ยังไม่รู้รายการแต่ง กด "ข้ามใบสั่งแต่งรถไปก่อน" แล้วทำขั้นถัดไปได้ · ทำใบสั่งแต่งรถ ภายหลังได้จนถึงก่อนส่งมอบ</div>` : '';
   };
   const delivBody = () => {
@@ -189,9 +204,9 @@ function flowPanel(m, a, D) {
     if (fl.done.confirmed) return `<div class="text-sm text-muted">ยืนยัน ${fmtDT(f.confirm.at)} · ${who(f.confirm)} พร้อมเข้าขั้นตอนจ่ายค่าคอม</div>`;
     return can('confirmed') ? `<div class="mt-1"><button class="btn btn-red btn-sm" data-act="flow-confirm" data-id="${esc(a.id)}">ยืนยันเพื่อทำค่าคอม</button></div>` : (fl.next === 'confirmed' ? '<div class="text-sm text-muted">รอผู้จัดการยืนยัน (พี่อั้มหรือนุช)</div>' : '');
   };
-  const planRow = canEditBooking(a) && !fl.done.delivered ? `<div class="grid sm:grid-cols-[1fr_auto] gap-2 items-end mb-1"><div class="field"><label for="fl-plan">วันนัดรับรถ</label><input id="fl-plan" type="date" data-modal="plan" value="${esc(m.plan ?? r.delivery_plan ?? '')}"></div>
+  const planRow = canEditBooking(a) && !fl.done.delivered && !a.done ? `<div class="grid sm:grid-cols-[1fr_auto] gap-2 items-end mb-1"><div class="field"><label for="fl-plan">วันนัดรับรถ</label><input id="fl-plan" type="date" data-modal="plan" value="${esc(m.plan ?? r.delivery_plan ?? '')}"></div>
       <button class="btn btn-ghost btn-sm" data-act="plan-save" data-id="${esc(a.id)}">บันทึกวันนัด</button></div><p class="text-xs text-muted mb-2">มีวันนัดรับรถแล้ว ล็อกรถจะถือไว้จนส่งมอบ ไม่ต้องปลดทุก 15 วัน</p>` : (r.delivery_plan ? `<p class="text-sm mb-2">วันนัดรับรถ ${fmtD(r.delivery_plan)}</p>` : '');
-  return `<section data-flow-steps><h3 class="font-head font-semibold mb-2">ขั้นตอนส่งมอบ</h3>${planRow}${invManBox(a, D)}
+  return `<section data-flow-steps><div class="flex flex-wrap items-center justify-between gap-2 mb-2"><h3 class="font-head font-semibold">ขั้นตอนส่งมอบ</h3>${fixBtn}</div>${fixNote}${planRow}${invManBox(a, D)}
     ${step('booked', bookedBody())}${step('fin', finBody())}${step('assign', assignBody())}${step('po', poBody())}${step('down', downBody())}${step('delivered', delivBody() + discBox(a, m, D, 'deliv'))}${step('confirmed', confBody())}</section>`;
 }
 
@@ -264,7 +279,7 @@ function poEditor(m, a, D) {
   const cost = poAutoCost(a, po) + po.items.reduce((n, x) => n + poFocCost(x), 0);
   const sale = po.items.reduce((n, x) => n + (Number(x.sale) || 0) * (Number(x.qty) || 1), 0);
   const focBudget = Number(a.rec.foc_total) || 0;
-  const ro = poLocked(a) || !stepAllowed(a, 'po');
+  const ro = poRO(a) || !stepAllowed(a, 'po');
   const vin = atVin(a), car = vin ? (carAny(vin, D) || {}) : {};
   return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">ใบสั่งแต่งรถ</h2><p class="text-sm text-muted">${esc(a.cust)} · ${esc(a.model)} ${esc(a.grade)} ${esc(a.color)} · รหัสรุ่นในรายการ FOC: ${codes.slice(0, -2).join(', ') || '–'}</p>
       <p class="text-sm mt-1">หมายเลขตัวถัง <span class="code">${esc(vin || 'ยังไม่จัดสรรรถ')}</span> · หมายเลขเครื่องยนต์ <span class="code">${esc(car.engine || '–')}</span></p>${ro && poLocked(a) ? '<p class="text-xs mt-1" style="color:var(--warn)">ส่งมอบแล้ว แก้ใบแต่งรถไม่ได้ ดูและพิมพ์ได้อย่างเดียว</p>' : ''}</div>

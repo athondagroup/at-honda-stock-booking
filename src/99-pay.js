@@ -86,7 +86,7 @@ function payCostBox(a, m) {
 }
 function payBody(a, m, who, canAdd) {
   const it = payItems(a), req = payRequired(a), paid = payPaid(a), left = req === null ? null : Math.max(0, req - paid), full = payDone(a), p = (m.pay = m.pay || { method: 'cash', date: todayISO() });
-  const edit = canEditBooking(a) && perms().write && !a.flow.done.delivered;
+  const edit = canEditBooking(a) && perms().write && (!a.flow.done.delivered || fixOn(a));
   const sum = `<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm mb-1">${req === null ? '<span class="text-muted">ยังไม่มีเงื่อนไขการขาย จึงไม่ทราบยอดที่ต้องชำระ</span>'
     : `<span>${isCash(a.rec) ? 'ราคาสุทธิ' : 'เงินดาวน์'} <b class="num">${money(req)}</b> บาท</span><span>ชำระแล้ว <b class="num">${money(paid)}</b></span><span>${left ? `คงเหลือ <b class="num" style="color:var(--warn)">${money(left)}</b>` : '<b style="color:var(--good)">ชำระครบ</b>'}</span>`}${it.length && !full ? chip('ยังไม่ครบ · ส่งมอบไม่ได้', 'warn') : ''}</div>`;
   const rows = it.length ? `<div class="border border-line rounded-lg divide-y divide-line text-sm mb-2">${it.map((x, i) => `<div class="p-2 px-3 flex flex-wrap items-center gap-x-3 gap-y-0.5"><span class="num text-muted">${dmyFull(x.date) || fmtD(x.date)}</span><span class="font-medium">${esc(payMethodName(x.method))}</span>
@@ -114,7 +114,7 @@ Object.assign(ACTIONS, {
   },
   async 'flow-down'(el) {
     const a = atById(el.dataset.id), m = S.modal || {};
-    if (!a || !stepAllowed(a, 'down') || a.flow.done.delivered || !(stepOpen(a, 'down') || payItems(a).length)) { toast('บันทึกการชำระได้หลังทำ ใบสั่งแต่งรถ แล้ว', 'bad'); return; }
+    if (!a || !stepAllowed(a, 'down') || (a.flow.done.delivered && !fixOn(a)) || !(stepOpen(a, 'down') || payItems(a).length)) { toast('บันทึกการชำระได้หลังทำ ใบสั่งแต่งรถ แล้ว', 'bad'); return; }
     const d = m.pay || {}, no = String(d.receipt_no || '').trim(), date = d.date || todayISO(), method = d.method || 'cash';
     if (!no) { toast('ใส่เลขที่ใบเสร็จ', 'bad'); $('#pay-no')?.focus(); return; }
     if (!(num(d.amount) > 0)) { toast('ใส่ยอดเงิน', 'bad'); $('#pay-am')?.focus(); return; }
@@ -128,7 +128,7 @@ Object.assign(ACTIONS, {
     if (await saveFlow(a, { flow: { down: payDown(a, items) } }, msg)) { S.modal.pay = { method, date: todayISO() }; render(); }
   },
   async 'pay-del'(el) {
-    const a = atById(el.dataset.id), i = Number(el.dataset.i); if (!a || !canEditBooking(a) || a.flow.done.delivered) return;
+    const a = atById(el.dataset.id), i = Number(el.dataset.i); if (!a || !canEditBooking(a) || (a.flow.done.delivered && !fixOn(a))) return;
     const items = payItems(a).map(x => x.legacy ? { method: '', receipt_no: x.receipt_no, amount: x.amount, date: x.date, by: x.by, role: x.role, at: x.at } : x), gone = items.splice(i, 1)[0]; if (!gone) return;
     const prev = (a.rec.flow || {}).down || {};
     if (await saveFlow(a, { flow: { down: items.length ? payDown(a, items, { hist: [...(prev.hist || []), { ...actor(), act: 'ลบแถวชำระ', row: gone }].slice(-30) }) : null } }, 'ลบรายการชำระแล้ว')) render();
