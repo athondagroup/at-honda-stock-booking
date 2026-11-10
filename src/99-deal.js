@@ -120,6 +120,9 @@ Object.assign(ACTIONS, {
     const pk = (((S.ref.get('honda_pay') || {}).picks || {})[String(atVin(a) || '').toUpperCase()]) || null;
     if (pk && dealState(a).admin && (!dd.campaign_id || dd.campaign_id === 'pending') && campOptions(termsCtxAt(a, derive())).opts.some(y => y.ok && y.value === pk.cid)) { dd.campaign_id = pk.cid; dd.margin_honda = ''; dd.margin_priv = ''; dd.adm_mode = 'own'; dd.adm_file = 'รายงานสรุปแคมเปญ'; }
     S.modal.campMatch = null;
+    // a margin on the car saved by the old rule (on the price with the add-on / cut) is worked out again on the real car price (10/11)
+    if (d.at && !termEmpty(dd.margin_car)) { const xx = termsCtxAt(a, derive()), stp = marginStdFor(xx, dd.campaign_id), oldAuto = Math.round((num(d.price) - num(d.paint)) * stp.pct);
+      if (xx.mbase && num(dd.margin_car) === oldAuto && Math.round(xx.mbase * stp.pct) !== oldAuto) dd.margin_car = ''; }
     dd.purchase_to = isCash(r) ? 'ซื้อสด' : 'ไฟแนนซ์';
     S.modal.dealMode = el.dataset.mode || 'first'; S.modal.dealWhy = ''; render();
   },

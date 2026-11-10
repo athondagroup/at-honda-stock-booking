@@ -146,7 +146,7 @@ function termsFill(x, v, paint) {
   const insOff = !x.cash && o.ins_credit_by === 'down' ? num(o.ins_credit) : 0;
   o.down_net = x.cash || termEmpty(o.down) ? null : num(o.down) - insOff;
   o.fin_amount = x.cash ? null : commFinAmount({ price: o.price, discount: o.disc, down: num(o.down) - insOff });
-  const base = num(o.price) ? num(o.price) - num(paint) : 0;
+  const base = x.mbase ? x.mbase : num(o.price) ? num(o.price) - num(o.price_add) - num(paint) : 0;
   const pv = privDefault(x, o, camp);
   const def = { margin_car: base ? Math.round(base * st.pct) : 0, margin_at: o.at_step === '1' ? st.step1 : o.at_step === '2' ? st.step2 : 0, margin_honda: camp && camp.ok ? camp.sup : 0, margin_priv: pv.amt };
   ['margin_car', 'margin_at', 'margin_honda', 'margin_priv'].forEach(k => { if (termEmpty(o[k])) o[k] = def[k]; });
@@ -192,7 +192,7 @@ function termsFields(x, v, f) {
     ${insBox}
     <div class="mt-3 p-3 rounded-lg border border-line" style="background:var(--surface)"><div class="font-medium text-sm mb-2">Margin (แก้ตัวเลขได้)</div>
       <div class="grid sm:grid-cols-3 gap-3">${N('margin_car', `1. Margin รถ ${Math.round(st.pct * 100)}%`)}${step}${x.cash ? '' : N('margin_at', '2. AT แคมเปญ (บาท)')}${N('margin_honda', `${x.cash ? '2' : '3'}. Honda แคมเปญ (บาท)`)}</div>
-      <div class="text-xs text-muted mt-1">Margin รถ คิดจากราคาไม่รวมค่าสี ${base ? `${money(base)} บาท${f.paint ? ` (ค่าสี ${money(f.paint)})` : ''}` : '(ใส่ราคารถก่อน)'} · ตาราง Margin เดือน ${fmtM(st.month)}${x.cash ? ' · ซื้อสดไม่มี Step AT' : ''}</div>
+      <div class="text-xs text-muted mt-1">Margin รถ คิดจากราคารถจริง ไม่รวมค่าสี ไม่รวมบวก/ลดราคารถ ${base ? `${money(base)} บาท${f.paint ? ` (ค่าสี ${money(f.paint)})` : ''}` : '(ใส่ราคารถก่อน)'} · ตาราง Margin เดือน ${fmtM(st.month)}${x.cash ? ' · ซื้อสดไม่มี Step AT' : ''}</div>
       ${st.warn ? `<div class="text-xs" style="color:var(--warn)">${esc(st.warn)}</div>` : ''}
       ${privBox}
       <div class="mt-3 pt-3 border-t border-line"><div class="font-medium text-sm mb-2">${x.cash ? '4' : '5'}. ลูกค้าชำระเพิ่ม <span class="text-xs text-muted font-normal">(รวมใน Margin)</span></div>
@@ -240,7 +240,9 @@ function termsCheck(x, v) {
 // the sale on a booking: model, cash/finance, booking date, the invoice (or the Advance invoice) of its car
 function termsCtxAt(a, D) {
   const vin = atVin(a), adv = vin ? advRec(vin) : null, inv = adv ? adv.idate : (vin && D.invByVin.get(vin) && D.invByVin.get(vin).idate) || (a.rec.inv_man && a.rec.inv_man.idate) || null;
-  return { model: a.model, grade: a.grade, color: a.color, cash: isCash(a.rec), bookDate: a.date || a.rec.booking_date || null, inv: inv || null, adv: !!adv };
+  // the margin on the car is worked out on the real car price (web price list, no paint): never on a price added to or cut (10/11)
+  const web = typeof dealWeb === 'function' ? dealWeb(a, D) : null;
+  return { model: a.model, grade: a.grade, color: a.color, cash: isCash(a.rec), bookDate: a.date || a.rec.booking_date || null, inv: inv || null, adv: !!adv, mbase: web && web.base > 0 ? web.base : null };
 }
 // ---- the booking form: the same fields, price from the price list and the discount from the booking's own field
 function bookTermsCtx(d) { return { model: d.model, grade: d.grade, color: d.color, cash: d.purchase === 'ซื้อสด', bookDate: d.booking_date || todayISO(), inv: null, adv: false }; }
