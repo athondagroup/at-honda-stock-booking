@@ -54,14 +54,14 @@ function payCostVals(a, m) {
   // registration / insurance from the fee tables follow the sale terms (person / company, plan): a figure still at the table value it
   // had is replaced when the terms change; one typed by hand stays (10/11)
   const auto = { reg: A.regDef || '', ins: A.insDef || '' }, keep = k => sv[k] != null && !(sv[k + 'Auto'] != null && num(sv[k]) === num(sv[k + 'Auto']) && num(sv[k + 'Auto']) !== num(auto[k]));
-  if (!m.cost || m.cost.id !== a.id) m.cost = { id: a.id, auto, reg: keep('reg') ? sv.reg : auto.reg, plate: sv.plate ?? 5000, ins: keep('ins') ? sv.ins : auto.ins, acc: sv.acc ?? '', dep: sv.dep ?? (A.deposit || ''), plus: (sv.plus || []).map(y => ({ ...y })), minus: (sv.minus || []).map(y => ({ ...y })) };
+  if (!m.cost || m.cost.id !== a.id) m.cost = { id: a.id, auto, reg: keep('reg') ? sv.reg : auto.reg, plate: sv.plate ?? 5000, ins: keep('ins') ? sv.ins : auto.ins, acc: sv.acc ?? '', tradeOn: sv.tradeOn ?? 'yes', dep: sv.dep ?? (A.deposit || ''), plus: (sv.plus || []).map(y => ({ ...y })), minus: (sv.minus || []).map(y => ({ ...y })) };
   const v = m.cost;
   for (const k of ['reg', 'ins']) if (v.auto && num(v.auto[k]) !== num(auto[k]) && num(v[k]) === num(v.auto[k])) v[k] = auto[k];
   v.auto = auto;
   const plus = [[A.cash ? 'ค่ารถยนต์ (ราคาสุทธิ)' : 'เงินดาวน์', A.main], ...(A.insCredit ? [['ค่าประกันคุ้มครองสินเชื่อ (ชำระวันรับรถ)', A.insCredit]] : []),
     ['ค่าจดทะเบียน', A.regGift ? 0 : num(v.reg)], ['ค่ามัดจำป้ายแดง', num(v.plate)], ['ค่าเบี้ยประกันภัย', A.insGift ? 0 : num(v.ins)],
     ...(A.po ? A.po.map(y => ['อุปกรณ์ · ' + y.l, y.v]) : [['ค่าอุปกรณ์ตกแต่ง', num(v.acc)]]), ...v.plus.map(y => ['อื่น ๆ · ' + (y.l || ''), num(y.v)])];
-  const minus = [...(A.downDisc ? [['ส่วนลดเงินดาวน์', A.downDisc]] : []), ['เงินมัดจำ', num(v.dep)], ...(A.trade ? [['รถเก่าเทิร์น', A.trade]] : []), ...v.minus.map(y => ['อื่น ๆ · ' + (y.l || ''), num(y.v)])];
+  const minus = [...(A.downDisc ? [['ส่วนลดเงินดาวน์', A.downDisc]] : []), ['เงินมัดจำ', num(v.dep)], ...(A.trade && v.tradeOn !== 'no' ? [['รถเก่าเทิร์น', A.trade]] : []), ...v.minus.map(y => ['อื่น ๆ · ' + (y.l || ''), num(y.v)])];
   const tp = plus.reduce((n, x) => n + num(x[1]), 0), tm = minus.reduce((n, x) => n + num(x[1]), 0);
   return { A, v, plus, minus, tp, tm, net: tp - tm };
 }
@@ -86,7 +86,7 @@ function payCostBox(a, m) {
     <div class="flex justify-between font-semibold text-sm pt-2"><span>รวมค่าใช้จ่าย</span><span class="num">${money(tp)}</span></div>
     ${A.downDisc ? row('หัก ส่วนลดเงินดาวน์', ro(A.downDisc, 1), tag('จากเงื่อนไข', 'good')) : ''}
     ${row('หัก เงินมัดจำ', inp('dep', 'dep'), !A.deposit ? tag(num(v.dep) ? 'ใส่เอง · ใบจองไม่ระบุยอด' : 'ใบจองไม่ระบุยอด', 'warn') : num(v.dep) === A.deposit ? tag('จากใบจอง', 'good') : tag(`แก้เอง · ใบจอง ${money(A.deposit)}`, 'warn'))}
-    ${A.trade ? row('หัก รถเก่าเทิร์น', ro(A.trade, 1), tag('จากรถเก่า', 'good')) : ''}
+    ${A.trade ? row('หัก รถเก่าเทิร์น', v.tradeOn === 'no' ? ro(0) : ro(A.trade, 1), `<select class="p-1 rounded border border-line text-sm" style="background:var(--surface)" data-modal="cost.tradeOn" aria-label="หักรถเก่าในยอดชำระ" ${dis}><option value="yes" ${v.tradeOn !== 'no' ? 'selected' : ''}>หักในยอดชำระ (${money(A.trade)})</option><option value="no" ${v.tradeOn === 'no' ? 'selected' : ''}>ไม่หัก (แยกจ่าย)</option></select>`) : ''}
     ${list('minus', '−')}
     <div class="flex justify-between items-baseline pt-2 mt-1" style="border-top:2px solid var(--fg)"><span class="font-semibold">${A.cash ? 'รวมค่าใช้จ่ายทั้งสิ้น' : 'รวมจ่ายสุทธิ'}</span><b class="num text-xl" style="color:var(--red)">${money(net)}</b></div>
     ${edit ? `<div class="flex items-center gap-2 mt-2"><button class="btn btn-ghost btn-sm" data-act="pc-save" data-id="${esc(a.id)}">บันทึกค่าใช้จ่าย</button><span class="text-xs text-muted">${sv && sv.at ? `บันทึกล่าสุด ${fmtDT(sv.at)}` : 'ยังไม่ได้บันทึก (ตัวเลขข้างบนเป็นค่าตั้งต้น)'}</span></div>` : ''}</div>`;
@@ -119,7 +119,7 @@ Object.assign(ACTIONS, {
     const t = payCostVals(a, S.modal);
     const dep = num(v.dep), fillDep = !num(a.deposit) && dep > 0;
     // the booking had no deposit amount: the one typed here fills the booking too (10/11)
-    if (await saveFlow(a, { ...(fillDep ? { deposit: dep, receipt_hist: [...(a.rec.receipt_hist || []), { old: { receipt_no: a.rec.receipt_no || null, deposit: a.rec.deposit || null }, why: 'ใส่ยอดมัดจำจากค่าใช้จ่ายวันรับรถ (ใบจองไม่ระบุยอด)', ...actor() }] } : {}), flow: { cost: { dep, regAuto: num(v.auto && v.auto.reg), insAuto: num(v.auto && v.auto.ins), reg: num(v.reg), plate: num(v.plate), ins: num(v.ins), acc: num(v.acc), plus: clean(v.plus), minus: clean(v.minus), total: t.tp, net: t.net, ...actor() } } }, 'บันทึกค่าใช้จ่ายวันรับรถแล้ว')) { S.modal.cost = null; render(); }
+    if (await saveFlow(a, { ...(fillDep ? { deposit: dep, receipt_hist: [...(a.rec.receipt_hist || []), { old: { receipt_no: a.rec.receipt_no || null, deposit: a.rec.deposit || null }, why: 'ใส่ยอดมัดจำจากค่าใช้จ่ายวันรับรถ (ใบจองไม่ระบุยอด)', ...actor() }] } : {}), flow: { cost: { dep, regAuto: num(v.auto && v.auto.reg), insAuto: num(v.auto && v.auto.ins), reg: num(v.reg), plate: num(v.plate), ins: num(v.ins), acc: num(v.acc), tradeOn: v.tradeOn === 'no' ? 'no' : 'yes', plus: clean(v.plus), minus: clean(v.minus), total: t.tp, net: t.net, ...actor() } } }, 'บันทึกค่าใช้จ่ายวันรับรถแล้ว')) { S.modal.cost = null; render(); }
   },
   async 'flow-down'(el) {
     const a = atById(el.dataset.id), m = S.modal || {};
