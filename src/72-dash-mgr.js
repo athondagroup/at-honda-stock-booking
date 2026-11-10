@@ -137,7 +137,7 @@ function cmpSel() { return `<div class="field"><label for="e-cmp">เทีย�
 function mixTable(rows, title, unit = 'จอง') {
   const tot = rows.reduce((n, r) => n + r.n, 0);
   return `<div class="min-w-0"><h3 class="font-medium mb-1">${title}</h3><div class="scroll-x"><table class="tbl text-sm"><thead><tr><th></th><th class="text-right">${unit}</th><th class="text-right">%</th><th class="text-right">ช่วงก่อน</th><th class="text-right">เปลี่ยน</th></tr></thead><tbody>
-    ${rows.slice(0, 12).map(r => { const d = r.n - r.p; return `<tr><td class="truncate" style="max-width:200px">${esc(r.k)}</td><td class="num text-right font-semibold">${fmtN(r.n)}</td><td class="num text-right text-muted">${pctOf(r.n, tot)}%</td><td class="num text-right text-muted">${fmtN(r.p)}</td><td class="num text-right" style="color:var(--${d > 0 ? 'good' : d < 0 ? 'bad' : 'muted'})">${d > 0 ? '+' : ''}${d}${r.p ? ` (${d > 0 ? '+' : ''}${Math.round(d / r.p * 100)}%)` : ''}</td></tr>`; }).join('') || '<tr><td colspan="5" class="text-muted">ไม่มีข้อมูล</td></tr>'}</tbody></table></div></div>`;
+    ${rows.slice(0, 12).map(r => { const d = r.n - r.p; return `<tr><td style="min-width:9rem">${esc(r.k)}</td><td class="num text-right font-semibold">${fmtN(r.n)}</td><td class="num text-right text-muted">${pctOf(r.n, tot)}%</td><td class="num text-right text-muted">${fmtN(r.p)}</td><td class="num text-right nowrap" style="color:var(--${d > 0 ? 'good' : d < 0 ? 'bad' : 'muted'})">${d > 0 ? '+' : ''}${d}${r.p ? ` (${d > 0 ? '+' : ''}${Math.round(d / r.p * 100)}%)` : ''}</td></tr>`; }).join('') || '<tr><td colspan="5" class="text-muted">ไม่มีข้อมูล</td></tr>'}</tbody></table></div></div>`;
 }
 function mixOf(cur, prev, key) {
   const c = {}, p = {}; cur.forEach(a => { const k = key(a) || 'ไม่ระบุ'; c[k] = (c[k] || 0) + 1; }); prev.forEach(a => { const k = key(a) || 'ไม่ระบุ'; p[k] = (p[k] || 0) + 1; });
@@ -210,8 +210,8 @@ function dashAna(D, part) {
     ${mixTable(mixOf(curOk, prev, a => a.spec ? specLabelText(a.spec) : ''), 'รุ่น เกรด สี (สเปก)')}</div>`, 'เปลี่ยน = เทียบช่วงก่อนหน้าที่ยาวเท่ากัน ใช้ดูว่ารุ่นหรือสีไหนคนจองเพิ่มขึ้นหรือลดลง')}`,
     // ยอดจอง keeps only these three (10/11)
     mix3: `${dCard('การจองแยกตามรุ่น เกรด สี ไฟแนนซ์ และช่องทาง', `<div class="grid lg:grid-cols-2 gap-5">
-    <div class="lg:col-span-2">${mixTable(mixOf(curOk, prev, a => a.spec ? specLabelText(a.spec) : ''), 'รุ่น เกรด สี')}</div>
-    <div>${mixTable(mixOf(curOk, prev, a => finKey(a, D)), 'ไฟแนนซ์ / ซื้อสด')}${dspNote(curOk, a => finKey(a, D))}</div>
+    <div class="lg:col-span-2 min-w-0">${mixTable(mixOf(curOk, prev, a => a.spec ? specLabelText(a.spec) : ''), 'รุ่น เกรด สี')}</div>
+    <div class="min-w-0">${mixTable(mixOf(curOk, prev, a => finKey(a, D)), 'ไฟแนนซ์ / ซื้อสด')}${dspNote(curOk, a => finKey(a, D))}</div>
     ${mixTable(mixOf(curOk, prev, a => a.rec.source), 'ช่องทางลูกค้า')}</div>`, 'เปลี่ยน = เทียบช่วงก่อนหน้าที่ยาวเท่ากัน')}`,
     rank: `${dCard('อันดับเซลล์', `<div class="scroll-x max-h-96 overflow-auto"><table class="tbl text-sm"><thead><tr><th>เซลล์</th><th class="text-right">จอง</th><th class="text-right">ยกเลิก</th><th class="text-right">% ยกเลิก</th><th class="text-right">ใบกำกับ</th><th class="text-right">ส่งมอบ</th></tr></thead><tbody>
       ${rank.map((p, i) => `<tr><td class="nowrap"><span class="text-muted num">${i + 1}.</span> ${salesName(p.n)}</td><td class="num text-right">${fmtN(p.bk)}</td><td class="num text-right">${fmtN(p.cx)}</td><td class="num text-right" ${pctOf(p.cx, p.bk + p.cx) > 20 ? 'style="color:var(--bad)"' : ''}>${p.bk + p.cx ? pctOf(p.cx, p.bk + p.cx) + '%' : '–'}</td><td class="num text-right">${fmtN(p.inv)}</td><td class="num text-right font-semibold">${fmtN(p.dv)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted">ไม่มีข้อมูล</td></tr>'}</tbody></table></div>`, 'เรียงตามส่งมอบ · ใบกำกับและส่งมอบนับจากใบจอง AT ที่ผูกกับรถ')}`,
