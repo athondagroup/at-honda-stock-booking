@@ -142,7 +142,10 @@ function termEmpty(v) { return v === '' || v === null || v === undefined; }
 // fills the worked-out values (amount financed, default margins, total) without writing them into the draft
 function termsFill(x, v, paint) {
   const o = { ...v }, { opts } = campOptions(x), camp = opts.find(y => y.value === o.campaign_id), st = marginStdFor(x, o.campaign_id);
-  o.fin_amount = x.cash ? null : commFinAmount({ price: o.price, discount: o.disc, down: o.down });
+  // ค่าประกันคุ้มครองสินเชื่อ (10/11): taken out of the down payment, it raises the amount financed (finance letter: ดาวน์สุทธิ = ดาวน์ − ประกัน, ยอดจัด = ราคา − ดาวน์สุทธิ)
+  const insOff = !x.cash && o.ins_credit_by === 'down' ? num(o.ins_credit) : 0;
+  o.down_net = x.cash || termEmpty(o.down) ? null : num(o.down) - insOff;
+  o.fin_amount = x.cash ? null : commFinAmount({ price: o.price, discount: o.disc, down: num(o.down) - insOff });
   const base = num(o.price) ? num(o.price) - num(paint) : 0;
   const pv = privDefault(x, o, camp);
   const def = { margin_car: base ? Math.round(base * st.pct) : 0, margin_at: o.at_step === '1' ? st.step1 : o.at_step === '2' ? st.step2 : 0, margin_honda: camp && camp.ok ? camp.sup : 0, margin_priv: pv.amt };
@@ -167,7 +170,9 @@ function termsFields(x, v, f) {
     ${N('margin_priv', '4. สิทธิพิเศษ Honda (บาท)')}</div>
     <div class="text-xs text-muted mt-1">${pv.pr.miss ? `เดือน ${fmtM(pv.pr.req)} ไม่มียอดในตาราง (Gen to Gen ของแคมเปญเดือนนี้ขึ้นกับปีที่ครอบครองรถเดิม) ใส่ยอดเองในช่อง 4 และดูเงื่อนไขในเอกสารแคมเปญ` : `ยอดตามแท็บสิทธิพิเศษ Honda เดือน ${fmtM(pv.pr.month)}`} · ฮอนด้าเคียงข้างคุณใช้ร่วมกับ Gen to Gen / Local Native ไม่ได้${pv.pr.td ? '<br>e:N2 Test Drive: ต้องมีบันทึกทดลองขับใน SPEAR ชื่อตรงผู้ซื้อ และจอง/รับรถกับผู้จำหน่ายเดียวกับที่ทดลองขับ (ไม่รวม Fleet / Leasing)' : ''}</div></div>`;
   const price = f.priceDisc ? `<div class="field"><label for="${f.idp}-price" class="req">ราคารถ (ราคาเต็ม)</label><input id="${f.idp}-price" type="number" min="0" step="100" inputmode="decimal" ${f.attr}="${f.pre}.price" value="${esc(o.price ?? '')}" ${f.lockPrice || f.ro ? 'readonly style="background:var(--surface-2)"' : ''}>${f.priceNote ? `<span class="text-xs text-muted">${f.priceNote}</span>` : ''}</div>` + (f.priceAdd ? N('price_add', 'บวกราคารถ (บาท)', 'step="100" placeholder="ถ้าราคาจริงสูงกว่าราคาในเว็บ"') : '') + N('disc', 'ส่วนลดราคารถ', 'step="100"') : '';
-  const fin = x.cash ? '' : N('down', 'เงินดาวน์', 'step="100"') + N('down_disc', 'ส่วนลดดาวน์', 'step="100"') + RO('ยอดจัด', o.fin_amount, 'ราคารถ − ส่วนลด − ดาวน์ (คิดให้เอง)') + N('rate', 'ดอกเบี้ย (% ต่อปี)', 'step="0.01" max="30"') + N('term', 'จำนวนงวด (เดือน)', 'step="1" max="120"');
+  const fco = f.finCo ? S2('fin_co', 'บริษัทไฟแนนซ์', [['', 'เลือกบริษัทไฟแนนซ์'], ...FINANCE.map(n => [n, n])]) : '';
+  const insCr = N('ins_credit', 'ค่าประกันคุ้มครองสินเชื่อ (บาท)', 'step="1"') + S2('ins_credit_by', 'ค่าประกันคุ้มครองสินเชื่อ ชำระแบบ', [['', 'ไม่มี / ยังไม่ระบุ'], ['down', 'หักจากเงินดาวน์ (ยอดจัดเพิ่ม)'], ['pay', 'ลูกค้าชำระวันรับรถ']]);
+  const fin = x.cash ? '' : fco + N('down', 'เงินดาวน์', 'step="100"') + insCr + (o.ins_credit_by === 'down' && num(o.ins_credit) ? RO('เงินดาวน์สุทธิ', o.down_net, 'ดาวน์ − ค่าประกันคุ้มครองสินเชื่อ') : '') + N('down_disc', 'ส่วนลดดาวน์', 'step="100"') + RO('ยอดจัด', o.fin_amount, o.ins_credit_by === 'down' && num(o.ins_credit) ? 'ราคารถ − ส่วนลด − ดาวน์สุทธิ (คิดให้เอง)' : 'ราคารถ − ส่วนลด − ดาวน์ (คิดให้เอง)') + N('rate', 'ดอกเบี้ย (% ต่อปี)', 'step="0.01" max="30"') + N('term', 'จำนวนงวด (เดือน)', 'step="1" max="120"');
   const groups = [...new Set(opts.map(y => y.group))];
   const sel = `<div class="field sm:col-span-3"><label for="${f.idp}-camp">แคมเปญ Honda <span class="text-xs text-muted">(ยังไม่เลือกได้)</span></label><select id="${f.idp}-camp" ${f.attr}="${f.pre}.campaign_id" ${dis}><option value="">เลือกแคมเปญ</option>${groups.map(gname => {
     const os = opts.filter(y => y.group === gname).map(y => `<option value="${esc(y.value)}" ${o.campaign_id === y.value ? 'selected' : ''} ${y.ok ? '' : 'disabled'}>${esc(y.name)}${y.ok ? '' : ` · ใช้ไม่ได้: ${esc(y.why)}`}</option>`).join('');
@@ -193,6 +198,7 @@ function termsFields(x, v, f) {
 function termsRecord(x, v, paint) {
   const { o, camp, pv } = termsFill(x, v, paint), n = k => termEmpty(o[k]) ? null : num(o[k]);
   return { price: n('price'), disc: n('disc'), down: x.cash ? null : n('down'), down_disc: x.cash ? null : n('down_disc'), fin_amount: x.cash ? null : o.fin_amount,
+    fin_co: x.cash ? null : (o.fin_co || null), ins_credit: x.cash ? null : n('ins_credit'), ins_credit_by: x.cash || !num(o.ins_credit) ? null : (o.ins_credit_by || null), down_net: x.cash ? null : o.down_net,
     rate: x.cash || termEmpty(o.rate) ? null : Number(o.rate), term: x.cash || termEmpty(o.term) ? null : parseInt(o.term, 10),
     campaign_id: o.campaign_id || null, campaign: camp ? (camp.value === 'other' ? String(o.campaign_text || '').trim() || 'อื่น ๆ' : (camp.group ? camp.group + ' · ' : '') + camp.name) : null, campaign_text: o.campaign_id === 'other' ? String(o.campaign_text || '').trim() : null,
     camp_month: camp && camp.month ? camp.month : null, at_step: x.cash ? null : (o.at_step || null), margin_car: num(o.margin_car), margin_at: num(o.margin_at), margin_honda: num(o.margin_honda), margin: o.margin, paint: num(paint),
@@ -205,6 +211,8 @@ function termsCheck(x, v) {
   if (!x.cash) {
     if (termEmpty(v.down)) return { err: 'ใส่เงินดาวน์', id: 'down' };
     if (num(v.down_disc) > num(v.down)) return { err: 'ส่วนลดดาวน์มากกว่าเงินดาวน์', id: 'down_disc' };
+    if (num(v.ins_credit) && !v.ins_credit_by) return { err: 'เลือกว่าค่าประกันคุ้มครองสินเชื่อ หักจากเงินดาวน์ หรือชำระวันรับรถ', id: 'ins_credit_by' };
+    if (v.ins_credit_by === 'down' && num(v.ins_credit) > num(v.down)) return { err: 'ค่าประกันคุ้มครองสินเชื่อมากกว่าเงินดาวน์', id: 'ins_credit' };
     if (termEmpty(v.rate) || !(Number(v.rate) >= 0) || Number(v.rate) > 30) return { err: 'ใส่ดอกเบี้ย (0–30%)', id: 'rate' };
     const t = Number(v.term); if (!(t >= 1 && t <= 120 && t === Math.round(t))) return { err: 'ใส่จำนวนงวด 1–120 เดือน', id: 'term' };
   }
