@@ -13,13 +13,15 @@ function payItems(a) {
 }
 function payRequired(a) {
   const d = a.rec.deal; if (!(d && d.at)) return null;
-  const n = isCash(a.rec) ? num(d.price) - num(d.disc ?? d.discount) : num(d.down) - num(d.down_disc);
+  // what the customer pays = the net total of the day-of-collection costs (รวมจ่ายสุทธิ), not only the down / the price (10/11)
+  const n = payCostVals(a, {}).net;
   return n > 0 ? n : null;
 }
 const payPaid = a => payItems(a).reduce((t, x) => t + num(x.amount), 0);
 function payDone(a) {
   const it = payItems(a); if (!it.length) return false;
   if (it.some(x => x.legacy)) return true;
+  if (a.rec.flow && a.rec.flow.delivered && a.rec.flow.delivered.date) return true;   // already handed over: the old rule stands
   const req = payRequired(a); return req === null || payPaid(a) >= req;
 }
 // the booking's flow.down after a change of the rows (receipt_no / amount / date mirror the rows for the places that read them)
@@ -88,7 +90,7 @@ function payBody(a, m, who, canAdd) {
   const it = payItems(a), req = payRequired(a), paid = payPaid(a), left = req === null ? null : Math.max(0, req - paid), full = payDone(a), p = (m.pay = m.pay || { method: 'cash', date: todayISO() });
   const edit = canEditBooking(a) && perms().write && (!a.flow.done.delivered || fixOn(a));
   const sum = `<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm mb-1">${req === null ? '<span class="text-muted">ยังไม่มีเงื่อนไขการขาย จึงไม่ทราบยอดที่ต้องชำระ</span>'
-    : `<span>${isCash(a.rec) ? 'ราคาสุทธิ' : 'เงินดาวน์'} <b class="num">${money(req)}</b> บาท</span><span>ชำระแล้ว <b class="num">${money(paid)}</b></span><span>${left ? `คงเหลือ <b class="num" style="color:var(--warn)">${money(left)}</b>` : '<b style="color:var(--good)">ชำระครบ</b>'}</span>`}${it.length && !full ? chip('ยังไม่ครบ · ส่งมอบไม่ได้', 'warn') : ''}</div>`;
+    : `<span>${isCash(a.rec) ? 'รวมค่าใช้จ่ายทั้งสิ้น' : 'รวมจ่ายสุทธิ'} <b class="num">${money(req)}</b> บาท</span><span>ชำระแล้ว <b class="num">${money(paid)}</b></span><span>${left ? `คงเหลือ <b class="num" style="color:var(--warn)">${money(left)}</b>` : '<b style="color:var(--good)">ชำระครบ</b>'}</span>`}${it.length && !full ? chip('ยังไม่ครบ · ส่งมอบไม่ได้', 'warn') : ''}</div>`;
   const rows = it.length ? `<div class="border border-line rounded-lg divide-y divide-line text-sm mb-2">${it.map((x, i) => `<div class="p-2 px-3 flex flex-wrap items-center gap-x-3 gap-y-0.5"><span class="num text-muted">${dmyFull(x.date) || fmtD(x.date)}</span><span class="font-medium">${esc(payMethodName(x.method))}</span>
       <span>ใบเสร็จ <span class="code">${esc(x.receipt_no || '–')}</span></span>${x.bank ? `<span class="text-muted">${esc(x.bank)}</span>` : ''}${x.cheque_no ? `<span class="text-muted">เช็ค ${esc(x.cheque_no)}</span>` : ''}${num(x.fee) ? `<span class="text-muted">ค่าธรรมเนียม ${money(x.fee)}</span>` : ''}
       <span class="num font-medium ml-auto">${x.amount ? money(x.amount) + ' บาท' : '–'}</span><span class="text-xs text-muted">${esc(x.role || '')}</span>${edit ? `<button class="btn btn-ghost btn-sm" data-act="pay-del" data-id="${esc(a.id)}" data-i="${i}">ลบ</button>` : ''}</div>`).join('')}</div>` : '';
