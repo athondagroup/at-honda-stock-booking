@@ -151,7 +151,10 @@ function termsFill(x, v, paint) {
   const def = { margin_car: base ? Math.round(base * st.pct) : 0, margin_at: o.at_step === '1' ? st.step1 : o.at_step === '2' ? st.step2 : 0, margin_honda: camp && camp.ok ? camp.sup : 0, margin_priv: pv.amt };
   ['margin_car', 'margin_at', 'margin_honda', 'margin_priv'].forEach(k => { if (termEmpty(o[k])) o[k] = def[k]; });
   if (x.cash) { o.margin_at = 0; o.at_step = ''; }
-  o.margin = num(o.margin_car) + num(o.margin_at) + num(o.margin_honda) + num(o.margin_priv);
+  // ลูกค้าชำระเพิ่ม (10/11): items the customer pays for on top, each with its value, counted in the margin
+  o.extra_pay = Array.isArray(o.extra_pay) ? o.extra_pay : [];
+  o.margin_extra = o.extra_pay.reduce((n, y) => n + num(y && y.v), 0);
+  o.margin = num(o.margin_car) + num(o.margin_at) + num(o.margin_honda) + num(o.margin_priv) + o.margin_extra;
   return { o, camp, st, base, def, pv };
 }
 // the fields: price + discount (unless the booking form has them), down / instalments, campaign, margin
@@ -192,6 +195,12 @@ function termsFields(x, v, f) {
       <div class="text-xs text-muted mt-1">Margin รถ คิดจากราคาไม่รวมค่าสี ${base ? `${money(base)} บาท${f.paint ? ` (ค่าสี ${money(f.paint)})` : ''}` : '(ใส่ราคารถก่อน)'} · ตาราง Margin เดือน ${fmtM(st.month)}${x.cash ? ' · ซื้อสดไม่มี Step AT' : ''}</div>
       ${st.warn ? `<div class="text-xs" style="color:var(--warn)">${esc(st.warn)}</div>` : ''}
       ${privBox}
+      <div class="mt-3 pt-3 border-t border-line"><div class="font-medium text-sm mb-2">${x.cash ? '4' : '5'}. ลูกค้าชำระเพิ่ม <span class="text-xs text-muted font-normal">(รวมใน Margin)</span></div>
+        ${o.extra_pay.map((y, i) => `<div class="flex gap-2 items-end mb-2"><div class="field grow"><label for="${f.idp}-xp${i}l">รายการ</label><input id="${f.idp}-xp${i}l" ${f.attr}="${f.pre}.extra_pay.${i}.l" value="${esc((y && y.l) || '')}" placeholder="เช่น ฟิล์มเกรดสูงกว่าแพ็กเกจ" autocomplete="off" ${dis}></div>
+          <div class="field w-36"><label for="${f.idp}-xp${i}v">มูลค่า (บาท)</label><input id="${f.idp}-xp${i}v" type="number" min="0" step="1" inputmode="decimal" ${f.attr}="${f.pre}.extra_pay.${i}.v" value="${esc((y && y.v) ?? '')}" ${dis}></div>
+          ${f.ro ? '' : `<button type="button" class="btn btn-ghost btn-sm" data-act="terms-xp-del" data-attr="${f.attr}" data-pre="${f.pre}" data-i="${i}" aria-label="ลบรายการ">ลบ</button>`}</div>`).join('')}
+        ${f.ro ? '' : `<button type="button" class="btn btn-ghost btn-sm" data-act="terms-xp-add" data-attr="${f.attr}" data-pre="${f.pre}">+ เพิ่มรายการ</button>`}
+        ${o.margin_extra ? `<span class="text-sm ml-2">รวม <b class="num">${money(o.margin_extra)}</b> บาท</span>` : ''}</div>
       <div class="text-sm mt-2">รวม Margin <b class="num">${money(o.margin)}</b> บาท</div></div>`;
 }
 // what is saved: numbers, the campaign's text and month, the margin parts and total
@@ -203,6 +212,7 @@ function termsRecord(x, v, paint) {
     campaign_id: o.campaign_id || null, campaign: camp ? (camp.value === 'other' ? String(o.campaign_text || '').trim() || 'อื่น ๆ' : (camp.group ? camp.group + ' · ' : '') + camp.name) : null, campaign_text: o.campaign_id === 'other' ? String(o.campaign_text || '').trim() : null,
     camp_month: camp && camp.month ? camp.month : null, at_step: x.cash ? null : (o.at_step || null), margin_car: num(o.margin_car), margin_at: num(o.margin_at), margin_honda: num(o.margin_honda), margin: o.margin, paint: num(paint),
     priv_gtg: pv.bl.gtg ? null : (o.priv_gtg || null), priv_ln: pv.bl.ln ? null : (o.priv_ln || null), priv_td: o.priv_td && pv.pr.td ? o.priv_td : null, priv_hk: n('priv_hk'), margin_priv: num(o.margin_priv), privileges: privText({ ...o, priv_td: pv.pr.td ? o.priv_td : '' }) || null,
+    extra_pay: o.extra_pay.filter(y => y && (String(y.l || '').trim() || num(y.v))).map(y => ({ l: String(y.l || '').trim(), v: num(y.v) })), margin_extra: o.margin_extra,
     ins1_by: o.ins1_by || null, ins1_kind: o.ins1_kind || null, ins2_by: o.ins2_by || null, ins3_by: o.ins3_by || null, ins2_kind: o.ins2_kind || null, ins3_kind: o.ins3_kind || null, reg_by: o.reg_by || null, reg_type: o.reg_by ? (o.reg_type || 'บุคคลธรรมดา') : null };
 }
 function termsCheck(x, v) {
@@ -216,6 +226,7 @@ function termsCheck(x, v) {
     if (termEmpty(v.rate) || !(Number(v.rate) >= 0) || Number(v.rate) > 30) return { err: 'ใส่ดอกเบี้ย (0–30%)', id: 'rate' };
     const t = Number(v.term); if (!(t >= 1 && t <= 120 && t === Math.round(t))) return { err: 'ใส่จำนวนงวด 1–120 เดือน', id: 'term' };
   }
+  if ((v.extra_pay || []).some(y => y && num(y.v) && !String(y.l || '').trim())) return { err: 'ลูกค้าชำระเพิ่ม: ใส่ชื่อรายการ', id: 'xp0l' };
   if (num(v.priv_hk) && (num(v.priv_hk) < 25000 || num(v.priv_hk) > 70000)) return { err: 'ฮอนด้าเคียงข้างคุณ 25,000–70,000 บาท', id: 'priv_hk' };
   if (num(v.priv_hk) && (v.priv_gtg || v.priv_ln)) return { err: 'ฮอนด้าเคียงข้างคุณ ใช้ร่วมกับ Gen to Gen / Local Native ไม่ได้', id: 'priv_hk' };
   // not chosen yet is allowed (ตกลง 30/10): it is kept as "รอเลือกแคมเปญ" and the admin picks it later
@@ -263,7 +274,7 @@ function commForm(a, m, D) {
   if (!(d && d.at)) return `<div class="mt-2 p-3 rounded-lg text-sm" style="background:var(--warn-soft)">ยังไม่ได้ใส่เงื่อนไขการขาย (ราคา ดาวน์ ผ่อน แคมเปญ Margin) · ใส่ที่ขั้น "ไฟแนนซ์ผ่าน" ด้านบน ใช้ทำค่าคอม${cm.price ? ` · มีข้อมูลค่าคอมเดิม ราคา ${money(cm.price)}${cm.margin ? ` Margin ${money(cm.margin)}` : ''}` : ''}</div>`;
   return `<div class="mt-2 p-3 rounded-lg border border-line text-sm"><b>ข้อมูลค่าคอม</b> ใช้เงื่อนไขการขายในขั้นไฟแนนซ์ · ${esc(d.campaign || 'ไม่ได้เลือกแคมเปญ')}
     ${d.privileges ? `<div class="mt-1">สิทธิพิเศษ: ${esc(d.privileges)}</div>` : ''}
-    <div class="mt-1">Margin รถ ${money(d.margin_car)} + AT แคมเปญ ${money(d.margin_at)} + Honda แคมเปญ ${money(d.margin_honda)} + สิทธิพิเศษ ${money(d.margin_priv)} = <b class="num">${money(d.margin)}</b> บาท</div></div>`;
+    <div class="mt-1">Margin รถ ${money(d.margin_car)} + AT แคมเปญ ${money(d.margin_at)} + Honda แคมเปญ ${money(d.margin_honda)} + สิทธิพิเศษ ${money(d.margin_priv)}${num(d.margin_extra) ? ` + ลูกค้าชำระเพิ่ม ${money(d.margin_extra)}` : ''} = <b class="num">${money(d.margin)}</b> บาท</div></div>`;
 }
 // picking a campaign or a Step column puts that margin part back to its default (it can be typed over after);
 // on 'input', because the page redraws on a select's input and its 'change' then never reaches the document
@@ -348,4 +359,11 @@ Object.assign(ACTIONS, {
     render();
   },
   'camp-use'(el) { const d = S.modal && S.modal.deal; if (!d) return; d.campaign_id = el.dataset.cid; d.margin_honda = ''; d.margin_priv = ''; d.adm_mode = 'own'; d.adm_file = (S.modal.campMatch || {}).file || null; render(); }
+});
+
+Object.assign(ACTIONS, {
+  'terms-xp-add'(el) { const root = el.dataset.attr === 'data-modal' ? S.modal : S.draft; if (!root) return; const k = el.dataset.pre + '.extra_pay';
+    let o = root; for (const p of k.split('.').slice(0, -1)) { if (!o[p]) o[p] = {}; o = o[p]; } if (!Array.isArray(o.extra_pay)) o.extra_pay = []; o.extra_pay.push({ l: '', v: '' }); render(); },
+  'terms-xp-del'(el) { const root = el.dataset.attr === 'data-modal' ? S.modal : S.draft; if (!root) return;
+    let o = root; for (const p of el.dataset.pre.split('.')) { if (!o[p]) return; o = o[p]; } if (Array.isArray(o.extra_pay)) o.extra_pay.splice(Number(el.dataset.i), 1); render(); }
 });

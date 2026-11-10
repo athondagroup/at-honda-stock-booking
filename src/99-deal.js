@@ -46,11 +46,13 @@ function dealRows(d, cash) {
   if (!cash) r.push([`AT แคมเปญ${d.at_step ? ` (Step ช่อง ${d.at_step})` : ''}`, money(d.margin_at)]);
   r.push(['Honda แคมเปญ', money(d.margin_honda)]);
   if (d.privileges) r.push(['สิทธิพิเศษ Honda', d.privileges]);
-  r.push(['สิทธิพิเศษ (Margin)', money(d.margin_priv)], ['รวม Margin', money(d.margin)]);
+  r.push(['สิทธิพิเศษ (Margin)', money(d.margin_priv)]);
+  (d.extra_pay || []).forEach(y => r.push(['ลูกค้าชำระเพิ่ม · ' + (y.l || ''), money(y.v)]));
+  r.push(['รวม Margin', money(d.margin)]);
   return r;
 }
 function dealDiff(old, nw) {
-  const L = { price: 'ราคารถ', disc: 'ส่วนลด', down: 'ดาวน์', fin_co: 'บริษัทไฟแนนซ์', ins_credit: 'ค่าประกันคุ้มครองสินเชื่อ', ins_credit_by: 'ชำระประกันคุ้มครองสินเชื่อ', down_disc: 'ส่วนลดดาวน์', fin_amount: 'ยอดจัด', rate: 'ดอกเบี้ย', term: 'งวด', campaign: 'แคมเปญ', margin_car: 'Margin รถ', margin_at: 'AT แคมเปญ', margin_honda: 'Honda แคมเปญ', privileges: 'สิทธิพิเศษ', margin_priv: 'สิทธิพิเศษ (Margin)', margin: 'รวม Margin' };
+  const L = { price: 'ราคารถ', disc: 'ส่วนลด', down: 'ดาวน์', fin_co: 'บริษัทไฟแนนซ์', ins_credit: 'ค่าประกันคุ้มครองสินเชื่อ', ins_credit_by: 'ชำระประกันคุ้มครองสินเชื่อ', margin_extra: 'ลูกค้าชำระเพิ่ม', down_disc: 'ส่วนลดดาวน์', fin_amount: 'ยอดจัด', rate: 'ดอกเบี้ย', term: 'งวด', campaign: 'แคมเปญ', margin_car: 'Margin รถ', margin_at: 'AT แคมเปญ', margin_honda: 'Honda แคมเปญ', privileges: 'สิทธิพิเศษ', margin_priv: 'สิทธิพิเศษ (Margin)', margin: 'รวม Margin' };
   return Object.keys(L).filter(k => (old[k] ?? null) !== (nw[k] ?? null)).map(k => `${L[k]} ${['campaign', 'privileges', 'rate', 'term'].includes(k) ? esc(old[k] ?? '–') : money(old[k])} → <b>${['campaign', 'privileges', 'rate', 'term'].includes(k) ? esc(nw[k] ?? '–') : money(nw[k])}</b>`);
 }
 // the web price plus what the sales add on top (a price above the list, e.g. extras); the add-on and why are kept (2/11)
@@ -100,14 +102,14 @@ function commDeal(a) {
   const o = { price: dl.price, discount: dl.disc, down: dl.down, down_disc: dl.down_disc, fin_amount: dl.fin_amount, rate: dl.rate, term: dl.term, campaign: dl.campaign, margin: dl.margin, margin_car: dl.margin_car, margin_at: dl.margin_at, margin_honda: dl.margin_honda, margin_priv: dl.margin_priv, privileges: dl.privileges };
   return Object.fromEntries(Object.entries(o).filter(([, x]) => x !== null && x !== undefined));
 }
-function dealOld(d) { return Object.fromEntries(['price', 'price_add', 'price_add_note', 'disc', 'down', 'fin_co', 'ins_credit', 'ins_credit_by', 'down_disc', 'fin_amount', 'rate', 'term', 'campaign_id', 'campaign', 'campaign_text', 'camp_month', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'priv_gtg', 'priv_ln', 'priv_td', 'priv_hk', 'ins1_by', 'ins1_kind', 'ins2_by', 'ins3_by', 'ins2_kind', 'ins3_kind', 'reg_by', 'reg_type', 'privileges', 'margin_priv', 'margin', 'paint', 'at', 'by', 'role', 'how', 'why'].map(k => [k, d[k] ?? null])); }
+function dealOld(d) { return Object.fromEntries(['price', 'price_add', 'price_add_note', 'disc', 'down', 'fin_co', 'ins_credit', 'ins_credit_by', 'extra_pay', 'margin_extra', 'down_disc', 'fin_amount', 'rate', 'term', 'campaign_id', 'campaign', 'campaign_text', 'camp_month', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'priv_gtg', 'priv_ln', 'priv_td', 'priv_hk', 'ins1_by', 'ins1_kind', 'ins2_by', 'ins3_by', 'ins2_kind', 'ins3_kind', 'reg_by', 'reg_type', 'privileges', 'margin_priv', 'margin', 'paint', 'at', 'by', 'role', 'how', 'why'].map(k => [k, d[k] ?? null])); }
 Object.assign(ACTIONS, {
   'deal-open'(el) {
     const a = atById(el.dataset.id); if (!a) return;
     const d = a.rec.deal || {}, cm = a.rec.comm || {}, r = a.rec, web = dealWeb(a, derive());
-    const keep = ['price', 'price_add', 'price_add_note', 'disc', 'down', 'fin_co', 'ins_credit', 'ins_credit_by', 'down_disc', 'rate', 'term', 'campaign_id', 'campaign_text', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'priv_gtg', 'priv_ln', 'priv_td', 'priv_hk', 'margin_priv', 'ins1_by', 'ins1_kind', 'ins2_by', 'ins3_by', 'ins2_kind', 'ins3_kind', 'reg_by', 'reg_type'];
+    const keep = ['price', 'price_add', 'price_add_note', 'disc', 'down', 'fin_co', 'ins_credit', 'ins_credit_by', 'extra_pay', 'down_disc', 'rate', 'term', 'campaign_id', 'campaign_text', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'priv_gtg', 'priv_ln', 'priv_td', 'priv_hk', 'margin_priv', 'ins1_by', 'ins1_kind', 'ins2_by', 'ins3_by', 'ins2_kind', 'ins3_kind', 'reg_by', 'reg_type'];
     // a first entry starts from what the booking or the old commission data already has
-    S.modal.deal = d.at ? Object.fromEntries(keep.map(k => [k, d[k] ?? ''])) : { price: (web && web.price) || num(cm.price) || num(r.price) || '', disc: num(r.discount) || num(cm.discount) || '', down: num(cm.down) || '', down_disc: num(cm.down_disc) || '', rate: cm.rate ?? '', term: cm.term ?? '', campaign_id: '', at_step: '' };
+    S.modal.deal = d.at ? Object.fromEntries(keep.map(k => [k, k === 'extra_pay' ? (d.extra_pay || []).map(y => ({ ...y })) : d[k] ?? ''])) : { price: (web && web.price) || num(cm.price) || num(r.price) || '', disc: num(r.discount) || num(cm.discount) || '', down: num(cm.down) || '', down_disc: num(cm.down_disc) || '', rate: cm.rate ?? '', term: cm.term ?? '', campaign_id: '', at_step: '' };
     // the sales' own campaign pick is kept; the admin decides the one that counts (same as the sales / own pick / uploaded sheet)
     // the finance company: the one confirmed at "ไฟแนนซ์ผ่าน", else the one applied to on the booking (10/11)
     if (!S.modal.deal.fin_co) S.modal.deal.fin_co = (r.flow && r.flow.fin && r.flow.fin.company) || (FINANCE.includes(r.finance) ? r.finance : '') || '';

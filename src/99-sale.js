@@ -59,7 +59,7 @@ function printSaleApp(a, D) {
   ];
   const terms = [['ราคารถ (ราคาเต็ม)', M(d.price)], ['ส่วนลดราคารถ', M(d.disc)]];
   if (!cash) terms.push(['เงินดาวน์', M(d.down)], ['ส่วนลดดาวน์', M(d.down_disc)], ['ยอดจัด', M(d.fin_amount)], ['ดอกเบี้ย / งวด', `${d.rate ?? '–'} % · ${d.term || '–'} งวด`]);
-  const mg = [['1. Margin รถ', M(d.margin_car)], ['2. AT แคมเปญ', M(d.margin_at)], ['3. Honda แคมเปญ', M(d.margin_honda)], [`4. สิทธิพิเศษ Honda${d.privileges ? ` (${d.privileges})` : ''}`, M(d.margin_priv)], ['Margin รวม', M(s.margin)],
+  const mg = [['1. Margin รถ', M(d.margin_car)], ['2. AT แคมเปญ', M(d.margin_at)], ['3. Honda แคมเปญ', M(d.margin_honda)], [`4. สิทธิพิเศษ Honda${d.privileges ? ` (${d.privileges})` : ''}`, M(d.margin_priv)], ...(d.extra_pay || []).map(y => [`5. ลูกค้าชำระเพิ่ม · ${y.l || ''}`, M(y.v)]), ['Margin รวม', M(s.margin)],
     ['หัก ส่วนลดรวม', M(s.disc)], [`หัก FOC รวม (${s.foc.src || '–'})`, M(s.foc.v)], [s.bal !== null && s.bal < 0 ? 'เกิน Margin' : 'เหลือ', s.bal === null ? '–' : money(Math.abs(s.bal))]];
   // gifts (accessories PO): each item with its sale value and its FOC cost, then the totals (26/10)
   const po = (r.flow && r.flow.po) || {}, pit = po.items || [];
