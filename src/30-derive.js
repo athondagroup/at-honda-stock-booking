@@ -682,7 +682,8 @@ function buildAlerts(D) {
       (g.get(t) || g.set(t, []).get(t)).push(l);
     }
     for (const [t, ls] of g) {
-      const units = [...new Set(ls.map(l => l.vin || 'Quota ' + l.ref))]; if (units.length < 2) continue;
+      const uid = l => l.vin || ((D.quota.find(q => q.ref === l.ref) || {}).vin) || 'Quota ' + l.ref;   // a quota slot with the car's frame number = the same car (11/11)
+      const units = [...new Set(ls.map(uid))]; if (units.length < 2) continue;
       const l0 = ls[0], who = l0.sales || l0.owner || null, br = (who && salesBranch(who)) || l0.bk_br || l0.car_br;
       add('lockdup:' + t, { br, roles: ['manager'] }, 'warn', `ล็อกชื่อซ้ำ ${units.length} คัน: "${l0.sheet_text || l0.prospect}"`,
         `${ls.map(l => `${l.car_br} ${l.vin || 'Quota ' + l.ref} (${l.status === 'pending' ? 'รออนุมัติ' : 'ล็อกแล้ว'})`).join(' · ')}${who ? ' · เซลล์ ' + who : ''} · เลือกเก็บคันเดียว`, { act: 'go', view: 'lock', sub: 'active', label: 'ดู' });

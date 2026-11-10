@@ -55,6 +55,28 @@ Deno.serve(async (req) => {
       const tw = await token(JSON.parse(SA), true);
       const base = `https://sheets.googleapis.com/v4/spreadsheets/${CELL_SHEET}`;
       const col = (i: number) => { let s = "", n = i + 1; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; };
+      // the quota tabs ("11.2026 PSC"): the "Vin Number" cell holds the frame number and the typed name ("VIN name"); the frame number stays
+      if (body.target === "quota") {
+        const meta = await fetch(`${base}?fields=sheets.properties.title`, { headers: { Authorization: `Bearer ${tw}` } });
+        const titles: string[] = ((await meta.json()).sheets || []).map((x: any) => x.properties.title).filter((t: string) => /^\d{1,2}\.\d{4}\s+(PSC|ATE|SPH|KPA)$/.test(t.trim()));
+        for (const tab of titles) {
+          const r = await fetch(`${base}/values/${encodeURIComponent(`'${tab}'!A1:Z600`)}`, { headers: { Authorization: `Bearer ${tw}` } });
+          if (!r.ok) continue;
+          const rows: string[][] = (await r.json()).values || [];
+          const h = rows.findIndex((x) => x.some((v) => /vin\s*number/i.test(String(v)))); if (h < 0) continue;
+          const vi = rows[h].findIndex((v) => /vin\s*number/i.test(String(v)));
+          const ri = rows.findIndex((x, i) => i > h && String(x[vi] || "").toUpperCase().includes(vin)); if (ri < 0) continue;
+          const cur = String(rows[ri][vi] ?? "").trim(), curText = cur.toUpperCase().replace(vin, "").replace(/^[\s/\-]+|[\s/\-]+$/g, "");
+          const nrm = (x: unknown) => String(x ?? "").replace(/\s+/g, "");
+          const curT = cur.replace(new RegExp(vin, "i"), "").replace(/^[\s/\-]+|[\s/\-]+$/g, "");
+          if (!body.force && body.expect !== undefined && nrm(curT) !== nrm(body.expect) && nrm(curT) !== nrm(value)) return out({ code: "conflict", current: curT, tab });
+          const range = `'${tab}'!${col(vi)}${ri + 1}`, nv = value ? `${vin} ${value}` : vin;
+          const w = await fetch(`${base}/values/${encodeURIComponent(range)}?valueInputOption=RAW`, { method: "PUT", headers: { Authorization: `Bearer ${tw}`, "Content-Type": "application/json" }, body: JSON.stringify({ range, majorDimension: "ROWS", values: [[nv]] }) });
+          if (!w.ok) return out({ code: "tool_error", status: w.status }, 502);
+          return out({ ok: true, range, tab, prev: cur, value: nv, unused: curText ? null : null });
+        }
+        return out({ code: "not_found" });
+      }
       for (const tab of tabs) {
         const r = await fetch(`${base}/values/${encodeURIComponent(`'${tab}'!A1:AD800`)}`, { headers: { Authorization: `Bearer ${tw}` } });
         if (!r.ok) continue;

@@ -79,6 +79,11 @@ async function ltSheet(id, value, expect, force) {
   cur.sheet_sync = res && res.ok ? { at: new Date().toISOString(), value, range: res.range || null, preview: !!res.preview }
     : { at: new Date().toISOString(), value, conflict: res && res.code === 'conflict', current: res && res.current, error: res && res.code !== 'conflict' ? (res && res.code) || 'error' : null };
   if (value === '' && res && res.ok) cur.sheet_cleared = new Date().toISOString();
+  // the same car's quota slot ("Vin Number" holds the frame number and the name) gets the same text (11/11)
+  if (live && l.vin && res && res.ok && derive().quota.some(q => q.vin === l.vin)) {
+    try { const mcp = await gsUse(); const r2 = await mcp.callTool('Google Sheets', 'stock_cell', { target: 'quota', vin: l.vin, value, expect: expect ?? '', force: !!force }, { cache: false }); const p2 = idsGsPayload(r2); cur.sheet_quota = p2 && p2.ok ? { at: new Date().toISOString(), range: p2.range } : { at: new Date().toISOString(), error: (p2 && p2.code) || 'error', current: p2 && p2.current }; }
+    catch (e) { cur.sheet_quota = { at: new Date().toISOString(), error: (e && e.code) || 'error' }; }
+  }
   await write('locks', id, cur);
   if (res && res.code === 'conflict') toast(`ยังไม่ได้เขียนลงชีต: ช่องเลขที่ใบจองในชีตตอนนี้เป็น "${res.current || ''}" ไม่ตรงกับที่เว็บรู้ · ล็อกในเว็บบันทึกแล้ว`, 'bad');
   else if (!(res && res.ok)) toast(res && res.code === 'not_found' ? 'ไม่พบเลขตัวถังนี้ในชีต Stock IDS (ล็อกในเว็บบันทึกแล้ว)' : 'เขียนชีตไม่สำเร็จ ล็อกในเว็บบันทึกแล้ว ลองใหม่ภายหลัง', 'bad');
