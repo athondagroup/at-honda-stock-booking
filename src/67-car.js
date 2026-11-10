@@ -80,7 +80,7 @@ function carModal(m, D) {
       <div class="mt-1 flex flex-wrap gap-2">${c.status === 'temp' ? chip('ล็อกชั่วคราว (แซงได้)', 'warn') : carStChip(c)}${c.kind ? ' ' + chip(FREE_KINDS[c.kind], c.kind === 'adv' ? 'ink' : 'warn') : ''} ${c.fromInv ? '' : tempChip(c)} ${chip(`${c.br} ${BR[c.br]?.name || ''}`, 'neutral')}</div>${c.fromInv ? '<p class="text-xs text-muted mt-1">รถคันนี้ไม่อยู่ในไฟล์ Stock IDS แล้ว (ออกใบกำกับแล้ว) แสดงข้อมูลจากไฟล์ DL</p>' : ''}</div>
     </div>
   ${carWhyBox(c, D, inv, bk, hideCust)}
-  ${c.status === 'unknown' && typeof carHistRows === 'function' && typeof carFixBox === 'function' ? (r => r ? carFixBox(r) : '')(carHistRows(D).find(x => x.vin === c.vin)) : ''}${spBox(c, D)}${rptBox(c)}${carCampBox(c, bk)}
+  ${D.cars.has(c.vin) && !isSales() && perms().write ? `<div class="flex flex-wrap gap-2 mb-3" data-car-acts>${stockActions(D.cars.get(c.vin), perms(), D)}</div>` : ''}  ${c.status === 'unknown' && typeof carHistRows === 'function' && typeof carFixBox === 'function' ? (r => r ? carFixBox(r) : '')(carHistRows(D).find(x => x.vin === c.vin)) : ''}${spBox(c, D)}${rptBox(c)}${carCampBox(c, bk)}
   <div class="grid md:grid-cols-2 gap-5">
     <div><table class="tbl text-sm"><tbody>
       ${row('รุ่น เกรด สี', specLabel(c.spec))}

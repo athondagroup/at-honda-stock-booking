@@ -127,6 +127,13 @@ tr.low td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 .modal.wide { max-width: 1120px; }
 .tbl td, .tbl th { padding: 7px 9px; }
 .tbl tbody tr:hover td { background: var(--surface-2); }
+.tbl-xl { font-size: 13px; border-collapse: collapse; }
+.tbl-xl td, .tbl-xl th { padding: 4px 7px; border: 1px solid var(--line); vertical-align: top; line-height: 1.35; }
+.tbl-xl th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+.tbl-xl .btn-sm { padding: 2px 8px; min-height: 26px; font-size: 12px; }
+.tbl-xl .xl-pin { position: sticky; left: 0; z-index: 1; background: var(--surface); }
+.tbl-xl th.xl-pin { background: var(--surface-2); z-index: 2; }
+@media (max-width: 767px) { .tbl-xl .xl-desk { display: none; } }
 .nowrap { white-space: nowrap; }
 .opt-tip { display: inline-block; border-bottom: 1px dotted currentColor; cursor: help; font-weight: 600; white-space: nowrap; }
 .opt-pop { position: fixed; z-index: 9999; max-width: min(420px, calc(100vw - 16px)); padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.45; background: var(--ink, #222); color: var(--bg, #fff); box-shadow: 0 6px 24px rgba(0,0,0,.25); pointer-events: none; }

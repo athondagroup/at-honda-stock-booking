@@ -6,7 +6,8 @@
 // ส่งมอบ allocated or invoiced cars — executive, managers, branch admin
 // นำออก  executive and managers
 // Only function declarations here: the first render runs before this part of the file.
-function stockActions(c, p, D) {
+// part: 'lock' = the lock button only, 'rest' = the others (the stock table on a phone keeps only the lock, 10/11)
+function stockActions(c, p, D, part) {
   if (isSales() || !p.write) return '';
   const r = S.role.role, mgrLike = r === 'exec' || !!MGR_OF[r];
   const brOk = canApproveBr(c.br) || (r === 'admin' && myBranch() === c.br);
@@ -15,7 +16,8 @@ function stockActions(c, p, D) {
   const lockB = nLocks ? `<button class="btn ${pendMine ? 'btn-red' : 'btn-ghost'} btn-sm" data-act="carlock-open" data-vin="${esc(c.vin)}">ล็อก${nLocks > 1 ? ` (${nLocks})` : ''} ▾</button>`
     : btn('lock-open', 'ล็อก', p.request && carLockable(c), carLockable(c) ? '' : 'สถานะนี้ล็อกไม่ได้');
   const deliv = delivBtn(c, D) || btn('cdeliv-open', 'ส่งมอบ', false, 'ต้องจัดสรรหรือออกใบกำกับก่อน');
-  return `${lockB}${btn('st-assign', c.assignedTo ? 'จัดสรร ▾' : 'จัดสรร', (brOk || mgrLike) && c.status !== 'company', brOk || mgrLike ? (brOk ? '' : 'รถสาขาอื่น: จัดสรรได้เฉพาะใบจองของสาขาที่ตัวเองดูแล') : 'ไม่ใช่สาขาที่ดูแล')}${deliv}${mgrLike ? btn('remove-open', '− นำออก', p.remove && !c.lock && brOk, c.lock ? 'ยกเลิกล็อกก่อน' : '') : r === 'admin' ? btn('remove-open', 'ย้าย / ขาย', !c.lock, c.lock ? 'ยกเลิกล็อกก่อน' : '') : ''}`;
+  if (part === 'lock') return lockB;
+  return `${part === 'rest' ? '' : lockB}${btn('st-assign', c.assignedTo ? 'จัดสรร ▾' : 'จัดสรร', (brOk || mgrLike) && c.status !== 'company', brOk || mgrLike ? (brOk ? '' : 'รถสาขาอื่น: จัดสรรได้เฉพาะใบจองของสาขาที่ตัวเองดูแล') : 'ไม่ใช่สาขาที่ดูแล')}${deliv}${mgrLike ? btn('remove-open', '− นำออก', p.remove && !c.lock && brOk, c.lock ? 'ยกเลิกล็อกก่อน' : '') : r === 'admin' ? btn('remove-open', 'ย้าย / ขาย', !c.lock, c.lock ? 'ยกเลิกล็อกก่อน' : '') : ''}`;
 }
 // can this person give a car to this booking?
 function stAssignWhy(a) {
