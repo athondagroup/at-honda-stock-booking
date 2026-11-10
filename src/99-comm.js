@@ -213,7 +213,7 @@ function termsRecord(x, v, paint) {
     camp_month: camp && camp.month ? camp.month : null, at_step: x.cash ? null : (o.at_step || null), margin_car: num(o.margin_car), margin_at: num(o.margin_at), margin_honda: num(o.margin_honda), margin: o.margin, paint: num(paint),
     priv_gtg: pv.bl.gtg ? null : (o.priv_gtg || null), priv_ln: pv.bl.ln ? null : (o.priv_ln || null), priv_td: o.priv_td && pv.pr.td ? o.priv_td : null, priv_hk: n('priv_hk'), margin_priv: num(o.margin_priv), privileges: privText({ ...o, priv_td: pv.pr.td ? o.priv_td : '' }) || null,
     extra_pay: o.extra_pay.filter(y => y && (String(y.l || '').trim() || num(y.v))).map(y => ({ l: String(y.l || '').trim(), v: num(y.v) })), margin_extra: o.margin_extra,
-    ins1_by: o.ins1_by || null, ins1_kind: o.ins1_kind || null, ins2_by: o.ins2_by || null, ins3_by: o.ins3_by || null, ins2_kind: o.ins2_kind || null, ins3_kind: o.ins3_kind || null, reg_by: o.reg_by || null, reg_type: o.reg_by ? (o.reg_type || 'บุคคลธรรมดา') : null };
+    ins1_by: o.ins1_by || null, ins1_kind: o.ins1_kind || null, ins2_by: o.ins2_by || null, ins3_by: o.ins3_by || null, ins2_kind: o.ins2_kind || null, ins3_kind: o.ins3_kind || null, reg_by: o.reg_by || null, reg_type: o.reg_type || (o.reg_by ? 'บุคคลธรรมดา' : null) };
 }
 function termsCheck(x, v) {
   if (termEmpty(v.price) || !num(v.price)) return { err: 'ใส่ราคารถ', id: 'price' };
