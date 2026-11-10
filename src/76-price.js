@@ -151,9 +151,7 @@ function dashAcct(D) {
   const hi = r => r.pct !== null && avgPct && r.pct > avgPct * 1.5;
   const gTable = (list, label) => `<div class="scroll-x max-h-96 overflow-auto"><table class="tbl text-sm"><thead><tr><th>${label}</th><th class="text-right">ใบกำกับ</th><th class="text-right">ราคารถรวม</th><th class="text-right">เงินรางวัลแคมเปญ</th><th class="text-right">ส่วนลดเฉลี่ย/คัน</th><th class="text-right">% ส่วนลด</th><th class="text-right">ลดสูงสุด</th><th class="text-right">FOC เฉลี่ย/คัน</th></tr></thead><tbody>
     ${list.map(x => `<tr><td class="nowrap">${label === 'เซลล์' ? salesName(x.k) : esc(x.k)}</td><td class="num text-right">${fmtN(x.n)}</td><td class="num text-right">${x.np ? money(x.price) : '–'}</td><td class="num text-right">${x.rew ? money(x.rew) : '–'}</td><td class="num text-right font-semibold">${x.avg === null ? '–' : money(Math.round(x.avg))}</td><td class="num text-right" ${x.pct !== null && avgPct && x.pct > avgPct * 1.5 ? 'style="color:var(--bad)"' : ''}>${pct1(x.pct)}</td><td class="num text-right">${x.np ? money(x.max) : '–'}</td><td class="num text-right">${money(Math.round(x.focAvg))}</td></tr>`).join('') || '<tr><td colspan="8" class="text-muted">ไม่มีข้อมูลในช่วงนี้</td></tr>'}</tbody></table></div>`;
-  const F = S.filters.acf || {}, fk = { date: r => fmtD(r.date), br: r => r.br, vin: r => r.vin, sales: r => salesName(r.sales || ''), cust: r => r.cust, spec: r => `${r.model} ${gradeShort(r.model, r.grade) || r.grade || ''} ${r.color}` };
-  const list = rows.filter(r => Object.entries(F).every(([k, q]) => !q || !fk[k] || searchKey(String(fk[k](r) || '')).includes(searchKey(q)))).sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
-  const fIn = k => `<input id="acf-${k}" data-acf="${k}" value="${esc(F[k] || '')}" placeholder="กรอง" class="w-full mt-1 text-xs font-normal p-1 rounded border border-line" style="background:var(--surface);min-width:4rem" autocomplete="off">`;
+  const list = acxApply(rows), fIn = k => acxHead(k, rows);
   const grey = (v, off) => off ? v : `<span class="text-muted" style="opacity:.6" title="ยังไม่ official: ตัวเลขที่เซลล์ลงตอนจอง (แอดมินยังไม่คีย์)">${v}</span>`;
   const basisSeg = `<div class="seg mb-3" role="group" aria-label="ดูจาก">${[['inv', 'ใบกำกับภาษี'], ['dv', 'ส่งมอบ']].map(([k, t]) => `<button data-act="sale-basis" data-k="${k}" aria-pressed="${saleBasis() === k}">${t}</button>`).join('')}</div>`;
   const oddBox = odd.length ? `<p class="mb-4 p-3 rounded-lg text-sm" style="background:var(--surface-2)"><b style="color:var(--bad)">ส่วนลดเกิน ${acctOddPct()}% ของราคารถ ${fmtN(odd.length)} ใบ</b> น่าจะพิมพ์ตัวเลขผิด (เช่น เกิน 0 ไป 1 ตัว) ระบบไม่นับใบเหล่านี้ในยอดรวมและค่าเฉลี่ย แก้ส่วนลดได้ที่ใบจอง (ปุ่ม "แก้ไขใบจอง") · ${odd.slice(0, 6).map(r => `${esc(r.cust && !isSales() ? r.cust : r.sales || '')} ลด ${money(r.disc)}`).join(' · ')}${odd.length > 6 ? ' …' : ''}</p>` : '';
@@ -173,9 +171,9 @@ function dashAcct(D) {
     ${dCard('แยกเซลล์', gTable(acctGroup(rows, r => r.sales), 'เซลล์'), `ตัวแดง = % ส่วนลดสูงกว่าค่าเฉลี่ยเกิน 1.5 เท่า · ไม่นับใบที่ส่วนลดเกิน ${acctOddPct()}%`)}
     ${dCard('แยกรุ่น เกรด', gTable(acctGroup(rows, r => `${r.model || ''} ${gradeShort(r.model, r.grade) || r.grade || ''}`.trim()), 'รุ่น เกรด'))}
   </div>
-  ${dCard(`รายคัน <span class="text-muted text-sm font-normal">เรียงจาก % ส่วนลดมากไปน้อย · กดแถวเพื่อเปิดใบจอง กดเลขตัวถังเพื่อดูรถ</span>`, `<div class="scroll-x max-h-96 overflow-auto"><table class="tbl text-sm"><thead><tr><th>${saleBasis() === 'dv' ? 'ส่งมอบ' : 'ออกใบกำกับ'}${fIn('date')}</th><th>สาขา${fIn('br')}</th><th>เลขตัวถัง${fIn('vin')}</th><th>เซลล์${fIn('sales')}</th>${isSales() ? '' : `<th>ลูกค้า${fIn('cust')}</th>`}<th>รุ่น เกรด สี${fIn('spec')}</th><th class="text-right">ราคาเต็ม</th><th class="text-right">เงินรางวัลแคมเปญ</th><th class="text-right">ส่วนลด</th><th class="text-right">%</th><th class="text-right">ราคาหลังลด</th><th class="text-right">FOC</th></tr></thead><tbody>
+  ${dCard(`รายคัน <span class="text-muted text-sm font-normal">กด ▾ ที่หัวคอลัมน์เพื่อเรียงหรือกรองแบบ Excel · ค่าเริ่มต้นเรียง % ส่วนลดมากไปน้อย · กดแถวเพื่อเปิดใบจอง กดเลขตัวถังเพื่อดูรถ</span>`, `<div class="scroll-x max-h-96 overflow-auto"><table class="tbl text-sm"><thead><tr><th>${saleBasis() === 'dv' ? 'ส่งมอบ' : 'ออกใบกำกับ'}${fIn('date')}</th><th>สาขา${fIn('br')}</th><th>เลขตัวถัง${fIn('vin')}</th><th>เซลล์${fIn('sales')}</th>${isSales() ? '' : `<th>ลูกค้า${fIn('cust')}</th>`}<th>รุ่น เกรด สี${fIn('spec')}</th><th class="text-right">ราคาเต็ม${fIn('price')}</th><th class="text-right">เงินรางวัลแคมเปญ${fIn('reward')}</th><th class="text-right">ส่วนลด${fIn('disc')}</th><th class="text-right">%${fIn('pct')}</th><th class="text-right">ราคาหลังลด${fIn('net')}</th><th class="text-right">FOC${fIn('foc')}</th></tr></thead><tbody>
     ${list.slice(0, 1500).map(r => `<tr ${r.a ? `class="cursor-pointer" data-act="at-open" data-id="${esc(r.a.id)}"` : ''}><td class="num nowrap">${fmtD(r.date)}</td><td>${esc(r.br || '')}</td><td class="nowrap">${r.vin ? vinLink({ vin: r.vin }) : ''}</td><td class="nowrap">${salesName(r.sales || '')}${r.a ? '' : ' <span class="text-xs text-muted">ไม่พบใบจอง</span>'}</td>${isSales() ? '' : `<td class="truncate" style="max-width:160px">${esc(r.cust || '')}</td>`}<td class="nowrap">${esc(r.model || '')} ${esc(gradeShort(r.model, r.grade) || r.grade || '')} ${esc(r.color || '')}</td>
-      <td class="num text-right" title="${esc(r.src || '')}">${r.price === null ? '<span class="text-muted">ไม่มีราคา</span>' : money(r.price)}</td><td class="num text-right">${r.reward === null ? '–' : money(r.reward)}</td><td class="num text-right nowrap">${r.disc === null ? '–' : grey(money(r.disc), r.discOff)}${r.odd ? ' ' + chip('ตรวจ', 'bad') : ''}</td><td class="num text-right font-semibold" ${hi(r) ? 'style="color:var(--bad)"' : ''}>${pct1(r.pct)}</td><td class="num text-right">${r.net === null ? '–' : money(r.net)}</td><td class="num text-right">${r.foc === null ? '–' : grey(money(r.foc), r.focOff)}</td></tr>`).join('') || `<tr><td colspan="12" class="text-muted">${Object.values(F).some(Boolean) ? 'ไม่มีรายการตามตัวกรอง' : 'ไม่มีรายการในช่วงนี้'}</td></tr>`}</tbody></table></div>`,
+      <td class="num text-right" title="${esc(r.src || '')}">${r.price === null ? '<span class="text-muted">ไม่มีราคา</span>' : money(r.price)}</td><td class="num text-right">${r.reward === null ? '–' : money(r.reward)}</td><td class="num text-right nowrap">${r.disc === null ? '–' : grey(money(r.disc), r.discOff)}${r.odd ? ' ' + chip('ตรวจ', 'bad') : ''}</td><td class="num text-right font-semibold" ${hi(r) ? 'style="color:var(--bad)"' : ''}>${pct1(r.pct)}</td><td class="num text-right">${r.net === null ? '–' : money(r.net)}</td><td class="num text-right">${r.foc === null ? '–' : grey(money(r.foc), r.focOff)}</td></tr>`).join('') || `<tr><td colspan="12" class="text-muted">${acxOn() ? 'ไม่มีรายการตามตัวกรอง' : 'ไม่มีรายการในช่วงนี้'}</td></tr>`}</tbody></table></div>`,
     `ราคาเต็ม: ใบจองใหม่เก็บราคาตอนจองไว้ (คันที่ไม่พบใบจองใช้ใบราคาปัจจุบัน) · เงินรางวัลแคมเปญ: ตามไฟล์เงิน Honda ถ้ามี ไม่งั้นตามแคมเปญที่เลือกไว้ · ราคารถ · ใบจองเดิมใช้ใบราคาตามปีรุ่นของรถที่จัดสรร (ยังไม่จัดสรรใช้ปีล่าสุด)${iss && iss.no ? ` · ใบราคาที่ใช้ Issued No. ${esc(iss.no)}${iss.date ? ' (' + esc(iss.date) + ')' : ''}` : ''} · ส่วนลด: ยอดส่วนลดรวมที่แอดมินคีย์ในเงื่อนไขการขาย · FOC: ตามใบสั่งแต่งรถ · ตัวเลขสีเทาจาง = ยังไม่ official (ที่เซลล์ลงตอนจอง) · ขั้นต่อไป: ใส่ต้นทุนของแถม (FOC) แต่ละรายการ`)}`;
 }
 
@@ -240,5 +238,54 @@ document.addEventListener('change', ev => {
   const cs = catEditColors(S.modal); S.modal.pr = Object.fromEntries(cs.map(c => [c, (S.modal.pr || {})[c] || { cur: '', old: '' }])); render();
 });
 
-// the per-car table's header filters (10/11)
-document.addEventListener('input', ev => { const t = ev.target; if (!t || !t.dataset || !t.dataset.acf) return; S.filters.acf = { ...(S.filters.acf || {}), [t.dataset.acf]: t.value }; render(); });
+// the per-car table: Excel-like column menus (10/11): sort A→Z / Z→A, search, tick the values to show
+const ACX_COL = {
+  date: [r => fmtD(r.date), r => r.date || ''], br: [r => r.br || '', r => r.br || ''], vin: [r => r.vin || '', r => r.vin || ''],
+  sales: [r => salesName(r.sales || '') || '', r => r.sales || ''], cust: [r => r.cust || '', r => r.cust || ''],
+  spec: [r => `${r.model || ''} ${gradeShort(r.model, r.grade) || r.grade || ''} ${r.color || ''}`.trim(), r => `${r.model || ''} ${r.grade || ''} ${r.color || ''}`],
+  price: [r => r.price === null ? '(ไม่มี)' : money(r.price), r => r.price ?? -1], reward: [r => r.reward === null ? '(ไม่มี)' : money(r.reward), r => r.reward ?? -1],
+  disc: [r => r.disc === null ? '(ไม่มี)' : money(r.disc), r => r.disc ?? -1], pct: [r => pct1(r.pct), r => r.pct ?? -1],
+  net: [r => r.net === null ? '(ไม่มี)' : money(r.net), r => r.net ?? -1], foc: [r => r.foc === null ? '(ไม่มี)' : money(r.foc), r => r.foc ?? -1]
+};
+function acxSt() { return S.filters.acx = S.filters.acx || { open: null, q: '', sort: null, sel: {} }; }
+function acxOn() { const x = acxSt(); return Object.values(x.sel).some(v => v); }
+function acxApply(rows) {
+  const x = acxSt();
+  let out = rows.filter(r => Object.entries(x.sel).every(([k, v]) => !v || !ACX_COL[k] || v.includes(String(ACX_COL[k][0](r)))));
+  if (x.sort && ACX_COL[x.sort.k]) { const f = ACX_COL[x.sort.k][1], d = x.sort.dir === 'desc' ? -1 : 1; out = out.slice().sort((a, b) => { const p = f(a), q = f(b); return (typeof p === 'number' && typeof q === 'number' ? p - q : String(p).localeCompare(String(q), 'th')) * d; }); }
+  else out = out.slice().sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
+  return out;
+}
+function acxHead(k, rows) {
+  const x = acxSt(), on = !!x.sel[k], so = x.sort && x.sort.k === k ? (x.sort.dir === 'desc' ? '↓' : '↑') : '';
+  const btn = `<button id="acx-b-${k}" class="acx-btn ${on || so ? 'on' : ''}" data-act="acx-open" data-k="${k}" title="เรียง / กรอง">${so}${on ? '⧩' : '▾'}</button>`;
+  if (x.open !== k) return btn;
+  const vals = [...new Set(rows.map(r => String(ACX_COL[k][0](r))))].sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
+  const q = searchKey(x.q || ''), shown = vals.filter(v => !q || searchKey(v).includes(q)).slice(0, 400), dr = x.draft || new Set(vals);
+  return `${btn}<div class="acx-pop">
+    <button class="acx-it" data-act="acx-sort" data-k="${k}" data-v="asc">↑ เรียงน้อย → มาก (A→Z)</button>
+    <button class="acx-it" data-act="acx-sort" data-k="${k}" data-v="desc">↓ เรียงมาก → น้อย (Z→A)</button>
+    ${on ? `<button class="acx-it" data-act="acx-clear" data-k="${k}">✕ ล้างตัวกรองคอลัมน์นี้</button>` : ''}
+    <input id="acx-q" data-acxq="1" value="${esc(x.q || '')}" placeholder="ค้นหา" class="w-full my-1 p-1 text-xs rounded border border-line" style="background:var(--surface)" autocomplete="off">
+    <label class="acx-row"><input type="checkbox" data-acxall="1" ${shown.every(v => dr.has(v)) ? 'checked' : ''}> <b>(เลือกทั้งหมด${q ? 'ที่ค้นเจอ' : ''})</b></label>
+    <div class="acx-list">${shown.map(v => `<label class="acx-row"><input type="checkbox" data-acxv="${esc(v)}" ${dr.has(v) ? 'checked' : ''}> ${esc(v || '(ว่าง)')}</label>`).join('')}</div>
+    <div class="flex justify-end gap-2 mt-2"><button class="btn btn-ghost btn-sm" data-act="acx-close">ยกเลิก</button><button class="btn btn-dark btn-sm" data-act="acx-ok" data-k="${k}">ตกลง</button></div></div>`;
+}
+function acxVals(k) { const E = execData(derive()); return [...new Set(acctRows(derive(), E).map(r => String(ACX_COL[k][0](r))))]; }
+Object.assign(ACTIONS, {
+  'acx-open'(el) { const x = acxSt(), k = el.dataset.k; if (x.open === k) { x.open = null; render(); return; } x.open = k; x.q = ''; x.draft = new Set(x.sel[k] || acxVals(k)); render(); },
+  'acx-close'() { acxSt().open = null; render(); },
+  'acx-sort'(el) { const x = acxSt(); x.sort = { k: el.dataset.k, dir: el.dataset.v }; x.open = null; render(); },
+  'acx-clear'(el) { const x = acxSt(); delete x.sel[el.dataset.k]; x.open = null; render(); },
+  'acx-ok'(el) { const x = acxSt(), k = el.dataset.k, all = acxVals(k); x.sel[k] = x.draft && x.draft.size < all.length ? [...x.draft] : null; if (!x.sel[k]) delete x.sel[k]; x.open = null; render(); }
+});
+document.addEventListener('input', ev => { const t = ev.target; if (!t || !t.dataset || !t.dataset.acxq) return; acxSt().q = t.value; render(); });
+document.addEventListener('change', ev => {
+  const t = ev.target; if (!t || !t.dataset) return; const x = S.filters && S.filters.acx; if (!x || !x.open) return;
+  if (t.dataset.acxv !== undefined) { x.draft = x.draft || new Set(); t.checked ? x.draft.add(t.dataset.acxv) : x.draft.delete(t.dataset.acxv); render(); }
+  if (t.dataset.acxall) { const q = searchKey(x.q || ''), vs = acxVals(x.open).filter(v => !q || searchKey(v).includes(q)); x.draft = x.draft || new Set(); vs.forEach(v => t.checked ? x.draft.add(v) : x.draft.delete(v)); render(); }
+});
+// the menu floats over the page (the table scrolls inside its box)
+function acxPlace() { const p = document.querySelector('.acx-pop'), b = p && p.previousElementSibling; if (!p || !b) return; const r = b.getBoundingClientRect(), w = Math.min(280, window.innerWidth - 16); p.style.position = 'fixed'; p.style.width = w + 'px'; p.style.top = (r.bottom + 4) + 'px'; p.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px'; }
+new MutationObserver(() => acxPlace()).observe(document.documentElement, { childList: true, subtree: true });
+window.addEventListener('scroll', acxPlace, true);
