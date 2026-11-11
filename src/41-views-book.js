@@ -149,13 +149,13 @@ function bookRow(r, D, p) {
   if (!a && b && p.write && idsFixCan(b)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="idsfix-open" data-id="${esc(b.no)}">แก้ไข</button>`);
   if (p.write && p.request && !ltCan() && row.state === 'waiting' && (!isSales() || isMine(r.owner)) && (a ? a.active : true)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="lock-open" data-bk="${esc(row.key || r.key)}">ขอล็อกรถ</button>`);
   // the booking's own locks are handled on this row: approve, allocate, extend, release, swap, undo (ตกลง 13/10)
-  if (p.write) D.locks.filter(l => (l.bkref === r.key || (row.key && l.bkref === row.key) || (a && l.bkref === a.key)) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased).forEach(l => acts.push(...rowLockActs(l, D)));
+  if (p.write) D.locks.filter((l, i, all) => all.findIndex(x => x.id === l.id) === i).filter(l => (l.bkref === r.key || (row.key && l.bkref === row.key) || (a && l.bkref === a.key)) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased).forEach(l => acts.push(...rowLockActs(l, D)));
 
   const idsCell = a ? `${matchChip(a)}${a.matchAsk ? `<div>${chip('รอยืนยันการจับคู่', 'warn')}</div>` : ''}${b && b.ids ? `<div class="text-xs text-muted">${esc(b.ids)}</div>` : ''}`
     : `${r.noForm ? chip('ยังไม่มีฟอร์ม AT', 'bad') : b.webCancel ? '' : b.match === 'cancel' ? chip('รอยกเลิกใน IDS', 'muted') : chip('ใน IDS', 'neutral')}<div class="text-xs text-muted">${esc(b.ids || '')}</div>${idsFixChip(b)}`;
   const stateCell = a && a.cancelled ? (a.rec.cancel && a.rec.cancel.refund === 'refund' ? chip(a.rec.refund && a.rec.refund.at ? 'ยกเลิก · ทำใบคืนเงินแล้ว' : 'ยกเลิก · รอทำใบคืนเงิน', a.rec.refund && a.rec.refund.at ? 'muted' : 'warn') : chip('ยกเลิก', 'muted'))
     : `${a && a.change ? `<div>${chip(a.change.type === 'cancel' ? 'รออนุมัติยกเลิก' : a.change.type === 'merge' ? 'รออนุมัติรวมใบ (ลงซ้ำ)' : 'รออนุมัติแก้ไข', 'warn')}</div>` : ''}${a && gformDue(a) && gformCfg() && (a.rec.created_at || '') >= (gformCfg().at || '') ? `<div>${chip('ยังไม่ส่ง Google Form', 'warn')}</div>` : ''}${a && a.flow.history ? chip('ส่งมอบแล้ว (ประวัติ)', 'muted') : statusChip(BOOK_STATE, row.state || 'waiting')}${row.state === 'waiting' && row.pos ? ` <span class="text-xs text-muted">คิวที่ ${row.pos}</span>` : ''}
-      ${a && a.flow.next ? `<div class="text-xs text-muted">ถัดไป: ${FLOW_LABEL[a.flow.next]}</div>` : ''}`;
+      ${a && a.flow.next ? `<div class="text-xs text-muted">ถัดไป: ${a.flow.next === 'booked' ? 'ใบเสร็จมัดจำ' : FLOW_LABEL[a.flow.next]}</div>` : ''}`;
   return `<tr class="${r.noForm ? 'low' : ''}${a ? ' bk-row' : ''}" ${a ? `data-act="at-open" data-id="${esc(a.id)}" title="กดเพื่อเปิดใบจอง"` : ''}>
     <td class="nowrap"><span class="num">${fmtD(r.date)}</span>${r.no ? `<div class="code text-xs text-muted">${esc(r.no)}</div>` : ''}</td>
     <td style="min-width:110px;max-width:170px">${custCell(r.cust, r.owner, { seed: r.seed })}${a && a.rec.doc_url ? `<div class="text-xs"><a class="underline" data-act="noop" href="${esc(a.rec.doc_url)}" target="_blank" rel="noopener">ใบจองใน Drive</a></div>` : ''}</td>
@@ -164,7 +164,7 @@ function bookRow(r, D, p) {
     <td class="nowrap" data-act="noop">${bkLockCell(r, D)}</td>
     <td style="min-width:90px;max-width:150px">${idsCell}</td>
     <td style="min-width:90px;max-width:160px">${stateCell}</td>
-    <td class="text-right" ${acts.length ? 'data-act="noop"' : ''}><div class="flex flex-wrap gap-1 justify-end bk-acts">${acts.join('')}</div></td></tr>`;
+    <td class="text-right" ${acts.length ? 'data-act="noop"' : ''}><div class="flex gap-1 justify-end bk-acts">${acts.join('')}</div></td></tr>`;
 }
 function bookingFilters(qKey, withState) {
   const f = S.filters;
