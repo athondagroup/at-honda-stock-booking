@@ -185,8 +185,8 @@ function execData(D, rng) {
   const trades = [];
   D.at.forEach(a => {
     if (a.cancelled || a.demo || !inBrX(a)) return;
-    const f = a.rec.flow || {}, t = f.down && f.down.tradein; if (!t || !t.has) return;
-    const date = (f.delivered && f.delivered.date) || (a.match && a.match.ddate) || f.down.date;
+    const t = tradeOf(a); if (!t) return;
+    const date = tradeDate(a, D);
     if (inR(date)) trades.push({ date, br: a.delivBr || a.br, ...t, cust: a.cust, sales: a.sales, newModel: a.model, id: a.id });
   });
   const books = D.at.filter(a => !a.demo && inBr(a) && inR(a.date));
