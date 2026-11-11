@@ -7,12 +7,15 @@
 function catPrices() { return (S.ref.get('catalog') || {}).prices || []; }
 function catIssue() { return (S.ref.get('catalog') || {}).price_issue || null; }
 // grades on old bookings are sometimes written differently from the price list ("S+" vs "S")
+function gradeExact(g) { return String(g || '').replace(/\s+/g, '').toUpperCase(); }
 function gradeLoose(g) { return String(g || '').replace(/\s+/g, '').replace(/\+$/, '').toUpperCase(); }
 var PRICE_MEMO = null;
 function priceGroups() {
   const list = catPrices(); if (PRICE_MEMO && PRICE_MEMO.src === list) return PRICE_MEMO.by;
   const by = new Map();
-  list.forEach(p => { const k = p.model + '|' + gradeLoose(p.grade); if (!by.has(k)) by.set(k, []); by.get(k).push(p); });
+  // exact grade first ("e:HEV EL+" and "e:HEV EL" are two grades, 11/11); the loose key ("S+" = "S") only when the exact one is missing
+  const put = (k, p) => { if (!by.has(k)) by.set(k, []); by.get(k).push(p); };
+  list.forEach(p => { put('=' + p.model + '|' + gradeExact(p.grade), p); put(p.model + '|' + gradeLoose(p.grade), p); });
   PRICE_MEMO = { src: list, by }; return by;
 }
 // → {price, base, extra, exact, year, qd, old} or null when the price list has no such model and grade
@@ -21,7 +24,7 @@ function priceGroups() {
 function priceTier(p) { return p.tier === 'old' ? 'old' : 'cur'; }
 function priceOf(model, grade, color, year, old) {
   if (!model || !grade) return null;
-  const all = priceGroups().get(model + '|' + gradeLoose(grade)); if (!all || !all.length) return null;
+  const G = priceGroups(), all = G.get('=' + model + '|' + gradeExact(grade)) || G.get(model + '|' + gradeLoose(grade)); if (!all || !all.length) return null;
   const years = [...new Set(all.map(p => p.year || 0))].sort((a, b) => b - a);
   const y = year && years.includes(Number(year)) ? Number(year) : years[0];
   const inY = all.filter(p => (p.year || 0) === y), oldList = inY.filter(p => priceTier(p) === 'old'), curList = inY.filter(p => priceTier(p) === 'cur');

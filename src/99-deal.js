@@ -123,6 +123,13 @@ Object.assign(ACTIONS, {
     // a margin on the car saved by the old rule (on the price with the add-on / cut) is worked out again on the real car price (10/11)
     if (d.at && !termEmpty(dd.margin_car)) { const xx = termsCtxAt(a, derive()), stp = marginStdFor(xx, dd.campaign_id), oldAuto = Math.round((num(d.price) - num(d.paint)) * stp.pct);
       if (xx.mbase && num(dd.margin_car) === oldAuto && Math.round(xx.mbase * stp.pct) !== oldAuto) dd.margin_car = ''; }
+    // a price taken from the price list under the old grade lookup ("EL+" read as "EL", fixed 11/11): the list price now, and the
+    // car margin worked out again from it
+    if (d.at && /^ใบราคา/.test(String(d.price_src || '')) && web && web.price && num(d.price) !== web.price && num(d.price_add) === 0) {
+      const xx = termsCtxAt(a, derive()), stp = marginStdFor(xx, dd.campaign_id), oldAuto = Math.round((num(d.price) - num(d.paint)) * stp.pct);
+      toast(`ราคาตามใบราคาเป็น ${money(web.price)} บาท (ที่บันทึกไว้ ${money(num(d.price))}) ใส่ราคาใหม่ให้แล้ว ตรวจแล้วกดบันทึก`, 'bad');
+      dd.price = web.price; if (num(dd.margin_car) === oldAuto) dd.margin_car = '';
+    }
     dd.purchase_to = isCash(r) ? 'ซื้อสด' : 'ไฟแนนซ์';
     S.modal.dealMode = el.dataset.mode || 'first'; S.modal.dealWhy = ''; render();
   },
