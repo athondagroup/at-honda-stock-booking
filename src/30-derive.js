@@ -447,7 +447,7 @@ function deriveNow() {
     else if (tl) b.state = 'locked';
     else if (b.match === 'waiting' && b.app && b.app.rec.flow && b.app.rec.flow.assign && b.app.rec.flow.assign.vin) b.state = 'allocated';
     else if (b.gone) b.state = 'gone';
-    else if (b.noIds) b.state = 'noids';
+    // a web form not in the IDS booking file yet queues like the rest, by the booking date on the form (ตกลง 11/11); b.noIds marks it
     else if (b.match === 'car') b.state = 'idscar';
 
     else if (b.match === 'quota') b.state = 'idsquota';

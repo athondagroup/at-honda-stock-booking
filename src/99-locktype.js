@@ -47,7 +47,7 @@ function ltDrop(c, D) {
   const t = S.lt, q = String(t.q || '').trim();
   const p = parseSheetText(q), cands = ltCands(c, q, D);
   const it = (k, body, sub) => `<button class="lt-it" data-act="lt-pick" data-vin="${esc(ltKey(c))}" data-k="${esc(k)}"><span>${body}</span>${sub ? `<span class="lt-sub">${sub}</span>` : ''}</button>`;
-  const rows = cands.map(({ b, rank }) => it(b.app ? b.app.key : b.key, `<b>${esc(b.cust || '–')}</b>${b.no ? ` · ${esc(b.no)}` : ' · <span class="text-muted">ยังไม่มีเลข IDS</span>'} <span class="text-muted">${esc(b.br || '')}</span>${b.state === 'noids' ? ' <span class="lt-sub" style="display:inline;color:var(--warn)">ฟอร์มยังไม่อยู่ใน IDS</span>' : ''}`,
+  const rows = cands.map(({ b, rank }) => it(b.app ? b.app.key : b.key, `<b>${esc(b.cust || '–')}</b>${b.no ? ` · ${esc(b.no)}` : ' · <span class="text-muted">ยังไม่มีเลข IDS</span>'} <span class="text-muted">${esc(b.br || '')}</span>${b.noIds ? ' <span class="lt-sub" style="display:inline;color:var(--warn)">ฟอร์มยังไม่อยู่ใน IDS</span>' : ''}`,
     `เซลล์ ${esc(b.owner || b.sales || '–')} · จอง ${fmtD(b.qdate || b.date)} · ${esc(specLabelText(b.spec))} · ${rank === 0 ? '<span style="color:var(--good)">สเปกตรง</span>' : '<span style="color:var(--warn)">สเปกไม่ตรง</span>'} · ล็อก ${LOCK_DAYS_BY.booking} วัน`)).join('');
   const temp = p.kind === 'named' || p.kind === 'nick'
     ? it('temp', `＋ ล็อกชั่วคราว "${esc(q)}"`, `ยังไม่มีใบจอง · เซลล์ ${p.sales ? esc(p.sales) : `<span style="color:var(--warn)">ยังไม่รู้ว่า "${esc(p.who)}" คือใคร</span>`}${p.cust ? ` · ลูกค้า ${esc(p.cust)}` : ''} · ${LOCK_DAYS_BY.temp} วัน`)
