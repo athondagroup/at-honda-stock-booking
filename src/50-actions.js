@@ -753,11 +753,14 @@ const ACTIONS = {
   'flow-fix'(el) { const a = atById(el.dataset.id); if (!a || !fixOk(a) || !S.modal) return; S.modal.fix = S.modal.fix === a.id ? null : a.id; S.modal.se = null; render(); },
   async 'flow-booked'(el) {
     const a = atById(el.dataset.id); if (!a || !canEditBooking(a) || a.flow.done.booked) return;
-    const no = String(S.modal.receipt_no || '').trim();
+    const no = String(S.modal.receipt_no ?? a.rec.receipt_no ?? '').trim();
     if (!no) { toast('ใส่เลขที่ใบเสร็จมัดจำ', 'bad'); $('#fl-rc')?.focus(); return; }
+    // the deposit amount (11/11): from the booking form when it was keyed there, typed here otherwise; it goes to the collection-day costs
+    const dpIn = S.modal.deposit_in, dep = dpIn === undefined || dpIn === '' ? num(a.rec.deposit) : num(dpIn);
     const dup = derive().at.find(x => x.id !== a.id && !x.cancelled && String(x.rec.receipt_no || '').trim() === no && x.br === a.br);
     if (dup) { toast(`เลขที่ใบเสร็จนี้ใช้กับใบจองของ ${dup.cust} แล้ว`, 'bad'); return; }
-    if (await saveFlow(a, { receipt_no: no, receipt_by: actor() }, 'บันทึกเลขที่ใบเสร็จมัดจำแล้ว')) { delete S.modal.receipt_no; render(); }
+    const depPatch = dep > 0 && dep !== num(a.rec.deposit) ? { deposit: dep, ...(num(a.rec.deposit) ? { receipt_hist: [...(a.rec.receipt_hist || []), { old: { receipt_no: a.rec.receipt_no || null, deposit: a.rec.deposit || null }, why: 'แก้ยอดมัดจำตอนบันทึกใบเสร็จ', ...actor() }] } : {}) } : {};
+    if (await saveFlow(a, { receipt_no: no, receipt_by: actor(), ...depPatch }, 'บันทึกเลขที่ใบเสร็จมัดจำแล้ว' + (dep > 0 ? ` · มัดจำ ${money(dep)} บาท` : ''))) { delete S.modal.receipt_no; delete S.modal.deposit_in; render(); }
   },
   async 'flow-down'(el) {
     const a = atById(el.dataset.id);

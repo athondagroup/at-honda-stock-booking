@@ -138,7 +138,8 @@ function flowPanel(m, a, D) {
   const bookedBody = () => {
     if (fl.done.booked) return `<div class="text-sm text-muted">${fmtD(a.date)} · ใบเสร็จมัดจำ <span class="code">${esc(r.receipt_no)}</span>${r.deposit ? ` · ${money(r.deposit)} บาท` : ''}</div>`;
     return `<div class="text-sm text-muted">${fmtD(a.date)} · ยังไม่มีเลขที่ใบเสร็จมัดจำ ต้องใส่ก่อนไปขั้นถัดไป</div>
-      ${canEditBooking(a) && perms().write ? `<div class="grid sm:grid-cols-[1fr_auto] gap-2 items-end mt-1"><div class="field"><label for="fl-rc">เลขที่ใบเสร็จมัดจำ</label><input id="fl-rc" data-modal="receipt_no" value="${esc(m.receipt_no ?? '')}" autocomplete="off"></div>
+      ${canEditBooking(a) && perms().write ? `<div class="grid sm:grid-cols-[1fr_1fr_auto] gap-2 items-end mt-1"><div class="field"><label for="fl-rc">เลขที่ใบเสร็จมัดจำ</label><input id="fl-rc" data-modal="receipt_no" value="${esc(m.receipt_no ?? r.receipt_no ?? '')}" autocomplete="off"></div>
+      <div class="field"><label for="fl-dp">จำนวนเงินมัดจำ (บาท)</label><input id="fl-dp" type="number" min="0" step="100" inputmode="numeric" data-modal="deposit_in" value="${esc(m.deposit_in ?? (r.deposit || ''))}" placeholder="ไปขึ้นในค่าใช้จ่ายวันรับรถ"></div>
       <button class="btn btn-dark btn-sm" data-act="flow-booked" data-id="${esc(a.id)}">บันทึก</button></div>` : ''}`;
   };
   const finBody = () => {

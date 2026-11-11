@@ -58,7 +58,7 @@ function payCostVals(a, m) {
   // registration / insurance from the fee tables follow the sale terms (person / company, plan): a figure still at the table value it
   // had is replaced when the terms change; one typed by hand stays (10/11)
   const auto = { reg: A.regDef || '', ins: A.insDef || '' }, keep = k => sv[k] != null && !(sv[k + 'Auto'] != null && num(sv[k]) === num(sv[k + 'Auto']) && num(sv[k + 'Auto']) !== num(auto[k]));
-  if (!m.cost || m.cost.id !== a.id) m.cost = { id: a.id, auto, reg: keep('reg') ? sv.reg : auto.reg, plate: sv.plate ?? 5000, ins: keep('ins') ? sv.ins : auto.ins, acc: sv.acc ?? '', vat: sv.vat ?? '', inst: A.adv && num(sv.inst) ? sv.inst : (A.inst || ''), dep: sv.dep ?? (A.deposit || ''), plus: (sv.plus || []).map(y => ({ ...y })), minus: (sv.minus || []).map(y => ({ ...y })) };
+  if (!m.cost || m.cost.id !== a.id) m.cost = { id: a.id, auto, reg: keep('reg') ? sv.reg : auto.reg, plate: sv.plate ?? 5000, ins: keep('ins') ? sv.ins : auto.ins, acc: sv.acc ?? '', vat: sv.vat ?? '', inst: A.adv && num(sv.inst) ? sv.inst : (A.inst || ''), dep: num(sv.dep) ? sv.dep : (A.deposit || ''), plus: (sv.plus || []).map(y => ({ ...y })), minus: (sv.minus || []).map(y => ({ ...y })) };
   const v = m.cost;
   for (const k of ['reg', 'ins']) if (v.auto && num(v.auto[k]) !== num(auto[k]) && num(v[k]) === num(v.auto[k])) v[k] = auto[k];
   v.auto = auto;
