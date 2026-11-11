@@ -39,7 +39,7 @@ function dealRows(d, cash) {
   if (!cash && num(d.ins_credit)) r.push(['ค่าประกันคุ้มครองสินเชื่อ', `${money(d.ins_credit)} · ${d.ins_credit_by === 'down' ? 'หักจากเงินดาวน์' : d.ins_credit_by === 'pay' ? 'ชำระวันรับรถ' : 'ยังไม่ระบุ'}`]);
   if (!cash && d.ins_credit_by === 'down' && num(d.ins_credit)) r.push(['เงินดาวน์สุทธิ', money(num(d.down) - num(d.ins_credit))]);
   if (!cash) r.push(['ส่วนลดดาวน์', money(d.down_disc)], ['ยอดจัด', money(d.fin_amount)], ['ดอกเบี้ย', d.rate !== null && d.rate !== undefined ? d.rate + ' %' : '–'], ['จำนวนงวด', d.term ? d.term + ' งวด' : '–']);
-  const mo = cash ? null : dealMonthly(d); if (mo) r.push(['ค่างวดโดยประมาณ', `${money(mo)} บาท / เดือน`]);
+  const mo = cash ? null : dealMonthly(d); if (mo) r.push(['ค่างวดโดยประมาณ', `${money(mo)} บาท / เดือน${d.adv_inst ? ' · ผ่อนต้นงวด (ชำระงวดแรกวันรับรถ)' : ''}`]);
   if (d.paint) r.push(['ค่าสี', money(d.paint)]);
   if (d.sales_camp && d.sales_camp_id !== d.campaign_id) r.push(['เซลล์เลือกแคมเปญ', d.sales_camp]);
   r.push([d.sales_camp && d.sales_camp_id !== d.campaign_id ? 'แคมเปญ Honda (แอดมินเลือก)' : 'แคมเปญ Honda', d.campaign || '–'], ['Margin รถ', money(d.margin_car)]);
@@ -107,7 +107,7 @@ Object.assign(ACTIONS, {
   'deal-open'(el) {
     const a = atById(el.dataset.id); if (!a) return;
     const d = a.rec.deal || {}, cm = a.rec.comm || {}, r = a.rec, web = dealWeb(a, derive());
-    const keep = ['price', 'price_add', 'price_add_note', 'disc', 'down', 'fin_co', 'ins_credit', 'ins_credit_by', 'extra_pay', 'down_disc', 'rate', 'term', 'campaign_id', 'campaign_text', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'priv_gtg', 'priv_ln', 'priv_td', 'priv_hk', 'margin_priv', 'ins1_by', 'ins1_kind', 'ins2_by', 'ins3_by', 'ins2_kind', 'ins3_kind', 'reg_by', 'reg_type'];
+    const keep = ['price', 'price_add', 'price_add_note', 'disc', 'down', 'fin_co', 'ins_credit', 'ins_credit_by', 'extra_pay', 'down_disc', 'rate', 'term', 'campaign_id', 'campaign_text', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'priv_gtg', 'priv_ln', 'priv_td', 'priv_hk', 'margin_priv', 'ins1_by', 'ins1_kind', 'ins2_by', 'ins3_by', 'ins2_kind', 'ins3_kind', 'reg_by', 'reg_type', 'adv_inst'];
     // a first entry starts from what the booking or the old commission data already has
     S.modal.deal = d.at ? Object.fromEntries(keep.map(k => [k, k === 'extra_pay' ? (d.extra_pay || []).map(y => ({ ...y })) : d[k] ?? ''])) : { price: (web && web.price) || num(cm.price) || num(r.price) || '', disc: num(r.discount) || num(cm.discount) || '', down: num(cm.down) || '', down_disc: num(cm.down_disc) || '', rate: cm.rate ?? '', term: cm.term ?? '', campaign_id: '', at_step: '' };
     // the sales' own campaign pick is kept; the admin decides the one that counts (same as the sales / own pick / uploaded sheet)

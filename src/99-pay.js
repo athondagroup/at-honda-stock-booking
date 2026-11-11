@@ -49,7 +49,7 @@ function payCostAuto(a) {
     vat: (d.extra_pay || []).filter(y => y && num(y.v) && /vat|แวต|ภาษีมูลค่าเพิ่ม/i.test(String(y.l || ''))).map(y => ({ l: String(y.l || 'VAT'), v: num(y.v) })),
     po: poRows,
     // the first instalment paid on collection day (finance, 11/11): estimated from the sale terms, can be typed over
-    inst: !cash && typeof dealMonthly === 'function' ? dealMonthly(d) || 0 : 0,
+    adv: !cash && !!d.adv_inst, inst: !cash && d.adv_inst && typeof dealMonthly === 'function' ? dealMonthly(d) || 0 : 0,
     downDisc: cash ? 0 : num(d.down_disc), deposit: num(a.deposit), trade: r.trade && r.trade.has && r.trade.deduct !== false ? num(r.trade.sale_price) : 0, tradeNo: !!(r.trade && r.trade.has && r.trade.deduct === false), tradeHas: !!(r.trade && r.trade.has), tradeApp: r.trade && r.trade.has ? num(r.trade.price) : 0
   };
 }
@@ -64,7 +64,7 @@ function payCostVals(a, m) {
   v.auto = auto;
   const plus = [[A.cash ? 'ค่ารถยนต์ (ราคาสุทธิ)' : 'เงินดาวน์', A.main], ...(A.insCredit ? [['ค่าประกันคุ้มครองสินเชื่อ (ชำระวันรับรถ)', A.insCredit]] : []),
     ['ค่าจดทะเบียน', A.regGift ? 0 : num(v.reg)], ['ค่ามัดจำป้ายแดง', num(v.plate)], ['ค่าเบี้ยประกันภัย', A.insGift ? 0 : num(v.ins)],
-    ...(A.vat.length ? A.vat.map(y => [y.l, y.v]) : [['VAT', num(v.vat)]]), ...(A.cash ? [] : [['ค่างวด งวดแรก', num(v.inst)]]), ...(A.po ? A.po.map(y => ['อุปกรณ์ · ' + y.l, y.v]) : [['ค่าอุปกรณ์ตกแต่ง', num(v.acc)]]), ...v.plus.map(y => ['อื่น ๆ · ' + (y.l || ''), num(y.v)])];
+    ...(A.vat.length ? A.vat.map(y => [y.l, y.v]) : [['VAT', num(v.vat)]]), ...(A.adv ? [['ค่างวด งวดแรก (ต้นงวด)', num(v.inst)]] : []), ...(A.po ? A.po.map(y => ['อุปกรณ์ · ' + y.l, y.v]) : [['ค่าอุปกรณ์ตกแต่ง', num(v.acc)]]), ...v.plus.map(y => ['อื่น ๆ · ' + (y.l || ''), num(y.v)])];
   const minus = [...(A.downDisc ? [['ส่วนลดเงินดาวน์', A.downDisc]] : []), ['เงินมัดจำ', num(v.dep)], ...(A.trade ? [['รถเก่าเทิร์น (ราคาขายให้เต็นท์)', A.trade]] : []), ...v.minus.map(y => ['อื่น ๆ · ' + (y.l || ''), num(y.v)])];
   const tp = plus.reduce((n, x) => n + num(x[1]), 0), tm = minus.reduce((n, x) => n + num(x[1]), 0);
   return { A, v, plus, minus, tp, tm, net: tp - tm };
@@ -86,7 +86,7 @@ function payCostBox(a, m) {
     ${row('ค่ามัดจำป้ายแดง', inp('plate', 'plate'), tag('ค่าตั้งต้น', 'warn'))}
     ${row('ค่าเบี้ยประกันภัย', A.insGift ? `<span class="w-32 text-right">${esc(A.insGift)} 1 ปี</span>` : inp('ins', 'ins'), A.insGift ? '' : tag('จากเงื่อนไข', 'good'))}
     ${A.vat.length ? A.vat.map(y => row(esc(y.l), ro(y.v), tag('จากลูกค้าชำระเพิ่ม (เงื่อนไขการขาย)', 'good'))).join('') : row('VAT', inp('vat', 'vat'), '')}
-    ${A.cash ? '' : row('ค่างวด งวดแรก', inp('inst', 'inst'), !num(v.inst) ? (A.inst ? '' : tag('ใส่ยอดค่างวด', 'warn')) : A.inst && num(v.inst) === A.inst ? tag('ประมาณจากเงื่อนไข', 'good') : tag(A.inst ? `ใส่เอง · ประมาณ ${money(A.inst)}` : 'ใส่เอง', 'warn'))}
+    ${!A.adv ? '' : row('ค่างวด งวดแรก (ต้นงวด)', inp('inst', 'inst'), !num(v.inst) ? (A.inst ? '' : tag('ใส่ยอดค่างวด', 'warn')) : A.inst && num(v.inst) === A.inst ? tag('ประมาณจากเงื่อนไข', 'good') : tag(A.inst ? `ใส่เอง · ประมาณ ${money(A.inst)}` : 'ใส่เอง', 'warn'))}
     ${A.po ? (A.po.length ? A.po.map(y => row('อุปกรณ์ · ' + esc(y.l), ro(y.v), tag('จาก PO', 'good'))).join('') : row('ค่าอุปกรณ์ตกแต่ง', ro(0), tag('จาก PO', 'good'))) : row('ค่าอุปกรณ์ตกแต่ง (ยังไม่มีใบสั่งแต่ง)', inp('acc', 'acc'), '')}
     ${list('plus', '+')}
     <div class="flex justify-between font-semibold text-sm pt-2"><span>รวมค่าใช้จ่าย</span><span class="num">${money(tp)}</span></div>
@@ -125,7 +125,7 @@ Object.assign(ACTIONS, {
     const t = payCostVals(a, S.modal);
     const dep = num(v.dep), fillDep = !num(a.deposit) && dep > 0;
     // the booking had no deposit amount: the one typed here fills the booking too (10/11)
-    if (await saveFlow(a, { ...(fillDep ? { deposit: dep, receipt_hist: [...(a.rec.receipt_hist || []), { old: { receipt_no: a.rec.receipt_no || null, deposit: a.rec.deposit || null }, why: 'ใส่ยอดมัดจำจากค่าใช้จ่ายวันรับรถ (ใบจองไม่ระบุยอด)', ...actor() }] } : {}), flow: { cost: { dep, regAuto: num(v.auto && v.auto.reg), insAuto: num(v.auto && v.auto.ins), reg: num(v.reg), plate: num(v.plate), ins: num(v.ins), acc: num(v.acc), vat: num(v.vat), inst: num(v.inst), plus: clean(v.plus), minus: clean(v.minus), total: t.tp, net: t.net, ...actor() } } }, 'บันทึกค่าใช้จ่ายวันรับรถแล้ว')) { S.modal.cost = null; render(); }
+    if (await saveFlow(a, { ...(fillDep ? { deposit: dep, receipt_hist: [...(a.rec.receipt_hist || []), { old: { receipt_no: a.rec.receipt_no || null, deposit: a.rec.deposit || null }, why: 'ใส่ยอดมัดจำจากค่าใช้จ่ายวันรับรถ (ใบจองไม่ระบุยอด)', ...actor() }] } : {}), flow: { cost: { dep, regAuto: num(v.auto && v.auto.reg), insAuto: num(v.auto && v.auto.ins), reg: num(v.reg), plate: num(v.plate), ins: num(v.ins), acc: num(v.acc), vat: num(v.vat), inst: t.A.adv ? num(v.inst) : 0, plus: clean(v.plus), minus: clean(v.minus), total: t.tp, net: t.net, ...actor() } } }, 'บันทึกค่าใช้จ่ายวันรับรถแล้ว')) { S.modal.cost = null; render(); }
   },
   async 'flow-down'(el) {
     const a = atById(el.dataset.id), m = S.modal || {};
