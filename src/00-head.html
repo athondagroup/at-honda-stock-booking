@@ -58,6 +58,10 @@ html, body { height: 100%; }
 /* nothing may make the page wider than the phone (iOS then zooms the whole page out) */
 html { overflow-x: hidden; }
 .field select { max-width: 100%; min-width: 0; text-overflow: ellipsis; }
+/* the sale terms grid (11/11): labels take two lines' height side by side so the boxes of one row line up; a small tick under a box */
+@media (min-width: 640px) { .tf-grid > .field > label:first-child { min-height: 2.7em; display: flex; align-items: flex-end; } }
+.field label.tf-chk { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; color: var(--fg); min-height: 0; }
+.field label.tf-chk input[type=checkbox] { width: 16px; height: 16px; min-height: 0; padding: 0; margin: 0; flex: none; box-shadow: none; }
 select { max-width: 100%; text-overflow: ellipsis; }
 body { background: var(--bg); color: var(--fg); font-family: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif; font-size: 14px; line-height: 1.55; }
 h1, h2, h3 { text-wrap: balance; }
