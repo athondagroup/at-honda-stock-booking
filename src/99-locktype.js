@@ -63,7 +63,9 @@ function ltCell(c, D, p) {
   if (!ltOpenCar(c) && !L) return c.quota ? null : stockActions(c, p, D, 'lock');
   const asks = ltLocks(c, D).filter(l => l.status === 'pending' && l.replaces);
   const askTxt = asks.length ? `<div class="text-xs" style="color:var(--warn)">${asks.map(l => `${esc(ltRoleShort(l))} ขอแก้เป็น "${esc(ltTextOf(l))}" รอ${esc(l.approver_role || 'คนล็อก')}อนุมัติ`).join('<br>')}</div>` : '';
-  const warn = L && L.sheet_sync && L.sheet_sync.conflict ? `<div class="text-xs" style="color:var(--bad)">ชีตมี "${esc(L.sheet_sync.current || '')}" ยังไม่ได้เขียน <button class="underline" data-act="lt-force" data-id="${esc(L.id)}">เขียนทับ</button></div>` : '';
+  const ss = L && L.sheet_sync;
+  const warn = ss && ss.conflict ? `<div class="text-xs" style="color:var(--bad)">ชีตมี "${esc(ss.current || '')}" ยังไม่ได้เขียน <button class="underline" data-act="lt-force" data-id="${esc(L.id)}">เขียนทับ</button></div>`
+    : ss && ss.error && ss.value ? `<div class="text-xs" style="color:var(--warn)">ยังไม่ได้ลงชีต (${ss.error === 'not_found' ? 'ไม่มีรถในชีต · เขียนให้เองเมื่อรถเข้าชีต' : 'เขียนไม่สำเร็จ'}) <button class="underline" data-act="lt-retry" data-id="${esc(L.id)}">ลองอีกครั้ง</button></div>` : '';
   if (t) return `<div class="lt-cell on"><input id="lt-in" class="lt-in" data-lt="${esc(ltKey(c))}" value="${esc(t.q || '')}" placeholder="ชื่อลูกค้า / เลขใบจอง / เซลล์" autocomplete="off">
     <button class="text-xs underline text-muted" data-act="lt-cancel">ยกเลิก</button>${ltDrop(c, D)}</div>`;
   const gone = !L ? ltGone(c, D) : null;
@@ -78,7 +80,7 @@ function ltCell(c, D, p) {
 function ltQuotaCell(q, D, p) { const u = q.car || ltUnitQ(q); return ltOpenCar(u) || ltLockOf(u, D) ? ltCell(u, D, p) : null; }
 const ltRoleShort = l => String(l.requested_role || '').replace(/\s*\(.*\)$/, '') || 'ผู้จัดการ';
 // ---- write / clear the sheet cell (only on the real web; the preview never touches the real sheet)
-async function ltSheet(id, value, expect, force) {
+async function ltSheet(id, value, expect, force, quiet) {
   const l = findLock(id); if (!l) return null;
   const live = !!(window.__WEB), D = derive();
   // the stock tab when the car is in stock; the quota tab's "Vin Number" cell when the unit has a quota slot (by frame number or Ref)
@@ -101,14 +103,27 @@ async function ltSheet(id, value, expect, force) {
   if (qres) cur.sheet_quota = qres.ok ? { at: now, range: qres.range } : { at: now, error: qres.code || 'error', current: qres.current };
   if (value === '' && res && res.ok) cur.sheet_cleared = now;
   await write('locks', id, cur);
-  if (res && res.code === 'conflict') toast(`ยังไม่ได้เขียนลงชีต: ช่องในชีตตอนนี้เป็น "${res.current || ''}" ไม่ตรงกับที่เว็บรู้ · ล็อกในเว็บบันทึกแล้ว`, 'bad');
+  if (quiet) { if (res && res.ok) toast(`ลงชีตให้แล้ว "${value}" (${l.vin || 'Quota ' + l.ref})`); }
+  else if (res && res.code === 'conflict') toast(`ยังไม่ได้เขียนลงชีต: ช่องในชีตตอนนี้เป็น "${res.current || ''}" ไม่ตรงกับที่เว็บรู้ · ล็อกในเว็บบันทึกแล้ว`, 'bad');
   else if (!(res && res.ok)) toast(res && res.code === 'not_found' ? 'ไม่พบรถ / Quota นี้ในชีต Stock IDS (ล็อกในเว็บบันทึกแล้ว)' : 'เขียนชีตไม่สำเร็จ ล็อกในเว็บบันทึกแล้ว ลองใหม่ภายหลัง', 'bad');
   return res;
 }
 // typed locks that ended (let go, expired, not approved, replaced): clear their sheet cell once (managers' sessions)
 let ltSwept = new Set();
+// typed locks the sheet does not hold yet (the car / slot was not in the sheet, or the write failed): written once the IDS stock or
+// quota is updated after the try (the car is in the sheet now), or once per opening of the web for other errors. Only into an empty
+// cell: a cell holding another name is not overwritten, the cell shows it and the branch managers are told (11/11)
+let ltRetried = new Set();
+function ltRetry(D) {
+  for (const l of D.locks) {
+    const ss = l.sheet_sync; if (!l.typed || !l.live || !ss || !ss.error || !ss.value || ltRetried.has(l.id)) continue;
+    if (ss.error === 'not_found') { const newer = [...S.ids.entries()].some(([k, d]) => /^(stock|quota)_/.test(k) && d && d.at && d.at > ss.at); if (!newer) continue; }
+    ltRetried.add(l.id); ltSheet(l.id, ltTextOf(l), '', false, true);
+  }
+}
 function ltSweep(D) {
   if (!ltCan() || !window.__WEB) return;
+  ltRetry(D);
   for (const l of D.locks) {
     if (!l.typed || l.sheet_cleared || ltSwept.has(l.id) || l.live || !(l.vin || l.ref) || !(l.sheet_sync && l.sheet_sync.value && !l.sheet_sync.conflict)) continue;
     if (D.locks.some(x => x.id !== l.id && x.live && ltSameL(x, l) && x.typed)) { ltSwept.add(l.id); continue; }   // the cell now belongs to the next typed lock
@@ -191,6 +206,7 @@ Object.assign(ACTIONS, {
     toast('ปล่อยล็อกแล้ว รถกลับเป็นว่าง');
     if (l.typed) ltSheet(id, '', ltTextOf(l));
   },
+  async 'lt-retry'(el) { const l = findLock(el.dataset.id); if (!l || !ltCan()) return; const r = await ltSheet(el.dataset.id, ltTextOf(l), '', false); if (r && r.ok) toast('ลงชีตแล้ว'); },
   async 'lt-force'(el) { const l = findLock(el.dataset.id); if (!l || !ltCan()) return; await ltSheet(el.dataset.id, ltTextOf(l), '', true); toast('เขียนทับในชีตแล้ว'); },
   async 'ntc-ack'(el) {
     const [id, at] = String(el.dataset.id || '').split('|'), l = findLock(id); if (!l || !S.me || !S.me.id) return;
@@ -212,6 +228,8 @@ async function ltApproveChange(id) {
 // notices that go away once read (managers' typed locks and requests decided at once): new lock, let go, expired
 function ltNotices(D, add) {
   for (const l of D.locks) {
+    if (l.typed && l.live && l.sheet_sync && l.sheet_sync.conflict) add('ltconf:' + l.id, { br: l.car_br, roles: ['manager'] }, 'bad', 'ชื่อในชีตไม่ตรงกับล็อกในเว็บ · ไม่ได้เขียนทับ',
+      `${l.vin || 'Quota ' + (l.ref || '')} · เว็บล็อก "${ltTextOf(l)}" · ชีตมี "${l.sheet_sync.current || ''}" · ตัดสินที่ช่องล็อก (เขียนทับ หรือ แก้ / ปล่อยล็อกในเว็บ)`, { act: 'go', view: l.vin ? 'stock' : 'quota', label: 'ดู' });
     const owner = l.owner || l.sales || null, unit = l.vin || ('Quota ' + (l.ref || '')), cust = (l.booking && l.booking.cust) || l.prospect || l.dealer_name || '';
     const evs = [...(l.notices || [])];
     if (l.typed && (l.expired || l.autoReleased) && l.end) evs.push({ k: 'exp', at: l.end + 'T23:59:00.000Z', by: null });

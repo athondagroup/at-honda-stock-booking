@@ -163,6 +163,7 @@ function renderNow() {
   if (S.view === 'flow') { S.view = 'book'; S.sub.book = 'steps'; }
   if (!navFor().some(n => n.id === S.view)) S.view = 'dash';
   renderChrome(D);
+  if (typeof ltSweep === 'function') ltSweep(D);   // typed locks: clear ended ones / write ones not in the sheet yet (managers, real web)
   const V = { dash: viewDash, alerts: viewAlerts, inbox: viewInbox, stock: viewStock, book: viewBook, quota: viewQuota, lock: viewLock, sold: viewSold, flow: viewFlow, receive: viewReceive, upload: viewUpload, campup: viewCampUp, campdb: viewCampDb, campsum: viewCampSum, admin: viewAdmin, datafix: viewDatafix }[S.view] || viewDash;
   const ae = document.activeElement, main = $('#main');
   const fid = ae && ae.id && main.contains(ae) && /INPUT|SELECT|TEXTAREA/.test(ae.tagName) ? ae.id : null;
