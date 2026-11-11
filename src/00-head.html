@@ -157,6 +157,8 @@ tr.low td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 .lt-hint { font-size: 11px; color: var(--muted); padding: 5px 10px; background: var(--surface-2); }
 .tbl-xl .xl-pin { position: sticky; left: 0; z-index: 1; background: var(--surface); }
 .tbl-xl td.xl-st { white-space: normal; }
+.bk-tbl tr.bk-row { cursor: pointer; } .bk-tbl tr.bk-row:hover td { background: var(--surface-2); }
+.bk-tbl td[data-act="noop"] { cursor: default; }
 .tbl-xl td.xl-st > div { max-width: 11em; }
 .tbl-xl .xl-tags { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .tbl-xl .xl-tags .chip { white-space: nowrap; }

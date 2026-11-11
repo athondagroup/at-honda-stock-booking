@@ -193,7 +193,10 @@ Object.assign(ACTIONS, {
     if (l.type !== 'temp') await settleUnit(derive(), l, id);
     S.lt = null;
     toast(`ล็อกแล้วถึง ${fmtD(l.end)} · แจ้งสาขา ${c.br} แล้ว${window.__WEB ? '' : ' · เว็บตัวอย่าง: ไม่เขียนชีตจริง'}`);
-    ltSheet(id, l.sheet_text, old ? ltTextOf(old) : (c.quota ? (c.quota.vnote || '') : (c.bknote || '')));
+    // a change to another car / slot (from the booking page, 11/11): the old unit's cell is cleared, the new one written from what it holds
+    const same = old && ltSameL(old, l);
+    if (old && !same && old.typed) ltSheet(t.old, '', ltTextOf(old));
+    ltSheet(id, l.sheet_text, same ? ltTextOf(old) : (c.quota ? (c.quota.vnote || '') : (c.bknote || '')));
   },
   async 'lt-release'(el) {
     const id = el.dataset.id, l = await claimFresh('locks', id, x => x.status === 'approved' || x.status === 'allocated');
