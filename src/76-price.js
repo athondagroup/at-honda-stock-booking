@@ -35,9 +35,16 @@ function priceOf(model, grade, color, year, old) {
 }
 // a car sells at the price before the adjustment ("ราคาเดิม") when its model code is an old-price code (ตกลง 11/11: ราคาตาม model code),
 // or its IDS model name says "ราคาเดิม" / "ราคาเก่า". The code comes from the IDS stock file, else from Honda's sales report (MTOC).
-// Which codes are old: set on the price-list page; not set = a code ending in "1" (GN363VLN1, GN162VL1 … are the old-price CITY codes)
+// Which codes are old: set on the price-list page; not set = Honda's model code list (MODEL_CODE 01/10/2026):
+//   CITY family (GN…): the code ending in "1" is the old one (GN162VL1 → GN162VL from 1/10/2026)
+//   HR-V e:HEV MY26 (RV…T…): the code ending in "2" (from 4/5/2026) is the new one, RV586TEN / RV589TJN … are old
 function codeTiers() { return (S.ref.get('catalog') || {}).code_tier || {}; }
-function codeTierOf(code) { if (!code) return null; const t = codeTiers()[code]; return t ? { tier: t, auto: false } : { tier: /1$/.test(code) ? 'old' : 'cur', auto: true }; }
+function codeAutoTier(code) {
+  if (/^GN/.test(code)) return /1$/.test(code) ? 'old' : 'cur';
+  if (/^RV\d{3}T/.test(code)) return /2$/.test(code) ? 'cur' : 'old';
+  return 'cur';
+}
+function codeTierOf(code) { if (!code) return null; const t = codeTiers()[code]; return t ? { tier: t, auto: false } : { tier: codeAutoTier(code), auto: true }; }
 var CODES_MEMO = null;
 function knownCodes() {
   const D = derive(); if (CODES_MEMO && CODES_MEMO.D === D) return CODES_MEMO.list;

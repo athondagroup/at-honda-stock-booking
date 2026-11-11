@@ -190,7 +190,7 @@ function codeTierBox(can) {
       return `<tr><td class="code">${esc(r.code)}</td><td>${esc(r.model || '')}</td><td>${esc(r.grade || '')}</td><td class="num text-right">${r.n || ''}</td><td class="nowrap">${can
         ? `<select data-ctier="${esc(r.code)}" class="text-sm p-1 rounded border border-line" style="background:var(--surface)"><option value="cur" ${t.tier === 'cur' ? 'selected' : ''}>ราคาปัจจุบัน</option><option value="old" ${t.tier === 'old' ? 'selected' : ''}>ราคาเดิม</option></select>`
         : esc(t.tier === 'old' ? 'ราคาเดิม' : 'ราคาปัจจุบัน')}${t.auto ? ' <span class="text-xs text-muted">อัตโนมัติ</span>' : ''}${t.tier === 'old' && !old ? ' <span class="text-xs" style="color:var(--warn)">ใบราคายังไม่มีราคาเดิมของเกรดนี้ · ใช้ราคาปัจจุบัน</span>' : ''}</td></tr>`; }).join('')}</tbody></table></div>
-    <p class="text-xs text-muted mt-2">ไม่ได้ตั้งไว้: รหัสที่ลงท้ายด้วย 1 (เช่น GN363VLN1, GN162VL1) = ราคาเดิม · รถที่ไม่อยู่ในไฟล์ Stock แล้ว ใช้รหัสจากรายงานการขาย Honda (MTOC)</p></details>`;
+    <p class="text-xs text-muted mt-2">ไม่ได้ตั้งไว้ (อัตโนมัติตาม Model code ของ Honda 01/10/2026): CITY ทุกตัว รหัสลงท้าย 1 = ราคาเดิม (เช่น GN162VL1) · HR-V e:HEV MY26 รหัสลงท้าย 2 = ราคาใหม่ ที่ไม่ลงท้าย 2 = ราคาเดิม (เช่น RV589TJN) · รถที่ไม่อยู่ในไฟล์ Stock แล้ว ใช้รหัสจากรายงานการขาย Honda (MTOC)</p></details>`;
 }
 document.addEventListener('change', async ev => {
   const t = ev.target; if (!t || !t.dataset || !t.dataset.ctier) return;
