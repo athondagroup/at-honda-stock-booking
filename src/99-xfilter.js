@@ -9,6 +9,8 @@ function xfKey(t, i) {
   const h = t.tHead.rows[t.tHead.rows.length - 1];
   return [S.view || '', (S.sub && S.sub[S.view]) || '', (S.modal && S.modal.kind) || '', i, [...h.cells].map(xfLabel).join('|')].join('/');
 }
+// a cell may carry several values for the filter (the status tags, 11/11): the row shows under each of them
+function xfVals(row, ci) { const c = row.cells[ci]; return c && c.dataset && c.dataset.xfTags ? c.dataset.xfTags.split('|').filter(Boolean) : [xfText(row, ci)]; }
 function xfText(row, ci) { const c = row.cells[ci]; return c ? String(c.innerText || c.textContent || '').trim().split('\n')[0].trim() : ''; }
 function xfSortVal(v) {
   const d = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
@@ -22,7 +24,7 @@ function xfRows(t) { const h = t.tHead.rows[t.tHead.rows.length - 1], n = h.cell
 function xfApply(t) {
   const st = XF.st[t.dataset.xfKey]; if (!st) return;
   const rows = xfRows(t), body = t.tBodies[0];
-  rows.forEach(r => { r.style.display = Object.entries(st.sel || {}).every(([ci, set]) => !set || set.includes(xfText(r, Number(ci)))) ? '' : 'none'; });
+  rows.forEach(r => { r.style.display = Object.entries(st.sel || {}).every(([ci, set]) => !set || xfVals(r, Number(ci)).some(v => set.includes(v))) ? '' : 'none'; });
   if (st.sort) { const ci = st.sort.ci, d = st.sort.dir === 'desc' ? -1 : 1; rows.slice().sort((a, b) => xfCmp(xfText(a, ci), xfText(b, ci)) * d).forEach(r => body.appendChild(r)); }
   const h = t.tHead.rows[t.tHead.rows.length - 1];
   [...h.cells].forEach((th, ci) => { const b = th.querySelector('.xf-btn'); if (!b) return; const on = !!(st.sel && st.sel[ci]), so = st.sort && st.sort.ci === ci ? (st.sort.dir === 'desc' ? '↓' : '↑') : ''; b.textContent = so + (on ? '⧩' : '▾'); b.classList.toggle('on', !!(on || so)); });
@@ -48,7 +50,7 @@ function xfClose() { if (XF.pop) { XF.pop.remove(); XF.pop = null; } }
 function xfOpen(btn) {
   const t = btn.closest('table'), ci = Number(btn.dataset.xfCi), key = t.dataset.xfKey; xfClose();
   const st = XF.st[key] = XF.st[key] || { sel: {}, sort: null };
-  const vals = [...new Set(xfRows(t).map(r => xfText(r, ci)))].sort(xfCmp);
+  const vals = [...new Set(xfRows(t).flatMap(r => xfVals(r, ci)))].sort(xfCmp);
   const draft = new Set(st.sel[ci] || vals);
   const p = document.createElement('div'); p.className = 'acx-pop xf-pop';
   const draw = q => {

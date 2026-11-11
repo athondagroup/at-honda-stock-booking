@@ -19,7 +19,7 @@ function prodText(c) {
   return `ผลิต <span class="num">${fmtD(c.prod)}</span>${c.prodSrc === 'key' ? ' <span class="text-muted">(คีย์จากป้าย)</span>' : ''}${c.prodDiff ? ` <span style="color:var(--warn)">· ที่คีย์ไว้ ${fmtD(c.prodKey)} ไม่ตรงกับ IDS</span>` : ''}`;
 }
 const ageFromNote = c => !c || c.age === null || c.age === undefined || c.ageFrom === 'prod' ? '' : c.ageFrom === 'consign' ? 'นับจากวันที่รถฝากศูนย์ (ยังไม่มีวันผลิต)' : 'นับจากวันที่ stock in (ยังไม่มีวันผลิต)';
-const prodBtn = c => canProd(c) && !c.prodIds ? `<button class="underline text-xs" data-act="prod-open" data-vin="${esc(c.vin)}">${c.prodKey ? 'แก้วันผลิต' : 'ใส่วันผลิต'}</button>` : '';
+const prodBtn = (c, short) => canProd(c) && !c.prodIds ? `<button class="underline text-xs" data-act="prod-open" data-vin="${esc(c.vin)}">${c.prodKey ? (short ? 'แก้' : 'แก้วันผลิต') : (short ? 'ใส่' : 'ใส่วันผลิต')}</button>` : '';
 // where the label photo and the AI read live: the production-date window itself, or one car of a delivery note
 const prodSlot = i => (i === '' || i === undefined || i === null) ? S.modal : ((S.modal.pimg ||= [])[Number(i)] ||= {});
 // date field + label photo + AI read; o = { id, path, val, max, img, i, required, dis, note }

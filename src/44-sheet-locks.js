@@ -169,8 +169,23 @@ function carLockModal(m, D) {
     <button class="btn btn-ghost" data-act="close">ปิด</button></div>`;
 }
 // the status itself opens the car's locks, so a pending request is approved or changed where it is seen
-function carStatusCell(c, D) {
-  const chips = `${c.status === 'temp' ? chip('ล็อกชั่วคราว (แซงได้)', 'warn') : statusChip(CAR_STATUS, c.status)}${c.kind ? ' ' + chip(FREE_KINDS[c.kind], c.kind === 'adv' ? 'ink' : 'warn') : ''} ${tempChip(c)}${spChip(c)}`;
+// the status tags of a car (ตกลง 11/11): free = ว่าง; a returned car for sale: ว่าง + คืนรถ; an Advance with no customer: ว่าง + Advance +
+// ออกใบกำกับแล้ว (with a customer: ออกใบกำกับแล้ว only); a Demo for sale: ว่าง + รถบริษัท, not for sale: รถบริษัท. The table's status filter
+// lists every tag, a car shows under each of its own
+function carTags(c) {
+  const lab = k => (CAR_STATUS[k] || [k])[0];
+  if (c.status === 'free') return ['ว่าง', ...(c.kind === 'ret' ? ['คืนรถ'] : c.kind === 'adv' ? ['Advance', lab('invoiced')] : c.kind === 'demo' ? [lab('company')] : [])];
+  if (c.status === 'company') return [lab('company')];
+  const t = [c.status === 'temp' ? 'ล็อกชั่วคราว' : lab(c.status)];
+  if (c.kind === 'ret') t.push('คืนรถ'); else if (c.kind === 'demo') t.push(lab('company'));
+  return t;
+}
+const TAG_TONE = { 'ว่าง': 'good', 'คืนรถ': 'warn', 'Advance': 'ink', 'รถบริษัท': 'muted' };
+function carStatusCell(c, D, compact) {
+  const tags = compact ? carTags(c).map(t => chip(t, TAG_TONE[t] || ((CAR_STATUS[c.status] || [])[1]) || 'neutral')).join(' ')
+    : `${c.status === 'temp' ? chip('ล็อกชั่วคราว (แซงได้)', 'warn') : statusChip(CAR_STATUS, c.status)}${c.kind ? ' ' + chip(FREE_KINDS[c.kind], c.kind === 'adv' ? 'ink' : 'warn') : ''}`;
+  // the table keeps it short: the special-car note only while it still needs a decision (sellable cars are just tagged)
+  const chips = `${tags} ${tempChip(c)}${compact && c.special && c.special.sellable === true ? '' : spChip(c)}`;
   if (!D || !carLocks(c, D).length) return chips;
   const pend = carLocks(c, D).some(canDecideLock);
   return `<button class="text-left inline-flex flex-wrap items-center gap-1" data-act="carlock-open" data-vin="${esc(c.vin)}" title="กดเพื่ออนุมัติหรือแก้ไขล็อก">${chips}<span class="text-xs underline ${pend ? '' : 'text-muted'}" ${pend ? 'style="color:var(--red)"' : ''}>${pend ? 'อนุมัติ/แก้' : 'ดูล็อก'}</span></button>`;

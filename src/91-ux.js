@@ -8,8 +8,11 @@ function startView() {
   return r === 'sales' ? 'dash' : r === 'admin' ? 'datafix' : r === 'exec' ? 'dash' : perms().approve ? 'inbox' : 'alerts';
 }
 // ---- ages: days in stock and days since production, never one number with a *
-function ageCell(c) {
+function ageCell(c, plain) {
   if (!c) return '–';
+  // the stock table (11/11): two lines of numbers, the colour tells the age (over 90 days orange, over 180 red), no bar
+  if (plain) { const n = a => a === null ? '–' : `<b class="num" style="color:${a > 180 ? 'var(--bad)' : a > 90 ? 'var(--warn)' : 'inherit'}">${a}</b>`;
+    return `<div class="text-xs leading-tight"><div>สต็อก ${n(c.stockAge ?? null)}</div><div>${c.prodAge == null ? '<span style="color:var(--warn)">ผลิต รอระบุ</span>' : 'ผลิต ' + n(c.prodAge)}</div></div>`; }
   const st = c.stockAge ?? null, pr = c.prodAge ?? null;
   return `<div class="text-xs leading-tight"><div>สต็อก ${st === null ? '–' : ageBar(st)}</div><div>${pr === null ? '<span style="color:var(--warn)">ผลิต: รอระบุ</span>' : `ผลิต ${ageBar(pr)}`}</div></div>`;
 }

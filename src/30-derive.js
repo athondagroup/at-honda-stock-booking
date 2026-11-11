@@ -412,6 +412,8 @@ function deriveNow() {
     // two ages shown apart (บทวิเคราะห์ 19/10): days in stock, and days since production (none = รอระบุ)
     const inS = car.consign || car.stockin; car.stockAge = inS ? daysBetween(inS, today) : null; car.prodAge = car.prod ? daysBetween(car.prod, today) : null;
     car.spec = specKey(car.model, car.grade, car.color);
+    // a returned / Demo car marked for sale is free again, whatever IDS still says about the old sale (ตกลง 11/11)
+    if (car.special && car.special.sellable === true && car.special.reason !== 'adv' && ['sold', 'invoiced', 'company'].includes(car.st)) { car.stIds = car.st; car.st = 'free'; }
     const ls = lockStateOf(['V:' + car.vin, car.ref ? 'R:' + car.ref : null].filter(Boolean));
     car.lock = ls.hard; car.temps = ls.temps;
     car.status = ls.hard ? (ls.hard.status === 'pending' ? 'pending' : ls.hard.status === 'allocated' ? 'allocated' : 'locked')

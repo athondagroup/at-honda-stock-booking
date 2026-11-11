@@ -17,7 +17,7 @@ function stockActions(c, p, D, part) {
     : btn('lock-open', 'ล็อก', p.request && carLockable(c), carLockable(c) ? '' : 'สถานะนี้ล็อกไม่ได้');
   const deliv = delivBtn(c, D) || btn('cdeliv-open', 'ส่งมอบ', false, 'ต้องจัดสรรหรือออกใบกำกับก่อน');
   if (part === 'lock') return lockB;
-  return `${part === 'rest' ? '' : lockB}${btn('st-assign', c.assignedTo ? 'จัดสรร ▾' : 'จัดสรร', (brOk || mgrLike) && c.status !== 'company', brOk || mgrLike ? (brOk ? '' : 'รถสาขาอื่น: จัดสรรได้เฉพาะใบจองของสาขาที่ตัวเองดูแล') : 'ไม่ใช่สาขาที่ดูแล')}${deliv}${mgrLike ? btn('remove-open', '− นำออก', p.remove && !c.lock && brOk, c.lock ? 'ยกเลิกล็อกก่อน' : '') : r === 'admin' ? btn('remove-open', 'ย้าย / ขาย', !c.lock, c.lock ? 'ยกเลิกล็อกก่อน' : '') : ''}`;
+  return `${part === 'rest' ? '' : lockB}${btn('st-assign', c.assignedTo ? 'เปลี่ยนจัดสรร' : 'จัดสรร', (brOk || mgrLike) && c.status !== 'company', brOk || mgrLike ? (brOk ? '' : 'รถสาขาอื่น: จัดสรรได้เฉพาะใบจองของสาขาที่ตัวเองดูแล') : 'ไม่ใช่สาขาที่ดูแล')}${deliv}${mgrLike ? btn('remove-open', '− นำออก', p.remove && !c.lock && brOk, c.lock ? 'ยกเลิกล็อกก่อน' : '') : r === 'admin' ? btn('remove-open', 'ย้าย / ขาย', !c.lock, c.lock ? 'ยกเลิกล็อกก่อน' : '') : ''}`;
 }
 // can this person give a car to this booking?
 function stAssignWhy(a) {

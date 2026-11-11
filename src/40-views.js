@@ -400,16 +400,16 @@ function carTable(cars, D) {
   if (typeof ltSweep === 'function') ltSweep(D);
   const sales = isSales(), lc = c => c.lock ? (c.lock.booking ? c.lock.booking.cust : c.lock.prospect) : null;
   return `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl tbl-xl">
-    <thead><tr><th class="xl-pin">เลขตัวถัง</th><th>รุ่น / เกรด</th><th>สี</th><th>ชื่อลูกค้า</th><th>ล็อก</th><th>ที่ปรึกษา</th><th>สถานะ</th><th>วันผลิต</th><th class="text-right">อยู่ในสต็อก / อายุผลิต</th><th>สาขา</th>${sales ? '' : '<th class="xl-desk"></th>'}</tr></thead>
+    <thead><tr><th class="xl-pin">เลขตัวถัง</th><th>รุ่น / เกรด</th><th>สี</th><th>ชื่อลูกค้า</th><th>ล็อก</th><th>ที่ปรึกษา</th><th class="xl-st">สถานะ</th><th>วันผลิต</th><th class="text-right">อายุรถ</th><th>สาขา</th>${sales ? '' : '<th class="xl-desk"></th>'}</tr></thead>
     <tbody>${list.map(c => `<tr>
-      <td class="nowrap xl-pin">${vinLink(c)}${c.ref || c.src !== 'IDS' || c.fromBr ? `<div class="text-xs text-muted">${c.ref ? 'Ref ' + esc(c.ref) : ''}${c.src !== 'IDS' ? (c.ref ? ' · ' : '') + esc(c.src) : ''}${c.fromBr ? ` · โอนจาก ${esc(c.fromBr)}` : ''}</div>` : ''}</td>
+      <td class="nowrap xl-pin">${vinLink(c)}${(() => { const xs = [c.mcode ? esc(c.mcode) : '', c.ref ? 'Ref ' + esc(c.ref) : '', c.src !== 'IDS' ? esc(c.src) : '', c.fromBr ? `โอนจาก ${esc(c.fromBr)}` : ''].filter(Boolean); return xs.length ? `<div class="text-xs text-muted xl-sub">${xs.join(' · ')}</div>` : ''; })()}</td>
       <td class="nowrap">${esc(c.model || '')} <span class="text-muted">${esc(gradeShort(c.model, c.grade) || c.grade || '')}</span></td><td class="nowrap">${esc(c.color || '')}</td>
       <td class="nowrap">${sales && c.lock ? '' : custCell(c.cust || c.bknote || (c.assignedTo && c.assignedTo.cust) || lc(c), c.sales || (c.assignedTo && c.assignedTo.sales), { company: c.company || c.status === 'company', seed: c.seed && ['booked', 'noted', 'sold', 'invoiced'].includes(c.status) })}${c.bk || (c.assignedTo && (c.assignedTo.no || c.assignedTo.rec.booking_no)) ? `<div class="code text-xs text-muted">${esc(c.bk || c.assignedTo.no || c.assignedTo.rec.booking_no)}</div>` : c.assignedTo ? '<div class="text-xs text-muted">จัดสรรในเว็บ · ยังไม่มีเลข IDS</div>' : ''}</td>
       <td class="nowrap">${sales ? (c.lock ? `<span class="text-xs">${lockText(c.lock)}</span>` : '') : (ltCan() ? ltCell(c, D, p) : stockActions(c, p, D, 'lock'))}</td>
       <td class="nowrap">${esc(c.sales || (c.assignedTo && c.assignedTo.sales) || (c.lock && c.lock.owner) || '')}</td>
-      <td class="nowrap">${carStatusCell(c, D)}${c.lock ? `<div class="text-xs text-muted">${lockLabel(c.lock)}</div>` : ''}</td>
-      <td class="nowrap text-sm">${c.prod ? `<span class="num">${fmtD(c.prod)}</span>${c.prodSrc === 'key' ? ' <span class="text-xs text-muted">คีย์</span>' : ''}${c.prodDiff ? ' <span class="text-xs" style="color:var(--warn)">ไม่ตรง IDS</span>' : ''}` : '<span class="text-xs" style="color:var(--warn)">ยังไม่มี</span>'} ${prodBtn(c)}</td>
-      <td class="text-right nowrap">${ageCell(c)}</td><td><b>${esc(c.br)}</b></td>
+      <td class="xl-st" data-xf-tags="${esc(carTags(c).join('|'))}">${carStatusCell(c, D, true)}${c.lock ? `<div class="text-xs text-muted">${lockLabel(c.lock)}</div>` : ''}</td>
+      <td class="nowrap text-sm">${c.prod ? `<div class="num">${fmtD(c.prod)}</div>` : '<div class="text-xs" style="color:var(--warn)">ยังไม่มี</div>'}<div class="text-xs text-muted">${[c.prod && c.prodSrc === 'key' ? 'คีย์' : '', c.prodDiff ? '<span style="color:var(--warn)">ไม่ตรง IDS</span>' : '', prodBtn(c, true)].filter(Boolean).join(' · ')}</div></td>
+      <td class="text-right nowrap">${ageCell(c, true)}</td><td><b>${esc(c.br)}</b></td>
       ${sales ? '' : `<td class="nowrap text-right xl-desk">${stockActions(c, p, D, 'rest')}</td>`}</tr>`).join('')}</tbody></table></div>`;
 }
 function bookingLabel(ref, D) {
