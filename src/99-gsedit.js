@@ -19,7 +19,8 @@ async function gseRun() {
     const tabs = titles.filter(t => /^(PSC|ATE|SPH|KPA)$/.test(t.trim()) || /^\d{1,2}\.\d{4}\s+(PSC|ATE|SPH|KPA)$/.test(t.trim()));
     const edits = [], texts = new Map(); let n = 0, newCars = 0;
     // a quota slot with the frame number of a stock car is the same car: one unit, not a duplicate (11/11)
-    const seen = (t, br, unit, vin) => { const k = sheetNorm(t); if (!k || !t.includes('/')) return; const L = texts.get(k) || texts.set(k, []).get(k); const id = vin || unit; if (!L.some(u => u.id === id)) L.push({ br, unit, id }); };
+    const qVin = new Map(); for (const d of S.ids.values()) if (d && d.src === 'quota') unpack(d).forEach(x => { if (x.ref && x.vin) qVin.set(x.ref, x.vin); });
+    const seen = (t, br, unit, vin) => { const k = gseKey(t); if (!k || !t.includes('/')) return; const L = texts.get(k) || texts.set(k, []).get(k); const id = vin || unit; if (!L.some(u => u.id === id)) L.push({ br, unit, id }); };
     const sheetStock = new Map(), qNames = [];
     for (const t of tabs) {
       const p = idsGsPayload(await mcp.callTool('Google Sheets', 'get_values', { spreadsheetId: id, range: `'${t.replace(/'/g, "''")}'!A1:BZ` }, { cache: false }));
@@ -38,7 +39,7 @@ async function gseRun() {
         for (const m of r.months || []) {
           const docId = idsDocId('quota', r.br, m), old = new Map(unpack(S.ids.get(docId)).map(x => [x.ref, x]));
           for (const x of r.rows.filter(y => y.m === m)) {
-            if (x.vnote) { seen(x.vnote, r.br, 'Quota ' + x.ref, x.vin || null); if (x.vin) qNames.push({ br: r.br, ref: x.ref, vin: x.vin, text: x.vnote }); }
+            if (x.vnote) { seen(x.vnote, r.br, 'Quota ' + x.ref, x.vin || qVin.get(x.ref) || null); if (x.vin) qNames.push({ br: r.br, ref: x.ref, vin: x.vin, text: x.vnote }); }
             const o = old.get(x.ref); if (!o) continue;
             const ch = GSE_QUOTA.filter(f => gseN(x[f]) !== gseN(o[f])).map(f => ({ f, from: o[f] ?? null, to: x[f] ?? null }));
             if (ch.length) edits.push({ src: 'quota', docId, br: r.br, key: x.ref, ch });
@@ -46,14 +47,18 @@ async function gseRun() {
         }
       }
     }
+    // a cell the web wrote itself (a live typed lock: stock cell and its quota slot) is already in the web, not an edit (12/11)
+    const webTxt = new Map(); for (const l of derive().locks) if (l.live && l.typed) { const t = gseKey(ltTextOf(l)); if (l.vin) webTxt.set(l.vin, t); if (l.ref) webTxt.set('Q:' + l.ref, t); if (l.vin) for (const [ref, v] of qVin) if (v === l.vin) webTxt.set('Q:' + ref, t); }
+    for (let i = edits.length - 1; i >= 0; i--) { const e = edits[i], k = e.src === 'quota' ? 'Q:' + e.key : e.key, vTo = e.src === 'quota' ? ((e.ch.find(c => c.f === 'vin') || {}).to || null) : null, w = webTxt.get(k) || (vTo && webTxt.get(vTo)); if (!w || e.src === 'warn') continue;
+      e.ch = e.ch.filter(c => !((c.f === 'bknote' || c.f === 'vnote') && gseKey(c.to) === w)); if (!e.ch.length) edits.splice(i, 1); }
     // the same name typed on two cars / quota slots: shown on the row, and the manager of the seller's branch is told after saving
-    edits.forEach(e => { e.on = true; const c = e.ch.find(c => c.f === 'bknote' || c.f === 'vnote'); const k = c && c.to ? sheetNorm(c.to) : ''; const me = e.src === 'quota' ? 'Quota ' + e.key : e.key;
-      const myId = e.src === 'quota' ? ((e.ch.find(c => c.f === 'vin') || {}).to || (unpack(S.ids.get(e.docId)).find(x => x.ref === e.key) || {}).vin || me) : e.key;
+    edits.forEach(e => { e.on = true; const c = e.ch.find(c => c.f === 'bknote' || c.f === 'vnote'); const k = c && c.to ? gseKey(c.to) : ''; const me = e.src === 'quota' ? 'Quota ' + e.key : e.key;
+      const myId = e.src === 'quota' ? ((e.ch.find(c => c.f === 'vin') || {}).to || qVin.get(e.key) || me) : e.key;
       e.dup = k && texts.has(k) ? texts.get(k).filter(u => u.id !== myId && u.unit !== me) : []; });
     // a name on a quota slot whose car is already in stock, the stock row still empty (lock forgotten): match it to the car
     for (const q of qNames) {
       const st = sheetStock.get(q.vin); if (!st) continue;
-      if (gseN(st.x.bkno) || (gseN(st.x.bknote) && sheetNorm(st.x.bknote) !== sheetNorm(q.text))) { if (!gseN(st.x.bkno) && gseN(st.x.bknote)) edits.push({ src: 'warn', br: st.br, key: q.vin, ch: [{ f: 'bknote', from: st.x.bknote, to: q.text }], note: `Quota ${q.ref} มีชื่อ "${q.text}" แต่แถว Stock มี "${st.x.bknote}" ผู้จัดการตัดสิน`, on: false }); continue; }
+      if (gseN(st.x.bkno) || (gseN(st.x.bknote) && gseKey(st.x.bknote) !== gseKey(q.text))) { if (!gseN(st.x.bkno) && gseN(st.x.bknote)) edits.push({ src: 'warn', br: st.br, key: q.vin, ch: [{ f: 'bknote', from: st.x.bknote, to: q.text }], note: `Quota ${q.ref} มีชื่อ "${q.text}" แต่แถว Stock มี "${st.x.bknote}" ผู้จัดการตัดสิน`, on: false }); continue; }
       if (gseN(st.x.bknote)) continue;   // both sheets already hold it
       edits.push({ src: 'match', docId: idsDocId('stock', st.br), br: st.br, key: q.vin, ref: q.ref, text: q.text, ch: [{ f: 'bknote', from: null, to: q.text }], on: true, dup: [] });
     }
@@ -116,3 +121,6 @@ document.addEventListener('change', ev => {
   if (t.dataset.gse !== undefined) { const e = G.edits[Number(t.dataset.gse)]; if (e) e.on = t.checked; render(); }
   if (t.dataset.gseall) { G.edits.forEach(e => { e.on = t.checked; }); render(); }
 });
+
+// the same name on two cells: spaces and upper / lower case do not count ("off / x" = "OFF/x")
+function gseKey(t) { return sheetNorm(t).toLowerCase(); }
