@@ -31,24 +31,32 @@ function bltDrop(r, D) {
     ${qs.length ? `<div class="lt-hint">Quota ที่ยังว่าง</div>${qs.map(it).join('')}` : ''}
     ${list.length ? '' : `<div class="lt-hint">${t.q ? `ไม่พบรถว่าง / Quota ว่างที่ตรงกับ "${esc(t.q)}"` : 'ไม่มีรถว่าง / Quota ว่างสเปกนี้ · พิมพ์เลขเฟรม หรือ Ref Quota เพื่อหาสเปกอื่น'}</div>`}</div>`;
 }
+function bkLocks(r, D) {
+  const row = r.row || {}, a = r.a, keys = [r.key, row.key, a && a.key].filter(Boolean);
+  return D.locks.filter((l, i, all) => all.findIndex(x => x.id === l.id) === i && keys.includes(l.bkref) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased && (l.live || l.status === 'pending'));
+}
 function bkLockCell(r, D) {
-  const row = r.row || {}, key = bltKey(r), L = row.lock && !['pending'].includes(row.lock.status) ? row.lock : null, T = !L ? row.tempLock || null : null;
+  const row = r.row || {}, key = bltKey(r), a = r.a;
   const can = ltCan() && !isSales(), t = S.blt && S.blt.key === key ? S.blt : null;
   if (t) return `<div class="lt-cell on"><input id="blt-in" class="lt-in" data-blt="${esc(key)}" value="${esc(t.q || '')}" placeholder="เลขเฟรม / Ref Quota" autocomplete="off">
     <button class="text-xs underline text-muted" data-act="blt-cancel">ยกเลิก</button>${bltDrop(r, D)}</div>`;
-  const lk = L || T;
+  const ls = bkLocks(r, D);
+  // a booking holds one car: more than one comes from a slip between the sheet and the web, checked on the booking card (11/11)
+  if (ls.length > 1) return a ? `<button class="text-xs underline font-semibold" style="color:var(--bad)" data-act="at-open" data-id="${esc(a.id)}">ล็อกไว้เกิน 1 คัน กดตรวจสอบ</button>` : `<span class="text-xs font-semibold" style="color:var(--bad)">ล็อกไว้เกิน 1 คัน</span>`;
+  const lk = ls[0];
   if (lk) {
-    const own = can && lk.typed && ltMine(lk);
-    return `<div class="text-sm">${bltUnitLabel(lk, D)}${lk.type === 'temp' ? '<div class="text-xs text-muted">ล็อกชั่วคราว</div>' : ''}${lk.status === 'pending' ? '<div class="text-xs" style="color:var(--warn)">รออนุมัติ</div>' : ''}
-      ${own ? `<div class="text-xs"><button class="underline" style="color:var(--accent, #2563eb)" data-act="blt-edit" data-k="${esc(key)}" data-id="${esc(lk.id)}">แก้</button> · <button class="underline" style="color:var(--accent, #2563eb)" data-act="lt-release" data-id="${esc(lk.id)}">ปล่อย</button>${lk.end ? ` <span class="text-muted">· ถึง ${fmtD(lk.end)}</span>` : ''}</div>` : lk.end ? `<div class="text-xs text-muted">ถึง ${fmtD(lk.end)}</div>` : ''}
+    const lnk = (act, txt, extra = '') => `<button class="underline" style="color:var(--accent, #2563eb)" data-act="${act}" ${extra}>${txt}</button>`;
+    const rel = lk.typed && ltMine(lk) ? lnk('lt-release', 'ปล่อยล็อก', `data-id="${esc(lk.id)}"`) : lnk('release-open', 'ปล่อยล็อก', `data-id="${esc(lk.id)}"`);
+    return `<div class="text-sm">${bltUnitLabel(lk, D)}${lk.type === 'temp' ? '<div class="text-xs text-muted">ล็อกชั่วคราว</div>' : ''}
+      ${lk.status === 'pending' ? `<div class="text-xs" style="color:var(--warn)">รออนุมัติ${a ? ` · ${lnk('at-open', 'ตรวจสอบ', `data-id="${esc(a.id)}"`)}` : ''}</div>`
+        : can ? `<div class="text-xs">${lnk('blt-edit', 'แก้ไข', `data-k="${esc(key)}" data-id="${esc(lk.id)}"`)} · ${rel}${lk.end ? ` <span class="text-muted">· ถึง ${fmtD(lk.end)}</span>` : ''}</div>` : lk.end ? `<div class="text-xs text-muted">ถึง ${fmtD(lk.end)}</div>` : ''}
       ${lk.sheet_sync && lk.sheet_sync.error && lk.sheet_sync.value ? '<div class="text-xs" style="color:var(--warn)">ยังไม่ได้ลงชีต</div>' : ''}</div>`;
   }
-  if (row.lock && row.lock.status === 'pending') return `<div class="text-sm">${bltUnitLabel(row.lock, D)}<div class="text-xs" style="color:var(--warn)">รออนุมัติล็อก</div></div>`;
   // allocated by IDS / in the delivery steps: its frame number
-  const vin = r.vin || row.vin || (r.a && atVin(r.a));
+  const vin = r.vin || row.vin || (a && atVin(a));
   if (vin) return `<span class="code text-sm">${esc(vin)}</span><div class="text-xs text-muted">${row.state === 'idscar' || row.match === 'car' ? 'IDS จัดสรร' : 'จัดสรรแล้ว'}</div>`;
   if (row.state === 'idsquota' && (row.ref || row.ws)) return `<span class="code text-sm">Quota ${esc(row.ref || row.ws)}</span><div class="text-xs text-muted">IDS จับคู่</div>`;
-  if (!can || !['waiting'].includes(row.state) || (r.a && !r.a.active)) return '<span class="text-muted">–</span>';
+  if (!can || !['waiting'].includes(row.state) || (a && !a.active)) return '<span class="text-muted">–</span>';
   return `<input class="lt-in idle" data-blt-open="${esc(key)}" placeholder="พิมพ์เลขเฟรม / Ref Quota" readonly>`;
 }
 document.addEventListener('focusin', ev => {

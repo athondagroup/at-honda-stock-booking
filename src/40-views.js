@@ -268,7 +268,7 @@ function viewStock(D) {
   const base = [...D.cars.values()].filter(c => !f.model || c.model === f.model);
   const grades = [...new Set(base.map(c => c.grade).filter(Boolean))].sort();
   const colors = [...new Set(base.filter(c => !f.sGrade || c.grade === f.sGrade).map(c => c.color).filter(Boolean))].sort();
-  const filters = `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
+  const filters = `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3 flt2">
     <div class="field"><label for="f-model">รุ่น</label><select id="f-model" data-filter="model"><option value="">ทุกรุ่น</option>${models.map(m => `<option ${f.model === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
     <div class="field"><label for="f-sg">เกรด</label><select id="f-sg" data-filter="sGrade"><option value="">ทุกเกรด</option>${grades.map(g => `<option value="${esc(g)}" ${f.sGrade === g ? 'selected' : ''}>${esc(gradeShort(f.model || '', g) || g)}</option>`).join('')}</select></div>
     <div class="field"><label for="f-sc">สี</label><select id="f-sc" data-filter="sColor"><option value="">ทุกสี</option>${colors.map(c => `<option ${f.sColor === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>

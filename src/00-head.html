@@ -157,6 +157,8 @@ tr.low td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 .lt-hint { font-size: 11px; color: var(--muted); padding: 5px 10px; background: var(--surface-2); }
 .tbl-xl .xl-pin { position: sticky; left: 0; z-index: 1; background: var(--surface); }
 .tbl-xl td.xl-st { white-space: normal; }
+/* filters on a phone: two boxes a row whatever loads the utility classes (11/11) */
+@media (max-width: 639px) { .flt2 { display: grid !important; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; } .flt2 > .col-span-2 { grid-column: span 2 / span 2; } .flt2 > .field { min-width: 0; } }
 .bk-tbl tr.bk-row { cursor: pointer; } .bk-tbl tr.bk-row:hover td { background: var(--surface-2); }
 .bk-tbl td[data-act="noop"] { cursor: default; }
 .bk-tbl .bk-acts .btn { white-space: nowrap; } .bk-tbl td { padding: 4px 6px; } .bk-tbl .chip { white-space: nowrap; }
