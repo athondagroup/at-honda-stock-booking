@@ -33,15 +33,35 @@ function priceOf(model, grade, color, year, old) {
   const main = old && op ? op : cur;
   return { ...main, year: y || null, isOld: !!(old && op), old: op ? op.price : null, cur: cur ? cur.price : null };
 }
-// a car in stock whose IDS model name says "ราคาเดิม" sells at the price before the adjustment
-function carOldPrice(car) { return !!(car && /ราคาเดิม/.test(String(car.note || ''))); }
+// a car sells at the price before the adjustment ("ราคาเดิม") when its model code is an old-price code (ตกลง 11/11: ราคาตาม model code),
+// or its IDS model name says "ราคาเดิม" / "ราคาเก่า". The code comes from the IDS stock file, else from Honda's sales report (MTOC).
+// Which codes are old: set on the price-list page; not set = a code ending in "1" (GN363VLN1, GN162VL1 … are the old-price CITY codes)
+function codeTiers() { return (S.ref.get('catalog') || {}).code_tier || {}; }
+function codeTierOf(code) { if (!code) return null; const t = codeTiers()[code]; return t ? { tier: t, auto: false } : { tier: /1$/.test(code) ? 'old' : 'cur', auto: true }; }
+var CODES_MEMO = null;
+function knownCodes() {
+  const D = derive(); if (CODES_MEMO && CODES_MEMO.D === D) return CODES_MEMO.list;
+  const set = new Set(Object.keys(codeTiers())); [...D.cars.values(), ...D.deliveredOut, ...D.removed].forEach(c => { if (c.mcode) set.add(c.mcode); });
+  const list = [...set].sort((a, b) => b.length - a.length); CODES_MEMO = { D, list }; return list;
+}
+function carCode(car) {
+  if (!car) return null; if (car.mcode) return car.mcode;
+  const rp = ((S.ref.get('honda_rpt') || {}).v || {})[String(car.vin || '').toUpperCase()], mt = rp && rp.mtoc ? String(rp.mtoc).toUpperCase() : '';
+  if (!mt) return null;
+  return knownCodes().find(c => mt.startsWith(c)) || (mt.length > 6 ? mt.slice(0, -6) : null);   // MTOC = code + 3 letters + colour
+}
+function carOldPrice(car) {
+  if (!car) return false;
+  if (/ราคาเดิม|ราคาเก่า/.test(String(car.note || ''))) return true;
+  const t = codeTierOf(carCode(car)); return !!(t && t.tier === 'old');
+}
 function priceText(p) { return p ? `${money(p.price)} บาท${p.isOld ? ' (ราคาเดิม)' : ''}${p.extra ? ` (สีนี้ +${money(p.extra)})` : ''}${p.exact ? '' : ' · ไม่มีราคาสีนี้ ใช้ราคาเริ่มต้นของเกรด'}${!p.isOld && p.old && p.old !== p.price ? ` · รถที่ IDS ระบุ "ราคาเดิม" ${money(p.old)} บาท` : ''}` : ''; }
 // the price of one booking: what it was booked at, else the price list for the allocated car's model year (else the newest year)
 function bookPrice(a, D) {
   const r = a.rec || {};
   const v = atVin(a), car = v && D && (D.cars.get(v) || (typeof carAny === 'function' ? carAny(v, D) : null));
   // the allocated car is a "ราคาเดิม" car: its old price, whatever was snapshotted at booking time
-  if (carOldPrice(car) || r.price_old) { const p = priceOf(a.model, a.grade, a.color, (car && car.year) || r.list_price_year || null, true); if (p && p.isOld) return { price: p.price, src: 'ราคาเดิม (รถคันนี้)', exact: p.exact }; }
+  if (carOldPrice(car) || r.price_old) { const p = priceOf(a.model, a.grade, a.color, (car && car.year) || r.list_price_year || null, true); if (p && p.isOld) return { price: p.price, src: `ราคาเดิม (รถคันนี้${carCode(car) ? ' · Model code ' + carCode(car) : ''})`, exact: p.exact }; }
   if (r.list_price) return { price: Number(r.list_price), src: 'ราคาตอนจอง' };
   const p = priceOf(a.model, a.grade, a.color, (car && car.year) || null);
   return p ? { price: p.price, src: car && car.year ? `ใบราคา MY'${String(p.year).slice(-2)}` : 'ใบราคาปัจจุบัน', exact: p.exact } : null;

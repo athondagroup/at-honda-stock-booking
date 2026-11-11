@@ -100,6 +100,7 @@ function adminCatalog(D) {
       <div class="field"><label for="cat-g">เกรด</label><input id="cat-g" data-catf="grade" value="${esc(m.grade || '')}" placeholder="เช่น e:HEV SV"></div>
       <div class="field"><label for="cat-c">รหัสสี (คั่นด้วยจุลภาค)</label><input id="cat-c" data-catf="colors" value="${esc(m.colors || '')}" placeholder="เช่น MTG, CBL, PMW"></div>
       <button class="btn btn-dark btn-sm" data-act="cat-add">เพิ่ม</button></div></section>` : ''}
+  ${codeTierBox(can)}
   <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl"><thead><tr><th>รุ่น</th><th>เกรด</th><th>สี</th><th class="text-right">ราคา (ปีรุ่นล่าสุด)</th><th>มาจาก</th><th></th></tr></thead><tbody>
     ${list.map(x => `<tr><td>${esc(x.mo)}</td><td>${esc(x.g)}</td><td class="text-sm">${x.cs.map(esc).join(' ')}</td><td class="num text-right text-xs">${priceCell(newestPrices(x.mo, x.g))}</td><td class="text-xs">${[x.fromIds ? 'ไฟล์ IDS' : '', x.fromCat ? 'ใบราคา / เพิ่มเอง' : ''].filter(Boolean).join(' · ')}</td>
       <td class="text-right nowrap">${can ? `<button class="btn btn-ghost btn-sm" data-act="cat-edit" data-k="${esc(x.mo + '|' + x.g)}">แก้ / ใส่ราคา</button>` : ''}${can && x.fromCat ? `<button class="btn btn-ghost btn-sm" data-act="cat-del" data-k="${esc(x.mo + '|' + x.g)}">ลบ</button>` : ''}</td></tr>`).join('')}</tbody></table></div>
@@ -174,3 +175,26 @@ function specYears(D, key) {
   return Object.entries(by).sort((a, b) => b[0].localeCompare(a[0]));
 }
 function catYearOf(model, grade) { const ys = catRows().filter(x => x.model === model && (!grade || x.grade === grade) && x.year).map(x => x.year); return ys.length ? Math.max(...ys) : null; }
+
+// ---- model code → current price or ราคาเดิม (ตกลง 11/11: ราคาตาม model code). Codes seen in the IDS stock; not set = ending in "1" is ราคาเดิม
+function codeTierBox(can) {
+  const D = derive(), by = new Map();
+  [...D.cars.values(), ...D.deliveredOut, ...D.removed].forEach(c => { if (!c.mcode) return; const x = by.get(c.mcode) || by.set(c.mcode, { code: c.mcode, model: c.model, grade: c.grade, n: 0 }).get(c.mcode); x.n++; });
+  Object.keys(codeTiers()).forEach(k => { if (!by.has(k)) by.set(k, { code: k, model: '', grade: '', n: 0 }); });
+  const rows = [...by.values()].sort((a, b) => String(a.model).localeCompare(String(b.model)) || String(a.grade).localeCompare(String(b.grade)) || a.code.localeCompare(b.code));
+  if (!rows.length) return '';
+  const hasOld = r => catPrices().some(p => p.model === r.model && gradeLoose(p.grade) === gradeLoose(r.grade) && priceTier(p) === 'old');
+  return `<details class="bg-surface border border-line rounded-lg p-4 mb-4"><summary class="font-head font-semibold cursor-pointer">ราคาตาม Model code <span class="text-sm text-muted font-normal">${rows.length} รหัส · รหัสที่เป็นราคาเดิม รถคันนั้นใช้ราคาเดิมของใบราคา</span></summary>
+    <div class="scroll-x mt-2"><table class="tbl text-sm"><thead><tr><th>Model code</th><th>รุ่น</th><th>เกรด</th><th class="text-right">ในสต็อก</th><th>ใช้ราคา</th></tr></thead><tbody>
+    ${rows.map(r => { const t = codeTierOf(r.code), old = hasOld(r);
+      return `<tr><td class="code">${esc(r.code)}</td><td>${esc(r.model || '')}</td><td>${esc(r.grade || '')}</td><td class="num text-right">${r.n || ''}</td><td class="nowrap">${can
+        ? `<select data-ctier="${esc(r.code)}" class="text-sm p-1 rounded border border-line" style="background:var(--surface)"><option value="cur" ${t.tier === 'cur' ? 'selected' : ''}>ราคาปัจจุบัน</option><option value="old" ${t.tier === 'old' ? 'selected' : ''}>ราคาเดิม</option></select>`
+        : esc(t.tier === 'old' ? 'ราคาเดิม' : 'ราคาปัจจุบัน')}${t.auto ? ' <span class="text-xs text-muted">อัตโนมัติ</span>' : ''}${t.tier === 'old' && !old ? ' <span class="text-xs" style="color:var(--warn)">ใบราคายังไม่มีราคาเดิมของเกรดนี้ · ใช้ราคาปัจจุบัน</span>' : ''}</td></tr>`; }).join('')}</tbody></table></div>
+    <p class="text-xs text-muted mt-2">ไม่ได้ตั้งไว้: รหัสที่ลงท้ายด้วย 1 (เช่น GN363VLN1, GN162VL1) = ราคาเดิม · รถที่ไม่อยู่ในไฟล์ Stock แล้ว ใช้รหัสจากรายงานการขาย Honda (MTOC)</p></details>`;
+}
+document.addEventListener('change', async ev => {
+  const t = ev.target; if (!t || !t.dataset || !t.dataset.ctier) return;
+  const code = t.dataset.ctier, v = t.value;
+  const ok = await catSave(() => {}, 'ราคาตาม Model code', `${code} → ${v === 'old' ? 'ราคาเดิม' : 'ราคาปัจจุบัน'}`, cur => ({ code_tier: { ...(cur.code_tier || {}), [code]: v } }));
+  if (ok !== false) { toast(`${code} ใช้${v === 'old' ? 'ราคาเดิม' : 'ราคาปัจจุบัน'}แล้ว`); render(); }
+});
