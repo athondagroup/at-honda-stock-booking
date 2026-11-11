@@ -64,15 +64,24 @@ function carOldPrice(car) {
 }
 function priceText(p) { return p ? `${money(p.price)} บาท${p.isOld ? ' (ราคาเดิม)' : ''}${p.extra ? ` (สีนี้ +${money(p.extra)})` : ''}${p.exact ? '' : ' · ไม่มีราคาสีนี้ ใช้ราคาเริ่มต้นของเกรด'}${!p.isOld && p.old && p.old !== p.price ? ` · รถที่ IDS ระบุ "ราคาเดิม" ${money(p.old)} บาท` : ''}` : ''; }
 // the price of one booking: what it was booked at, else the price list for the allocated car's model year (else the newest year)
-function bookPrice(a, D) {
+function bookPrice(a, D, vin0) {
   const r = a.rec || {};
-  const v = atVin(a), car = v && D && (D.cars.get(v) || (typeof carAny === 'function' ? carAny(v, D) : null));
+  const v = atVin(a) || vin0 || null, car = v && D && (D.cars.get(v) || (typeof carAny === 'function' ? carAny(v, D) : null));
   // the allocated car is a "ราคาเดิม" car: its old price, whatever was snapshotted at booking time
   if (carOldPrice(car) || r.price_old) { const p = priceOf(a.model, a.grade, a.color, (car && car.year) || r.list_price_year || null, true); if (p && p.isOld) return { price: p.price, src: `ราคาเดิม (รถคันนี้${carCode(car) ? ' · Model code ' + carCode(car) : ''})`, exact: p.exact }; }
   if (r.list_price) return { price: Number(r.list_price), src: 'ราคาตอนจอง' };
   const p = priceOf(a.model, a.grade, a.color, (car && car.year) || null);
   return p ? { price: p.price, src: car && car.year ? `ใบราคา MY'${String(p.year).slice(-2)}` : 'ใบราคาปัจจุบัน', exact: p.exact } : null;
 }
+// a car's own list price (no booking): its model code decides ราคาเดิม / current (11/11)
+function carListPrice(vin, model, grade, color, D) {
+  const car = (vin && (D.cars.get(vin) || (typeof carAny === 'function' ? carAny(vin, D) : null))) || { vin }, old = carOldPrice(car);
+  const p = priceOf(model, grade, color, car.year || null, old); if (!p) return null;
+  return { ...p, src: p.isOld ? `ราคาเดิม (Model code ${carCode(car) || '–'})` : 'ใบราคาปัจจุบัน' };
+}
+// the car sells at ราคาเดิม and the price list has one for it: the label under its model / grade
+function carIsOldPrice(c) { if (!c || !carOldPrice(c)) return false; const p = priceOf(c.model, c.grade, c.color, c.year || null, true); return !!(p && p.isOld); }
+function oldTag() { return '<div class="text-xs font-semibold" style="color:var(--warn)">ราคาเดิม</div>'; }
 function bookYear(model) { return (typeof MODEL_YEAR === 'object' && MODEL_YEAR[model]) || catYearOf(model) || null; }
 // the booking form: the price of the picked car and, once a discount is typed, the price after it
 function bookFormPrice(d) {
@@ -155,7 +164,7 @@ function acctRows(D, E) {
   const dv = saleBasis() === 'dv', dOf = i => dv ? i.ddate : i.idate;
   return D.X.inv.filter(i => !i.company && dOf(i) && dOf(i) >= E.from && dOf(i) <= E.to && inBr(i) && !(i.vin && advs.has(i.vin)) && !(i.vin && D.invByVin.get(i.vin) !== i)).map(i => {
     const a = i.vin ? carBookingOf(i.vin, D) : null, deal = a && a.rec && a.rec.deal, vin = String(i.vin || '').toUpperCase();
-    const p = a ? bookPrice(a, D) : (priceOf(i.model, i.grade, i.color, null) ? { ...priceOf(i.model, i.grade, i.color, null), src: 'ใบราคาปัจจุบัน' } : null);
+    const p = a ? bookPrice(a, D, i.vin) : carListPrice(i.vin, i.model, i.grade, i.color, D);
     const dOk = !!(deal && deal.at), fo = a ? saleFoc(a) : { v: null, src: '' }, focOff = fo.src === 'ตามใบสั่งแต่งรถ';
     const disc = a ? (dOk ? num(deal.disc) + num(deal.down_disc) : bookDiscount(a)) : null, foc = fo.v;
     const real = deal && deal.at && deal.campaign_id && !['pending', 'none'].includes(deal.campaign_id), pk = picks[vin];
@@ -202,7 +211,7 @@ function dashAcct(D) {
     ${dCard('แยกรุ่น เกรด', gTable(acctGroup(rows, r => `${r.model || ''} ${gradeShort(r.model, r.grade) || r.grade || ''}`.trim()), 'รุ่น เกรด'))}
   </div>
   ${dCard(`รายคัน <span class="text-muted text-sm font-normal">กด ▾ ที่หัวคอลัมน์เพื่อเรียงหรือกรองแบบ Excel · ค่าเริ่มต้นเรียง % ส่วนลดมากไปน้อย · กดแถวเพื่อเปิดใบจอง กดเลขตัวถังเพื่อดูรถ</span>`, `<div class="scroll-x max-h-96 overflow-auto"><table class="tbl text-sm"><thead><tr><th>${saleBasis() === 'dv' ? 'ส่งมอบ' : 'ออกใบกำกับ'}${fIn('date')}</th><th>สาขา${fIn('br')}</th><th>เลขตัวถัง${fIn('vin')}</th><th>เซลล์${fIn('sales')}</th>${isSales() ? '' : `<th>ลูกค้า${fIn('cust')}</th>`}<th>รุ่น เกรด สี${fIn('spec')}</th><th class="text-right">ราคาเต็ม${fIn('price')}</th><th class="text-right">เงินรางวัลแคมเปญ${fIn('reward')}</th><th class="text-right">ส่วนลด${fIn('disc')}</th><th class="text-right">%${fIn('pct')}</th><th class="text-right">ราคาหลังลด${fIn('net')}</th><th class="text-right">FOC${fIn('foc')}</th></tr></thead><tbody>
-    ${list.slice(0, 1500).map(r => `<tr ${r.a ? `class="cursor-pointer" data-act="at-open" data-id="${esc(r.a.id)}"` : ''}><td class="num nowrap">${fmtD(r.date)}</td><td>${esc(r.br || '')}</td><td class="nowrap">${r.vin ? vinLink({ vin: r.vin }) : ''}</td><td class="nowrap">${salesName(r.sales || '')}${r.a ? '' : ' <span class="text-xs text-muted">ไม่พบใบจอง</span>'}</td>${isSales() ? '' : `<td class="truncate" style="max-width:160px">${esc(r.cust || '')}</td>`}<td class="nowrap">${esc(r.model || '')} ${esc(gradeShort(r.model, r.grade) || r.grade || '')} ${esc(r.color || '')}</td>
+    ${list.slice(0, 1500).map(r => `<tr ${r.a ? `class="cursor-pointer" data-act="at-open" data-id="${esc(r.a.id)}"` : ''}><td class="num nowrap">${fmtD(r.date)}</td><td>${esc(r.br || '')}</td><td class="nowrap">${r.vin ? vinLink({ vin: r.vin }) : ''}</td><td class="nowrap">${salesName(r.sales || '')}${r.a ? '' : ' <span class="text-xs text-muted">ไม่พบใบจอง</span>'}</td>${isSales() ? '' : `<td class="truncate" style="max-width:160px">${esc(r.cust || '')}</td>`}<td class="nowrap">${esc(r.model || '')} ${esc(gradeShort(r.model, r.grade) || r.grade || '')} ${esc(r.color || '')}${/^ราคาเดิม/.test(r.src || '') ? oldTag() : ''}</td>
       <td class="num text-right" title="${esc(r.src || '')}">${r.price === null ? '<span class="text-muted">ไม่มีราคา</span>' : money(r.price)}</td><td class="num text-right">${r.reward === null ? '–' : money(r.reward)}</td><td class="num text-right nowrap">${r.disc === null ? '–' : grey(money(r.disc), r.discOff)}${r.odd ? ' ' + chip('ตรวจ', 'bad') : ''}</td><td class="num text-right font-semibold" ${hi(r) ? 'style="color:var(--bad)"' : ''}>${pct1(r.pct)}</td><td class="num text-right">${r.net === null ? '–' : money(r.net)}</td><td class="num text-right">${r.foc === null ? '–' : grey(money(r.foc), r.focOff)}</td></tr>`).join('') || `<tr><td colspan="12" class="text-muted">${acxOn() ? 'ไม่มีรายการตามตัวกรอง' : 'ไม่มีรายการในช่วงนี้'}</td></tr>`}</tbody></table></div>`,
     `ราคาเต็ม: ใบจองใหม่เก็บราคาตอนจองไว้ (คันที่ไม่พบใบจองใช้ใบราคาปัจจุบัน) · เงินรางวัลแคมเปญ: ตามไฟล์เงิน Honda ถ้ามี ไม่งั้นตามแคมเปญที่เลือกไว้ · ราคารถ · ใบจองเดิมใช้ใบราคาตามปีรุ่นของรถที่จัดสรร (ยังไม่จัดสรรใช้ปีล่าสุด)${iss && iss.no ? ` · ใบราคาที่ใช้ Issued No. ${esc(iss.no)}${iss.date ? ' (' + esc(iss.date) + ')' : ''}` : ''} · ส่วนลด: ยอดส่วนลดรวมที่แอดมินคีย์ในเงื่อนไขการขาย · FOC: ตามใบสั่งแต่งรถ · ตัวเลขสีเทาจาง = ยังไม่ official (ที่เซลล์ลงตอนจอง) · ขั้นต่อไป: ใส่ต้นทุนของแถม (FOC) แต่ละรายการ`)}`;
 }
