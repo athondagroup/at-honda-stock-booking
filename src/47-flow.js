@@ -160,7 +160,9 @@ function flowPanel(m, a, D) {
       <div class="mt-2 flex gap-2"><button class="btn btn-dark btn-sm" data-act="flow-fin" data-id="${esc(a.id)}">บันทึก</button>
       <span class="text-xs text-muted self-center">เลือก "ผ่าน" แล้วไปขั้นถัดไปได้ · ใบอนุมัติแนบภายหลังได้ แต่ต้องแนบก่อนส่งมอบ</span></div>` : ''}${dealBox(a, m, D)}`;
   };
-  const downBody = () => (fl.done.down || payItems(a).length || can('down')) ? payBody(a, m, who, perms().write && (can('down') || (payItems(a).length > 0 && stepAllowed(a, 'down') && (!fl.done.delivered || fix)))) : '';
+  // delivered already (IDS DL) and not paid in the web: admin and above record the payment late (11/11)
+  const downLate = fl.done.delivered && stepAllowed(a, 'down') && (!isSales() || fix);
+  const downBody = () => (fl.done.down || payItems(a).length || can('down') || downLate) ? payBody(a, m, who, perms().write && (can('down') || downLate || (payItems(a).length > 0 && stepAllowed(a, 'down') && (!fl.done.delivered || fix)))) : '';
   const assignBody = () => {
     if (fl.done.assign && !(f.assign && f.assign.vin)) return `<div class="text-sm text-muted">IDS จัดสรรรถ <span class="code">${esc(a.match.vin)}</span> ให้ใบจองนี้แล้ว (จากไฟล์ IDS)</div>${bkLocks(a, D)}${swapHist(a)}`;
     if (fl.done.assign) { const ac = D.cars.get(f.assign.vin); return `<div class="text-sm text-muted">รถ <span class="code">${esc(f.assign.vin)}</span>${ac ? ` · ${esc(ac.br)} · ${prodPlain(ac)}` : ''} · ${who(f.assign)}</div>${swapHist(a)}`; }

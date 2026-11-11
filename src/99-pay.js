@@ -131,7 +131,10 @@ Object.assign(ACTIONS, {
   },
   async 'flow-down'(el) {
     const a = atById(el.dataset.id), m = S.modal || {};
-    if (!a || !stepAllowed(a, 'down') || (a.flow.done.delivered && !fixOn(a)) || !(stepOpen(a, 'down') || payItems(a).length)) { toast('บันทึกการชำระได้หลังทำ ใบสั่งแต่งรถ แล้ว', 'bad'); return; }
+    // delivered already (e.g. from the IDS DL file, PO skipped): admin and above can still record the payment (11/11)
+    const late = !!(a && a.flow.done.delivered);
+    if (late && isSales() && !fixOn(a)) { toast('ส่งมอบแล้ว แอดมินขึ้นไปบันทึกการชำระได้', 'bad'); return; }
+    if (!a || !stepAllowed(a, 'down') || !(stepOpen(a, 'down') || payItems(a).length || late)) { toast('บันทึกการชำระได้หลังทำ / ข้ามใบสั่งแต่งรถแล้ว', 'bad'); return; }
     const d = m.pay || {}, no = String(d.receipt_no || '').trim(), date = d.date || todayISO(), method = d.method || 'cash';
     if (!no) { toast('ใส่เลขที่ใบเสร็จ', 'bad'); $('#pay-no')?.focus(); return; }
     if (!(num(d.amount) > 0)) { toast('ใส่ยอดเงิน', 'bad'); $('#pay-am')?.focus(); return; }
