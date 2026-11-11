@@ -254,23 +254,23 @@ function bookTermsBox(d) {
   if (!d.model || !d.grade || !d.color) return `<fieldset class="p-4 rounded-lg border border-line"><legend class="font-head font-semibold px-1">เงื่อนไขการขาย</legend><p class="text-sm text-muted">เลือกรุ่น เกรด สี ก่อน แล้วจะเลือกดาวน์ ผ่อน แคมเปญ และ Margin ได้</p></fieldset>`;
   d.deal = d.deal || {};
   const x = bookTermsCtx(d), p = bookTermsPrice(d);
-  const v = { ...d.deal, price: p ? p.price : d.deal.price, disc: d.discount, ins1_by: d.insurance, ins1_kind: d.insurance_kind };
+  const v = bookTermsV(d, x, p);
   return `<fieldset class="p-4 rounded-lg border border-line"><legend class="font-head font-semibold px-1">เงื่อนไขการขาย (${x.cash ? 'ซื้อสด' : 'ไฟแนนซ์'})</legend>
     <p class="text-sm text-muted mb-2">ส่วนลดไม่มีเว้นว่างได้ · หลังบันทึก เซลล์ขอแก้ได้อีก 1 ครั้งตอนไฟแนนซ์ผ่าน (แอดมินอนุมัติ)</p>
     <div class="grid sm:grid-cols-3 gap-3 mb-3">
       ${p ? `<div class="field"><label>ราคารถ (ราคาเต็ม)</label><div class="num p-2 rounded-lg border border-line" style="background:var(--surface-2)">${money(p.price)}</div><span class="text-xs text-muted">ตามใบราคาในเว็บ${p.paint ? ` · รวมค่าสี ${money(p.paint)}` : ''}</span></div>`
         : `<div class="field"><label for="bt-price" class="req">ราคารถ (ราคาเต็ม)</label><input id="bt-price" type="number" min="0" step="100" inputmode="decimal" data-draft="booking.deal.price" value="${esc(d.deal.price ?? '')}"><span class="text-xs" style="color:var(--warn)">ยังไม่มีราคาสีนี้ในเว็บ ใส่เอง</span></div>`}
-      <div class="field"><label for="b-discount">ส่วนลดราคารถ (บาท)</label><input id="b-discount" type="number" min="0" step="100" inputmode="numeric" data-draft="booking.discount" value="${esc(d.discount ?? '')}" placeholder="ไม่มีเว้นว่าง"></div></div>
+      <div class="field"><label for="b-discount">${x.cash ? 'ส่วนลดราคารถ (บาท)' : 'ส่วนลด (บาท) · ไฟแนนซ์ลงเป็นส่วนลดดาวน์'}</label><input id="b-discount" type="number" min="0" step="100" inputmode="numeric" data-draft="booking.discount" value="${esc(d.discount ?? '')}" placeholder="ไม่มีเว้นว่าง"></div></div>
     ${termsFields(x, v, { attr: 'data-draft', pre: 'booking.deal', idp: 'bt', paint: p ? p.paint : 0, priceDisc: false, noIns1: true })}</fieldset>`;
 }
 function bookTermsMissing(d) {
   if (!d.model || !d.grade || !d.color) return null;
-  const x = bookTermsCtx(d), p = bookTermsPrice(d), v = { ...(d.deal || {}), price: p ? p.price : (d.deal || {}).price, disc: d.discount, ins1_by: d.insurance, ins1_kind: d.insurance_kind };
+  const x = bookTermsCtx(d), p = bookTermsPrice(d), v = bookTermsV(d, x, p);
   return termsCheck(x, v).err || null;
 }
 function bookTermsRec(d) {
   if (!d.model || !d.grade || !d.color) return null;
-  const x = bookTermsCtx(d), p = bookTermsPrice(d), v = { ...(d.deal || {}), price: p ? p.price : (d.deal || {}).price, disc: d.discount, ins1_by: d.insurance, ins1_kind: d.insurance_kind };
+  const x = bookTermsCtx(d), p = bookTermsPrice(d), v = bookTermsV(d, x, p);
   return { ...termsRecord(x, v, p ? p.paint : 0), price_src: p ? 'ใบราคาในเว็บ' : 'ใส่เอง', cash: x.cash, ...actor(), first: actor(), hist: [], src: 'ใบจอง' };
 }
 // ---- after delivery: the commission data is the sale terms (changed in the finance step), shown here
@@ -374,3 +374,9 @@ Object.assign(ACTIONS, {
 });
 
 function xpVat(y) { return !!y && /^\s*(vat|แวต|ภาษีมูลค่าเพิ่ม)\s*$/i.test(String(y.l || '')); }
+
+// the booking form's discount (11/11): cash = discount on the car price · finance = the down-payment discount first
+function bookTermsV(d, x, p) {
+  const dl = d.deal || {}, fin = !x.cash;
+  return { ...dl, price: p ? p.price : dl.price, disc: fin ? (dl.disc ?? '') : d.discount, down_disc: fin && termEmpty(dl.down_disc) ? (d.discount ?? '') : dl.down_disc, ins1_by: d.insurance, ins1_kind: d.insurance_kind };
+}

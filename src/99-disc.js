@@ -37,7 +37,7 @@ function discPre(a, D) {
   return {
     date: s.date || (f.delivered && f.delivered.date) || todayISO(), cust: s.cust || a.cust || '', model: s.model || a.model || '', grade: s.grade || gradeShort(a.model, a.grade) || a.grade || '', color: s.color || a.color || '',
     vin: s.vin || vin, engine: s.engine || c.engine || '', cash: s.cash ?? cash, fin: s.fin ?? finFull(fin), down: s.down ?? (has('down') ? dl.down : (num(cm.down) || num(r.down) || '')), price: s.price ?? (has('price') ? dl.price : (num(cm.price) || num(r.price) || '')),
-    body: s.body ?? (cash ? '' : has('disc') ? dl.disc : dl.at ? '' : total || ''), downDisc: s.downDisc ?? (has('down_disc') ? dl.down_disc : ''), cashDisc: s.cashDisc ?? (cash ? (has('disc') ? dl.disc : dl.at ? '' : total || '') : ''), tel: s.tel || '', mobile: s.mobile || r.phone || ''
+    body: s.body ?? (cash ? '' : has('disc') ? dl.disc : ''), downDisc: s.downDisc ?? (has('down_disc') ? dl.down_disc : !cash && !dl.at ? total || '' : ''), cashDisc: s.cashDisc ?? (cash ? (has('disc') ? dl.disc : dl.at ? '' : total || '') : ''), tel: s.tel || '', mobile: s.mobile || r.phone || ''
   };
 }
 function discTotal(v) { return v.cash ? num(v.cashDisc) : num(v.body) + num(v.downDisc); }
