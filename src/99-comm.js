@@ -152,7 +152,7 @@ function termsFill(x, v, paint) {
   ['margin_car', 'margin_at', 'margin_honda', 'margin_priv'].forEach(k => { if (termEmpty(o[k])) o[k] = def[k]; });
   if (x.cash) { o.margin_at = 0; o.at_step = ''; }
   // ลูกค้าชำระเพิ่ม (10/11): items the customer pays for on top, each with its value, counted in the margin
-  o.extra_pay = Array.isArray(o.extra_pay) ? o.extra_pay : [];
+  o.extra_pay = xpArr(o.extra_pay);
   o.margin_extra = o.extra_pay.reduce((n, y) => n + num(y && y.v), 0);
   o.margin = num(o.margin_car) + num(o.margin_at) + num(o.margin_honda) + num(o.margin_priv) + o.margin_extra;
   return { o, camp, st, base, def, pv };
@@ -161,7 +161,8 @@ function termsFill(x, v, paint) {
 // f: { attr: 'data-modal' | 'data-draft', pre, idp, ro, paint, priceDisc: bool, lockPrice, priceNote }
 function termsFields(x, v, f) {
   // VAT is always the first line of ลูกค้าชำระเพิ่ม (11/11): ready to fill, left empty when there is none (only the form being keyed)
-  if (v && !f.ro) { if (!Array.isArray(v.extra_pay)) v.extra_pay = []; if (!v.extra_pay.some(xpVat)) v.extra_pay.unshift({ l: 'VAT', v: '' }); }
+  // the list lives on the form being keyed itself (the booking form passes a copy): typed values go to the same array (12/11 fix)
+  if (v && !f.ro) { const tgt = xpTarget(f) || v; tgt.extra_pay = xpArr(tgt.extra_pay); if (!tgt.extra_pay.some(xpVat)) tgt.extra_pay.unshift({ l: 'VAT', v: '' }); v.extra_pay = tgt.extra_pay; }
   const { o, st, base, pv } = termsFill(x, v, f.paint), { opts, warns } = campOptions(x), dis = f.ro ? 'disabled' : '';
   const S2 = (k, label, list) => `<div class="field"><label for="${f.idp}-${k}">${label}</label><select id="${f.idp}-${k}" ${f.attr}="${f.pre}.${k}" ${dis}>${list.map(([val, t, off]) => `<option value="${val}" ${String(o[k] || '') === val ? 'selected' : ''} ${off ? 'disabled' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
   const N = (k, label, extra = '') => `<div class="field"><label for="${f.idp}-${k}">${label}</label><input id="${f.idp}-${k}" type="number" min="0" inputmode="decimal" ${f.attr}="${f.pre}.${k}" value="${esc(o[k] ?? '')}" ${dis} ${extra}></div>`;
@@ -229,7 +230,7 @@ function termsCheck(x, v) {
     if (termEmpty(v.rate) || !(Number(v.rate) >= 0) || Number(v.rate) > 30) return { err: 'ใส่ดอกเบี้ย (0–30%)', id: 'rate' };
     const t = Number(v.term); if (!(t >= 1 && t <= 120 && t === Math.round(t))) return { err: 'ใส่จำนวนงวด 1–120 เดือน', id: 'term' };
   }
-  if ((v.extra_pay || []).some(y => y && num(y.v) && !String(y.l || '').trim())) return { err: 'ลูกค้าชำระเพิ่ม: ใส่ชื่อรายการ', id: 'xp0l' };
+  if (xpArr(v.extra_pay).some(y => y && num(y.v) && !String(y.l || '').trim())) return { err: 'ลูกค้าชำระเพิ่ม: ใส่ชื่อรายการ', id: 'xp0l' };
   if (num(v.priv_hk) && (num(v.priv_hk) < 25000 || num(v.priv_hk) > 70000)) return { err: 'ฮอนด้าเคียงข้างคุณ 25,000–70,000 บาท', id: 'priv_hk' };
   if (num(v.priv_hk) && (v.priv_gtg || v.priv_ln)) return { err: 'ฮอนด้าเคียงข้างคุณ ใช้ร่วมกับ Gen to Gen / Local Native ไม่ได้', id: 'priv_hk' };
   // not chosen yet is allowed (ตกลง 30/10): it is kept as "รอเลือกแคมเปญ" and the admin picks it later
@@ -368,7 +369,7 @@ Object.assign(ACTIONS, {
 
 Object.assign(ACTIONS, {
   'terms-xp-add'(el) { const root = el.dataset.attr === 'data-modal' ? S.modal : S.draft; if (!root) return; const k = el.dataset.pre + '.extra_pay';
-    let o = root; for (const p of k.split('.').slice(0, -1)) { if (!o[p]) o[p] = {}; o = o[p]; } if (!Array.isArray(o.extra_pay)) o.extra_pay = []; o.extra_pay.push({ l: '', v: '' }); render(); },
+    let o = root; for (const p of k.split('.').slice(0, -1)) { if (!o[p]) o[p] = {}; o = o[p]; } o.extra_pay = xpArr(o.extra_pay); o.extra_pay.push({ l: '', v: '' }); render(); },
   'terms-xp-del'(el) { const root = el.dataset.attr === 'data-modal' ? S.modal : S.draft; if (!root) return;
     let o = root; for (const p of el.dataset.pre.split('.')) { if (!o[p]) return; o = o[p]; } if (Array.isArray(o.extra_pay)) o.extra_pay.splice(Number(el.dataset.i), 1); render(); }
 });
@@ -379,4 +380,12 @@ function xpVat(y) { return !!y && /^\s*(vat|แวต|ภาษีมูลค�
 function bookTermsV(d, x, p) {
   const dl = d.deal || {}, fin = !x.cash;
   return { ...dl, price: p ? p.price : dl.price, disc: fin ? (dl.disc ?? '') : d.discount, down_disc: fin && termEmpty(dl.down_disc) ? (d.discount ?? '') : dl.down_disc, ins1_by: d.insurance, ins1_kind: d.insurance_kind };
+}
+
+// extra_pay as an array, also when a typed value made it an object ({0: {...}}) (12/11)
+function xpArr(x) { return Array.isArray(x) ? x : x && typeof x === 'object' ? Object.keys(x).filter(k => /^\d+$/.test(k)).sort((a, b) => a - b).map(k => x[k]) : []; }
+function xpTarget(f) {
+  let o = f.attr === 'data-modal' ? S.modal : f.attr === 'data-draft' ? S.draft : null; if (!o) return null;
+  for (const k of String(f.pre || '').split('.').filter(Boolean)) { if (!o[k] || typeof o[k] !== 'object') o[k] = {}; o = o[k]; }
+  return o;
 }

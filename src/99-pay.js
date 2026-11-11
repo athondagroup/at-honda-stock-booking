@@ -48,7 +48,7 @@ function payCostAuto(a) {
     regGift: gift(d.reg_by) ? d.reg_by : null, regDef: gift(d.reg_by) ? 0 : feeReg(a, d.reg_type),
     insGift: gift(d.ins1_by) ? d.ins1_by : null, insDef: d.ins1_by === 'ลูกค้าซื้อ' ? feeIns(a, 1, d) : 0,
     // VAT keyed under "ลูกค้าชำระเพิ่ม" in the sale terms is paid on collection day (11/11)
-    vat: (d.extra_pay || []).filter(y => y && num(y.v) && /vat|แวต|ภาษีมูลค่าเพิ่ม/i.test(String(y.l || ''))).map(y => ({ l: String(y.l || 'VAT'), v: num(y.v) })),
+    vat: xpArr(d.extra_pay).filter(y => y && num(y.v) && /vat|แวต|ภาษีมูลค่าเพิ่ม/i.test(String(y.l || ''))).map(y => ({ l: String(y.l || 'VAT'), v: num(y.v) })),
     po: poRows,
     // the first instalment paid on collection day (finance, 11/11): estimated from the sale terms, can be typed over
     adv: !cash && !!d.adv_inst, inst: !cash && d.adv_inst && typeof dealMonthly === 'function' ? dealMonthly(d) || 0 : 0,
