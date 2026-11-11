@@ -149,7 +149,10 @@ function bookRow(r, D, p) {
   if (!a && b && p.write && idsFixCan(b)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="idsfix-open" data-id="${esc(b.no)}">แก้ไข</button>`);
   if (p.write && p.request && !ltCan() && row.state === 'waiting' && (!isSales() || isMine(r.owner)) && (a ? a.active : true)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="lock-open" data-bk="${esc(row.key || r.key)}">ขอล็อกรถ</button>`);
   // the booking's own locks are handled on this row: approve, allocate, extend, release, swap, undo (ตกลง 13/10)
-  if (p.write) D.locks.filter((l, i, all) => all.findIndex(x => x.id === l.id) === i).filter(l => (l.bkref === r.key || (row.key && l.bkref === row.key) || (a && l.bkref === a.key)) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased).forEach(l => acts.push(...rowLockActs(l, D)));
+  if (p.write) D.locks.filter((l, i, all) => all.findIndex(x => x.id === l.id) === i).filter(l => (l.bkref === r.key || (row.key && l.bkref === row.key) || (a && l.bkref === a.key)) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased).forEach(l => { const bs = rowLockActs(l, D); if (!bs.length) return;
+    // one line per lock: which car / quota slot it is for (11/11)
+    const q = !l.vin && l.ref ? D.quota.find(x => x.ref === l.ref) : null, unit = l.vin || (q && q.vin) || (l.ref ? 'Quota ' + l.ref : l.type === 'temp' ? 'ล็อกชั่วคราว' : '');
+    acts.push(`<div class="flex gap-1 items-center justify-end">${unit ? `<span class="code text-xs text-muted mr-1">${esc(unit)}</span>` : ''}${bs.join('')}</div>`); });
 
   const idsCell = a ? `${matchChip(a)}${a.matchAsk ? `<div>${chip('รอยืนยันการจับคู่', 'warn')}</div>` : ''}${b && b.ids ? `<div class="text-xs text-muted">${esc(b.ids)}</div>` : ''}`
     : `${r.noForm ? chip('ยังไม่มีฟอร์ม AT', 'bad') : b.webCancel ? '' : b.match === 'cancel' ? chip('รอยกเลิกใน IDS', 'muted') : chip('ใน IDS', 'neutral')}<div class="text-xs text-muted">${esc(b.ids || '')}</div>${idsFixChip(b)}`;
@@ -164,7 +167,7 @@ function bookRow(r, D, p) {
     <td class="nowrap" data-act="noop">${bkLockCell(r, D)}</td>
     <td style="min-width:90px;max-width:150px">${idsCell}</td>
     <td style="min-width:90px;max-width:160px">${stateCell}</td>
-    <td class="text-right" ${acts.length ? 'data-act="noop"' : ''}><div class="flex gap-1 justify-end bk-acts">${acts.join('')}</div></td></tr>`;
+    <td class="text-right" ${acts.length ? 'data-act="noop"' : ''}><div class="flex flex-col gap-1 items-end bk-acts">${acts.join('')}</div></td></tr>`;
 }
 function bookingFilters(qKey, withState) {
   const f = S.filters;
