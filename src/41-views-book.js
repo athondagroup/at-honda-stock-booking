@@ -14,11 +14,12 @@ function matchChip(a) {
     if (a.demo) return chip('รถทดลองขับ', 'muted');
     if (a.flow.history) return chip('ส่งมอบแล้ว (ฟอร์มเดิม)', 'muted');
     const nearTxt = a.near ? (a.near.some(h => h.other) ? ' · ชื่อซ้ำกับใบจองอื่น' : ' · มีชื่อคล้ายใน IDS') : '';
-    return a.ageDays >= AT_TO_IDS_DAYS ? chip(`ยังไม่อยู่ใน IDS ${a.ageDays} วัน${nearTxt}`, a.near ? 'warn' : 'bad') : chip(`รอคีย์ IDS (${a.ageDays ?? 0} วัน)${nearTxt}`, 'neutral');
+    // the tag, then the days in light text under it (11/11)
+    return (a.ageDays >= AT_TO_IDS_DAYS ? chip('ยังไม่อยู่ใน IDS', a.near ? 'warn' : 'bad') : chip('รอคีย์ IDS', 'neutral')) + `<div class="text-xs text-muted">${a.ageDays ?? 0} วัน${esc(nearTxt)}</div>`;
   }
   const pre = m.status === 'possible' ? 'อาจตรง · ' : '';
-  if (m.kind === 'dl') return chip(pre + (m.ddate ? `ส่งมอบแล้ว ${fmtD(m.ddate)}` : `ออกใบกำกับ ${fmtD(m.idate)}`), m.status === 'possible' ? 'warn' : 'good');
-  if (m.kind === 'stock') return chip(pre + 'จัดสรรรถแล้ว · รอส่งมอบ', m.status === 'possible' ? 'warn' : 'good');
+  if (m.kind === 'dl') return chip(pre + (m.ddate ? 'ส่งมอบแล้ว' : 'ออกใบกำกับ'), m.status === 'possible' ? 'warn' : 'good') + `<div class="text-xs text-muted">${fmtD(m.ddate || m.idate)}</div>`;
+  if (m.kind === 'stock') return chip(pre + 'รอส่งมอบ', m.status === 'possible' ? 'warn' : 'good');
   return chip(pre + 'พบใน IDS', m.status === 'possible' ? 'warn' : 'good');
 }
 
@@ -146,24 +147,24 @@ function bookRow(r, D, p) {
   else if (r.noForm && p.book && p.write && (!isSales() || isMine(r.owner))) acts.push(`<button class="btn btn-dark btn-sm" data-act="ids-claim" data-id="${esc(b.no)}">ลงฟอร์ม AT</button>`);
   if (!a && b && r.noForm && p.write && idsFixCan(b)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="idspair-open" data-id="${esc(b.key)}">จับคู่กับฟอร์มที่มี</button>`);
   if (!a && b && p.write && idsFixCan(b)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="idsfix-open" data-id="${esc(b.no)}">แก้ไข</button>`);
-  if (p.write && p.request && row.state === 'waiting' && (!isSales() || isMine(r.owner)) && (a ? a.active : true)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="lock-open" data-bk="${esc(row.key || r.key)}">ขอล็อกรถ</button>`);
+  if (p.write && p.request && !ltCan() && row.state === 'waiting' && (!isSales() || isMine(r.owner)) && (a ? a.active : true)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="lock-open" data-bk="${esc(row.key || r.key)}">ขอล็อกรถ</button>`);
   // the booking's own locks are handled on this row: approve, allocate, extend, release, swap, undo (ตกลง 13/10)
   if (p.write) D.locks.filter(l => (l.bkref === r.key || (row.key && l.bkref === row.key) || (a && l.bkref === a.key)) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased).forEach(l => acts.push(...rowLockActs(l, D)));
-  if (p.write && a && a.active && ((a.flow.next === 'assign' && (canAllocBr(a.br) || adminOwns(a))) || mgrAssign(a))) acts.push(chip('รอจัดสรรรถ', 'ink'));
+
   const idsCell = a ? `${matchChip(a)}${a.matchAsk ? `<div>${chip('รอยืนยันการจับคู่', 'warn')}</div>` : ''}${b && b.ids ? `<div class="text-xs text-muted">${esc(b.ids)}</div>` : ''}`
     : `${r.noForm ? chip('ยังไม่มีฟอร์ม AT', 'bad') : b.webCancel ? '' : b.match === 'cancel' ? chip('รอยกเลิกใน IDS', 'muted') : chip('ใน IDS', 'neutral')}<div class="text-xs text-muted">${esc(b.ids || '')}</div>${idsFixChip(b)}`;
   const stateCell = a && a.cancelled ? (a.rec.cancel && a.rec.cancel.refund === 'refund' ? chip(a.rec.refund && a.rec.refund.at ? 'ยกเลิก · ทำใบคืนเงินแล้ว' : 'ยกเลิก · รอทำใบคืนเงิน', a.rec.refund && a.rec.refund.at ? 'muted' : 'warn') : chip('ยกเลิก', 'muted'))
-    : `${a && a.change ? `<div>${chip(a.change.type === 'cancel' ? 'รออนุมัติยกเลิก' : a.change.type === 'merge' ? 'รออนุมัติรวมใบ (ลงซ้ำ)' : 'รออนุมัติแก้ไข', 'warn')}</div>` : ''}${a && gformDue(a) && gformCfg() && (a.rec.created_at || '') >= (gformCfg().at || '') ? `<div>${chip('ยังไม่ส่ง Google Form', 'warn')}</div>` : ''}${a && a.flow.history ? chip('ส่งมอบแล้ว (ประวัติ)', 'muted') : statusChip(BOOK_STATE, row.state || 'waiting')}${row.state === 'waiting' && row.pos ? ` <span class="text-xs text-muted">คิวที่ ${row.pos}</span>` : ''}${row.state === 'waiting' && row.noIds ? ' <span class="text-xs" style="color:var(--warn)">ยังไม่มีใน IDS</span>' : ''}
+    : `${a && a.change ? `<div>${chip(a.change.type === 'cancel' ? 'รออนุมัติยกเลิก' : a.change.type === 'merge' ? 'รออนุมัติรวมใบ (ลงซ้ำ)' : 'รออนุมัติแก้ไข', 'warn')}</div>` : ''}${a && gformDue(a) && gformCfg() && (a.rec.created_at || '') >= (gformCfg().at || '') ? `<div>${chip('ยังไม่ส่ง Google Form', 'warn')}</div>` : ''}${a && a.flow.history ? chip('ส่งมอบแล้ว (ประวัติ)', 'muted') : statusChip(BOOK_STATE, row.state || 'waiting')}${row.state === 'waiting' && row.pos ? ` <span class="text-xs text-muted">คิวที่ ${row.pos}</span>` : ''}
       ${a && a.flow.next ? `<div class="text-xs text-muted">ถัดไป: ${FLOW_LABEL[a.flow.next]}</div>` : ''}`;
   return `<tr class="${r.noForm ? 'low' : ''}${a ? ' bk-row' : ''}" ${a ? `data-act="at-open" data-id="${esc(a.id)}" title="กดเพื่อเปิดใบจอง"` : ''}>
     <td class="nowrap"><span class="num">${fmtD(r.date)}</span>${r.no ? `<div class="code text-xs text-muted">${esc(r.no)}</div>` : ''}</td>
-    <td style="min-width:120px;max-width:190px">${custCell(r.cust, r.owner, { seed: r.seed })}${a && a.rec.doc_url ? `<div class="text-xs"><a class="underline" data-act="noop" href="${esc(a.rec.doc_url)}" target="_blank" rel="noopener">ใบจองใน Drive</a></div>` : ''}</td>
+    <td style="min-width:110px;max-width:170px">${custCell(r.cust, r.owner, { seed: r.seed })}${a && a.rec.doc_url ? `<div class="text-xs"><a class="underline" data-act="noop" href="${esc(a.rec.doc_url)}" target="_blank" rel="noopener">ใบจองใน Drive</a></div>` : ''}</td>
     <td class="nowrap">${salesCell(a ? a.sales : null, r.idsSales, a ? a.ownerCheck : null)}<div class="text-xs text-muted">${esc(r.br || '')} ${BR[r.br]?.name || ''}</div>${crossChip(a)}</td>
-    <td class="nowrap">${specLabel(r.spec)}${a && a.specFromIds ? ' <span class="text-xs text-muted">(ตาม IDS)</span>' : ''}${a && (a.multi || a.multiOf) ? `<div>${chip('จอง 2 คัน', 'warn')}</div>` : ''}</td>
+    <td class="nowrap">${(([m, g, c]) => `${esc(m)}<div class="text-xs text-muted">${esc(gradeShort(m, g) || g || '')} <span class="code">${esc(c || '')}</span></div>`)(String(r.spec || '?|?|?').split('|'))}${a && a.specFromIds ? '<span class="text-xs text-muted">(ตาม IDS)</span>' : ''}${a && (a.multi || a.multiOf) ? `<div>${chip('จอง 2 คัน', 'warn')}</div>` : ''}</td>
     <td class="nowrap" data-act="noop">${bkLockCell(r, D)}</td>
-    <td style="min-width:110px;max-width:170px">${idsCell}</td>
-    <td style="min-width:110px">${stateCell}</td>
-    <td class="text-right" ${acts.length ? 'data-act="noop"' : ''}><div class="flex flex-wrap gap-1 justify-end">${acts.join('')}</div></td></tr>`;
+    <td style="min-width:90px;max-width:150px">${idsCell}</td>
+    <td style="min-width:90px;max-width:160px">${stateCell}</td>
+    <td class="text-right" ${acts.length ? 'data-act="noop"' : ''}><div class="flex flex-wrap gap-1 justify-end bk-acts">${acts.join('')}</div></td></tr>`;
 }
 function bookingFilters(qKey, withState) {
   const f = S.filters;

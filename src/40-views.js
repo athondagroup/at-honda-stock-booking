@@ -212,7 +212,7 @@ const salesCell = (atName, idsName, chk) => {
   const diff = atName && idsName && !sameName(atName, idsName);
   const tone = !diff ? '' : chk === 'confirmed' || chk === 'auto' ? 'class="text-muted"' : 'style="color:var(--warn)"';
   return `<div class="leading-snug"><span class="text-xs text-muted inline-block w-7">AT</span>${atName ? salesName(atName) : '<span class="text-xs" style="color:var(--bad)">ยังไม่มีฟอร์ม</span>'}</div>
-    <div class="leading-snug text-xs" ${diff ? tone : 'class="text-muted"'}><span class="inline-block w-7 text-muted">IDS</span>${idsName ? esc(idsName) : 'ยังไม่อยู่ใน IDS'}${diff && chk && OWNER_CHK[chk] ? ` ${chip(OWNER_CHK[chk][0], OWNER_CHK[chk][1])}` : ''}</div>`;
+    <div class="leading-snug text-xs" ${diff ? tone : 'class="text-muted"'}><span class="inline-block w-7 text-muted">IDS</span>${idsName ? esc(idsName) : 'ยังไม่อยู่ใน IDS'}${diff && chk && OWNER_CHK[chk] && chk !== 'confirmed' && chk !== 'auto' ? ` ${chk === 'pending' ? chip('รอยืนยัน', 'warn') : chip(OWNER_CHK[chk][0], OWNER_CHK[chk][1])}` : ''}</div>`;
 };
 const crossChip = a => a && a.cross ? `<div class="mt-0.5">${chip(`ขายข้ามสาขา → ${a.delivBr}`, 'neutral')}</div>` : '';
 
