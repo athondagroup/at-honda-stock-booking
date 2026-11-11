@@ -58,7 +58,7 @@ function payCostVals(a, m) {
   // registration / insurance from the fee tables follow the sale terms (person / company, plan): a figure still at the table value it
   // had is replaced when the terms change; one typed by hand stays (10/11)
   const auto = { reg: A.regDef || '', ins: A.insDef || '' }, keep = k => sv[k] != null && !(sv[k + 'Auto'] != null && num(sv[k]) === num(sv[k + 'Auto']) && num(sv[k + 'Auto']) !== num(auto[k]));
-  if (!m.cost || m.cost.id !== a.id) m.cost = { id: a.id, auto, reg: keep('reg') ? sv.reg : auto.reg, plate: sv.plate ?? 5000, ins: keep('ins') ? sv.ins : auto.ins, acc: sv.acc ?? '', vat: sv.vat ?? '', inst: sv.inst ?? (A.inst || ''), dep: sv.dep ?? (A.deposit || ''), plus: (sv.plus || []).map(y => ({ ...y })), minus: (sv.minus || []).map(y => ({ ...y })) };
+  if (!m.cost || m.cost.id !== a.id) m.cost = { id: a.id, auto, reg: keep('reg') ? sv.reg : auto.reg, plate: sv.plate ?? 5000, ins: keep('ins') ? sv.ins : auto.ins, acc: sv.acc ?? '', vat: sv.vat ?? '', inst: A.adv && num(sv.inst) ? sv.inst : (A.inst || ''), dep: sv.dep ?? (A.deposit || ''), plus: (sv.plus || []).map(y => ({ ...y })), minus: (sv.minus || []).map(y => ({ ...y })) };
   const v = m.cost;
   for (const k of ['reg', 'ins']) if (v.auto && num(v.auto[k]) !== num(auto[k]) && num(v[k]) === num(v.auto[k])) v[k] = auto[k];
   v.auto = auto;
@@ -99,6 +99,8 @@ function payCostBox(a, m) {
 }
 function payBody(a, m, who, canAdd) {
   const it = payItems(a), req = payRequired(a), paid = payPaid(a), left = req === null ? null : Math.max(0, req - paid), full = payDone(a), p = (m.pay = m.pay || { method: 'cash', date: todayISO() });
+  // the amount box starts at what is left to pay (the first instalment included when ผ่อนต้นงวด, 11/11); it can be typed over
+  if ((p.amount === undefined || p.amount === '') && left && !p.amountTyped) p.amount = left;
   const edit = canEditBooking(a) && perms().write && (!a.flow.done.delivered || fixOn(a));
   const sum = `<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm mb-1">${req === null ? '<span class="text-muted">ยังไม่มีเงื่อนไขการขาย จึงไม่ทราบยอดที่ต้องชำระ</span>'
     : `<span>${isCash(a.rec) ? 'รวมค่าใช้จ่ายทั้งสิ้น' : 'รวมจ่ายสุทธิ'} <b class="num">${money(req)}</b> บาท</span><span>ชำระแล้ว <b class="num">${money(paid)}</b></span><span>${left ? `คงเหลือ <b class="num" style="color:var(--warn)">${money(left)}</b>` : '<b style="color:var(--good)">ชำระครบ</b>'}</span>`}${it.length && !full ? chip('ยังไม่ครบ · ส่งมอบไม่ได้', 'warn') : ''}</div>`;
@@ -151,3 +153,5 @@ Object.assign(ACTIONS, {
 });
 // the day-of-collection total follows each typed amount (on leaving the box)
 document.addEventListener('change', e => { const k = e.target && e.target.dataset && e.target.dataset.modal; if (k && /^cost\./.test(k) && S.modal && S.modal.cost) render(); });
+// the amount typed by hand stays as typed (not refilled with what is left)
+document.addEventListener('input', ev => { const t = ev.target; if (t && t.id === 'pay-am' && S.modal && S.modal.pay) S.modal.pay.amountTyped = true; });
