@@ -5,7 +5,9 @@
 // delivery step opens only then. Old bookings keep their single receipt (shown as one row).
 // Only function declarations / ACTIONS here: the first render runs before this part of the file.
 function payMethods() { return [['cash', 'เงินสด'], ['transfer', 'โอน'], ['cheque', 'เช็ค'], ['card', 'บัตรเครดิต']]; }
-function payMethodName(k) { return (payMethods().find(x => x[0] === k) || [, 'ไม่ระบุวิธี'])[1]; }
+function payMethodName(k) { return k === 'zero' ? 'ไม่มียอดชำระ (0 บาท)' : (payMethods().find(x => x[0] === k) || [, 'ไม่ระบุวิธี'])[1]; }
+// 0 baht can be recorded only when the saved day-of-collection costs net to 0 (11/11)
+function payZeroOk(a) { const sv = (a.rec.flow || {}).cost; return !!(sv && sv.at) && Math.round(payCostVals(a, {}).net) === 0; }
 function payItems(a) {
   const d = (a.rec.flow || {}).down; if (!d) return [];
   if (Array.isArray(d.items)) return d.items;
@@ -136,8 +138,17 @@ Object.assign(ACTIONS, {
     if (late && isSales() && !fixOn(a)) { toast('ส่งมอบแล้ว แอดมินขึ้นไปบันทึกการชำระได้', 'bad'); return; }
     if (!a || !stepAllowed(a, 'down') || !(stepOpen(a, 'down') || payItems(a).length || late)) { toast('บันทึกการชำระได้หลังทำ / ข้ามใบสั่งแต่งรถแล้ว', 'bad'); return; }
     const d = m.pay || {}, no = String(d.receipt_no || '').trim(), date = d.date || todayISO(), method = d.method || 'cash';
+    const zero = String(d.amount ?? '').trim() !== '' && num(d.amount) === 0;
+    if (zero) {
+      if (!payZeroOk(a)) { toast('ใส่ 0 บาทได้เมื่อบันทึกค่าใช้จ่ายวันรับรถแล้ว และรวมจ่ายสุทธิเป็น 0 บาท', 'bad'); $('#pay-am')?.focus(); return; }
+      if (!validDate(date) || date > todayISO()) { toast('วันที่ชำระต้องไม่เกินวันนี้', 'bad'); return; }
+      const row0 = { method: 'zero', receipt_no: no || '-', amount: 0, date, ...actor() };
+      const items0 = [...payItems(a).map(x => x.legacy ? { method: '', receipt_no: x.receipt_no, amount: x.amount, date: x.date, by: x.by, role: x.role, at: x.at } : x), row0];
+      if (await saveFlow(a, { flow: { down: payDown(a, items0) } }, 'บันทึกแล้ว: ไม่มียอดชำระ (รวมจ่ายสุทธิ 0 บาท)')) { S.modal.pay = { method, date: todayISO() }; render(); }
+      return;
+    }
     if (!no) { toast('ใส่เลขที่ใบเสร็จ', 'bad'); $('#pay-no')?.focus(); return; }
-    if (!(num(d.amount) > 0)) { toast('ใส่ยอดเงิน', 'bad'); $('#pay-am')?.focus(); return; }
+    if (!(num(d.amount) > 0)) { toast('ใส่ยอดเงิน (ถ้ารวมจ่ายสุทธิเป็น 0 บาท ใส่ 0 ได้)', 'bad'); $('#pay-am')?.focus(); return; }
     if (!validDate(date) || date > todayISO()) { toast('วันที่ชำระต้องไม่เกินวันนี้', 'bad'); return; }
     if (method === 'transfer' && !String(d.bank || '').trim()) { toast('ใส่ธนาคารที่โอน', 'bad'); $('#pay-bk')?.focus(); return; }
     if (method === 'cheque' && !String(d.cheque_no || '').trim()) { toast('ใส่เลขที่เช็ค', 'bad'); $('#pay-ck')?.focus(); return; }
