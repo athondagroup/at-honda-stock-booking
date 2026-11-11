@@ -141,10 +141,12 @@ Object.assign(ACTIONS, {
     const zero = String(d.amount ?? '').trim() !== '' && num(d.amount) === 0;
     if (zero) {
       if (!payZeroOk(a)) { toast('ใส่ 0 บาทได้เมื่อบันทึกค่าใช้จ่ายวันรับรถแล้ว และรวมจ่ายสุทธิเป็น 0 บาท', 'bad'); $('#pay-am')?.focus(); return; }
-      if (!validDate(date) || date > todayISO()) { toast('วันที่ชำระต้องไม่เกินวันนี้', 'bad'); return; }
-      const row0 = { method: 'zero', receipt_no: no || '-', amount: 0, date, ...actor() };
+      if (method !== 'cash') { toast('0 บาท: เลือกวิธีชำระเป็นเงินสด', 'bad'); $('#pay-m')?.focus(); return; }
+      if (!no) { toast('ใส่เลขที่ใบเสร็จ', 'bad'); $('#pay-no')?.focus(); return; }
+      if (!d.date || !validDate(date) || date > todayISO()) { toast('ใส่วันที่ชำระ (ไม่เกินวันนี้)', 'bad'); $('#pay-dt')?.focus(); return; }
+      const row0 = { method: 'cash', receipt_no: no, amount: 0, date, zero: true, ...actor() };
       const items0 = [...payItems(a).map(x => x.legacy ? { method: '', receipt_no: x.receipt_no, amount: x.amount, date: x.date, by: x.by, role: x.role, at: x.at } : x), row0];
-      if (await saveFlow(a, { flow: { down: payDown(a, items0) } }, 'บันทึกแล้ว: ไม่มียอดชำระ (รวมจ่ายสุทธิ 0 บาท)')) { S.modal.pay = { method, date: todayISO() }; render(); }
+      if (await saveFlow(a, { flow: { down: payDown(a, items0) } }, 'บันทึกแล้ว: เงินสด 0 บาท (รวมจ่ายสุทธิ 0 บาท)')) { S.modal.pay = { method, date: todayISO() }; render(); }
       return;
     }
     if (!no) { toast('ใส่เลขที่ใบเสร็จ', 'bad'); $('#pay-no')?.focus(); return; }
