@@ -40,8 +40,9 @@ function fixOk(a) {
   return !(a.flow.done.confirmed && !canApproveBr(a.br));
 }
 function fixOn(a) { return !!(a && S.modal && S.modal.fix === a.id) && fixOk(a); }
-// the PO cannot change after delivery, except in the admin fix mode
-function poRO(a) { return poLocked(a) && !fixOn(a); }
+// the PO can be changed after delivery too, with the reason written down (11/11); the admin fix mode needs no reason
+function poRO(a) { return false; }
+function poWhyNeed(a) { return poLocked(a) && !fixOn(a); }
 // the branch manager can allocate a car at any step, without the deposit receipt or the finance approval (13/10)
 function mgrAssign(a) { return !!(a && perms().write && !a.cancelled && !a.done && !a.flow.done.assign && !a.flow.history && canApproveBr(a.br)); }
 // trade-in at the down payment step: has an old car or not, brand / model / year, the price taken in (13/10)
@@ -178,7 +179,7 @@ function flowPanel(m, a, D) {
   const poBody = () => {
     const locked = poRO(a);
     if (fl.done.po) return `<div class="text-sm text-muted">สั่งแต่ง ${(f.po.items || []).length} รายการ ${fmtD(f.po.date)} · ${who(f.po)}${(f.po.hist || []).length ? ` · แก้ไขแล้ว ${f.po.hist.length} ครั้ง` : ''}</div>
-      <div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-ghost btn-sm" data-act="po-open" data-id="${esc(a.id)}">${locked || !stepAllowed(a, 'po') ? 'ดูใบแต่งรถ' : 'แก้ใบแต่งรถ'}</button><button class="btn btn-ghost btn-sm" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button>${discBtn(a, 'po')}</div>${locked ? '<div class="text-xs text-muted mt-1">ส่งมอบแล้ว แก้ใบแต่งรถไม่ได้</div>' : ''}${discBox(a, m, D, 'po')}`;
+      <div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-ghost btn-sm" data-act="po-open" data-id="${esc(a.id)}">${locked || !stepAllowed(a, 'po') ? 'ดูใบแต่งรถ' : 'แก้ใบแต่งรถ'}</button><button class="btn btn-ghost btn-sm" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button>${discBtn(a, 'po')}</div>${poWhyNeed(a) && stepAllowed(a, 'po') ? '<div class="text-xs text-muted mt-1">ส่งมอบแล้ว แก้ใบแต่งรถได้ ต้องใส่เหตุผล</div>' : ''}${discBox(a, m, D, 'po')}`;
     if (fl.poSkip) return `<div class="text-sm" style="color:var(--warn)">ข้ามใบสั่งแต่งรถ ไว้ก่อน · ${who(f.po_skip)} ${fmtDT(f.po_skip.at)} · ยังไม่ได้ทำใบสั่งแต่งรถ</div>
       ${stepAllowed(a, 'po') && !locked ? `<div class="mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่งรถ</button></div>` : ''}`;
     return can('po') ? `<div class="flex flex-wrap gap-2 mt-1"><button class="btn btn-dark btn-sm" data-act="po-open" data-id="${esc(a.id)}">ทำใบสั่งแต่งรถ</button>${poLocked(a) ? '' : `<button class="btn btn-ghost btn-sm" data-act="po-skip" data-id="${esc(a.id)}">ข้ามใบสั่งแต่งรถไปก่อน</button>`}</div>
@@ -292,7 +293,7 @@ function poEditor(m, a, D) {
   const ro = poRO(a) || !stepAllowed(a, 'po');
   const vin = atVin(a), car = vin ? (carAny(vin, D) || {}) : {};
   return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">ใบสั่งแต่งรถ</h2><p class="text-sm text-muted">${esc(a.cust)} · ${esc(a.model)} ${esc(a.grade)} ${esc(a.color)} · รหัสรุ่นในรายการ FOC: ${codes.slice(0, -2).join(', ') || '–'}</p>
-      <p class="text-sm mt-1">หมายเลขตัวถัง <span class="code">${esc(vin || 'ยังไม่จัดสรรรถ')}</span> · หมายเลขเครื่องยนต์ <span class="code">${esc(car.engine || '–')}</span></p>${ro && poLocked(a) ? '<p class="text-xs mt-1" style="color:var(--warn)">ส่งมอบแล้ว แก้ใบแต่งรถไม่ได้ ดูและพิมพ์ได้อย่างเดียว</p>' : ''}</div>
+      <p class="text-sm mt-1">หมายเลขตัวถัง <span class="code">${esc(vin || 'ยังไม่จัดสรรรถ')}</span> · หมายเลขเครื่องยนต์ <span class="code">${esc(car.engine || '–')}</span></p>${!ro && poWhyNeed(a) ? '<p class="text-xs mt-1" style="color:var(--warn)">ส่งมอบแล้ว แก้ได้ ต้องใส่เหตุผลที่แก้ (เก็บในประวัติ)</p>' : ''}</div>
     <button class="btn btn-ghost btn-sm" data-act="po-back">กลับ</button></div>
   <div class="grid md:grid-cols-[1.1fr_1fr] gap-5">
     <div class="flex flex-col gap-3">
@@ -316,6 +317,8 @@ function poEditor(m, a, D) {
       <div class="text-sm p-3 rounded-lg border border-line"><div class="font-medium mb-1">รายการมาตรฐานที่มากับตัวรถ</div><ul class="list-disc pl-5">${poStd(a).map(t => `<li>${esc(t)}</li>`).join('')}</ul>
         </div>
       <div class="field"><label for="po-note">หมายเหตุ</label><input id="po-note" data-modal="po.note" value="${esc(po.note)}" ${ro ? 'disabled' : ''}></div>
+      ${!ro && poWhyNeed(a) ? `<div class="field"><label for="po-why" class="req">เหตุผลที่แก้หลังส่งมอบ (บังคับ · เก็บในประวัติ)</label><input id="po-why" data-modal="poWhy" value="${esc(m.poWhy || '')}" placeholder="เช่น ลูกค้าเปลี่ยนฟิล์ม / ลงรายการตกหล่น" autocomplete="off"></div>` : ''}
+      ${(() => { const h = (a.rec.flow && a.rec.flow.po && a.rec.flow.po.hist) || []; return h.length ? `<details class="text-xs"><summary class="cursor-pointer text-muted">ประวัติการแก้ใบแต่งรถ ${h.length} ครั้ง</summary><div class="mt-1 flex flex-col gap-1">${h.map((x, i) => { const nx = h[i + 1] || a.rec.flow.po; return `<div>${fmtDT(nx.at)} · ${who(nx)}${nx.why ? ` · <b>เหตุผล:</b> ${esc(nx.why)}` : ''}<div class="text-muted">ก่อนแก้: ${esc((x.items || []).join(', '))}</div></div>`; }).join('')}</div></details>` : ''; })()}
       <div class="flex flex-wrap gap-2">${ro ? '' : `<button class="btn btn-red" data-act="po-save" data-id="${esc(a.id)}">บันทึกใบสั่งแต่งรถ</button><button class="btn btn-ghost" data-act="po-custom">+ เพิ่มรายการเอง</button>`}<button class="btn btn-ghost" data-act="po-print" data-id="${esc(a.id)}">พิมพ์ใบแต่งรถ</button></div>
     </div>
     <div class="flex flex-col gap-2">

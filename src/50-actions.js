@@ -838,16 +838,18 @@ const ACTIONS = {
   async 'po-save'(el) {
     const a = atById(el.dataset.id), po = S.modal.po;
     if (!a || !po) return;
-    if (!stepAllowed(a, 'po') || poRO(a) || !(stepOpen(a, 'po') || a.flow.done.po || a.flow.poSkip || S.modal.ret)) { toast('ทำใบสั่งแต่งรถ ได้ก่อนส่งมอบ (ข้ามขั้นก่อนหน้าได้)', 'bad'); return; }
+    if (!stepAllowed(a, 'po') || !(stepOpen(a, 'po') || a.flow.done.po || a.flow.poSkip || poLocked(a) || S.modal.ret)) { toast('ทำใบสั่งแต่งรถ ได้ก่อนส่งมอบ (ข้ามขั้นก่อนหน้าได้)', 'bad'); return; }
     const items = po.items.map(x => ({ ...x, name: String(x.name || '').trim(), qty: Math.max(1, parseInt(x.qty, 10) || 1) })).filter(x => x.name);
     const noUlt = items.find(x => poUlt(x) && !x.hon && !(Number(x.cost) > 0)); if (noUlt) { toast('Ultimate Care ที่ AT แถม ต้องใส่มูลค่า (ทุน) · ถ้า Honda แถม ให้ติ๊ก "Honda แถม" แทน', 'bad'); return; }
     items.forEach(x => { if (x.hon) { x.cost = 0; x.sale = 0; if (!/Honda แถม/.test(x.name)) x.name += ' (Honda แถม)'; } });
     if (!items.length) { toast('ใส่รายการแต่งอย่างน้อย 1 รายการ (ถ้าไม่มีแต่ง ใส่ "ไม่มีรายการแต่ง")', 'bad'); return; }
     const prev = a.rec.flow && a.rec.flow.po;
+    const why = poWhyNeed(a) ? String(S.modal.poWhy || '').trim() : '';
+    if (poWhyNeed(a) && !why) { toast('ส่งมอบแล้ว ต้องใส่เหตุผลที่แก้ใบแต่งรถ', 'bad'); $('#po-why')?.focus(); return; }
     // an edit keeps the earlier version's summary (who, when, items) as history
-    const hist = prev && prev.at ? [...(prev.hist || []), { at: prev.at, by: prev.by, role: prev.role, items: (prev.items || []).map(x => `${x.name} ×${x.qty}`) }] : undefined;
-    const rec = { ...actor(), items, date: po.date || todayISO(), ddate: po.ddate || null, dtime: po.dtime || null, by_name: po.by || a.sales, note: (po.note || '').trim() || null, ac: po.ac && Object.keys(po.ac).some(k => po.ac[k]) ? po.ac : null, ucare: !!po.ucare, ...(hist ? { hist } : {}) };
-    if (await saveFlow(a, { flow: { po: rec } }, prev && prev.at ? 'แก้ใบแต่งรถแล้ว' : 'บันทึกใบสั่งแต่งรถ แล้ว')) { if (S.modal.ret) S.modal = S.modal.ret; else S.modal.po = null; render(); }
+    const hist = prev && prev.at ? [...(prev.hist || []), { at: prev.at, by: prev.by, role: prev.role, ...(prev.why ? { why: prev.why } : {}), items: (prev.items || []).map(x => `${x.name} ×${x.qty}`) }] : undefined;
+    const rec = { ...actor(), items, date: po.date || todayISO(), ddate: po.ddate || null, dtime: po.dtime || null, by_name: po.by || a.sales, note: (po.note || '').trim() || null, ac: po.ac && Object.keys(po.ac).some(k => po.ac[k]) ? po.ac : null, ucare: !!po.ucare, ...(hist ? { hist } : {}), ...(why ? { why } : {}) };
+    if (await saveFlow(a, { flow: { po: rec } }, why ? 'แก้ใบแต่งรถแล้ว (หลังส่งมอบ · ' + why + ')' : prev && prev.at ? 'แก้ใบแต่งรถแล้ว' : 'บันทึกใบสั่งแต่งรถ แล้ว')) { if (S.modal.ret) S.modal = S.modal.ret; else S.modal.po = null; render(); }
   },
   'po-print'(el) { const a = atById(el.dataset.id); if (a) printPO(a); },
   async 'flow-deliver'(el) {
