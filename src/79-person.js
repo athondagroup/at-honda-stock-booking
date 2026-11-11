@@ -12,7 +12,10 @@ function pmEvents(a, D) {
   if (a.cancelled) return ev;
   if (a.flow && a.flow.deliveredDate) ev.push(['dv', a.flow.deliveredDate]);
   // invoices by invoice month; the commission claim (เบิกค่าคอม) in the month a manager set (11/11), else the invoice month
-  const v = atVin(a), i = v && D.invByVin.get(v); if (i && !i.company && i.idate) { ev.push(['inv', i.idate]); ev.push(['cm', i.idate, a.rec.comm_month || null]); }
+  // no invoice in IDS yet but the customer has the car: the commission can be claimed from the booking (a month set by a manager, 11/11)
+  const v = atVin(a), i = v && D.invByVin.get(v), id = i && !i.company ? i.idate || i.ddate : null;
+  if (id) { ev.push(['inv', id]); ev.push(['cm', id, a.rec.comm_month || null]); }
+  else if (a.rec.comm_month) ev.push(['cm', (a.flow && a.flow.deliveredDate) || a.rec.comm_month + '-01', a.rec.comm_month]);
   const t = tradeOf(a); if (t) { const d = tradeDate(a, D); if (d) ev.push(['tr', d]); }
   return ev;
 }
@@ -90,8 +93,8 @@ function pmModalBody(m, D) {
   const dOf = a => { const e = pmEvents(a, D).find(([c]) => c === m.c); return e ? e[1] : a.date; };
   // a list by month for invoices follows the claim month: say so when a car was moved
   return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">${col} · ${m.who === '*' ? 'ทุกคน' : esc(m.who)}</h2><p class="text-sm text-muted">${m.m ? fmtM(m.m) : 'ทั้งปี ' + y} · ${fmtN(list.length)} คัน · กดแถวเพื่อเปิดใบจอง</p></div><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
-  <div class="scroll-x max-h-[70vh] overflow-auto"><table class="tbl text-sm"><thead><tr><th>วันที่${m.c === 'cm' ? 'ใบกำกับ' : col}</th><th>วันที่จอง</th><th>สาขา</th>${m.who === '*' ? '<th>เซลล์</th>' : ''}<th>ลูกค้า</th><th>รุ่น เกรด สี</th><th>VIN</th>${['inv', 'cm', 'dv', 'tr'].includes(m.c) ? '<th>รถเก่า</th>' : ''}${['inv', 'cm'].includes(m.c) ? '<th class="nowrap">เดือนเบิกค่าคอม</th>' : ''}</tr></thead><tbody>
-  ${list.map(a => { const t = tradeOf(a), iv = ['inv', 'cm'].includes(m.c) ? D.invByVin.get(atVin(a)) : null; return `<tr class="cursor-pointer" data-act="at-open" data-id="${esc(a.id)}"><td class="nowrap">${fmtD(dOf(a))}</td><td class="nowrap">${fmtD(a.date)}</td><td>${esc(a.delivBr || a.br || '')}</td>${m.who === '*' ? `<td class="nowrap">${salesName(a.sales)}</td>` : ''}<td>${mineAll || isMine(a.sales) ? esc(a.cust || '') : '<span class="text-muted">ลูกค้าเซลล์อื่น</span>'}</td><td class="nowrap">${esc(a.model || '')} ${esc(gradeShort(a.model, a.grade) || a.grade || '')} ${esc(a.color || '')}</td><td class="code text-xs">${esc(atVin(a) || '')}</td>${['inv', 'cm', 'dv', 'tr'].includes(m.c) ? `<td class="text-xs" onclick="event.stopPropagation()">${t ? `<span style="color:var(--good)">✓ มีรถเก่า</span> ${esc(tradeTxt(t))}` : canEditBooking(a) ? `<button class="underline" style="color:var(--accent, #2563eb)" data-act="pm-trade" data-id="${esc(a.id)}">＋ เพิ่มรถเก่า</button>` : '<span class="text-muted">–</span>'}</td>` : ''}${['inv', 'cm'].includes(m.c) ? `<td class="nowrap" onclick="event.stopPropagation()">${commCell(a, iv)}</td>` : ''}</tr>`; }).join('') || '<tr><td colspan="8" class="text-muted">ไม่มี</td></tr>'}</tbody></table></div>`;
+  <div class="scroll-x max-h-[70vh] overflow-auto"><table class="tbl text-sm"><thead><tr><th>วันที่${m.c === 'cm' ? 'ใบกำกับ' : col}</th><th>วันที่จอง</th><th>สาขา</th>${m.who === '*' ? '<th>เซลล์</th>' : ''}<th>ลูกค้า</th><th>รุ่น เกรด สี</th><th>VIN</th>${['inv', 'cm', 'dv', 'tr'].includes(m.c) ? '<th>รถเก่า</th>' : ''}${['inv', 'cm', 'dv'].includes(m.c) ? '<th class="nowrap">เดือนเบิกค่าคอม</th>' : ''}</tr></thead><tbody>
+  ${list.map(a => { const t = tradeOf(a); return `<tr class="cursor-pointer" data-act="at-open" data-id="${esc(a.id)}"><td class="nowrap">${fmtD(dOf(a))}</td><td class="nowrap">${fmtD(a.date)}</td><td>${esc(a.delivBr || a.br || '')}</td>${m.who === '*' ? `<td class="nowrap">${salesName(a.sales)}</td>` : ''}<td>${mineAll || isMine(a.sales) ? esc(a.cust || '') : '<span class="text-muted">ลูกค้าเซลล์อื่น</span>'}</td><td class="nowrap">${esc(a.model || '')} ${esc(gradeShort(a.model, a.grade) || a.grade || '')} ${esc(a.color || '')}</td><td class="code text-xs">${esc(atVin(a) || '')}</td>${['inv', 'cm', 'dv', 'tr'].includes(m.c) ? `<td class="text-xs" onclick="event.stopPropagation()">${t ? `<span style="color:var(--good)">✓ มีรถเก่า</span> ${esc(tradeTxt(t))}` : canEditBooking(a) ? `<button class="underline" style="color:var(--accent, #2563eb)" data-act="pm-trade" data-id="${esc(a.id)}">＋ เพิ่มรถเก่า</button>` : '<span class="text-muted">–</span>'}</td>` : ''}${['inv', 'cm', 'dv'].includes(m.c) ? `<td class="nowrap" onclick="event.stopPropagation()">${commCell(a, D)}</td>` : ''}</tr>`; }).join('') || '<tr><td colspan="8" class="text-muted">ไม่มี</td></tr>'}</tbody></table></div>`;
 }
 
 // ---- per-car list for ยอดขายและเป้า: invoices (by invoice date) or deliveries (by delivery date) in the period
@@ -203,19 +206,26 @@ Object.assign(ACTIONS, {
   'car-list-xlsx'() { carListXlsx(); }
 });
 
-// the claim month on the invoice list (managers / the executive choose; the seller only sees it)
-function commCell(a, iv) {
-  if (!iv || !iv.idate) return '';
-  const im = iv.idate.slice(0, 7), cm = a.rec.comm_month || '';
-  if (!perms().approve || !perms().write) return cm && cm !== im ? `<span style="color:var(--warn)">${esc(fmtM(cm))}</span>` : `<span class="text-muted">${esc(fmtM(im))}</span>`;
-  return `<select class="text-xs p-1 rounded border border-line" style="background:var(--surface)${cm && cm !== im ? ';color:var(--warn);font-weight:600' : ''}" data-cm="${esc(a.id)}" aria-label="เดือนที่เซลล์เบิกค่าคอม">
-    ${commMonths(iv.idate).map(k => `<option value="${k === im ? '' : k}" ${(cm || im) === k ? 'selected' : ''}>${esc(fmtM(k))}${k === im ? ' (เดือนใบกำกับ)' : ''}</option>`).join('')}</select>`;
+// the claim month (managers / the executive choose; the seller only sees it): around the invoice month, else the delivery recorded
+// here, else this month (a customer who has the car before IDS invoices it, 11/11)
+function commBase(a, D) {
+  const i = D.invByVin.get(atVin(a)), id = i && !i.company ? i.idate || i.ddate : null;
+  return { d: id || (a.flow && a.flow.deliveredDate) || null, inv: !!id };
+}
+function commCell(a, D) {
+  const b = commBase(a, D), im = (b.d || D.today).slice(0, 7), cm = a.rec.comm_month || '', dflt = b.inv ? im : '';
+  const lab = k => esc(fmtM(k));
+  if (!perms().approve || !perms().write) return cm ? `<span style="color:${cm !== dflt ? 'var(--warn)' : 'inherit'}">${lab(cm)}</span>` : b.inv ? `<span class="text-muted">${lab(im)}</span>` : '<span class="text-muted">ยังไม่เบิก</span>';
+  const opts = commMonths(b.d || D.today);
+  if (cm && !opts.includes(cm)) opts.push(cm);
+  return `<select class="text-xs p-1 rounded border border-line" style="background:var(--surface)${cm && cm !== dflt ? ';color:var(--warn);font-weight:600' : ''}" data-cm="${esc(a.id)}" aria-label="เดือนที่เซลล์เบิกค่าคอม">
+    ${b.inv ? '' : `<option value="" ${cm ? '' : 'selected'}>ยังไม่เบิก (รอใบกำกับ IDS)</option>`}${opts.map(k => `<option value="${b.inv && k === im ? '' : k}" ${(cm || dflt) === k ? 'selected' : ''}>${lab(k)}${b.inv && k === im ? ' (เดือนใบกำกับ)' : ''}</option>`).join('')}</select>`;
 }
 document.addEventListener('change', async ev => {
   const t = ev.target; if (!t || !t.dataset || !t.dataset.cm || !perms().approve) return;
   const id = t.dataset.cm, v = t.value || null;
   const r = await saveBk(id, 'เดือนเบิกค่าคอม', v ? `นับในเดือน ${fmtM(v)}` : 'นับตามเดือนใบกำกับ', x => { if (v) x.comm_month = v; else delete x.comm_month; });
-  if (r) { toast(v ? `นับใบกำกับคันนี้ในเดือน ${fmtM(v)} แล้ว` : 'นับตามเดือนใบกำกับแล้ว'); render(); }
+  if (r) { toast(v ? `เบิกค่าคอมคันนี้ในเดือน ${fmtM(v)}` : 'เบิกค่าคอมตามเดือนใบกำกับ (ยังไม่มีใบกำกับ = ยังไม่เบิก)'); render(); }
 });
 // no trade-in recorded: open the booking with its trade-in box ready to fill (11/11)
 Object.assign(ACTIONS, { 'pm-trade'(el) { ACTIONS['at-open']({ dataset: { id: el.dataset.id } }); if (S.modal) { S.modal.tradeEdit = true; S.modal.tr = null; if (typeof tradeFilesClear === 'function') tradeFilesClear(); render(); } } });

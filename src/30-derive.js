@@ -80,7 +80,8 @@ function deriveNow() {
   const invByVin = new Map();
   // latest invoice per car; on the same date the sale to a customer wins over the sale between AT Honda branches
   // (PSC sells to SPH on 31/03 and SPH sells to the customer the same day: the car is SPH's customer's)
-  X.inv.forEach(i => { const p = invByVin.get(i.vin), a = i.idate || '', b = p ? p.idate || '' : '';
+  // a DL row with no invoice date counts on its delivery date (11/11: the customer invoice must not lose to an older transfer invoice)
+  X.inv.forEach(i => { const p = invByVin.get(i.vin), a = i.idate || i.ddate || '', b = p ? p.idate || p.ddate || '' : '';
     if (!p || a > b || (a === b && p.company && !i.company) || (a === b && !!p.company === !!i.company && !p.ddate && i.ddate)) invByVin.set(i.vin, i); });
 
   // IDS bookings
