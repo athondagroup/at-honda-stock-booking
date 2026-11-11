@@ -676,6 +676,7 @@ function buildAlerts(D) {
     if (d !== null && d > 3) add('stale:' + br, { br, roles: ['admin'] }, 'muted', `ไฟล์ Stock IDS สาขา ${br} เก่า ${d} วัน`, 'อัปโหลดไฟล์ล่าสุดเพื่อให้การจับคู่และการแจ้งเตือนถูกต้อง', { act: 'go', view: 'upload' });
   }
   if (typeof ltNotices === 'function') ltNotices(D, add);
+  if (typeof bkstatNotices === 'function') bkstatNotices(D, add);
   // the same customer name locked / asked for on two cars or quota slots (11/11): the manager of the seller's branch looks
   { const g = new Map();
     for (const l of D.locks) {
