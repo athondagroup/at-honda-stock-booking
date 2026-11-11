@@ -274,7 +274,7 @@ function viewStock(D) {
     <div class="field"><label for="f-sc">สี</label><select id="f-sc" data-filter="sColor"><option value="">ทุกสี</option>${colors.map(c => `<option ${f.sColor === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
     ${isSales() ? '' : `<div class="field"><label for="f-status">สถานะ</label><select id="f-status" data-filter="status"><option value="">ทุกสถานะ</option>
       ${mode === 'spec' ? `<option value="low" ${f.status === 'low' ? 'selected' : ''}>สเปกที่ไม่พอ (แดง)</option>` : ''}
-      ${Object.entries(CAR_STATUS).map(([k, v]) => `<option value="${k}" ${f.status === k ? 'selected' : ''}>${k === 'free' ? 'ว่าง (พร้อมขายทั้งหมด)' : v[0]} (${counts[k] || 0})</option>${k === 'free' ? Object.entries(FREE_KINDS).map(([fk, fl]) => `<option value="free:${fk}" ${f.status === 'free:' + fk ? 'selected' : ''}>&nbsp;&nbsp;└ ว่าง · ${fl} (${counts['free:' + fk] || 0})</option>`).join('') : ''}`).join('')}</select></div>`}
+      ${Object.entries(CAR_STATUS).filter(([k]) => !ST_SAME[k]).map(([k, v]) => `<option value="${k}" ${f.status === k ? 'selected' : ''}>${k === 'free' ? 'ว่าง (พร้อมขายทั้งหมด)' : v[0]} (${(counts[k] || 0) + Object.keys(ST_SAME).filter(x => ST_SAME[x] === k).reduce((n, x) => n + (counts[x] || 0), 0)})</option>${k === 'free' ? Object.entries(FREE_KINDS).map(([fk, fl]) => `<option value="free:${fk}" ${f.status === 'free:' + fk ? 'selected' : ''}>&nbsp;&nbsp;└ ว่าง · ${fl} (${counts['free:' + fk] || 0})</option>`).join('') : ''}`).join('')}</select></div>`}
     ${mode === 'spec' ? `<div class="field"><label for="f-spsort">เรียง</label><select id="f-spsort" data-filter="specSort">${[['', 'ขาดมากสุด (รอรถ − ว่าง − Quota)'], ['model', 'รุ่น (A→Z)'], ['free', 'รถว่างมากสุด'], ['waiting', 'รอรถมากสุด'], ['quota', 'Quota ว่างมากสุด'], ['held', 'ติดจองมากสุด'], ['age', 'รถค้างนานสุด']].map(([k, t]) => `<option value="${k}" ${(f.specSort || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
     ${mode === 'list' ? `<div class="field"><label for="f-ssort">เรียง</label><select id="f-ssort" data-filter="sSort">${[['', 'สาขา → สเปก → อายุ'], ['old', 'เก่าสุดทุกสาขา'], ['free', 'รถว่างพร้อมจัดสรร'], ['model', 'รุ่นรถอย่างเดียว']].map(([k, t]) => `<option value="${k}" ${(f.sSort || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
     <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-q">ค้นหา VIN / Ref${isSales() ? '' : ' / เลขใบจอง / ชื่อลูกค้า'} · ${S.br ? 'ในสาขา ' + S.br : 'ทุกสาขา'}</label><input id="f-q" type="search" data-filter="q" value="${esc(f.q)}" placeholder="เช่น MRHGN36"></div>
@@ -323,7 +323,9 @@ function specNetModal(m, D) {
 const specPool = D => { const f = S.filters; return isSales() ? [...D.cars.values()].filter(inBr).filter(c => (!f.model || c.model === f.model) && (!f.sGrade || c.grade === f.sGrade) && (!f.sColor || c.color === f.sColor)) : stockCars(D); };
 // status filter (9/11): ว่าง = every car ready to sell; ว่าง · Advance / Demo / คืนรถ = only that kind among them
 const FREE_KINDS = { adv: 'Advance', demo: 'Demo', ret: 'คืนรถ' };
-const stMatch = (c, st) => !st || st === 'low' || (st.startsWith('free:') ? c.status === 'free' && c.kind === st.slice(5) : c.status === st);
+// statuses shown under one name (11/11): จัดสรร (เว็บ) = allocated lock + allocated in the delivery steps; ล็อกชั่วคราว = locked + a name typed in the sheet
+const ST_SAME = { assigned: 'allocated', noted: 'locked' }, stKey = s => ST_SAME[s] || s;
+const stMatch = (c, st) => !st || st === 'low' || (st.startsWith('free:') ? c.status === 'free' && c.kind === st.slice(5) : stKey(c.status) === st);
 function specView(s, pool) {
   const mine = pool.filter(c => c.spec === s.key), cat = { free: 0, held: 0, lock: 0, company: 0 };
   mine.forEach(c => { cat[specCat(c.status)]++; });

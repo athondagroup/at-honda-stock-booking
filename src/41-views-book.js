@@ -377,7 +377,7 @@ function lockRow(l, D, o = {}) {
   const br = l.car_br || car?.br || q?.br;
   const stTxt = l.status === 'pending' ? chip('รออนุมัติ', 'warn')
     : l.status === 'approved' ? (l.mgrDue ? chip(`ครบกำหนด ผู้จัดการต่อหรือปล่อยภายใน ${fmtD(addDays(l.releaseOn, -1))}`, 'bad') : l.autoReleased ? chip(`ปล่อยคิวแล้ว ${fmtD(l.releaseOn)} (ผู้จัดการไม่ได้ต่อ)`, 'muted') : l.hold ? chip(`ถือไว้จนส่งมอบ ${fmtD(l.holdUntil)}`, 'red') : l.expired ? chip('หมดอายุ', 'bad') : chip(`ล็อก เหลือ ${l.daysLeft} วัน`, l.daysLeft <= 2 ? 'bad' : 'red'))
-    : l.status === 'allocated' ? chip('จัดสรรแล้ว (เว็บ) รอไฟล์ IDS', 'ink') : l.status === 'rejected' ? chip('ไม่อนุมัติ', 'muted') : l.status === 'converted' ? chip('เปลี่ยนเป็นล็อกให้ใบจอง', 'muted') : l.status === 'bumped' ? chip(`มีคนจองก่อน (${l.bumped_by || ''})`, 'muted') : l.status === 'done' ? chip(l.ids_done ? 'สำเร็จ: IDS จัดสรรให้แล้ว' : l.type === 'dealer' ? 'ขายให้ดีลเลอร์แล้ว' : 'ส่งมอบแล้ว', 'good') : l.status === 'withdrawn' ? chip('ถอนคำขอแล้ว', 'muted') : chip('ปล่อยแล้ว', 'muted');
+    : l.status === 'allocated' ? chip('จัดสรร (เว็บ)', 'ink') : l.status === 'rejected' ? chip('ไม่อนุมัติ', 'muted') : l.status === 'converted' ? chip('เปลี่ยนเป็นล็อกให้ใบจอง', 'muted') : l.status === 'bumped' ? chip(`มีคนจองก่อน (${l.bumped_by || ''})`, 'muted') : l.status === 'done' ? chip(l.ids_done ? 'สำเร็จ: IDS จัดสรรให้แล้ว' : l.type === 'dealer' ? 'ขายให้ดีลเลอร์แล้ว' : 'ส่งมอบแล้ว', 'good') : l.status === 'withdrawn' ? chip('ถอนคำขอแล้ว', 'muted') : chip('ปล่อยแล้ว', 'muted');
   const took = l.idsTook && !l.idsTook.same ? l.idsTook : null;
   const canDecide = p.write && l.status === 'pending' && (l.type === 'dealer' ? p.approveDealer : canLockMgr(l));
   const sheet = sheetTextOf(l);

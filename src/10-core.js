@@ -36,7 +36,7 @@ const CAR_STATUS = {
   sold: ['แจ้งขาย', 'muted'], invoiced: ['ออกใบกำกับแล้ว', 'neutral'], delivered: ['ส่งมอบแล้ว', 'muted'],
   company: ['รถบริษัท', 'muted'], pending: ['รออนุมัติ', 'warn'], locked: ['ล็อกชั่วคราว', 'red'],
   review: ['รอตรวจ · ไม่อยู่ในไฟล์ IDS ล่าสุด', 'warn'],
-  allocated: ['จัดสรรแล้ว (เว็บ) รอไฟล์ IDS', 'ink'], assigned: ['จัดสรรแล้ว รอส่งมอบ', 'ink']
+  allocated: ['จัดสรร (เว็บ)', 'ink'], assigned: ['จัดสรร (เว็บ)', 'ink']
 };
 const QUOTA_STATUS = { waiting: ['รอ VIN', 'neutral'], vin: ['ได้ VIN แล้ว รอรถ', 'warn'], arrived: ['ถึงสาขาแล้ว', 'good'], sold: ['ขายแล้ว', 'muted'] };
 const BOOK_STATE = {

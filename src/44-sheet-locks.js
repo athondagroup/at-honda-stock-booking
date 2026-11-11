@@ -173,7 +173,7 @@ function carLockModal(m, D) {
 // ออกใบกำกับแล้ว (with a customer: ออกใบกำกับแล้ว only); a Demo for sale: ว่าง + รถบริษัท, not for sale: รถบริษัท. The table's status filter
 // lists every tag, a car shows under each of its own
 function carTags(c) {
-  const lab = k => ({ review: 'รอตรวจ (ไม่อยู่ใน IDS)', allocated: 'จัดสรร (เว็บ) รอ IDS', assigned: 'จัดสรร รอส่งมอบ' })[k] || (CAR_STATUS[k] || [k])[0];
+  const lab = k => ({ review: 'รอตรวจ (ไม่อยู่ใน IDS)', })[k] || (CAR_STATUS[k] || [k])[0];
   if (c.status === 'free') return ['ว่าง', ...(c.kind === 'ret' ? ['คืนรถ'] : c.kind === 'adv' ? ['Advance', lab('invoiced')] : c.kind === 'demo' ? [lab('company')] : [])];
   if (c.status === 'company') return [lab('company')];
   const t = [c.status === 'temp' ? 'ล็อกชั่วคราว' : lab(c.status)];
