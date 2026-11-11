@@ -11,8 +11,8 @@ function pmEvents(a, D) {
   if (a.date) ev.push([a.cancelled ? 'cx' : 'bk', a.date]);
   if (a.cancelled) return ev;
   if (a.flow && a.flow.deliveredDate) ev.push(['dv', a.flow.deliveredDate]);
-  // the invoice counts in the month the seller claims the commission when a manager set it (11/11), else the invoice month
-  const v = atVin(a), i = v && D.invByVin.get(v); if (i && !i.company && i.idate) ev.push(['inv', i.idate, a.rec.comm_month || null]);
+  // invoices by invoice month; the commission claim (เบิกค่าคอม) in the month a manager set (11/11), else the invoice month
+  const v = atVin(a), i = v && D.invByVin.get(v); if (i && !i.company && i.idate) { ev.push(['inv', i.idate]); ev.push(['cm', i.idate, a.rec.comm_month || null]); }
   const t = tradeOf(a); if (t) { const d = tradeDate(a, D); if (d) ev.push(['tr', d]); }
   return ev;
 }
@@ -28,11 +28,11 @@ const tradeTxt = t => t ? `${t.brand || ''} ${t.model || ''} ${t.year || ''}`.re
 function commMonths(idate) { const [y, m] = idate.slice(0, 7).split('-').map(Number), out = []; for (let k = -1; k <= 3; k++) { const d = new Date(Date.UTC(y, m - 1 + k, 1)); out.push(d.toISOString().slice(0, 7)); } return out; }
 // {month: {bk:[a], cx:[], dv:[], inv:[], tr:[]}} for one year, for the bookings that pass keep(a)
 function pmStats(D, keep, y) {
-  const out = {}; for (let m = 1; m <= 12; m++) out[`${y}-${String(m).padStart(2, '0')}`] = { bk: [], cx: [], dv: [], inv: [], tr: [] };
+  const out = {}; for (let m = 1; m <= 12; m++) out[`${y}-${String(m).padStart(2, '0')}`] = { bk: [], cx: [], dv: [], inv: [], cm: [], tr: [] };
   D.at.forEach(a => { if (a.demo || !keep(a)) return; pmEvents(a, D).forEach(([c, d, mk]) => { const k = mk || d.slice(0, 7); if (out[k]) out[k][c].push(a); }); });
   return out;
 }
-function pmCols(showInv) { return [['bk', 'จอง'], ['cx', 'ยกเลิก'], ['dv', 'ส่งมอบ'], ...(showInv ? [['inv', 'ใบกำกับ']] : []), ['tr', 'รถเก่า (เทิร์น)']]; }
+function pmCols(showInv) { return [['bk', 'จอง'], ['cx', 'ยกเลิก'], ['dv', 'ส่งมอบ'], ...(showInv ? [['inv', 'ใบกำกับ'], ['cm', 'เบิกค่าคอม']] : []), ['tr', 'รถเก่า (เทิร์น)']]; }
 function pmBtn(n, data) { return n ? `<button class="num underline decoration-dotted" data-act="pm-cell" ${Object.entries(data).map(([k, v]) => `data-${k}="${esc(String(v))}"`).join(' ')} title="กดเพื่อดูรายการ">${n}</button>` : '<span class="text-muted">–</span>'; }
 // one person's months (who = sales name), or everyone in scope when who is '*'
 function pmMonthTable(D, who, y, showInv) {
@@ -60,7 +60,7 @@ function dashPerson(D) {
   const keep = a => inBr(a), st = pmStats(D, keep, y), cols = pmCols(true);
   const months = mo ? [mo] : Object.keys(st);
   const ppl = {};
-  months.forEach(m => cols.forEach(([c]) => st[m][c].forEach(a => { const p = (ppl[a.sales || 'ไม่ระบุ'] ||= { n: a.sales || 'ไม่ระบุ', bk: 0, cx: 0, dv: 0, inv: 0, tr: 0 }); p[c]++; })));
+  months.forEach(m => cols.forEach(([c]) => st[m][c].forEach(a => { const p = (ppl[a.sales || 'ไม่ระบุ'] ||= { n: a.sales || 'ไม่ระบุ', bk: 0, cx: 0, dv: 0, inv: 0, cm: 0, tr: 0 }); p[c]++; })));
   const rows = Object.values(ppl).sort((a, b) => b.dv - a.dv || b.bk - a.bk), bkMax = Math.max(1, ...rows.map(p => p.bk));
   // bookings in the comparison period: the month before (or the same month last year), or last year for a whole year
   const pv = (() => {
@@ -90,8 +90,8 @@ function pmModalBody(m, D) {
   const dOf = a => { const e = pmEvents(a, D).find(([c]) => c === m.c); return e ? e[1] : a.date; };
   // a list by month for invoices follows the claim month: say so when a car was moved
   return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">${col} · ${m.who === '*' ? 'ทุกคน' : esc(m.who)}</h2><p class="text-sm text-muted">${m.m ? fmtM(m.m) : 'ทั้งปี ' + y} · ${fmtN(list.length)} คัน · กดแถวเพื่อเปิดใบจอง</p></div><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
-  <div class="scroll-x max-h-[70vh] overflow-auto"><table class="tbl text-sm"><thead><tr><th>วันที่${col}</th><th>วันที่จอง</th><th>สาขา</th>${m.who === '*' ? '<th>เซลล์</th>' : ''}<th>ลูกค้า</th><th>รุ่น เกรด สี</th><th>VIN</th>${['inv', 'dv', 'tr'].includes(m.c) ? '<th>รถเก่า</th>' : ''}${m.c === 'inv' ? '<th class="nowrap">เดือนเบิกค่าคอม</th>' : ''}</tr></thead><tbody>
-  ${list.map(a => { const t = tradeOf(a), iv = m.c === 'inv' ? D.invByVin.get(atVin(a)) : null; return `<tr class="cursor-pointer" data-act="at-open" data-id="${esc(a.id)}"><td class="nowrap">${fmtD(dOf(a))}</td><td class="nowrap">${fmtD(a.date)}</td><td>${esc(a.delivBr || a.br || '')}</td>${m.who === '*' ? `<td class="nowrap">${salesName(a.sales)}</td>` : ''}<td>${mineAll || isMine(a.sales) ? esc(a.cust || '') : '<span class="text-muted">ลูกค้าเซลล์อื่น</span>'}</td><td class="nowrap">${esc(a.model || '')} ${esc(gradeShort(a.model, a.grade) || a.grade || '')} ${esc(a.color || '')}</td><td class="code text-xs">${esc(atVin(a) || '')}</td>${['inv', 'dv', 'tr'].includes(m.c) ? `<td class="text-xs">${t ? `<span style="color:var(--good)">✓ มีรถเก่า</span> ${esc(tradeTxt(t))}` : '<span class="text-muted">–</span>'}</td>` : ''}${m.c === 'inv' ? `<td class="nowrap" onclick="event.stopPropagation()">${commCell(a, iv)}</td>` : ''}</tr>`; }).join('') || '<tr><td colspan="8" class="text-muted">ไม่มี</td></tr>'}</tbody></table></div>`;
+  <div class="scroll-x max-h-[70vh] overflow-auto"><table class="tbl text-sm"><thead><tr><th>วันที่${m.c === 'cm' ? 'ใบกำกับ' : col}</th><th>วันที่จอง</th><th>สาขา</th>${m.who === '*' ? '<th>เซลล์</th>' : ''}<th>ลูกค้า</th><th>รุ่น เกรด สี</th><th>VIN</th>${['inv', 'cm', 'dv', 'tr'].includes(m.c) ? '<th>รถเก่า</th>' : ''}${['inv', 'cm'].includes(m.c) ? '<th class="nowrap">เดือนเบิกค่าคอม</th>' : ''}</tr></thead><tbody>
+  ${list.map(a => { const t = tradeOf(a), iv = ['inv', 'cm'].includes(m.c) ? D.invByVin.get(atVin(a)) : null; return `<tr class="cursor-pointer" data-act="at-open" data-id="${esc(a.id)}"><td class="nowrap">${fmtD(dOf(a))}</td><td class="nowrap">${fmtD(a.date)}</td><td>${esc(a.delivBr || a.br || '')}</td>${m.who === '*' ? `<td class="nowrap">${salesName(a.sales)}</td>` : ''}<td>${mineAll || isMine(a.sales) ? esc(a.cust || '') : '<span class="text-muted">ลูกค้าเซลล์อื่น</span>'}</td><td class="nowrap">${esc(a.model || '')} ${esc(gradeShort(a.model, a.grade) || a.grade || '')} ${esc(a.color || '')}</td><td class="code text-xs">${esc(atVin(a) || '')}</td>${['inv', 'cm', 'dv', 'tr'].includes(m.c) ? `<td class="text-xs" onclick="event.stopPropagation()">${t ? `<span style="color:var(--good)">✓ มีรถเก่า</span> ${esc(tradeTxt(t))}` : canEditBooking(a) ? `<button class="underline" style="color:var(--accent, #2563eb)" data-act="pm-trade" data-id="${esc(a.id)}">＋ เพิ่มรถเก่า</button>` : '<span class="text-muted">–</span>'}</td>` : ''}${['inv', 'cm'].includes(m.c) ? `<td class="nowrap" onclick="event.stopPropagation()">${commCell(a, iv)}</td>` : ''}</tr>`; }).join('') || '<tr><td colspan="8" class="text-muted">ไม่มี</td></tr>'}</tbody></table></div>`;
 }
 
 // ---- per-car list for ยอดขายและเป้า: invoices (by invoice date) or deliveries (by delivery date) in the period
@@ -217,3 +217,5 @@ document.addEventListener('change', async ev => {
   const r = await saveBk(id, 'เดือนเบิกค่าคอม', v ? `นับในเดือน ${fmtM(v)}` : 'นับตามเดือนใบกำกับ', x => { if (v) x.comm_month = v; else delete x.comm_month; });
   if (r) { toast(v ? `นับใบกำกับคันนี้ในเดือน ${fmtM(v)} แล้ว` : 'นับตามเดือนใบกำกับแล้ว'); render(); }
 });
+// no trade-in recorded: open the booking with its trade-in box ready to fill (11/11)
+Object.assign(ACTIONS, { 'pm-trade'(el) { ACTIONS['at-open']({ dataset: { id: el.dataset.id } }); if (S.modal) { S.modal.tradeEdit = true; S.modal.tr = null; if (typeof tradeFilesClear === 'function') tradeFilesClear(); render(); } } });

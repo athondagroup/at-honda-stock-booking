@@ -173,7 +173,7 @@ function carLockModal(m, D) {
 // ออกใบกำกับแล้ว (with a customer: ออกใบกำกับแล้ว only); a Demo for sale: ว่าง + รถบริษัท, not for sale: รถบริษัท. The table's status filter
 // lists every tag, a car shows under each of its own
 function carTags(c) {
-  const lab = k => (CAR_STATUS[k] || [k])[0];
+  const lab = k => ({ review: 'รอตรวจ (ไม่อยู่ใน IDS)', allocated: 'จัดสรร (เว็บ) รอ IDS', assigned: 'จัดสรร รอส่งมอบ' })[k] || (CAR_STATUS[k] || [k])[0];
   if (c.status === 'free') return ['ว่าง', ...(c.kind === 'ret' ? ['คืนรถ'] : c.kind === 'adv' ? ['Advance', lab('invoiced')] : c.kind === 'demo' ? [lab('company')] : [])];
   if (c.status === 'company') return [lab('company')];
   const t = [c.status === 'temp' ? 'ล็อกชั่วคราว' : lab(c.status)];
@@ -182,10 +182,11 @@ function carTags(c) {
 }
 const TAG_TONE = { 'ว่าง': 'good', 'คืนรถ': 'warn', 'Advance': 'ink', 'รถบริษัท': 'muted' };
 function carStatusCell(c, D, compact) {
-  const tags = compact ? carTags(c).map(t => chip(t, TAG_TONE[t] || ((CAR_STATUS[c.status] || [])[1]) || 'neutral')).join(' ')
+  // the table: one tag a line (11/11)
+  const tags = compact ? `<span class="xl-tags">${carTags(c).map(t => chip(t, TAG_TONE[t] || ((CAR_STATUS[c.status] || [])[1]) || 'neutral')).join('')}${tempChip(c)}</span>`
     : `${c.status === 'temp' ? chip('ล็อกชั่วคราว (แซงได้)', 'warn') : statusChip(CAR_STATUS, c.status)}${c.kind ? ' ' + chip(FREE_KINDS[c.kind], c.kind === 'adv' ? 'ink' : 'warn') : ''}`;
   // the table keeps it short: the special-car note only while it still needs a decision (sellable cars are just tagged)
-  const chips = `${tags} ${tempChip(c)}${compact && c.special && c.special.sellable === true ? '' : spChip(c)}`;
+  const chips = `${tags} ${compact ? '' : tempChip(c)}${compact && c.special && c.special.sellable === true ? '' : spChip(c)}`;
   if (!D || !carLocks(c, D).length) return chips;
   const pend = carLocks(c, D).some(canDecideLock);
   return `<button class="text-left inline-flex flex-wrap items-center gap-1" data-act="carlock-open" data-vin="${esc(c.vin)}" title="กดเพื่ออนุมัติหรือแก้ไขล็อก">${chips}<span class="text-xs underline ${pend ? '' : 'text-muted'}" ${pend ? 'style="color:var(--red)"' : ''}>${pend ? 'อนุมัติ/แก้' : 'ดูล็อก'}</span></button>`;

@@ -152,10 +152,12 @@ tr.low td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 .lt-sub { font-size: 11px; color: var(--muted); }
 .lt-hint { font-size: 11px; color: var(--muted); padding: 5px 10px; background: var(--surface-2); }
 .tbl-xl .xl-pin { position: sticky; left: 0; z-index: 1; background: var(--surface); }
-.tbl-xl td.xl-st { white-space: normal; min-width: 7.5em; max-width: 10em; }
+.tbl-xl td.xl-st { white-space: normal; }
+.tbl-xl td.xl-st > div { max-width: 11em; }
+.tbl-xl .xl-tags { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.tbl-xl .xl-tags .chip { white-space: nowrap; }
 .tbl-xl td.xl-pin .xl-sub { white-space: normal; max-width: 15em; }
-.tbl-xl td.xl-st .chip, .tbl-xl td.xl-st span { white-space: normal; }
-@media (max-width: 767px) { .tbl-xl td.xl-pin { font-size: 11.5px; max-width: 9.6em; } .tbl-xl td.xl-pin .xl-sub { white-space: normal; font-size: 10.5px; } .tbl-xl td.xl-st { min-width: 6.5em; max-width: 8em; } }
+@media (max-width: 767px) { .tbl-xl td.xl-pin { font-size: 11.5px; } .tbl-xl td.xl-pin .xl-sub { font-size: 10.5px; max-width: 11em; } }
 .tbl-xl th.xl-pin { background: var(--surface-2); z-index: 2; }
 @media (max-width: 767px) { .tbl-xl .xl-desk { display: none; } }
 .nowrap { white-space: nowrap; }

@@ -32,9 +32,9 @@ const INSURANCE = ['Honda แถม','AT แถม', 'ลูกค้าซื�
 const INSURERS = ['ซมโปะประกันภัย', 'ธนชาตประกันภัย','คุ้มภัยโตเกียวมารีนประกันภัย', 'กรุงเทพประกันภัย',  'ประกันภัยไทยวิวัฒน์', 'แอกซ่าประกันภัย', 'มิตซุย สุมิโตโม อินชัวรันซ์','วิริยะประกันภัย'];
 const SRC_LABEL = { stock: 'Stock', booking: 'Booking', quota: 'Quota', invoice: 'Invoice/DL' };
 const CAR_STATUS = {
-  free: ['ว่าง', 'good'], noted: ['มีชื่อจองไว้', 'warn'], booked: ['จัดสรรแล้ว (IDS)', 'neutral'],
-  sold: ['แจ้งขายแล้ว', 'muted'], invoiced: ['ออกใบกำกับแล้ว', 'neutral'], delivered: ['ส่งมอบแล้ว', 'muted'],
-  company: ['รถบริษัท', 'muted'], pending: ['รออนุมัติล็อก', 'warn'], locked: ['ล็อกชั่วคราว', 'red'],
+  free: ['ว่าง', 'good'], noted: ['ล็อกชั่วคราว', 'warn'], booked: ['จัดสรร (IDS)', 'neutral'],
+  sold: ['แจ้งขาย', 'muted'], invoiced: ['ออกใบกำกับแล้ว', 'neutral'], delivered: ['ส่งมอบแล้ว', 'muted'],
+  company: ['รถบริษัท', 'muted'], pending: ['รออนุมัติ', 'warn'], locked: ['ล็อกชั่วคราว', 'red'],
   review: ['รอตรวจ · ไม่อยู่ในไฟล์ IDS ล่าสุด', 'warn'],
   allocated: ['จัดสรรแล้ว (เว็บ) รอไฟล์ IDS', 'ink'], assigned: ['จัดสรรแล้ว รอส่งมอบ', 'ink']
 };
