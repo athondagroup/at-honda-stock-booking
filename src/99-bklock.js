@@ -31,7 +31,7 @@ function bltDrop(r, D) {
     ${qs.length ? `<div class="lt-hint">Quota ที่ยังว่าง</div>${qs.map(it).join('')}` : ''}
     ${list.length ? '' : `<div class="lt-hint">${t.q ? `ไม่พบรถว่าง / Quota ว่างที่ตรงกับ "${esc(t.q)}"` : 'ไม่มีรถว่าง / Quota ว่างสเปกนี้ · พิมพ์เลขเฟรม หรือ Ref Quota เพื่อหาสเปกอื่น'}</div>`}</div>`;
 }
-function bkLocks(r, D) {
+function bkLockList(r, D) {
   const row = r.row || {}, a = r.a, keys = [r.key, row.key, a && a.key].filter(Boolean);
   return D.locks.filter((l, i, all) => all.findIndex(x => x.id === l.id) === i && keys.includes(l.bkref) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased && (l.live || l.status === 'pending'));
 }
@@ -40,7 +40,7 @@ function bkLockCell(r, D) {
   const can = ltCan() && !isSales(), t = S.blt && S.blt.key === key ? S.blt : null;
   if (t) return `<div class="lt-cell on"><input id="blt-in" class="lt-in" data-blt="${esc(key)}" value="${esc(t.q || '')}" placeholder="เลขเฟรม / Ref Quota" autocomplete="off">
     <button class="text-xs underline text-muted" data-act="blt-cancel">ยกเลิก</button>${bltDrop(r, D)}</div>`;
-  const ls = bkLocks(r, D);
+  const ls = bkLockList(r, D);
   // a booking holds one car: more than one comes from a slip between the sheet and the web, checked on the booking card (11/11)
   if (ls.length > 1) return a ? `<button class="text-xs underline font-semibold" style="color:var(--bad)" data-act="at-open" data-id="${esc(a.id)}">ล็อกไว้เกิน 1 คัน กดตรวจสอบ</button>` : `<span class="text-xs font-semibold" style="color:var(--bad)">ล็อกไว้เกิน 1 คัน</span>`;
   const lk = ls[0];
@@ -87,3 +87,12 @@ Object.assign(ACTIONS, {
     await ACTIONS['lt-pick']({ dataset: { vin: ltKey(u), k: el.dataset.k } });
   }
 });
+// the booking card: more than one lock, or a request still waiting, is shown on top so "กดตรวจสอบ" lands on it (11/11)
+function bkLockAlertOn(a, D) { const ls = bkLockList({ row: a.row, a, key: a.key }, D); return ls.length > 1 || ls.some(l => l.status === 'pending'); }
+function bkLockAlert(a, D) {
+  if (!bkLockAlertOn(a, D)) return '';
+  const ls = bkLockList({ row: a.row, a, key: a.key }, D);
+  return `<section class="mb-4 p-3 rounded-lg" style="border:1.5px solid var(--bad)"><h3 class="font-head font-semibold" style="color:var(--bad)">${ls.length > 1 ? `ใบจองนี้ล็อกไว้ ${ls.length} คัน (ควรมีคันเดียว)` : 'มีคำขอล็อกค้างอยู่'}</h3>
+    <div class="text-xs text-muted mb-2">${ls.length > 1 ? 'เกิดจากการลงชีตกับเว็บไม่ตรงกัน เลือกคันที่ใช้จริง แล้วกด "ยกเลิกล็อก (ปล่อยรถ)" หรือ "ไม่อนุมัติ" ที่คันอื่น' : 'คำขอเก่าที่ยังไม่ได้ตัดสิน อนุมัติหรือไม่อนุมัติได้ที่นี่'}</div>
+    <div class="border border-line rounded-lg divide-y divide-line bg-surface">${ls.map(l => lockRow(l, D)).join('')}</div></section>`;
+}

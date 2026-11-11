@@ -4,6 +4,7 @@
 function bkLocks(a, D) {
   const ls = D.locks.filter(l => (l.bkref === a.key || (a.row && l.bkref === a.row.key)) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased);
   if (!ls.length) return '';
+  if (bkLockAlertOn(a, D)) return '<div class="text-xs text-muted mt-1">ล็อกของใบจองนี้อยู่ด้านบน</div>';
   return `<div class="border border-line rounded-lg divide-y divide-line mt-2">${ls.map(l => lockRow(l, D)).join('')}</div>`;
 }
 
