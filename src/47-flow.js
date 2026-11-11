@@ -254,7 +254,8 @@ function poAuto(a, po) {
   const ins = (key, by, yr, c) => by && out.push({ key, by, name: `${by === 'ลูกค้าซื้อ' ? '' : 'ฟรี'}ประกันภัยชั้น 1 + พ.ร.บ. ปีที่ ${yr}${c ? ` (${c})` : ''}`, fee: by === 'AT แถม', def: by === 'AT แถม' ? feeIns(a, yr, { ...d, ins1_by: by1 }) : 0 });
   ins('ins1', by1, 1, d.ins1_kind || r.insurance_kind || ''); ins('ins2', d.ins2_by, 2, d.ins2_kind || ''); ins('ins3', d.ins3_by, 3, d.ins3_kind || '');
   if (d.reg_by === 'AT แถม') out.push({ key: 'reg', by: d.reg_by, name: `ฟรีค่าจดทะเบียน (${d.reg_type || 'บุคคลธรรมดา'})`, fee: true, def: feeReg(a, d.reg_type) });   // paid by the customer: not on the PO
-  const disc = num(d.disc) || num(r.discount); if (disc > 0) out.push({ key: 'disc', by: '', name: 'ส่วนลด', amt: disc });
+  // the latest saved sale terms decide (11/11): the booking form's discount only when no terms are saved yet
+  const disc = d.at ? num(d.disc) : num(r.discount); if (disc > 0) out.push({ key: 'disc', by: '', name: 'ส่วนลด', amt: disc });
   if (num(d.down_disc) > 0) out.push({ key: 'ddisc', by: '', name: 'ส่วนลดดาวน์', amt: num(d.down_disc) });
   if (po && po.ucare) out.push({ key: 'ucare', by: 'Honda', name: UCARE });
   return out;
