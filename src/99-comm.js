@@ -160,6 +160,8 @@ function termsFill(x, v, paint) {
 // the fields: price + discount (unless the booking form has them), down / instalments, campaign, margin
 // f: { attr: 'data-modal' | 'data-draft', pre, idp, ro, paint, priceDisc: bool, lockPrice, priceNote }
 function termsFields(x, v, f) {
+  // VAT is always the first line of ลูกค้าชำระเพิ่ม (11/11): ready to fill, left empty when there is none (only the form being keyed)
+  if (v && !f.ro) { if (!Array.isArray(v.extra_pay)) v.extra_pay = []; if (!v.extra_pay.some(xpVat)) v.extra_pay.unshift({ l: 'VAT', v: '' }); }
   const { o, st, base, pv } = termsFill(x, v, f.paint), { opts, warns } = campOptions(x), dis = f.ro ? 'disabled' : '';
   const S2 = (k, label, list) => `<div class="field"><label for="${f.idp}-${k}">${label}</label><select id="${f.idp}-${k}" ${f.attr}="${f.pre}.${k}" ${dis}>${list.map(([val, t, off]) => `<option value="${val}" ${String(o[k] || '') === val ? 'selected' : ''} ${off ? 'disabled' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
   const N = (k, label, extra = '') => `<div class="field"><label for="${f.idp}-${k}">${label}</label><input id="${f.idp}-${k}" type="number" min="0" inputmode="decimal" ${f.attr}="${f.pre}.${k}" value="${esc(o[k] ?? '')}" ${dis} ${extra}></div>`;
@@ -197,9 +199,9 @@ function termsFields(x, v, f) {
       ${st.warn ? `<div class="text-xs" style="color:var(--warn)">${esc(st.warn)}</div>` : ''}
       ${privBox}
       <div class="mt-3 pt-3 border-t border-line"><div class="font-medium text-sm mb-2">${x.cash ? '4' : '5'}. ลูกค้าชำระเพิ่ม <span class="text-xs text-muted font-normal">(รวมใน Margin)</span></div>
-        ${o.extra_pay.map((y, i) => `<div class="flex gap-2 items-end mb-2"><div class="field grow"><label for="${f.idp}-xp${i}l">รายการ</label><input id="${f.idp}-xp${i}l" ${f.attr}="${f.pre}.extra_pay.${i}.l" value="${esc((y && y.l) || '')}" placeholder="เช่น ฟิล์มเกรดสูงกว่าแพ็กเกจ" autocomplete="off" ${dis}></div>
+        ${o.extra_pay.map((y, i) => `<div class="flex gap-2 items-end mb-2"><div class="field grow"><label for="${f.idp}-xp${i}l">รายการ</label>${xpVat(y) ? `<div class="p-2 rounded-lg border border-line" style="background:var(--surface-2)">VAT <span class="text-xs text-muted">(ไม่มีเว้นว่างได้)</span></div>` : `<input id="${f.idp}-xp${i}l" ${f.attr}="${f.pre}.extra_pay.${i}.l" value="${esc((y && y.l) || '')}" placeholder="เช่น ฟิล์มเกรดสูงกว่าแพ็กเกจ" autocomplete="off" ${dis}>`}</div>
           <div class="field w-36"><label for="${f.idp}-xp${i}v">มูลค่า (บาท)</label><input id="${f.idp}-xp${i}v" type="number" min="0" step="1" inputmode="decimal" ${f.attr}="${f.pre}.extra_pay.${i}.v" value="${esc((y && y.v) ?? '')}" ${dis}></div>
-          ${f.ro ? '' : `<button type="button" class="btn btn-ghost btn-sm" data-act="terms-xp-del" data-attr="${f.attr}" data-pre="${f.pre}" data-i="${i}" aria-label="ลบรายการ">ลบ</button>`}</div>`).join('')}
+          ${f.ro || xpVat(y) ? '' : `<button type="button" class="btn btn-ghost btn-sm" data-act="terms-xp-del" data-attr="${f.attr}" data-pre="${f.pre}" data-i="${i}" aria-label="ลบรายการ">ลบ</button>`}</div>`).join('')}
         ${f.ro ? '' : `<button type="button" class="btn btn-ghost btn-sm" data-act="terms-xp-add" data-attr="${f.attr}" data-pre="${f.pre}">+ เพิ่มรายการ</button>`}
         ${o.margin_extra ? `<span class="text-sm ml-2">รวม <b class="num">${money(o.margin_extra)}</b> บาท</span>` : ''}</div>
       <div class="text-sm mt-2">รวม Margin <b class="num">${money(o.margin)}</b> บาท</div></div>`;
@@ -213,7 +215,7 @@ function termsRecord(x, v, paint) {
     campaign_id: o.campaign_id || null, campaign: camp ? (camp.value === 'other' ? String(o.campaign_text || '').trim() || 'อื่น ๆ' : (camp.group ? camp.group + ' · ' : '') + camp.name) : null, campaign_text: o.campaign_id === 'other' ? String(o.campaign_text || '').trim() : null,
     camp_month: camp && camp.month ? camp.month : null, at_step: x.cash ? null : (o.at_step || null), margin_car: num(o.margin_car), margin_at: num(o.margin_at), margin_honda: num(o.margin_honda), margin: o.margin, paint: num(paint),
     priv_gtg: pv.bl.gtg ? null : (o.priv_gtg || null), priv_ln: pv.bl.ln ? null : (o.priv_ln || null), priv_td: o.priv_td && pv.pr.td ? o.priv_td : null, priv_hk: n('priv_hk'), margin_priv: num(o.margin_priv), privileges: privText({ ...o, priv_td: pv.pr.td ? o.priv_td : '' }) || null,
-    extra_pay: o.extra_pay.filter(y => y && (String(y.l || '').trim() || num(y.v))).map(y => ({ l: String(y.l || '').trim(), v: num(y.v) })), margin_extra: o.margin_extra,
+    extra_pay: o.extra_pay.filter(y => y && (num(y.v) || (String(y.l || '').trim() && !xpVat(y)))).map(y => ({ l: String(y.l || '').trim(), v: num(y.v) })), margin_extra: o.margin_extra,
     ins1_by: o.ins1_by || null, ins1_kind: o.ins1_kind || null, ins2_by: o.ins2_by || null, ins3_by: o.ins3_by || null, ins2_kind: o.ins2_kind || null, ins3_kind: o.ins3_kind || null, reg_by: o.reg_by || null, reg_type: o.reg_type || (o.reg_by ? 'บุคคลธรรมดา' : null) };
 }
 function termsCheck(x, v) {
@@ -370,3 +372,5 @@ Object.assign(ACTIONS, {
   'terms-xp-del'(el) { const root = el.dataset.attr === 'data-modal' ? S.modal : S.draft; if (!root) return;
     let o = root; for (const p of el.dataset.pre.split('.')) { if (!o[p]) return; o = o[p]; } if (Array.isArray(o.extra_pay)) o.extra_pay.splice(Number(el.dataset.i), 1); render(); }
 });
+
+function xpVat(y) { return !!y && /^\s*(vat|แวต|ภาษีมูลค่าเพิ่ม)\s*$/i.test(String(y.l || '')); }
