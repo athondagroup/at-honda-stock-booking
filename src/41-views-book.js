@@ -345,7 +345,7 @@ function viewQuota(D) {
         : q.lock || (q.temps || []).length ? quotaHolders(q)
         : q.car && q.car.status && q.car.status !== 'free' ? `<span class="text-sm">${esc((CAR_STATUS[q.car.status] || [q.car.status])[0])}${q.car.cust ? ' · ' + esc(q.car.cust) : ''}</span>`
         : q.branchHold ? `<span class="text-muted">กันไว้ให้สาขา ${q.branchHold}</span>` : '<span class="text-muted">ยังว่าง</span>'}</td>`}
-      <td class="text-sm">${q.lock ? lockText(q.lock) : ''}${q.temps.length ? `<div>${chip(`ล็อกชั่วคราว ${q.temps.length} คน`, 'warn')}</div>` : ''}</td>
+      <td class="text-sm">${(!isSales() && ltCan() && ltQuotaCell(q, D, p)) || `${q.lock ? lockText(q.lock) : ''}${q.temps.length ? `<div>${chip(`ล็อกชั่วคราว ${q.temps.length} คน`, 'warn')}</div>` : ''}`}</td>
       <td class="text-right nowrap">${!p.write || !p.request ? '' : (q.open || quotaQueue(q)) ? `<button class="btn btn-ghost btn-sm" data-act="lock-open" data-ref="${esc(q.ref)}">${q.open ? 'ล็อก' : 'ขอคิวต่อ'}</button>`
         : q.car && !q.booking && carLockable(q.car) ? `<button class="btn btn-ghost btn-sm" data-act="lock-open" data-vin="${esc(q.car.vin)}">${q.car.status === 'pending' ? 'ขอคิวต่อ' : 'ล็อกรถคันนี้'}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`
     : `<div class="bg-surface border border-line rounded-lg">${emptyBox('ไม่มี Quota ตามตัวกรองนี้', 'อัปโหลดไฟล์ Quota จาก IDS ที่หน้าอัปเดตข้อมูล IDS')}</div>`}`;

@@ -11,9 +11,10 @@ function tgtRank(m) { const i = tgtOrder().indexOf(String(m || '').toUpperCase()
 function tgtInvList(D, from, to) {
   const out = [], advs = new Map(); for (const [vin] of S.vehicles) { const a = advRec(vin); if (a) advs.set(vin, a); }
   D.X.inv.forEach(i => {
-    if (i.company || !i.idate || i.idate < from || i.idate > to || (i.vin && advs.has(i.vin)) || (i.vin && D.invByVin.get(i.vin) !== i)) return;
+    // the same invoices as the tile ยอดขาย (ใบกำกับภาษี) (11/11): company (Demo) cars count, invoices to another branch / dealer do not
+    if (i.other || !i.idate || i.idate < from || i.idate > to || (i.vin && advs.has(i.vin))) return;
     const br = i.br;
-    out.push({ date: i.idate, br, model: i.model, fin: i.fin || null, grade: i.grade, color: i.color, vin: i.vin, cust: i.cust, sales: i.sales, inv: i.inv, idate: i.idate, ddate: i.ddate, src: 'DL', extra: '' });
+    out.push({ date: i.idate, br, model: i.model, fin: i.fin || null, grade: i.grade, color: i.color, vin: i.vin, cust: i.cust, sales: i.sales, inv: i.inv, idate: i.idate, ddate: i.ddate, src: 'DL', extra: i.company ? 'รถบริษัท (Demo)' : '' });
   });
   for (const [vin, a] of advs) { const br = advBr(vin, a, D), c = carAny(vin, D) || {}; if (br && a.idate >= from && a.idate <= to) out.push({ date: a.idate, br, model: c.model, grade: c.grade, color: c.color, vin, cust: a.cust, sales: null, inv: a.inv, idate: a.idate, ddate: null, fin: null, src: 'ใบ Advance', extra: 'ADV' }); }
   return out;
