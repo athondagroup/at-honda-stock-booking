@@ -838,6 +838,7 @@ const ACTIONS = {
   async 'po-save'(el) {
     const a = atById(el.dataset.id), po = S.modal.po;
     if (!a || !po) return;
+    if (poRO(a)) { toast('ส่งมอบแล้ว แอดมินขึ้นไปแก้ใบแต่งรถได้', 'bad'); return; }
     if (!stepAllowed(a, 'po') || !(stepOpen(a, 'po') || a.flow.done.po || a.flow.poSkip || poLocked(a) || S.modal.ret)) { toast('ทำใบสั่งแต่งรถ ได้ก่อนส่งมอบ (ข้ามขั้นก่อนหน้าได้)', 'bad'); return; }
     const items = po.items.map(x => ({ ...x, name: String(x.name || '').trim(), qty: Math.max(1, parseInt(x.qty, 10) || 1) })).filter(x => x.name);
     const noUlt = items.find(x => poUlt(x) && !x.hon && !(Number(x.cost) > 0)); if (noUlt) { toast('Ultimate Care ที่ AT แถม ต้องใส่มูลค่า (ทุน) · ถ้า Honda แถม ให้ติ๊ก "Honda แถม" แทน', 'bad'); return; }
