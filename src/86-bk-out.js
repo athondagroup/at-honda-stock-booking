@@ -98,12 +98,22 @@ function bkOutAlloc(o) {
 }
 // the booking is in the current Booking table again (a later upload has it): it never really left
 function bkOutBack(o) { return !!(o && o.no && derive().X.bookings.some(b => String(b.no) === String(o.no))); }
-function bkOutPending(o) { return !!(o && (o.flag || o.why === 'ไม่มีใบจองในเว็บ') && !o.res && !bkOutAuto(o) && !bkOutDelivered(o) && !bkOutAlloc(o) && !bkOutBack(o)); }
+function bkOutPending(o, br) { return !!(o && (o.flag || o.why === 'ไม่มีใบจองในเว็บ') && !o.res && !bkOutAuto(o) && !bkOutDelivered(o) && !bkOutAlloc(o) && !bkOutBack(o) && !bkOutWebCx(o, br)); }
+// gone from IDS and the web booking of that customer (same branch) is already cancelled: nothing to check (12/11)
+// (a cancelled web booking no longer pairs with its IDS booking, so the upload did not see it)
+function bkOutWebCx(o, br) {
+  if (!o) return null; const k = searchKey(o.cust || ''); if (k.length < 4) return null;
+  const a0 = o.atId && typeof atById === 'function' ? atById(o.atId) : null; if (a0 && a0.cancelled) return a0;
+  for (const [id, r] of S.bookings) if (r && r.status === 'cancelled' && (!br || r.br === br) && searchKey(r.customer || '') === k && (!r.booking_no || String(r.booking_no) === String(o.no))) return { id, rec: r };
+  return null;
+}
 function bkOutList(u, D) {
   const can = canApproveBr(u.br) && perms().write, F = S.bkOut && S.bkOut.id === u.id ? S.bkOut : { sel: {}, pick: {} };
-  const todo = (u.out || []).filter(bkOutPending);
+  const todo = (u.out || []).filter(o => bkOutPending(o, u.br));
   const row = (o, i) => {
-    const a = o.atId ? atById(o.atId) : null, auto = o.flag && !o.res ? bkOutAuto(o) : null, open = bkOutPending(o) && a && !a.cancelled;
+    const a = o.atId ? atById(o.atId) : null, auto = o.flag && !o.res ? bkOutAuto(o) : null, open = bkOutPending(o, u.br) && a && !a.cancelled;
+    const wcx = o.flag && !o.res ? bkOutWebCx(o, u.br) : null;
+    if (wcx && !(a && !a.cancelled)) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">ใบจองในเว็บยกเลิกแล้ว · ไม่ต้องตรวจ</span> <button class="underline text-xs" data-act="at-open" data-id="${esc(wcx.id)}">เปิด</button></div>`;
     const dv = o.flag && !o.res && !auto ? bkOutDelivered(o) : null;
     if (o.flag && !o.res && !auto && !dv && bkOutBack(o)) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">กลับมาอยู่ใน IDS แล้ว (ไฟล์ Booking รอบหลังมีใบจองนี้)</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>${a ? `<button class="underline text-xs" data-act="at-open" data-id="${esc(a.id)}">เปิด</button>` : ''}</div>`;
     const al = o.flag && !o.res && !auto && !dv ? bkOutAlloc(o) : null;
@@ -116,7 +126,7 @@ function bkOutList(u, D) {
     const head = `<div class="flex flex-wrap gap-x-4 items-center">${can && open ? `<input type="checkbox" class="w-4 h-4" data-bkout="${esc(u.id)}" data-i="${i}" ${F.sel[i] ? 'checked' : ''} aria-label="เลือกใบจอง ${esc(o.no)}">` : ''}
       <span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span class="text-muted">${esc(o.sales || '')}</span>
       ${o.res ? `<span style="color:var(--good)">ทำแล้ว: ${esc(o.res.text)}</span><span class="text-xs text-muted">${fmtDT(o.res.at)} ${esc(o.res.role || '')}</span>` : `<span style="color:var(--${o.flag ? 'bad' : 'muted'})">${esc(o.why)}</span>`}</div>`;
-    if (bkOutPending(o) && !a && can) return `<div class="py-2 border-t border-line">${head}<div class="mt-1 flex flex-wrap gap-2 items-center"><span class="text-xs text-muted">ยังไม่หายจากเว็บ (รอตรวจ ไม่นับคิว) จนกว่าจะตอบ</span>
+    if (bkOutPending(o, u.br) && !a && can) return `<div class="py-2 border-t border-line">${head}<div class="mt-1 flex flex-wrap gap-2 items-center"><span class="text-xs text-muted">ยังไม่หายจากเว็บ (รอตรวจ ไม่นับคิว) จนกว่าจะตอบ</span>
       <button class="btn btn-ghost btn-sm" data-act="bkout-gone" data-id="${esc(u.id)}" data-i="${i}" data-v="still">ยังจองอยู่ (ไฟล์ไม่ครบ)</button>
       <button class="btn btn-red btn-sm" data-act="bkout-gone" data-id="${esc(u.id)}" data-i="${i}" data-v="closed">ยกเลิก / ไม่มีแล้ว</button></div></div>`;
     if (!open || !can) return `<div class="py-1">${head}</div>`;

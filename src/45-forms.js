@@ -365,8 +365,8 @@ function viewUploadBase(D) {
   <!--UPL-EXTRA-->
   ${brSeg()}
   <section><h2 class="font-head text-lg font-semibold mb-2">ประวัติการอัปโหลด</h2>
-    <div class="bg-surface border border-line rounded-lg divide-y divide-line">${hist.filter((u, i) => i < 40 || (u.out || []).some(o => u.src === 'booking' ? bkOutPending(o) : outOpen(u, o))).map(u => {
-      const open = S.filters.uplOpen === u.id, flagged = (u.out || []).filter(o => u.src === 'booking' ? bkOutPending(o) : outOpen(u, o)).length;
+    <div class="bg-surface border border-line rounded-lg divide-y divide-line">${hist.filter((u, i) => i < 40 || (u.out || []).some(o => u.src === 'booking' ? bkOutPending(o, u.br) : outOpen(u, o))).map(u => {
+      const open = S.filters.uplOpen === u.id, flagged = (u.out || []).filter(o => u.src === 'booking' ? bkOutPending(o, u.br) : outOpen(u, o)).length;
       return `<div class="p-3 md:px-4">
         <div class="flex flex-wrap gap-x-5 gap-y-1 items-center text-sm">
           <span class="w-32 num text-muted">${fmtDT(u.at)}</span><span class="w-36 font-medium">${SRC_LABEL[u.src]} ${esc(u.br)}${u.m ? ' ' + fmtM(u.m) : ''}</span>

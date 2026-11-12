@@ -55,7 +55,7 @@ function datafixItems(D) {
   const at = D.at.filter(a => inBr(a));
   const upl = [...S.uploads.values()].filter(u => inBr(u));
   const outStock = upl.filter(u => u.src === 'stock').reduce((n, u) => n + (u.out || []).filter(o => outOpen(u, o)).length, 0);
-  const outBk = upl.filter(u => u.src === 'booking').reduce((n, u) => n + (u.out || []).filter(o => typeof bkOutPending === 'function' ? bkOutPending(o) : o.flag && !o.res).length, 0);
+  const outBk = upl.filter(u => u.src === 'booking').reduce((n, u) => n + (u.out || []).filter(o => typeof bkOutPending === 'function' ? bkOutPending(o, u.br) : o.flag && !o.res).length, 0);
   return [
     ['ไฟล์ IDS', [
       ['DL (ใบกำกับ/ส่งมอบ) ไม่ได้อัปเดต', f.stale.map(r => r.b).join(', ') || 0, 'bad', { act: 'go', view: 'upload' }],

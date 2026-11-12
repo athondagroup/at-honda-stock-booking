@@ -101,6 +101,7 @@ function deriveNow() {
     for (const [no, { u, x }] of last) {
       if (have.has(no) || x.atId || invByNo.has(no) || !(x.flag || x.why === 'ไม่มีใบจองในเว็บ' || (x.res && x.res.still))) continue;
       if (x.res && !x.res.still) continue;
+      if (!(x.res && x.res.still) && typeof bkOutWebCx === 'function' && bkOutWebCx({ ...x, atId: null }, u.br)) continue;   // the web booking of that customer is cancelled (12/11)
       const [m, g, c] = String(x.spec || '||').split('|');
       goneBk.push({ br: u.br, no, date: x.date || null, model: m || null, grade: g || null, color: c || null, sales: x.sales || null, cust: x.cust || null, ids: null, vin: null, ref: null, ws: null, gone: !(x.res && x.res.still), goneAt: u.at });
     } }
