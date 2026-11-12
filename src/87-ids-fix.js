@@ -68,7 +68,7 @@ function idsFixModal(m, D) {
     <div class="flex flex-wrap justify-end gap-2 mt-3"><button class="btn btn-dark" data-act="idsfix-save" ${can ? '' : 'disabled'}>บันทึกการแก้ไข</button></div>`;
   else if (m.mode === 'skip') body = `<div class="grid sm:grid-cols-2 gap-3"><div class="field"><label for="ixf-r" class="req">เหตุผล</label><select id="ixf-r" data-modal="reason" ${canClose ? '' : 'disabled'}>${opt(idsFixSkipReasons(), m.reason, 'เลือกเหตุผล')}</select></div>
       <div class="field"><label for="ixf-n" ${m.reason === 'อื่น ๆ' ? 'class="req"' : ''}>หมายเหตุ</label><input id="ixf-n" data-modal="note" value="${esc(m.note || '')}" ${canClose ? '' : 'disabled'}></div></div>
-    <p class="text-xs text-muted mt-2">ใบนี้ยังอยู่ในคิวตาม IDS แต่ไม่ขึ้นในรายการ "มีใน IDS แต่ไม่มีฟอร์ม AT" และไม่เตือนเซลล์อีก</p>
+    <p class="text-xs text-muted mt-2">${/advance/i.test(m.reason || '') ? 'ลูกค้า Make รถ Advanced = ไม่มีลูกค้าจริง: ใบนี้ไม่ต่อคิว ไม่ขึ้นในรายการ "มีใน IDS แต่ไม่มีฟอร์ม AT" และไม่เตือนเซลล์อีก' : 'ใบนี้ยังอยู่ในคิวตาม IDS แต่ไม่ขึ้นในรายการ "มีใน IDS แต่ไม่มีฟอร์ม AT" และไม่เตือนเซลล์อีก'}</p>
     <div class="flex flex-wrap justify-end gap-2 mt-3"><button class="btn btn-dark" data-act="idsfix-skip" ${canClose ? '' : 'disabled'}>บันทึก ไม่ต้องมีฟอร์ม</button></div>`;
   else body = `<div class="field"><label for="ixf-c" class="req">เหตุผลที่ยกเลิก</label><input id="ixf-c" data-modal="note" value="${esc(m.note || '')}" placeholder="เช่น ลูกค้าไม่ซื้อแล้ว" ${canClose ? '' : 'disabled'}></div>
     <p class="text-xs text-muted mt-2">ยกเลิกในเว็บทันที: ออกจากคิวและยอดจอง · อย่าลืมยกเลิกในระบบ IDS ด้วย</p>
