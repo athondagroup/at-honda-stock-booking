@@ -84,8 +84,12 @@ function bkOutDelivered(o) {
   if (!o) return null;
   const a = o.atId && typeof atById === 'function' ? atById(o.atId) : null;
   if (a && !a.cancelled && a.flow && a.flow.done && a.flow.done.delivered) return { date: a.flow.deliveredDate || (a.rec.flow && a.rec.flow.delivered && a.rec.flow.delivered.date) || null };
-  const inv = o.no ? derive().X.inv.find(i => String(i.no || '') === String(o.no) && !i.company) : null;
-  return inv ? { date: inv.ddate || inv.idate || null, inv: inv.inv } : null;
+  const X = derive().X, inv = o.no ? X.inv.find(i => String(i.no || '') === String(o.no) && !i.company) : null;
+  if (inv) return { date: inv.ddate || inv.idate || null, inv: inv.inv };
+  // the DL row carries another booking number (IDS re-keyed it): the same customer and model in the DL is the same sale (12/11)
+  const k = searchKey(o.cust || ''), [m] = String(o.spec || '').split('|');
+  const byName = k.length >= 4 ? X.inv.find(i => !i.company && i.cust && searchKey(i.cust) === k && (!m || !i.model || i.model === m)) : null;
+  return byName ? { date: byName.ddate || byName.idate || null, inv: byName.inv, byName: true } : null;
 }
 // gone from the Booking file because a car is now allocated to it (the Stock file lists the car with this booking no., or the web booking has the car): not lost
 function bkOutAlloc(o) {
@@ -111,14 +115,15 @@ function bkOutList(u, D) {
   const can = canApproveBr(u.br) && perms().write, F = S.bkOut && S.bkOut.id === u.id ? S.bkOut : { sel: {}, pick: {} };
   const todo = (u.out || []).filter(o => bkOutPending(o, u.br));
   const row = (o, i) => {
-    const a = o.atId ? atById(o.atId) : null, auto = o.flag && !o.res ? bkOutAuto(o) : null, open = bkOutPending(o, u.br) && a && !a.cancelled;
-    const wcx = o.flag && !o.res ? bkOutWebCx(o, u.br) : null;
+    const fl = (o.flag || o.why === 'ไม่มีใบจองในเว็บ') && !o.res;   // older uploads wrote the no-web case without the flag
+    const a = o.atId ? atById(o.atId) : null, auto = fl ? bkOutAuto(o) : null, open = bkOutPending(o, u.br) && a && !a.cancelled;
+    const wcx = fl ? bkOutWebCx(o, u.br) : null;
     if (wcx && !(a && !a.cancelled)) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">ใบจองในเว็บยกเลิกแล้ว · ไม่ต้องตรวจ</span> <button class="underline text-xs" data-act="at-open" data-id="${esc(wcx.id)}">เปิด</button></div>`;
-    const dv = o.flag && !o.res && !auto ? bkOutDelivered(o) : null;
-    if (o.flag && !o.res && !auto && !dv && bkOutBack(o)) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">กลับมาอยู่ใน IDS แล้ว (ไฟล์ Booking รอบหลังมีใบจองนี้)</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>${a ? `<button class="underline text-xs" data-act="at-open" data-id="${esc(a.id)}">เปิด</button>` : ''}</div>`;
-    const al = o.flag && !o.res && !auto && !dv ? bkOutAlloc(o) : null;
+    const dv = fl && !auto ? bkOutDelivered(o) : null;
+    if (fl && !auto && !dv && bkOutBack(o)) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">กลับมาอยู่ใน IDS แล้ว (ไฟล์ Booking รอบหลังมีใบจองนี้)</span><span class="text-xs text-muted line-through">${esc(o.why)}</span>${a ? `<button class="underline text-xs" data-act="at-open" data-id="${esc(a.id)}">เปิด</button>` : ''}</div>`;
+    const al = fl && !auto && !dv ? bkOutAlloc(o) : null;
     if (al) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">IDS จัดสรรรถแล้ว · <span class="code">${esc(al.vin)}</span> (ใบจองย้ายไปอยู่ในไฟล์ Stock)</span>${a ? `<button class="underline text-xs" data-act="at-open" data-id="${esc(a.id)}">เปิด</button>` : ''}</div>`;
-    if (dv) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">ส่งมอบแล้ว${dv.date ? ' ' + fmtD(dv.date) : ''}${dv.inv ? ` (DL ใบกำกับ ${esc(dv.inv)})` : ''} · หายจากไฟล์ Booking เพราะส่งมอบ ไม่ต้องทำอะไร</span></div>`;
+    if (dv) return `<div class="py-2 border-t border-line flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span style="color:var(--good)">ส่งมอบแล้ว${dv.date ? ' ' + fmtD(dv.date) : ''}${dv.inv ? ` (DL ใบกำกับ ${esc(dv.inv)}${dv.byName ? ' · ชื่อลูกค้าตรง เลขใบจองต่างกัน' : ''})` : ''} · หายจากไฟล์ Booking เพราะส่งมอบ ไม่ต้องทำอะไร</span></div>`;
     if (auto) return `<div class="py-2 border-t border-line"><div class="flex flex-wrap gap-x-4 items-center"><span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span class="text-muted">${esc(o.sales || '')}</span>
       <span style="color:var(--good)">ระบบจับคู่กับ IDS ใบใหม่แล้ว: ${esc(auto.no)} · ${esc(auto.cust || '')} · ${specLabel(auto.spec)}</span></div>
       <div class="text-xs text-muted mt-1">ใบจองในเว็บจับคู่กับใบใหม่นี้แล้ว (ส่วนใหญ่ IDS ออกเลขใบจองใหม่) ไม่ต้องยกเลิก <button class="underline" data-act="at-open" data-id="${esc(a.id)}">เปิด</button>
@@ -126,9 +131,10 @@ function bkOutList(u, D) {
     const head = `<div class="flex flex-wrap gap-x-4 items-center">${can && open ? `<input type="checkbox" class="w-4 h-4" data-bkout="${esc(u.id)}" data-i="${i}" ${F.sel[i] ? 'checked' : ''} aria-label="เลือกใบจอง ${esc(o.no)}">` : ''}
       <span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span class="text-muted">${esc(o.sales || '')}</span>
       ${o.res ? `<span style="color:var(--good)">ทำแล้ว: ${esc(o.res.text)}</span><span class="text-xs text-muted">${fmtDT(o.res.at)} ${esc(o.res.role || '')}</span>` : `<span style="color:var(--${o.flag ? 'bad' : 'muted'})">${esc(o.why)}</span>`}</div>`;
-    if (bkOutPending(o, u.br) && !a && can) return `<div class="py-2 border-t border-line">${head}<div class="mt-1 flex flex-wrap gap-2 items-center"><span class="text-xs text-muted">ยังไม่หายจากเว็บ (รอตรวจ ไม่นับคิว) จนกว่าจะตอบ</span>
+    if (bkOutPending(o, u.br) && !a && bkOutCanGone(u.br)) return `<div class="py-2 border-t border-line">${head}<div class="mt-1 flex flex-wrap gap-2 items-center"><span class="text-xs text-muted">ตรวจใน DL แล้ว ไม่พบ (ทั้งเลขใบจองและชื่อลูกค้า) · ตรวจใน IDS แล้วเลือก: ยังจองอยู่ = กลับเข้าคิว · ยกเลิก / ไม่มีแล้ว = ปิดใบนี้ (ไม่นับคิว)</span>
       <button class="btn btn-ghost btn-sm" data-act="bkout-gone" data-id="${esc(u.id)}" data-i="${i}" data-v="still">ยังจองอยู่ (ไฟล์ไม่ครบ)</button>
       <button class="btn btn-red btn-sm" data-act="bkout-gone" data-id="${esc(u.id)}" data-i="${i}" data-v="closed">ยกเลิก / ไม่มีแล้ว</button></div></div>`;
+    if (bkOutPending(o, u.br) && !a) return `<div class="py-1">${head}<div class="text-xs mt-1" style="color:var(--warn)">ตรวจใน DL แล้ว ไม่พบ · ให้แอดมินสาขา ${esc(u.br)} หรือ${esc(mgrNameOf(u.br) || 'ผู้จัดการสาขา')} ดูใน IDS แล้วกด "ยังจองอยู่" หรือ "ยกเลิก / ไม่มีแล้ว"</div></div>`;
     if (!open || !can) return `<div class="py-1">${head}</div>`;
     const sug = bkCands(a, D, false), all = bkCands(a, D, true), pick = F.pick[i] || '';
     const opt = b => `${b.no} · ${b.cust} · ${specLabelText(specKey(b.model, b.grade, b.color))} · ${b.sales || ''} · ${fmtD(b.date)}`;
@@ -205,7 +211,7 @@ Object.assign(ACTIONS, {
   async 'bkout-cancel-sel'(el) { const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k] && u && bkOutPending(u.out[Number(k)])).map(Number); if (!idxs.length || !confirm(`ยกเลิกใบจองที่เลือก ${idxs.length} ใบในเว็บทันที?`)) return; await bkOutCancel(el.dataset.id, idxs); },
   // an IDS booking gone from the file with no web form (10/11): still booked (the file was incomplete) or gone for good
   async 'bkout-gone'(el) {
-    const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !canApproveBr(u.br) || !bkOutPending(u.out[i])) return;
+    const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !bkOutCanGone(u.br) || !bkOutPending(u.out[i], u.br)) return;
     const still = el.dataset.v === 'still';
     if (await bkOutMark(el.dataset.id, [i], still ? 'ยังจองอยู่ (ไฟล์ IDS ไม่ครบ)' : 'ยกเลิก / ไม่มีใบจองนี้แล้ว')) {
       const cur = S.uploads.get(el.dataset.id); if (cur && cur.out[i] && cur.out[i].res) { cur.out[i].res.still = still; await write('uploads', el.dataset.id, cur); }
@@ -246,3 +252,6 @@ document.addEventListener('change', ev => {
   if (t.dataset.bkoutpick) { const F = bkOutState(t.dataset.bkoutpick); F.pick[Number(t.dataset.i)] = t.value; render(); }
 });
 document.addEventListener('input', ev => { const t = ev.target; if (t && t.dataset && t.dataset.bkoutnote) bkOutState(t.dataset.bkoutnote).note = t.value; });
+
+// an IDS booking with no web form gone from the file: the branch manager or the admin of that branch answers (12/11)
+function bkOutCanGone(br) { return perms().write && (canApproveBr(br) || (S.role.role === 'admin' && myBranch() === br)); }
