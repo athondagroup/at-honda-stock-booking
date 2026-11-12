@@ -57,7 +57,7 @@ function bkLockCell(r, D) {
   const vin = r.vin || row.vin || (a && atVin(a));
   if (vin) return `<span class="code text-sm">${esc(vin)}</span><div class="text-xs text-muted">${row.state === 'idscar' || row.match === 'car' ? 'IDS จัดสรร' : 'จัดสรรแล้ว'}</div>`;
   if (row.state === 'idsquota' && (row.ref || row.ws)) return `<span class="code text-sm">Quota ${esc(row.ref || row.ws)}</span><div class="text-xs text-muted">IDS จับคู่</div>`;
-  if (!can || !['waiting', 'demo'].includes(row.state) || (a && !a.active && row.state !== 'demo')) return '<span class="text-muted">–</span>';
+  if (!can || !['waiting', 'demo', 'democar'].includes(row.state) || (a && !a.active && row.state !== 'demo')) return '<span class="text-muted">–</span>';
   return `<input class="lt-in idle" data-blt-open="${esc(key)}" placeholder="พิมพ์เลขเฟรม / Ref Quota" readonly>`;
 }
 document.addEventListener('focusin', ev => {

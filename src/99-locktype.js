@@ -20,7 +20,7 @@ function ltOpenCar(c) {
 }
 // a company (demo) car can be locked only to an IDS booking marked "ไม่ต้องมีฟอร์ม · รถ Demo" (12/11)
 function ltDemoCar(c) { return !!(c && !c.quota && c.status === 'company'); }   // its IDS booking is the company's own
-function ltDemoBk(b) { return !!(b && b.skip && /demo/i.test(b.skip.reason || '')); }
+function ltDemoBk(b) { return !!(b && ((b.skip && /demo/i.test(b.skip.reason || '')) || (b.app && b.app.demoCar))); }
 function ltLocks(c, D) { return c.quota ? D.locks.filter(l => ltSameU(l, c) && (l.live || l.status === 'pending')).filter(lockVisible) : carLocks(c, D); }
 // the live lock on a car that the cell shows (pending requests to change it are listed under it)
 function ltLockOf(c, D) { return ltLocks(c, D).find(l => l.live && l.status !== 'pending') || null; }
@@ -43,7 +43,7 @@ function ltCands(c, q, D) {
   const k = searchKey(q || '');
   const [model] = String(c.spec).split('|');
   const demo = ltDemoCar(c);
-  return [...D.bookings, ...(D.demoRows || []).filter(b => !D.locks.some(l => l.live && l.bkref === b.key))].filter(b => ['waiting', 'noids', 'demo'].includes(b.state) && !(b.app && b.app.demo) && (!demo || ltDemoBk(b)) && (k ? [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k)) : b.spec === c.spec) && (k || !isSales() || isMine(b.owner)))
+  return [...D.bookings, ...(D.demoRows || []).filter(b => !D.locks.some(l => l.live && l.bkref === b.key))].filter(b => ['waiting', 'noids', 'demo', 'democar'].includes(b.state) && !(b.app && b.app.demo) && (!demo || ltDemoBk(b)) && (k ? [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k)) : b.spec === c.spec) && (k || !isSales() || isMine(b.owner)))
     .map(b => ({ b, rank: b.spec === c.spec ? 0 : String(b.spec || '').split('|')[0] === model ? 1 : 2 }))
     .sort((x, y) => x.rank - y.rank || String(x.b.qdate || x.b.date || '').localeCompare(String(y.b.qdate || y.b.date || ''))).slice(0, 6);
 }

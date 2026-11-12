@@ -223,7 +223,7 @@ function deriveNow() {
       key: 'app:' + id, id, src: 'AT', rec: r, no: r.booking_no || null, date: r.booking_date, br: r.br, sales: salesCanon(r.sales),
       cust: r.customer, model: r.model, grade: r.grade, color: r.color, spec: specKey(r.model, r.grade, r.color),
       deposit: (Number(r.deposit) || 0) + (r.deposit_from ? Number(r.deposit_from.amount) || 0 : 0), slip: (r.slip_imgs || []).length > 0 || r.slip === true || !!r.doc_url || !!r.deposit_from,
-      cancelled: r.status === 'cancelled', demo: !!r.demo || !!r.hidden, created_at: r.created_at,
+      cancelled: r.status === 'cancelled', demo: (!!r.demo && !demoSaleRec(r)) || !!r.hidden, demoCar: demoSaleRec(r), created_at: r.created_at,
       // a model change approved later puts the booking at the back of the queue
       qdate: r.queue_date || r.booking_date
     });
@@ -457,6 +457,8 @@ function deriveNow() {
     else if (b.gone) b.state = 'gone';
     // IDS booking marked "ไม่ต้องมีฟอร์ม · ลูกค้า Make รถ Advanced": no real customer, so it does not queue (12/11)
     else if (!b.app && b.skip && /advance/i.test(b.skip.reason || '') && b.match === 'waiting') b.state = 'adv';
+    // a customer buying a demo car (form status "รถ Demon"): matched to IDS as usual, takes the demo car, does not queue for a new one (12/11)
+    else if (b.app && b.app.demoCar && b.match === 'waiting') b.state = 'democar';
     // a web form not in the IDS booking file yet queues like the rest, by the booking date on the form (ตกลง 11/11); b.noIds marks it
     else if (b.match === 'car') b.state = 'idscar';
 
@@ -936,3 +938,6 @@ function vinSpecMap(X) {
   [...(X.cars || []), ...(X.inv || [])].forEach(c => { const n = c.bkno || c.no; if (n && c.model && c.grade && !m.has('no:' + n)) m.set('no:' + n, c); });
   _vsm = m; _vsmK = X; return m;
 }
+
+// the form's status column "รถ Demon" = a real customer buying a demo car (12/11); only a test drive (ทดลองขับ / เทสไดร์ in the model) is no booking
+function demoSaleRec(r) { return !!(r && (r.demo_car || (r.demo && !/ทดลองขับ|เทสไดร์/.test(String(r.model_text || ''))))); }
