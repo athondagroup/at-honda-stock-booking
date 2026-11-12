@@ -26,7 +26,7 @@ function bltDrop(r, D) {
     return `<button class="lt-it" data-act="blt-pick" data-u="${esc(ltKey(u))}" data-k="${esc(t.key)}"><span><b class="code">${esc(x.kind === 'car' ? u.vin : 'Quota ' + u.ref)}</b> · ${esc(u.br || '')}${x.kind === 'car' ? ' · ว่าง' : q && q.m ? ` · ส่ง ${fmtM(q.m)}${q.week ? ' W' + q.week : ''}` : ''}</span>
       <span class="lt-sub">${esc(specLabelText(u.spec))} · ${x.rank === 0 ? '<span style="color:var(--good)">สเปกตรง</span>' : '<span style="color:var(--warn)">สเปกไม่ตรง</span>'} · ล็อกให้ใบจองนี้ ${LOCK_DAYS_BY.booking} วัน</span></button>`; };
   const cars = list.filter(x => x.kind === 'car'), qs = list.filter(x => x.kind === 'quota');
-  return `<div class="lt-drop" role="listbox">${t.mode === 'edit' ? '<div class="lt-hint">เปลี่ยนรถ / Quota ของล็อกนี้ (ล็อกเดิมปล่อยให้เอง)</div>' : ''}
+  return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="blt-cancel" aria-label="ปิด">✕ ปิด</button>${t.mode === 'edit' ? '<div class="lt-hint">เปลี่ยนรถ / Quota ของล็อกนี้ (ล็อกเดิมปล่อยให้เอง)</div>' : ''}
     ${cars.length ? `<div class="lt-hint">รถในสต็อกที่ว่าง${t.q ? '' : ' สเปกเดียวกัน'}</div>${cars.map(it).join('')}` : ''}
     ${qs.length ? `<div class="lt-hint">Quota ที่ยังว่าง</div>${qs.map(it).join('')}` : ''}
     ${list.length ? '' : `<div class="lt-hint">${t.q ? `ไม่พบรถว่าง / Quota ว่างที่ตรงกับ "${esc(t.q)}"` : 'ไม่มีรถว่าง / Quota ว่างสเปกนี้ · พิมพ์เลขเฟรม หรือ Ref Quota เพื่อหาสเปกอื่น'}</div>`}</div>`;
@@ -96,3 +96,9 @@ function bkLockAlert(a, D) {
     <div class="text-xs text-muted mb-2">${ls.length > 1 ? 'เกิดจากการลงชีตกับเว็บไม่ตรงกัน เลือกคันที่ใช้จริง แล้วกด "ยกเลิกล็อก (ปล่อยรถ)" หรือ "ไม่อนุมัติ" ที่คันอื่น' : 'คำขอเก่าที่ยังไม่ได้ตัดสิน อนุมัติหรือไม่อนุมัติได้ที่นี่'}</div>
     <div class="border border-line rounded-lg divide-y divide-line bg-surface">${ls.map(l => lockRow(l, D)).join('')}</div></section>`;
 }
+// tapping anywhere outside the lock box closes it (stock page / quota page / booking page) – on a phone the list covered "ยกเลิก" (12/11)
+document.addEventListener('pointerdown', ev => {
+  if (!S.lt && !S.blt) return;
+  const t = ev.target; if (t && t.closest && t.closest('.lt-cell')) return;
+  S.lt = null; S.blt = null; render();
+}, true);

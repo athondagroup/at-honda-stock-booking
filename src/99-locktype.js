@@ -53,8 +53,8 @@ function ltDrop(c, D) {
     ? it('temp', `＋ ล็อกชั่วคราว "${esc(q)}"`, `ยังไม่มีใบจอง · เซลล์ ${p.sales ? esc(p.sales) : `<span style="color:var(--warn)">ยังไม่รู้ว่า "${esc(p.who)}" คือใคร</span>`}${p.cust ? ` · ลูกค้า ${esc(p.cust)}` : ''} · ${LOCK_DAYS_BY.temp} วัน`)
     : `<div class="lt-hint">ยังไม่มีใบจอง: พิมพ์ "ชื่อเล่นเซลล์ / ชื่อลูกค้า" เช่น "มด / เปิ้ล" (ล็อก ${LOCK_DAYS_BY.temp} วัน)</div>`;
   const dealer = it('dealer', `＋ ขาย / แลกดีลเลอร์ "${esc(p.kind === 'dealer' ? p.dealer : q)}"`, `ไม่มีชื่อลูกค้า · ${LOCK_DAYS_BY.dealer} วัน`);
-  if (!q) return `<div class="lt-drop" role="listbox">${rows ? `<div class="lt-hint">ใบจองสเปกนี้ที่ยังไม่มีรถ (พิมพ์ชื่อ / เลขใบจอง / เซลล์ เพื่อหาใบอื่น)</div>${rows}` : `<div class="lt-hint">ไม่มีใบจองสเปกนี้รอรถ · พิมพ์ชื่อลูกค้า / เลขใบจอง หรือ "ชื่อเล่นเซลล์ / ชื่อลูกค้า"</div>`}</div>`;
-  return `<div class="lt-drop" role="listbox">${t.mode === 'ask' ? '<div class="lt-hint">ขอแก้ล็อกของคนอื่น: คนที่ล็อกไว้ต้องอนุมัติก่อน ล็อกเดิมยังอยู่</div>' : ''}
+  if (!q) return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${rows ? `<div class="lt-hint">ใบจองสเปกนี้ที่ยังไม่มีรถ (พิมพ์ชื่อ / เลขใบจอง / เซลล์ เพื่อหาใบอื่น)</div>${rows}` : `<div class="lt-hint">ไม่มีใบจองสเปกนี้รอรถ · พิมพ์ชื่อลูกค้า / เลขใบจอง หรือ "ชื่อเล่นเซลล์ / ชื่อลูกค้า"</div>`}</div>`;
+  return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${t.mode === 'ask' ? '<div class="lt-hint">ขอแก้ล็อกของคนอื่น: คนที่ล็อกไว้ต้องอนุมัติก่อน ล็อกเดิมยังอยู่</div>' : ''}
     ${rows ? `<div class="lt-hint">ใบจองที่ยังไม่มีรถ · สเปกตรงกันขึ้นก่อน</div>${rows}` : `<div class="lt-hint">ไม่พบใบจองที่ตรงกับ "${esc(q)}"</div>`}${temp}${dealer}</div>`;
 }
 // the stock table's "ล็อก" cell for managers / the executive
