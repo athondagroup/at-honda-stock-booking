@@ -42,7 +42,7 @@ const QUOTA_STATUS = { waiting: ['รอ VIN', 'neutral'], vin: ['ได้ VIN 
 const BOOK_STATE = {
   waiting: ['รอรถ', 'warn'], pending: ['รออนุมัติล็อก', 'warn'], locked: ['ล็อกแล้ว', 'red'], allocated: ['จัดสรรแล้ว', 'ink'],
   idscar: ['IDS จัดสรรรถแล้ว', 'good'], idsquota: ['IDS จับคู่ Quota', 'neutral'], cancel: ['รอยกเลิก (IDS)', 'muted'],
-  gone: ['ไม่อยู่ในไฟล์ IDS ล่าสุด · รอตรวจ', 'warn'], noids: ['ยังไม่มีใน IDS · ไม่นับคิว', 'muted'], adv: ['Make Advance · ไม่ต่อคิว', 'muted'], xfer: ['โอนลูกค้าไปสาขาอื่น · ไม่ต่อคิว', 'muted'], dup: ['ใบจองซ้ำ · ไม่ต่อคิว', 'muted']
+  gone: ['ไม่อยู่ในไฟล์ IDS ล่าสุด · รอตรวจ', 'warn'], noids: ['ยังไม่มีใน IDS · ไม่นับคิว', 'muted'], adv: ['Make Advance · ไม่ต่อคิว', 'muted'], xfer: ['โอนลูกค้าแล้ว · รวมกับใบใหม่', 'muted'], dup: ['ใบจองซ้ำ · รวมกับใบเดิม', 'muted']
 };
 
 // ------------------------------------------------------------------ helpers

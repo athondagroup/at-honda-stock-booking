@@ -453,14 +453,26 @@ function deriveNow() {
     else if (b.gone) b.state = 'gone';
     // IDS booking marked "ไม่ต้องมีฟอร์ม · ลูกค้า Make รถ Advanced": no real customer, so it does not queue (12/11)
     else if (!b.app && b.skip && /advance/i.test(b.skip.reason || '') && b.match === 'waiting') b.state = 'adv';
-    // transferred to another branch (the new branch's IDS booking queues) / a repeat of another booking: no queue either (12/11)
-    else if (!b.app && b.skip && b.skip.to && b.match === 'waiting') b.state = 'xfer';
-    else if (!b.app && b.skip && b.skip.dup && b.match === 'waiting') b.state = 'dup';
     // a web form not in the IDS booking file yet queues like the rest, by the booking date on the form (ตกลง 11/11); b.noIds marks it
     else if (b.match === 'car') b.state = 'idscar';
 
     else if (b.match === 'quota') b.state = 'idsquota';
     else b.state = 'waiting';
+  }
+  // ไม่ต้องมีฟอร์ม · โอนลูกค้าให้สาขาอื่น / ใบจองซ้ำ (12/11): one booking, not two. The new IDS booking (keyed at the new branch, same customer
+  // and model) or the booking picked as the repeat takes this one's place in the queue (the earlier date) and this row folds into it.
+  // Until the new branch keys its IDS booking the transferred one keeps queueing ("รอใบจองใหม่ที่ <to>").
+  for (const b of bookings) {
+    if (b.app || !b.skip || !['waiting', 'idscar', 'idsquota'].includes(b.state)) continue;
+    const early = nb => { const d = b.qdate || b.date || ''; if (d && d < (nb.qdate || nb.date || '9')) nb.qdate = d; };
+    if (b.skip.to) {
+      const k = searchKey(b.cust || ''), m = String(b.spec || '').split('|')[0];
+      const nb = k ? bookings.find(x => x !== b && x.br === b.skip.to && x.no && searchKey(x.cust || '') === k && String(x.spec || '').split('|')[0] === m && !['cancel', 'cxform'].includes(x.state) && !x.mergedInto) : null;
+      if (nb) { early(nb); nb.xferFrom = { no: b.no, br: b.br }; b.mergedInto = nb.no; b.state = 'xfer'; } else b.xferWait = b.skip.to;
+    } else if (b.skip.dup) {
+      const nb = bookings.find(x => x !== b && ((x.app && x.app.key === b.skip.dup.key) || x.key === b.skip.dup.key) && !x.mergedInto);
+      if (nb) { early(nb); nb.dupOf = (nb.dupOf || []).concat(b.no); b.mergedInto = nb.no || nb.cust; b.state = 'dup'; }
+    }
   }
   // FIFO queue per spec
   const bySpec = {};

@@ -52,7 +52,7 @@ function bookRows(D) {
     rows.push({ key: a.key, a, b: ib || null, row: a.row, date: a.date, no: a.no, cust: a.cust, owner: a.sales, idsSales: a.idsSales, br: a.br, spec: a.spec, model: a.model, vin: a.match && a.match.vin });
   }
   for (const b of D.idsB) {
-    if (used.has(b.key)) continue;
+    if (used.has(b.key) || b.mergedInto) continue;   // folded into the new / the repeated booking (12/11)
     rows.push({ key: b.key, a: null, b, row: D.bookingByKey.get(b.key), date: b.date, no: b.no, cust: b.cust, owner: b.owner || b.sales, idsSales: b.sales, br: b.br, spec: b.spec, model: b.model, vin: b.vin, noForm: D.idsOnly.includes(b), seed: b.seed });
   }
   return (D._bookRows = rows);

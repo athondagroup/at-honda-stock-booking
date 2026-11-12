@@ -36,6 +36,10 @@ function idsFixCan(b) {
 function idsFixCanClose(b) { return !!b && perms().write && (canAllocBr(b.br) || (b.idsOrig && canAllocBr(b.idsOrig.br))); }
 // a chip for the IDS cell of the booking list
 function idsFixChip(b) {
+  const mg = !b ? '' : [b.xferWait ? `โอนไป ${b.xferWait} · รอใบจองใหม่ใน IDS (ยังต่อคิว)` : '', b.xferFrom ? `รวมกับใบเดิม ${b.xferFrom.no} (${b.xferFrom.br}) · ใช้ลำดับคิวเดิม` : '', b.dupOf ? `รวมใบจองซ้ำ ${b.dupOf.join(', ')}` : ''].filter(Boolean).map(t => `<div class="text-xs text-muted">${esc(t)}</div>`).join('');
+  return mg + idsFixChip0(b);
+}
+function idsFixChip0(b) {
   if (!b || !b.fix) return '';
   const f = b.fix, bits = [];
   if (f.cancel) bits.push(chip('ยกเลิกในเว็บ', 'muted'));
@@ -79,7 +83,7 @@ function idsFixModal(m, D) {
       ${m.reason === 'โอนลูกค้าให้สาขาอื่น' ? `<div class="field"><label for="ixf-to" class="req">สาขาปลายทาง (ออกใบกำกับ)</label><select id="ixf-to" data-modal="to" ${canClose ? '' : 'disabled'}>${opt(BRS.filter(x => x !== b.br), m.to, 'เลือกสาขา')}</select></div>` : ''}
       ${m.reason === 'ใบจองซ้ำ' ? `<div class="field sm:col-span-2"><label for="ixf-dup" class="req">ซ้ำกับใบจอง</label><select id="ixf-dup" data-modal="dup" ${canClose ? '' : 'disabled'}><option value="">เลือกใบจองที่ซ้ำ</option>${idsFixDupCands(b, D).map(x => `<option value="${esc(x.app ? x.app.key : x.key)}" ${m.dup === (x.app ? x.app.key : x.key) ? 'selected' : ''}>${esc(x.no || 'ฟอร์มเว็บ')} · ${esc(x.cust || '')} · ${esc(x.br || '')} · ${esc(specLabelText(x.spec))} · ${esc(x.owner || x.sales || '')} · จอง ${fmtD(x.date)}</option>`).join('')}</select></div>` : ''}
       <div class="field"><label for="ixf-n" ${m.reason === 'อื่น ๆ' ? 'class="req"' : ''}>หมายเหตุ</label><input id="ixf-n" data-modal="note" value="${esc(m.note || '')}" ${canClose ? '' : 'disabled'}></div></div>
-    <p class="text-xs text-muted mt-2">${/advance/i.test(m.reason || '') ? 'ลูกค้า Make รถ Advanced = ไม่มีลูกค้าจริง: ใบนี้ไม่ต่อคิว ไม่ขึ้นในรายการ "มีใน IDS แต่ไม่มีฟอร์ม AT" และไม่เตือนเซลล์อีก' : m.reason === 'โอนลูกค้าให้สาขาอื่น' ? 'เหมือนโอนลูกค้าในหน้าใบจอง: สาขาปลายทางคีย์ใบจองใหม่ใน IDS แล้วใบใหม่ต่อคิวแทน · ใบนี้ไม่ต่อคิว (รอถอนจองใน IDS)' : m.reason === 'ใบจองซ้ำ' ? 'ลูกค้าคนเดียวกันจองซ้ำ: ใบนี้ไม่ต่อคิว ใบที่เลือกต่อคิวตามเดิม' : m.reason === 'รถ Demo' ? 'ใบจองนี้ใช้รถบริษัท (Demo) ได้: ล็อกรถ Demo ให้ใบนี้ในหน้ารถหรือช่องล็อกหน้าใบจอง' : 'ใบนี้ยังอยู่ในคิวตาม IDS แต่ไม่ขึ้นในรายการ "มีใน IDS แต่ไม่มีฟอร์ม AT" และไม่เตือนเซลล์อีก'}</p>
+    <p class="text-xs text-muted mt-2">${/advance/i.test(m.reason || '') ? 'ลูกค้า Make รถ Advanced = ไม่มีลูกค้าจริง: ใบนี้ไม่ต่อคิว ไม่ขึ้นในรายการ "มีใน IDS แต่ไม่มีฟอร์ม AT" และไม่เตือนเซลล์อีก' : m.reason === 'โอนลูกค้าให้สาขาอื่น' ? 'เหมือนโอนลูกค้าในหน้าใบจอง: ใบนี้ยังต่อคิวตามเดิม พอสาขาปลายทางคีย์ใบจองใหม่ใน IDS (ชื่อลูกค้า + รุ่นเดียวกัน) ระบบรวมเป็นใบเดียว ใบใหม่ได้ลำดับคิวของใบนี้ · ใบนี้ยกเลิกใน IDS ได้เลย' : m.reason === 'ใบจองซ้ำ' ? 'ลูกค้าคนเดียวกันจองซ้ำ: รวมเป็นใบเดียวกับใบที่เลือก (ไม่ขึ้น 2 แถว) · ใช้ลำดับคิวของใบที่จองก่อน' : m.reason === 'รถ Demo' ? 'ใบจองนี้ใช้รถบริษัท (Demo) ได้: ล็อกรถ Demo ให้ใบนี้ในหน้ารถหรือช่องล็อกหน้าใบจอง' : 'ใบนี้ยังอยู่ในคิวตาม IDS แต่ไม่ขึ้นในรายการ "มีใน IDS แต่ไม่มีฟอร์ม AT" และไม่เตือนเซลล์อีก'}</p>
     <div class="flex flex-wrap justify-end gap-2 mt-3"><button class="btn btn-dark" data-act="idsfix-skip" ${canClose ? '' : 'disabled'}>บันทึก ไม่ต้องมีฟอร์ม</button></div>`;
   else body = `<div class="field"><label for="ixf-c" class="req">เหตุผลที่ยกเลิก</label><input id="ixf-c" data-modal="note" value="${esc(m.note || '')}" placeholder="เช่น ลูกค้าไม่ซื้อแล้ว" ${canClose ? '' : 'disabled'}></div>
     <p class="text-xs text-muted mt-2">ยกเลิกในเว็บทันที: ออกจากคิวและยอดจอง · อย่าลืมยกเลิกในระบบ IDS ด้วย</p>
