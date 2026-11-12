@@ -43,7 +43,7 @@ function ltCands(c, q, D) {
   const k = searchKey(q || '');
   const [model] = String(c.spec).split('|');
   const demo = ltDemoCar(c);
-  return D.bookings.filter(b => ['waiting', 'noids'].includes(b.state) && !(b.app && b.app.demo) && (!demo || ltDemoBk(b)) && (k ? [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k)) : b.spec === c.spec) && (k || !isSales() || isMine(b.owner)))
+  return [...D.bookings, ...(D.demoRows || []).filter(b => !D.locks.some(l => l.live && l.bkref === b.key))].filter(b => ['waiting', 'noids', 'demo'].includes(b.state) && !(b.app && b.app.demo) && (!demo || ltDemoBk(b)) && (k ? [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k)) : b.spec === c.spec) && (k || !isSales() || isMine(b.owner)))
     .map(b => ({ b, rank: b.spec === c.spec ? 0 : String(b.spec || '').split('|')[0] === model ? 1 : 2 }))
     .sort((x, y) => x.rank - y.rank || String(x.b.qdate || x.b.date || '').localeCompare(String(y.b.qdate || y.b.date || ''))).slice(0, 6);
 }
@@ -140,7 +140,7 @@ function ltNew(c, D, k, q, extra) {
   let type = 'temp', b = null, owner = null, prospect = null, dealer = null, text;
   if (k === 'dealer') { type = 'dealer'; dealer = (p.kind === 'dealer' ? p.dealer : q).trim(); text = 'ขาย ' + dealer; }
   else if (k === 'temp') { owner = p.sales || null; prospect = p.cust || null; text = q.trim(); }
-  else { b = D.bookingByKey.get(k); if (!b) return null; type = 'booking'; owner = b.owner || b.sales || null; text = `${ltNick(owner)} / ${b.cust || ''}`.trim(); }
+  else { b = D.bookingByKey.get(k); if (!b) return null; type = 'booking'; owner = b.owner || b.sales || null; text = b.state === 'demo' ? `${ltNick(owner)} / รถ Demo`.trim() : `${ltNick(owner)} / ${b.cust || ''}`.trim(); }
   return {
     vin: c.vin || null, ref: c.quota ? c.ref : null, car_br: c.br, spec: c.spec, type, bkref: b ? (b.app ? b.app.key : b.key) : null, bk_br: b ? b.br : null, sales: owner,
     sales_nick: type === 'temp' && !owner ? p.who || null : null, prospect, dealer_name: dealer, reason: 'พิมพ์ล็อกในหน้า Stock', note: '', warnings: [],

@@ -326,6 +326,10 @@ function deriveNow() {
   });
   const bookingByKey = new Map();
   bookings.forEach(b => { bookingByKey.set(b.key, b); if (b.app) bookingByKey.set(b.app.key, b); });
+  // a "รถ Demon" form: the branch keeps a stock car as its demo, so the car must not show free (12/11). It never queues; it is a row
+  // that a manager locks to a car (the lock holds until IDS turns the car into a company car).
+  const demoRows = at.filter(a => a.demo && !a.cancelled && !a.done).map(a => ({ key: a.key, app: a, state: 'demo', match: 'demo', spec: a.spec, model: a.model, grade: a.grade, color: a.color, cust: 'รถ Demo', no: null, br: a.br, owner: a.sales, sales: a.sales, date: a.date, qdate: a.date }));
+  demoRows.forEach(b => bookingByKey.set(b.key, b));
   at.forEach(a => { a.row = bookingByKey.get(a.key) || null; });
 
   // locks: a unit is a car (VIN) or a quota slot (Ref); several temporary locks may queue on one unit
@@ -353,8 +357,8 @@ function deriveNow() {
     l.owner = l.sales || (bk ? bk.owner : null);
     // finance approved (or cash) and the delivery date confirmed: the queue stays locked, no release, no more asking (ตกลง 19/10)
     const finOk = !!(bk && bk.app && bk.app.flow && bk.app.flow.done && bk.app.flow.done.fin) || !!(rec && rec.fin_status === 'ผ่าน');
-    l.hold = !!(l.type === 'booking' && rec && rec.delivery_plan && finOk && l.status === 'approved');
-    l.holdUntil = l.hold ? rec.delivery_plan : null;
+    l.hold = !!(l.type === 'booking' && rec && rec.delivery_plan && finOk && l.status === 'approved') || !!(bk && bk.state === 'demo' && l.status === 'approved');
+    l.holdUntil = l.hold && rec && rec.delivery_plan && !(bk && bk.state === 'demo') ? rec.delivery_plan : null;
     l.daysLeft = l.status === 'approved' && l.end ? daysBetween(today, l.end) : null;
     l.finWait = !!(l.type === 'booking' && rec && rec.purchase === 'ไฟแนนซ์' && rec.fin_status !== 'ผ่าน');
     const due = l.status === 'approved' && !l.hold && l.daysLeft !== null;
@@ -541,7 +545,7 @@ function deriveNow() {
   quota.forEach(q => { const s = sum[q.br]; if (!s) return; s.quota += q.qty || 1; if (q.open) s.quotaIn += q.qty || 1; });
 
   const receipts = [...S.receipts.entries()].filter(([, r]) => !r.hidden).map(([id, r]) => ({ id, ...r })).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-  const D = { today, X, cars, removed, deliveredOut, locks, idsB, at, bookings, bookingByKey, bySpec, quota, specs, sum, receipts, invByVin, idsOnly: M.idsOnly };
+  const D = { today, X, cars, removed, deliveredOut, locks, idsB, at, bookings, demoRows, bookingByKey, bySpec, quota, specs, sum, receipts, invByVin, idsOnly: M.idsOnly };
   D.spCars = [...Map.prototype.values.call(cars)].filter(c => c.special); S.spCount = D.spCars.length;
   D.alerts = buildAlerts(D);
   return D;

@@ -45,7 +45,7 @@ function bookRows(D) {
   if (D._bookRows) return D._bookRows;
   const rows = [], used = new Set();
   for (const a of D.at) {
-    if (a.demo) continue;
+    if (a.demo) { const dr = D.bookingByKey.get(a.key); if (dr && dr.state === 'demo') rows.push({ key: a.key, a, b: null, row: dr, date: a.date, no: null, cust: 'รถ Demo', owner: a.sales, br: a.br, spec: a.spec, model: a.model, vin: null, demoRow: true }); continue; }
     const ib = a.ids || a.idsLeft || a.idsGone;   // a cancelled booking keeps its IDS booking that is still open (one row, not two)
     if (ib) used.add(ib.key);
     ((a.match && a.match.alt) || []).forEach(x => used.add(x.key)); ((a.rec && a.rec.ids_alt) || []).forEach(k => used.add(k));   // the old number IDS replaced: same booking, no second row
@@ -58,10 +58,12 @@ function bookRows(D) {
   return (D._bookRows = rows);
 }
 const BOOK_FILTERS = [['active', 'ยังไม่ส่งมอบ'], ['noids', 'ฟอร์ม AT ยังไม่อยู่ใน IDS'], ['noat', 'มีใน IDS แต่ไม่มีฟอร์ม AT'], ['waiting', 'รอรถ'], ['locked', 'ล็อก / รออนุมัติล็อก'], ['idscar', 'IDS จัดสรรรถแล้ว'],
-  ['assign', 'รอจัดสรรรถ'], ['confirm', 'รอยืนยันเจ้าของ / การจับคู่'], ['req', 'รออนุมัติแก้ไข / ยกเลิก'], ['refund', 'ยกเลิกแล้ว รอทำใบคืนเงิน'], ['dtoday', 'ส่งมอบวันนี้'], ['d7', 'นัดส่งมอบภายใน 7 วัน'], ['stuck', 'ต้องเร่งตาม'], ['done', 'ส่งมอบแล้ว'], ['cancel', 'ยกเลิก'], ['cxids', 'ยกเลิกแล้ว รอยกเลิกใน IDS'], ['all', 'ทั้งหมด']];
+  ['assign', 'รอจัดสรรรถ'], ['confirm', 'รอยืนยันเจ้าของ / การจับคู่'], ['req', 'รออนุมัติแก้ไข / ยกเลิก'], ['refund', 'ยกเลิกแล้ว รอทำใบคืนเงิน'], ['demo', 'รถ Demo (ฟอร์มรถ Demon)'], ['dtoday', 'ส่งมอบวันนี้'], ['d7', 'นัดส่งมอบภายใน 7 วัน'], ['stuck', 'ต้องเร่งตาม'], ['done', 'ส่งมอบแล้ว'], ['cancel', 'ยกเลิก'], ['cxids', 'ยกเลิกแล้ว รอยกเลิกใน IDS'], ['all', 'ทั้งหมด']];
 function rowState(r, D, st) {
   const a = r.a, state = r.row ? r.row.state : null;
   if (st === 'all') return true;
+  if (r.demoRow) return st === 'active' || st === 'demo';   // a "รถ Demon" form (12/11)
+  if (st === 'demo') return false;
   if (st === 'active') return a ? a.active : r.b.match !== 'cancel';
   if (st === 'noids') return !!(a && a.active && !a.match);
   if (st === 'noat') return !!r.noForm;
@@ -150,15 +152,15 @@ function bookRow(r, D, p) {
   // ขอล็อกรถ / อนุมัติล็อก are gone from the list (11/11): managers type the lock in its column, anything odd is checked on the card
   // the booking's own locks are handled on this row: approve, allocate, extend, release, swap, undo (ตกลง 13/10)
 
-  const idsCell = a ? `${matchChip(a)}${a.matchAsk ? `<div>${chip('รอยืนยันการจับคู่', 'warn')}</div>` : ''}${b && b.ids ? `<div class="text-xs text-muted">${esc(b.ids)}</div>` : ''}`
+  const idsCell = r.demoRow ? '<span class="text-xs text-muted">ไม่ต้องคีย์ IDS (รถ Demo ของสาขา)</span>' : a ? `${matchChip(a)}${a.matchAsk ? `<div>${chip('รอยืนยันการจับคู่', 'warn')}</div>` : ''}${b && b.ids ? `<div class="text-xs text-muted">${esc(b.ids)}</div>` : ''}`
     : `${r.noForm ? chip('ยังไม่มีฟอร์ม AT', 'bad') : b.webCancel ? '' : b.match === 'cancel' ? chip('รอยกเลิกใน IDS', 'muted') : chip('ใน IDS', 'neutral')}<div class="text-xs text-muted">${esc(b.ids || '')}</div>${idsFixChip(b)}${acts.length ? `<div class="flex flex-wrap gap-1 mt-1 bk-acts" data-act="noop">${acts.join('')}</div>` : ''}`;
   const stateCell = a && a.cancelled ? (a.rec.cancel && a.rec.cancel.refund === 'refund' ? chip(a.rec.refund && a.rec.refund.at ? 'ยกเลิก · ทำใบคืนเงินแล้ว' : 'ยกเลิก · รอทำใบคืนเงิน', a.rec.refund && a.rec.refund.at ? 'muted' : 'warn') : chip('ยกเลิก', 'muted'))
     : `${a && a.change ? `<div>${chip(a.change.type === 'cancel' ? 'รออนุมัติยกเลิก' : a.change.type === 'merge' ? 'รออนุมัติรวมใบ (ลงซ้ำ)' : 'รออนุมัติแก้ไข', 'warn')}</div>` : ''}${a && gformDue(a) && gformCfg() && (a.rec.created_at || '') >= (gformCfg().at || '') ? `<div>${chip('ยังไม่ส่ง Google Form', 'warn')}</div>` : ''}${a && a.flow.history ? chip('ส่งมอบแล้ว (ประวัติ)', 'muted') : statusChip(BOOK_STATE, row.state || 'waiting')}${row.state === 'waiting' && row.pos ? ` <span class="text-xs text-muted">คิวที่ ${row.pos}</span>` : ''}
-      ${a && a.flow.next ? `<div class="text-xs text-muted">ถัดไป: ${a.flow.next === 'booked' ? 'ใบเสร็จมัดจำ' : FLOW_LABEL[a.flow.next]}</div>` : ''}`;
+      ${a && !r.demoRow && a.flow.next ? `<div class="text-xs text-muted">ถัดไป: ${a.flow.next === 'booked' ? 'ใบเสร็จมัดจำ' : FLOW_LABEL[a.flow.next]}</div>` : ''}`;
   return `<tr class="${r.noForm ? 'low' : ''}${a ? ' bk-row' : ''}" ${a ? `data-act="at-open" data-id="${esc(a.id)}" title="กดเพื่อเปิดใบจอง"` : ''}>
     <td class="nowrap"><span class="num">${fmtD(r.date)}</span>${r.no ? `<div class="code text-xs text-muted">${esc(r.no)}</div>` : ''}</td>
     <td style="min-width:110px;max-width:170px">${custCell(r.cust, r.owner, { seed: r.seed })}${a && a.rec.doc_url ? `<div class="text-xs"><a class="underline" data-act="noop" href="${esc(a.rec.doc_url)}" target="_blank" rel="noopener">ใบจองใน Drive</a></div>` : ''}</td>
-    <td class="nowrap">${salesCell(a ? a.sales : null, r.idsSales, a ? a.ownerCheck : null)}<div class="text-xs text-muted">${esc(r.br || '')} ${BR[r.br]?.name || ''}</div>${crossChip(a)}</td>
+    <td class="nowrap">${salesCell(a ? a.sales : null, r.idsSales, r.demoRow ? 'demo' : a ? a.ownerCheck : null)}<div class="text-xs text-muted">${esc(r.br || '')} ${BR[r.br]?.name || ''}</div>${crossChip(a)}</td>
     <td class="nowrap">${(([m, g, c]) => `${esc(m)}<div class="text-xs text-muted">${esc(gradeShort(m, g) || g || '')} <span class="code">${esc(c || '')}</span></div>`)(String(r.spec || '?|?|?').split('|'))}${a && a.specFromIds ? '<span class="text-xs text-muted">(ตาม IDS)</span>' : ''}${a && (a.multi || a.multiOf) ? `<div>${chip('จอง 2 คัน', 'warn')}</div>` : ''}</td>
     <td class="nowrap" data-act="noop">${bkLockCell(r, D)}</td>
     <td style="min-width:90px;max-width:150px">${idsCell}</td>

@@ -19,7 +19,7 @@ function bltCands(row, q, D) {
   const qs = D.quota.filter(x => !x.car).map(ltUnitQ).filter(u => ltOpenCar(u) && !ltLockOf(u, D) && hit(u.ref, u.vin)).map(u => ({ u, kind: 'quota' }));
   const rank = u => u.spec === spec ? 0 : String(u.spec || '').split('|')[0] === model ? 1 : 2;
   return [...cars, ...qs].map(x => ({ ...x, rank: rank(x.u) })).filter(x => k || x.rank === 0)
-    .sort((x, y) => x.rank - y.rank || (x.kind === y.kind ? 0 : x.kind === 'car' ? -1 : 1) || String(x.u.br).localeCompare(String(y.u.br))).slice(0, 10);
+    .sort((x, y) => x.rank - y.rank || (x.kind === y.kind ? 0 : x.kind === 'car' ? -1 : 1) || (x.u.br === row.br ? 0 : 1) - (y.u.br === row.br ? 0 : 1) || String(x.u.br).localeCompare(String(y.u.br))).slice(0, 10);
 }
 function bltDrop(r, D) {
   const t = S.blt, row = r.row || {}, list = bltCands(row, t.q, D);
@@ -57,7 +57,7 @@ function bkLockCell(r, D) {
   const vin = r.vin || row.vin || (a && atVin(a));
   if (vin) return `<span class="code text-sm">${esc(vin)}</span><div class="text-xs text-muted">${row.state === 'idscar' || row.match === 'car' ? 'IDS จัดสรร' : 'จัดสรรแล้ว'}</div>`;
   if (row.state === 'idsquota' && (row.ref || row.ws)) return `<span class="code text-sm">Quota ${esc(row.ref || row.ws)}</span><div class="text-xs text-muted">IDS จับคู่</div>`;
-  if (!can || !['waiting'].includes(row.state) || (a && !a.active)) return '<span class="text-muted">–</span>';
+  if (!can || !['waiting', 'demo'].includes(row.state) || (a && !a.active && row.state !== 'demo')) return '<span class="text-muted">–</span>';
   return `<input class="lt-in idle" data-blt-open="${esc(key)}" placeholder="พิมพ์เลขเฟรม / Ref Quota" readonly>`;
 }
 document.addEventListener('focusin', ev => {
