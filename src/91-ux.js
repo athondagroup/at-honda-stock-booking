@@ -183,7 +183,7 @@ function gsearchResults(m, D) {
     : `<p class="text-xs text-muted mb-2">ค้นใน${scope === 'all' ? 'ทุกสาขา' : ' ' + S.br} ตามสิทธิ์ที่เห็นได้${isSales() ? ' (เซลล์เห็นชื่อลูกค้าเฉพาะของตัวเอง)' : ''}</p>
     ${sec('รถ', cars.length, cars.map(c => btn(`data-act="car-open" data-vin="${esc(c.vin)}"`, `<span class="code">${vinShow(c.vin)}</span><span class="block text-xs text-muted">${carSub(c)}</span>${!isSales() && (c.lgOut || c.removed || c.dlOnly) ? stockOutWhere(c.vin, D) : ''}`)).join(''))}
     ${sec('ใบจอง', bks.length, bks.map(r => btn(r.a ? `data-act="at-open" data-id="${esc(r.a.id)}"` : `data-act="go" data-view="book" data-q="${esc(r.no || '')}"`, `<b>${(!isSales() || isMine(r.owner)) ? esc(r.cust || '') : 'ลูกค้าของเซลล์อื่น'}</b><span class="block text-xs text-muted">${esc(r.no || 'ยังไม่อยู่ใน IDS')} · ${esc(r.br || '')} · ${esc(r.owner || '')} · ${specLabelText(r.spec)}${r.vin ? ` · VIN …${esc(String(r.vin).slice(-6))}` : ''}</span>`)).join(''))}
-    ${sec('Quota', qs.length, qs.map(x => btn(`data-act="go" data-view="quota"`, `<b>Ref ${esc(x.ref || '')}</b><span class="block text-xs text-muted">${specLabelText(x.spec)} · ${esc(x.br || '')}${x.vin ? ` · VIN …${esc(String(x.vin).slice(-6))}` : ''}</span>`)).join(''))}`;
+    ${sec('Quota', qs.length, qs.map(x => btn(`data-act="quota-open" data-ref="${esc(x.ref || '')}"`, `<b>Ref ${esc(x.ref || '')}</b><span class="block text-xs text-muted">${specLabelText(x.spec)} · ${esc(x.br || '')}${x.vin ? ` · VIN …${esc(String(x.vin).slice(-6))}` : ''}</span>`)).join(''))}`;
 }
 Object.assign(ACTIONS, {
   'gsearch-open'() { S.modal = { kind: 'gsearch', q: '', all: true }; render(); setTimeout(() => { const i = document.getElementById('gs-q'); if (i) i.focus(); }, 30); },
