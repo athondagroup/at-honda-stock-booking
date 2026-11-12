@@ -453,6 +453,9 @@ function deriveNow() {
     else if (b.gone) b.state = 'gone';
     // IDS booking marked "ไม่ต้องมีฟอร์ม · ลูกค้า Make รถ Advanced": no real customer, so it does not queue (12/11)
     else if (!b.app && b.skip && /advance/i.test(b.skip.reason || '') && b.match === 'waiting') b.state = 'adv';
+    // transferred to another branch (the new branch's IDS booking queues) / a repeat of another booking: no queue either (12/11)
+    else if (!b.app && b.skip && b.skip.to && b.match === 'waiting') b.state = 'xfer';
+    else if (!b.app && b.skip && b.skip.dup && b.match === 'waiting') b.state = 'dup';
     // a web form not in the IDS booking file yet queues like the rest, by the booking date on the form (ตกลง 11/11); b.noIds marks it
     else if (b.match === 'car') b.state = 'idscar';
 

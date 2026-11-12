@@ -18,6 +18,9 @@ function ltOpenCar(c) {
   if (c && c.quota) { const q = c.quota; return (q.st === 'waiting' || q.st === 'vin') && !q.bk && !q.booking && !q.atb && !q.car; }
   return !!c && carLockable(c) && !c.bkno && !['invoiced', 'sold', 'booked', 'delivered', 'company'].includes(c.status);
 }
+// a company (demo) car can be locked only to an IDS booking marked "ไม่ต้องมีฟอร์ม · รถ Demo" (12/11)
+function ltDemoCar(c) { return !!(c && !c.quota && c.status === 'company'); }   // its IDS booking is the company's own
+function ltDemoBk(b) { return !!(b && b.skip && /demo/i.test(b.skip.reason || '')); }
 function ltLocks(c, D) { return c.quota ? D.locks.filter(l => ltSameU(l, c) && (l.live || l.status === 'pending')).filter(lockVisible) : carLocks(c, D); }
 // the live lock on a car that the cell shows (pending requests to change it are listed under it)
 function ltLockOf(c, D) { return ltLocks(c, D).find(l => l.live && l.status !== 'pending') || null; }
@@ -39,7 +42,8 @@ const ltMine = l => !!(l && S.me && S.me.id && (l.typed_by === S.me.id || (!l.ty
 function ltCands(c, q, D) {
   const k = searchKey(q || '');
   const [model] = String(c.spec).split('|');
-  return D.bookings.filter(b => ['waiting', 'noids'].includes(b.state) && !(b.app && b.app.demo) && (k ? [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k)) : b.spec === c.spec) && (k || !isSales() || isMine(b.owner)))
+  const demo = ltDemoCar(c);
+  return D.bookings.filter(b => ['waiting', 'noids'].includes(b.state) && !(b.app && b.app.demo) && (!demo || ltDemoBk(b)) && (k ? [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k)) : b.spec === c.spec) && (k || !isSales() || isMine(b.owner)))
     .map(b => ({ b, rank: b.spec === c.spec ? 0 : String(b.spec || '').split('|')[0] === model ? 1 : 2 }))
     .sort((x, y) => x.rank - y.rank || String(x.b.qdate || x.b.date || '').localeCompare(String(y.b.qdate || y.b.date || ''))).slice(0, 6);
 }
@@ -53,14 +57,14 @@ function ltDrop(c, D) {
     ? it('temp', `＋ ล็อกชั่วคราว "${esc(q)}"`, `ยังไม่มีใบจอง · เซลล์ ${p.sales ? esc(p.sales) : `<span style="color:var(--warn)">ยังไม่รู้ว่า "${esc(p.who)}" คือใคร</span>`}${p.cust ? ` · ลูกค้า ${esc(p.cust)}` : ''} · ${LOCK_DAYS_BY.temp} วัน`)
     : `<div class="lt-hint">ยังไม่มีใบจอง: พิมพ์ "ชื่อเล่นเซลล์ / ชื่อลูกค้า" เช่น "มด / เปิ้ล" (ล็อก ${LOCK_DAYS_BY.temp} วัน)</div>`;
   const dealer = it('dealer', `＋ ขาย / แลกดีลเลอร์ "${esc(p.kind === 'dealer' ? p.dealer : q)}"`, `ไม่มีชื่อลูกค้า · ${LOCK_DAYS_BY.dealer} วัน`);
-  if (!q) return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${rows ? `<div class="lt-hint">ใบจองสเปกนี้ที่ยังไม่มีรถ (พิมพ์ชื่อ / เลขใบจอง / เซลล์ เพื่อหาใบอื่น)</div>${rows}` : `<div class="lt-hint">ไม่มีใบจองสเปกนี้รอรถ · พิมพ์ชื่อลูกค้า / เลขใบจอง หรือ "ชื่อเล่นเซลล์ / ชื่อลูกค้า"</div>`}</div>`;
+  if (!q) return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${rows ? `<div class="lt-hint">ใบจองสเปกนี้ที่ยังไม่มีรถ (พิมพ์ชื่อ / เลขใบจอง / เซลล์ เพื่อหาใบอื่น)</div>${rows}` : (ltDemoCar(c) ? '<div class="lt-hint">รถบริษัท (Demo): ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo" · พิมพ์ชื่อลูกค้า / เลขใบจอง</div>' : `<div class="lt-hint">ไม่มีใบจองสเปกนี้รอรถ · พิมพ์ชื่อลูกค้า / เลขใบจอง หรือ "ชื่อเล่นเซลล์ / ชื่อลูกค้า"</div>`)}</div>`;
   return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${t.mode === 'ask' ? '<div class="lt-hint">ขอแก้ล็อกของคนอื่น: คนที่ล็อกไว้ต้องอนุมัติก่อน ล็อกเดิมยังอยู่</div>' : ''}
-    ${rows ? `<div class="lt-hint">ใบจองที่ยังไม่มีรถ · สเปกตรงกันขึ้นก่อน</div>${rows}` : `<div class="lt-hint">ไม่พบใบจองที่ตรงกับ "${esc(q)}"</div>`}${temp}${dealer}</div>`;
+    ${rows ? `<div class="lt-hint">ใบจองที่ยังไม่มีรถ · สเปกตรงกันขึ้นก่อน</div>${rows}` : `<div class="lt-hint">ไม่พบใบจองที่ตรงกับ "${esc(q)}"</div>`}${ltDemoCar(c) ? '<div class="lt-hint">รถบริษัท (Demo): ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo"</div>' : temp + dealer}</div>`;
 }
 // the stock table's "ล็อก" cell for managers / the executive
 function ltCell(c, D, p) {
   const L = ltLockOf(c, D), t = S.lt && S.lt.vin === ltKey(c) ? S.lt : null;
-  if (!ltOpenCar(c) && !L) return c.quota ? null : stockActions(c, p, D, 'lock');
+  if (!ltOpenCar(c) && !ltDemoCar(c) && !L) return c.quota ? null : stockActions(c, p, D, 'lock');
   const asks = ltLocks(c, D).filter(l => l.status === 'pending' && l.replaces);
   const askTxt = asks.length ? `<div class="text-xs" style="color:var(--warn)">${asks.map(l => `${esc(ltRoleShort(l))} ขอแก้เป็น "${esc(ltTextOf(l))}" รอ${esc(l.approver_role || 'คนล็อก')}อนุมัติ`).join('<br>')}</div>` : '';
   const ss = L && L.sheet_sync;
@@ -176,7 +180,8 @@ Object.assign(ACTIONS, {
     const D = derive(), c = ltUnit(el.dataset.vin, D), t = S.lt || {}, k = el.dataset.k, q = String(t.q || '').trim();
     if (!c) return;
     const old = t.old ? findLock(t.old) : null, oldD = t.old ? D.locks.find(x => x.id === t.old) : null;
-    if (!old && !ltOpenCar(c)) { toast('รถคันนี้ล็อกแบบพิมพ์ไม่ได้ (IDS จัดสรรหรือออกใบกำกับแล้ว) ใช้ปุ่มขอล็อก', 'bad'); return; }
+    if (!old && ltDemoCar(c) && !(k !== 'temp' && k !== 'dealer' && ltDemoBk(D.bookings.find(b => b.key === k || (b.app && b.app.key === k))))) { toast('รถบริษัท (Demo) ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo"', 'bad'); return; }
+    if (!old && !ltOpenCar(c) && !ltDemoCar(c)) { toast('รถคันนี้ล็อกแบบพิมพ์ไม่ได้ (IDS จัดสรรหรือออกใบกำกับแล้ว) ใช้ปุ่มขอล็อก', 'bad'); return; }
     if (!old && ltLockOf(c, D)) { toast('รถคันนี้มีล็อกแล้ว กดแก้ / ขอแก้แทน', 'bad'); return; }
     const ask = t.mode === 'ask' && old && !ltMine(oldD || old);
     const l = ltNew(c, D, k, q, ask ? { status: 'pending', start: null, end: null, approved_at: null, replaces: t.old, approver: old.typed_by || old.requested_by || null, approver_role: old.requested_role || null, notices: [] }

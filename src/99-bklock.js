@@ -14,7 +14,8 @@ function bltUnitLabel(l, D) {
 function bltCands(row, q, D) {
   const k = String(q || '').toUpperCase().replace(/\s+/g, ''), spec = row.spec || '', [model] = String(spec).split('|');
   const hit = (...xs) => !k || xs.some(x => x && String(x).toUpperCase().includes(k));
-  const cars = [...D.cars.values()].filter(c => ltOpenCar(c) && !ltLockOf(c, D) && hit(c.vin, c.ref)).map(c => ({ u: c, kind: 'car' }));
+  const demo = ltDemoBk(row);
+  const cars = [...D.cars.values()].filter(c => (ltOpenCar(c) || (demo && ltDemoCar(c))) && !ltLockOf(c, D) && hit(c.vin, c.ref)).map(c => ({ u: c, kind: 'car' }));
   const qs = D.quota.filter(x => !x.car).map(ltUnitQ).filter(u => ltOpenCar(u) && !ltLockOf(u, D) && hit(u.ref, u.vin)).map(u => ({ u, kind: 'quota' }));
   const rank = u => u.spec === spec ? 0 : String(u.spec || '').split('|')[0] === model ? 1 : 2;
   return [...cars, ...qs].map(x => ({ ...x, rank: rank(x.u) })).filter(x => k || x.rank === 0)
@@ -80,7 +81,7 @@ Object.assign(ACTIONS, {
     if (!ltCan()) { toast('พิมพ์ล็อกได้เฉพาะผู้จัดการและผู้บริหาร', 'bad'); return; }
     const D = derive(), u = ltUnit(el.dataset.u, D), t = S.blt || {}; if (!u) return;
     const other = ltLockOf(u, D); if (other && other.id !== t.old) { toast('รถ / Quota นี้มีล็อกแล้ว เลือกคันอื่น', 'bad'); return; }
-    if (!ltOpenCar(u)) { toast('รถ / Quota นี้ล็อกไม่ได้แล้ว (IDS จัดสรรหรือออกใบกำกับ)', 'bad'); return; }
+    if (!ltOpenCar(u) && !ltDemoCar(u)) { toast('รถ / Quota นี้ล็อกไม่ได้แล้ว (IDS จัดสรรหรือออกใบกำกับ)', 'bad'); return; }
     // the same typed lock as the stock page: the unit is the car / slot picked, the booking is this row
     S.lt = { vin: ltKey(u), q: '', mode: t.mode === 'edit' ? 'edit' : 'new', old: t.old || null };
     S.blt = null;

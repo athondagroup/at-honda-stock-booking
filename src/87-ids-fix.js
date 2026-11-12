@@ -8,7 +8,16 @@
 // Only function declarations here: the first render runs before this part of the file.
 function idsFixDoc() { return S.ids.get('bkfix') || null; }
 function idsFixMap() { const d = idsFixDoc(); return (d && d.fix) || {}; }
-function idsFixSkipReasons() { return ['ลูกค้า Make รถ Advanced', 'รถ Demo', 'ขายให้ดีลเลอร์ / สาขาอื่น', 'ใบจองซ้ำ', 'อื่น ๆ']; }
+function idsFixSkipReasons() { return ['ลูกค้า Make รถ Advanced', 'รถ Demo', 'โอนลูกค้าให้สาขาอื่น', 'ใบจองซ้ำ', 'อื่น ๆ']; }
+// what each reason does (12/11): Advanced = no customer, no queue · Demo = can take a company (demo) car · โอนลูกค้า = the customer goes to
+// another branch (like โอนลูกค้า on a booking: the new branch keys a new IDS booking, this one leaves the queue) · ใบจองซ้ำ = the same customer
+// twice: pick the booking it repeats, this one leaves the queue
+function idsFixDupCands(b, D) {
+  const k = searchKey(b.cust || '');
+  const rows = D.bookings.filter(x => x.key !== b.key && x.state !== 'cancel' && (x.no || x.app));
+  return rows.map(x => ({ x, s: (k && searchKey(x.cust || '') === k ? 4 : 0) + (x.spec === b.spec ? 2 : 0) + (x.br === b.br ? 1 : 0) })).filter(o => o.s >= 4 || o.x.spec === b.spec)
+    .sort((p, q) => q.s - p.s).slice(0, 30).map(o => o.x);
+}
 function idsFixFields() { return [['cust', 'ชื่อลูกค้า'], ['sales', 'เซลล์'], ['br', 'สาขา'], ['model', 'รุ่น'], ['grade', 'เกรด'], ['color', 'สี']]; }
 // an IDS booking row with the web changes on top (called from deriveNow)
 function idsFixApply(b) {
@@ -30,7 +39,7 @@ function idsFixChip(b) {
   if (!b || !b.fix) return '';
   const f = b.fix, bits = [];
   if (f.cancel) bits.push(chip('ยกเลิกในเว็บ', 'muted'));
-  else if (f.skip) bits.push(chip(`ไม่ต้องมีฟอร์ม: ${f.skip.reason}`, 'muted'));
+  else if (f.skip) bits.push(chip(`ไม่ต้องมีฟอร์ม: ${f.skip.reason}${f.skip.to ? ' → ' + f.skip.to : ''}${f.skip.dup ? ' กับ ' + (f.skip.dup.no || f.skip.dup.cust || '') : ''}`, 'muted'));
   if (f.set && Object.keys(f.set).length) bits.push(chip('แก้ข้อมูลในเว็บ', 'neutral'));
   const note = (f.cancel && f.cancel.note) || (f.skip && f.skip.note) || '';
   return `<div class="flex flex-wrap gap-1 mt-1">${bits.join('')}</div>${note ? `<div class="text-xs text-muted">${esc(note)}</div>` : ''}`;
@@ -40,7 +49,7 @@ function idsFixOpen(no) {
   const o = b.idsOrig || b;
   S.modal = { kind: 'idsfix', no: String(b.no), mode: b.webCancel ? 'cancel' : b.skip ? 'skip' : 'edit',
     e: { cust: b.cust || '', sales: b.sales || '', br: b.br || '', model: b.model || '', grade: b.grade || '', color: b.color || '' },
-    reason: (b.skip && b.skip.reason) || '', note: (b.webCancel && b.webCancel.note) || (b.skip && b.skip.note) || '', orig: { ...o } };
+    reason: (b.skip && b.skip.reason) || '', to: (b.skip && b.skip.to) || '', dup: (b.skip && b.skip.dup && b.skip.dup.key) || '', note: (b.webCancel && b.webCancel.note) || (b.skip && b.skip.note) || '', orig: { ...o } };
   render();
 }
 function idsFixModal(m, D) {
@@ -67,8 +76,10 @@ function idsFixModal(m, D) {
     <p class="text-xs text-muted mt-2">● = ต่างจาก IDS · ข้อมูลที่แก้ตรงนี้ใช้ในเว็บเท่านั้น (ไม่ได้แก้ในระบบ IDS) และอัพโหลด IDS รอบหน้าจะไม่ทับ · ถ้าแก้ชื่อลูกค้าให้ตรงกับฟอร์มที่ลงไว้ ระบบจะจับคู่ให้เอง</p>
     <div class="flex flex-wrap justify-end gap-2 mt-3"><button class="btn btn-dark" data-act="idsfix-save" ${can ? '' : 'disabled'}>บันทึกการแก้ไข</button></div>`;
   else if (m.mode === 'skip') body = `<div class="grid sm:grid-cols-2 gap-3"><div class="field"><label for="ixf-r" class="req">เหตุผล</label><select id="ixf-r" data-modal="reason" ${canClose ? '' : 'disabled'}>${opt(idsFixSkipReasons(), m.reason, 'เลือกเหตุผล')}</select></div>
+      ${m.reason === 'โอนลูกค้าให้สาขาอื่น' ? `<div class="field"><label for="ixf-to" class="req">สาขาปลายทาง (ออกใบกำกับ)</label><select id="ixf-to" data-modal="to" ${canClose ? '' : 'disabled'}>${opt(BRS.filter(x => x !== b.br), m.to, 'เลือกสาขา')}</select></div>` : ''}
+      ${m.reason === 'ใบจองซ้ำ' ? `<div class="field sm:col-span-2"><label for="ixf-dup" class="req">ซ้ำกับใบจอง</label><select id="ixf-dup" data-modal="dup" ${canClose ? '' : 'disabled'}><option value="">เลือกใบจองที่ซ้ำ</option>${idsFixDupCands(b, D).map(x => `<option value="${esc(x.app ? x.app.key : x.key)}" ${m.dup === (x.app ? x.app.key : x.key) ? 'selected' : ''}>${esc(x.no || 'ฟอร์มเว็บ')} · ${esc(x.cust || '')} · ${esc(x.br || '')} · ${esc(specLabelText(x.spec))} · ${esc(x.owner || x.sales || '')} · จอง ${fmtD(x.date)}</option>`).join('')}</select></div>` : ''}
       <div class="field"><label for="ixf-n" ${m.reason === 'อื่น ๆ' ? 'class="req"' : ''}>หมายเหตุ</label><input id="ixf-n" data-modal="note" value="${esc(m.note || '')}" ${canClose ? '' : 'disabled'}></div></div>
-    <p class="text-xs text-muted mt-2">${/advance/i.test(m.reason || '') ? 'ลูกค้า Make รถ Advanced = ไม่มีลูกค้าจริง: ใบนี้ไม่ต่อคิว ไม่ขึ้นในรายการ "มีใน IDS แต่ไม่มีฟอร์ม AT" และไม่เตือนเซลล์อีก' : 'ใบนี้ยังอยู่ในคิวตาม IDS แต่ไม่ขึ้นในรายการ "มีใน IDS แต่ไม่มีฟอร์ม AT" และไม่เตือนเซลล์อีก'}</p>
+    <p class="text-xs text-muted mt-2">${/advance/i.test(m.reason || '') ? 'ลูกค้า Make รถ Advanced = ไม่มีลูกค้าจริง: ใบนี้ไม่ต่อคิว ไม่ขึ้นในรายการ "มีใน IDS แต่ไม่มีฟอร์ม AT" และไม่เตือนเซลล์อีก' : m.reason === 'โอนลูกค้าให้สาขาอื่น' ? 'เหมือนโอนลูกค้าในหน้าใบจอง: สาขาปลายทางคีย์ใบจองใหม่ใน IDS แล้วใบใหม่ต่อคิวแทน · ใบนี้ไม่ต่อคิว (รอถอนจองใน IDS)' : m.reason === 'ใบจองซ้ำ' ? 'ลูกค้าคนเดียวกันจองซ้ำ: ใบนี้ไม่ต่อคิว ใบที่เลือกต่อคิวตามเดิม' : m.reason === 'รถ Demo' ? 'ใบจองนี้ใช้รถบริษัท (Demo) ได้: ล็อกรถ Demo ให้ใบนี้ในหน้ารถหรือช่องล็อกหน้าใบจอง' : 'ใบนี้ยังอยู่ในคิวตาม IDS แต่ไม่ขึ้นในรายการ "มีใน IDS แต่ไม่มีฟอร์ม AT" และไม่เตือนเซลล์อีก'}</p>
     <div class="flex flex-wrap justify-end gap-2 mt-3"><button class="btn btn-dark" data-act="idsfix-skip" ${canClose ? '' : 'disabled'}>บันทึก ไม่ต้องมีฟอร์ม</button></div>`;
   else body = `<div class="field"><label for="ixf-c" class="req">เหตุผลที่ยกเลิก</label><input id="ixf-c" data-modal="note" value="${esc(m.note || '')}" placeholder="เช่น ลูกค้าไม่ซื้อแล้ว" ${canClose ? '' : 'disabled'}></div>
     <p class="text-xs text-muted mt-2">ยกเลิกในเว็บทันที: ออกจากคิวและยอดจอง · อย่าลืมยกเลิกในระบบ IDS ด้วย</p>
@@ -119,7 +130,11 @@ Object.assign(ACTIONS, {
     const note = (m.note || '').trim();
     if (!m.reason) { toast('เลือกเหตุผลก่อน', 'bad'); return; }
     if (m.reason === 'อื่น ๆ' && !note) { toast('ใส่หมายเหตุก่อน', 'bad'); $('#ixf-n')?.focus(); return; }
-    if (!(await idsFixWrite(m.no, x => ({ ...x, skip: { reason: m.reason, note, ...actor() }, cancel: null }), 'ไม่ต้องมีฟอร์ม AT', `${m.reason}${note ? ' · ' + note : ''}`))) return;
+    const D = derive(), to = m.reason === 'โอนลูกค้าให้สาขาอื่น' ? m.to : null, dx = m.reason === 'ใบจองซ้ำ' ? D.bookings.find(x => (x.app ? x.app.key : x.key) === m.dup) : null;
+    if (m.reason === 'โอนลูกค้าให้สาขาอื่น' && (!BRS.includes(to) || to === b.br)) { toast('เลือกสาขาปลายทาง', 'bad'); return; }
+    if (m.reason === 'ใบจองซ้ำ' && !dx) { toast('เลือกใบจองที่ซ้ำ', 'bad'); return; }
+    const extra = { ...(to ? { to, from: b.br } : {}), ...(dx ? { dup: { key: dx.app ? dx.app.key : dx.key, no: dx.no || null, cust: dx.cust || null } } : {}) };
+    if (!(await idsFixWrite(m.no, x => ({ ...x, skip: { reason: m.reason, note, ...extra, ...actor() }, cancel: null }), 'ไม่ต้องมีฟอร์ม AT', `${m.reason}${to ? ' → ' + to : ''}${dx ? ' กับ ' + (dx.no || dx.cust) : ''}${note ? ' · ' + note : ''}`))) return;
     S.modal = null; toast(`บันทึกแล้ว: ${b.cust || b.no} ไม่ต้องมีฟอร์ม (${m.reason})`); render();
   },
   async 'idsfix-cancel'() {
