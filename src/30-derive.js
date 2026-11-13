@@ -465,6 +465,10 @@ function deriveNow() {
     else if (b.match === 'quota') b.state = 'idsquota';
     else b.state = 'waiting';
   }
+  // an IDS number that is the old / other-branch number of a form's booking (IDS re-issued it, or the customer moved branch) is that
+  // booking, not a second one: it does not queue (13/11)
+  const altKeys = new Set(); at.forEach(a => { if (a.cancelled) return; ((a.match && a.match.alt) || []).forEach(x => altKeys.add(x.key)); ((a.rec && a.rec.ids_alt) || []).forEach(k => altKeys.add(k)); });
+  for (const b of bookings) if (!b.app && altKeys.has(b.key) && b.state === 'waiting') { b.state = 'alt'; b.mergedInto = true; }
   // ไม่ต้องมีฟอร์ม · โอนลูกค้าให้สาขาอื่น / ใบจองซ้ำ (12/11): one booking, not two. The new IDS booking (keyed at the new branch, same customer
   // and model) or the booking picked as the repeat takes this one's place in the queue (the earlier date) and this row folds into it.
   // Until the new branch keys its IDS booking the transferred one keeps queueing ("รอใบจองใหม่ที่ <to>").

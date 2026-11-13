@@ -145,7 +145,23 @@ function matchForms(at, idsB, cars, inv) {
     const no = new Set(a.rec.dup_no || []), ak = nameKey(bk.name || a.cust);
     const y = idsOnly.find(x => x.key !== bk.key && !no.has(x.key) && x.cust && keyScore(ak, nameKey(x.cust)) >= 2 && x.model === bk.model && x.grade === bk.grade
       && String(x.color || '').toUpperCase() === String(bk.color || '').toUpperCase() && (x.br === bk.br || isCx(bk)));   // another branch: only when the old booking was withdrawn (a customer moved to another branch)
-    if (!y) continue;
+    if (!y) {
+      // the customer moved branch (13/11): the same customer, same model / grade / colour, booked in IDS at another branch while the old one
+      // is still open. One case, one row: the form keeps the live one (with a car, else the newer number), the other is its old number.
+      const z = idsOnly.find(x => x.key !== bk.key && !no.has(x.key) && x.cust && keyScore(ak, nameKey(x.cust)) >= 2 && x.model === bk.model && x.grade === bk.grade
+        && String(x.color || '').toUpperCase() === String(bk.color || '').toUpperCase() && x.br !== bk.br && x.date && bk.date && Math.abs(daysBetween(x.date, bk.date)) <= 120);
+      const zr = z && recs.find(x => x.key === z.key);
+      if (zr) {
+        const hasCar = r => !!((r.row && r.row.vin) || r.vin), keepZ = hasCar(zr) && !hasCar(bk) || (!hasCar(bk) && !hasCar(zr) && (zr.date || '') > (bk.date || ''));
+        if (keepZ) {
+          res.recs = res.recs.map(r => r === bk ? zr : r);
+          res.no = zr.no || res.no; res.idsSales = zr.sales || res.idsSales; res.vin = res.recs.find(r => r.vin)?.vin || null;
+          if (res.recs[0] === zr) { res.idsBr = zr.br; res.idsModel = zr.model; res.idsGrade = zr.grade; res.idsColor = zr.color; res.kind = 'booking'; }
+        }
+        (res.alt = res.alt || []).push(keepZ ? bk : zr); res.autoAlt = true; res.moveAlt = true; idsOnly = idsOnly.filter(x => x.key !== z.key);
+      }
+      continue;
+    }
     // sure case: one number is 'postponed' with no car, the other is live with a car: IDS re-issued the booking. No one needs to click.
     const live = r => !!((r.row && r.row.vin) || r.vin), post = r => !!(r.ids === 'เลื่อนการรับรถ' || (r.row && r.row.ids === 'เลื่อนการรับรถ')) && !live(r);
     const yr = recs.find(x => x.key === y.key);
