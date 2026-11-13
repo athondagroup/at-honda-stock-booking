@@ -255,3 +255,20 @@ document.addEventListener('input', ev => { const t = ev.target; if (t && t.datas
 
 // an IDS booking with no web form gone from the file: the branch manager or the admin of that branch answers (12/11)
 function bkOutCanGone(br) { return perms().write && (canApproveBr(br) || (S.role.role === 'admin' && myBranch() === br)); }
+// the booking card: its IDS booking left the IDS file and nobody has said why yet (13/11) – the answer is given on the upload, this says so
+function bkOutCardBox(a, D) {
+  if (!a || a.cancelled || a.match) return '';
+  const ups = [...S.uploads.values()].filter(u => u && u.src === 'booking' && Array.isArray(u.out)).sort((x, y) => String(y.at || '').localeCompare(String(x.at || '')));
+  for (const u of ups) {
+    const o = u.out.find(x => x && x.atId === a.id); if (!o) continue;
+    if (!bkOutPending(o, u.br)) return '';
+    const sp = String(o.spec || '').split('|'), diff = o.spec && specKey(a.model, a.grade, a.color) !== o.spec;
+    return `<section class="mb-4 p-3 rounded-lg" style="border:1.5px solid var(--warn)"><h3 class="font-head font-semibold" style="color:var(--warn)">ใบจอง IDS ที่เคยจับคู่หายจาก IDS · ต้องตรวจ</h3>
+      <div class="text-sm mt-1">ใบจอง IDS <span class="code">${esc(o.no || '')}</span> (${esc(u.br)}) ไม่อยู่ในไฟล์ Booking ที่อัปโหลด ${fmtD(u.at)} · ไม่พบใน DL · ยังไม่มีใบ IDS ใหม่ที่ระบบจับให้ได้</div>
+      ${diff ? `<div class="text-xs text-muted">IDS เดิมเป็น ${esc(specLabelText(o.spec))} · ฟอร์มเป็น ${esc(specLabelText(specKey(a.model, a.grade, a.color)))}</div>` : ''}
+      <div class="text-xs text-muted mt-1">ตรวจใน IDS ว่า: ออกเลขใบจองใหม่ (ชื่อ / สีเปลี่ยน) → "แก้ไขใบจองเป็นใบนี้" · ลูกค้ายกเลิก → "ยกเลิกใบจอง" · ขายแล้วรอ DL → "แจ้งขายแล้ว รออัปเดต DL"</div>
+      <button class="btn btn-dark btn-sm mt-2" data-act="bkout-goto" data-id="${esc(u.id)}">ไปตรวจที่รายการอัปโหลด</button></section>`;
+  }
+  return '';
+}
+Object.assign(ACTIONS, { 'bkout-goto'(el) { navPush(); S.modal = null; S.view = 'upload'; S.filters.uplOpen = el.dataset.id; setHash(); render(); } });

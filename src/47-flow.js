@@ -96,6 +96,7 @@ function atModal(m, D) {
   return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">ใบจอง AT Honda</h2><div class="mt-1 flex flex-wrap gap-2">${matchChip(a)} ${a.row && !a.cancelled ? statusChip(BOOK_STATE, a.row.state) : ''}${a.cross ? chip(`ขายข้ามสาขา ${a.salesBr} → ${a.delivBr}`, 'neutral') : ''}${a.multi || a.multiOf ? chip('จอง 2 คัน', 'warn') : ''}${a.change ? chip(a.change.type === 'cancel' ? 'รออนุมัติยกเลิก' : 'รออนุมัติแก้ไข', 'warn') : ''}</div>${multi}</div><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
   ${nextStepBox(a, D, mine)}
   ${bkLockAlert(a, D)}
+  ${bkOutCardBox(a, D)}
   <div class="grid md:grid-cols-[1fr_1.25fr] gap-5">
     <div class="flex flex-col gap-3 order-2 md:order-1">
       ${r.doc_url && mine ? `<a class="btn btn-ghost" href="${esc(r.doc_url)}" target="_blank" rel="noopener">เปิดรูปใบจองใน Google Drive</a><p class="text-xs text-muted -mt-1">ใบจองจากฟอร์มเดิมเก็บใน Drive หน้านี้ดึงรูปมาแสดงตรง ๆ ไม่ได้</p>` : ''}
