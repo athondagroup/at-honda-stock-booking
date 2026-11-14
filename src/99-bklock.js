@@ -34,7 +34,11 @@ function bltDrop(r, D) {
 }
 function bkLockList(r, D) {
   const row = r.row || {}, a = r.a, keys = [r.key, row.key, a && a.key].filter(Boolean);
-  return D.locks.filter((l, i, all) => all.findIndex(x => x.id === l.id) === i && keys.includes(l.bkref) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased && (l.live || l.status === 'pending'));
+  const ls = D.locks.filter((l, i, all) => all.findIndex(x => x.id === l.id) === i && keys.includes(l.bkref) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased && (l.live || l.status === 'pending'));
+  // a temporary lock a manager took for this customer by name (same seller and spec, no booking picked) holds this booking too:
+  // the row says "ล็อกแล้ว", so the lock column shows that car (15/11)
+  const t = row.tempLock; if (t && !ls.some(l => l.id === t.id)) ls.push(t);
+  return ls;
 }
 function bkLockCell(r, D) {
   const row = r.row || {}, key = bltKey(r), a = r.a;
@@ -48,7 +52,7 @@ function bkLockCell(r, D) {
   if (lk) {
     const lnk = (act, txt, extra = '') => `<button class="underline" style="color:var(--accent, #2563eb)" data-act="${act}" ${extra}>${txt}</button>`;
     const rel = lk.typed && ltMine(lk) ? lnk('lt-release', 'ปล่อยล็อก', `data-id="${esc(lk.id)}"`) : lnk('release-open', 'ปล่อยล็อก', `data-id="${esc(lk.id)}"`);
-    return `<div class="text-sm">${bltUnitLabel(lk, D)}${lk.type === 'temp' ? '<div class="text-xs text-muted">ล็อกชั่วคราว</div>' : ''}
+    return `<div class="text-sm">${bltUnitLabel(lk, D)}${lk.type === 'temp' ? `<div class="text-xs text-muted">ล็อกชั่วคราว${lk.bkref ? '' : ` (ชื่อ "${esc(lk.prospect || '')}")`}</div>` : ''}
       ${lk.status === 'pending' ? `<div class="text-xs" style="color:var(--warn)">รออนุมัติ${a ? ` · ${lnk('at-open', 'ตรวจสอบ', `data-id="${esc(a.id)}"`)}` : ''}</div>`
         : can ? `<div class="text-xs">${lnk('blt-edit', 'แก้ไข', `data-k="${esc(key)}" data-id="${esc(lk.id)}"`)} · ${rel}${lk.end ? ` <span class="text-muted">· ถึง ${fmtD(lk.end)}</span>` : ''}</div>` : lk.end ? `<div class="text-xs text-muted">ถึง ${fmtD(lk.end)}</div>` : ''}
       ${lk.sheet_sync && lk.sheet_sync.error && lk.sheet_sync.value ? '<div class="text-xs" style="color:var(--warn)">ยังไม่ได้ลงชีต</div>' : ''}</div>`;
