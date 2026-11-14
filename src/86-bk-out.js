@@ -88,7 +88,7 @@ function bkOutDelivered(o) {
   if (inv) return { date: inv.ddate || inv.idate || null, inv: inv.inv };
   // the DL row carries another booking number (IDS re-keyed it): the same customer and model in the DL is the same sale (12/11)
   const k = searchKey(o.cust || ''), [m] = String(o.spec || '').split('|');
-  const byName = k.length >= 4 ? X.inv.find(i => !i.company && i.cust && searchKey(i.cust) === k && (!m || !i.model || i.model === m)) : null;
+  const byName = k.length >= 4 ? X.inv.find(i => !i.company && i.cust && searchKey(i.cust) === k && (!m || !i.model || i.model === m) && (!o.date || (i.idate || i.ddate || '') >= o.date)) : null;   // not an earlier car of a repeat customer
   return byName ? { date: byName.ddate || byName.idate || null, inv: byName.inv, byName: true } : null;
 }
 // gone from the Booking file because a car is now allocated to it (the Stock file lists the car with this booking no., or the web booking has the car): not lost

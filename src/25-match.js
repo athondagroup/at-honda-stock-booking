@@ -148,7 +148,8 @@ function matchForms(at, idsB, cars, inv) {
     if (!y) {
       // the customer moved branch (13/11): the same customer, same model / grade / colour, booked in IDS at another branch while the old one
       // is still open. One case, one row: the form keeps the live one (with a car, else the newer number), the other is its old number.
-      const z = idsOnly.find(x => x.key !== bk.key && !no.has(x.key) && x.cust && keyScore(ak, nameKey(x.cust)) >= 2 && x.model === bk.model && x.grade === bk.grade
+      const isCo = /บริษัท|หจก|ห้างหุ้นส่วน|จำกัด|co\.|ltd/i.test(String(bk.name || bk.cust || a.cust || ''));   // a company books several cars of one spec on purpose
+      const z = isCo ? null : idsOnly.find(x => x.key !== bk.key && !no.has(x.key) && x.cust && keyScore(ak, nameKey(x.cust)) >= 2 && x.model === bk.model && x.grade === bk.grade
         && String(x.color || '').toUpperCase() === String(bk.color || '').toUpperCase() && x.br !== bk.br && x.date && bk.date && Math.abs(daysBetween(x.date, bk.date)) <= 120);
       const zr = z && recs.find(x => x.key === z.key);
       if (zr) {
