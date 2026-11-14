@@ -128,6 +128,7 @@ function ltRetry(D) {
 function ltSweep(D) {
   if (!ltCan() || !window.__WEB) return;
   ltRetry(D);
+  if (typeof bltConvertSweep === 'function') bltConvertSweep(D);
   for (const l of D.locks) {
     if (!l.typed || l.sheet_cleared || ltSwept.has(l.id) || l.live || !(l.vin || l.ref) || !(l.sheet_sync && l.sheet_sync.value && !l.sheet_sync.conflict)) continue;
     if (D.locks.some(x => x.id !== l.id && x.live && ltSameL(x, l) && x.typed)) { ltSwept.add(l.id); continue; }   // the cell now belongs to the next typed lock

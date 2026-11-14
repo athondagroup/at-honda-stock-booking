@@ -107,3 +107,29 @@ document.addEventListener('pointerdown', ev => {
   const t = ev.target; if (t && t.closest && t.closest('.lt-cell')) return;
   S.lt = null; S.blt = null; render();
 }, true);
+// a temporary lock taken by name becomes the booking's lock by itself (15/11): once the customer's form is in (same seller, spec and
+// name), the same car is locked to that booking for the booking days, the temporary lock closes as "ลูกค้ามาจองแล้ว". Run by a manager /
+// the executive's screen (the ones who may lock at once), once per lock; the new lock id comes from the temporary one so two screens
+// cannot make two.
+var bltConv = new Set();
+function bltConvertSweep(D) {
+  if (!ltCan() || !window.__WEB || !perms().write) return;
+  for (const b of D.bookings) {
+    const t = b.tempLock; if (!t || b.lock || !b.app || !b.app.active || t.bkref || t.status !== 'approved' || !t.live || bltConv.has(t.id)) continue;
+    if (!(t.vin || t.ref)) continue;
+    bltConv.add(t.id); bltConvert(t.id, b.app.key);
+  }
+}
+async function bltConvert(tid, bkKey) {
+  const D = derive(), t = D.locks.find(x => x.id === tid), b = D.bookingByKey.get(bkKey);
+  const id = 'CV_' + tid; if (!t || !b || S.locks.get(id)) return;
+  if (D.locks.some(x => x.id !== tid && x.live && x.type !== 'temp' && ((t.vin && x.vin === t.vin) || (t.ref && x.ref === t.ref)))) return;   // the car went to someone else
+  const now = new Date().toISOString(), start = todayISO(), days = LOCK_DAYS_BY.booking || 15;
+  const l = { vin: t.vin || null, ref: t.vin ? null : t.ref || null, car_br: t.car_br || null, spec: t.spec || b.spec, type: 'booking', bkref: b.app ? b.app.key : b.key, bk_br: b.br || null,
+    sales: b.owner || t.sales || null, prospect: null, dealer_name: null, reason: t.reason || LOCK_REASONS[0], note: '', warnings: [], status: 'approved', start, end: addDays(start, days),
+    approved_at: now, requested_at: now, requested_by: S.me.id || null, requested_role: roleLabel(), ext: 0, history: [], convert_from: tid, auto_convert: true,
+    req_br: b.br || null, notices: [{ k: 'new', at: now, by: S.me.id || null, role: roleLabel() }] };
+  if (!await saveLock(id, l, 'ล็อกให้ใบจอง (ล็อกชั่วคราวเดิม · ลูกค้ามาจองแล้ว)', `${b.cust || ''} · หมด ${fmtD(l.end)}`)) return;
+  const conv = findLock(tid); if (conv) { conv.status = 'converted'; conv.converted_to = id; await saveLock(tid, conv, 'ลูกค้ามาจองแล้ว', 'เปลี่ยนเป็นล็อกให้ใบจองอัตโนมัติ (รถคันเดิม)'); }
+  await settleUnit(derive(), l, id);
+}
