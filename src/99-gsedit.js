@@ -51,6 +51,7 @@ async function gseRun() {
     // also a lock made in the web for a booking (not typed): the sheet cell that names that booking's customer (first name: sheets carry
     // "nick / first name") is the same lock (16/11)
     const webName = new Map(); { const DD = derive(); for (const l of DD.locks) if (l.live && l.bkref && !l.typed) { const b = DD.bookingByKey.get(l.bkref), k = b && searchKey(String(b.cust || '').trim().split(/\s+/)[0] || ''); if (!k || k.length < 3) continue; if (l.vin) webName.set(l.vin, k); if (l.ref) webName.set('Q:' + l.ref, k); if (l.vin) for (const [ref, v] of qVin) if (v === l.vin) webName.set('Q:' + ref, k); } }
+    const bkOfUnit = new Map(); for (const l of derive().locks) if (l.live && l.bkref) { if (l.vin) bkOfUnit.set(l.vin, l.bkref); if (l.ref) bkOfUnit.set('Quota ' + l.ref, l.bkref); }
     const webTxt = new Map(); for (const l of derive().locks) if (l.live && l.typed) { const t = gseKey(ltTextOf(l)); if (l.vin) webTxt.set(l.vin, t); if (l.ref) webTxt.set('Q:' + l.ref, t); if (l.vin) for (const [ref, v] of qVin) if (v === l.vin) webTxt.set('Q:' + ref, t); }
     for (let i = edits.length - 1; i >= 0; i--) { const e = edits[i], k = e.src === 'quota' ? 'Q:' + e.key : e.key, vTo = e.src === 'quota' ? ((e.ch.find(c => c.f === 'vin') || {}).to || null) : null, w = webTxt.get(k) || (vTo && webTxt.get(vTo)); if (!w || e.src === 'warn') continue;
       e.ch = e.ch.filter(c => !((c.f === 'bknote' || c.f === 'vnote') && gseKey(c.to) === w)); if (!e.ch.length) edits.splice(i, 1); }
@@ -59,7 +60,9 @@ async function gseRun() {
     // the same name typed on two cars / quota slots: shown on the row, and the manager of the seller's branch is told after saving
     edits.forEach(e => { e.on = true; const c = e.ch.find(c => c.f === 'bknote' || c.f === 'vnote'); const k = c && c.to ? gseKey(c.to) : ''; const me = e.src === 'quota' ? 'Quota ' + e.key : e.key;
       const myId = e.src === 'quota' ? ((e.ch.find(c => c.f === 'vin') || {}).to || qVin.get(e.key) || me) : e.key;
-      e.dup = k && texts.has(k) ? texts.get(k).filter(u => u.id !== myId && u.unit !== me) : []; });
+      // two cars each locked in the web to its own booking (the customer books 2 cars, marked not a duplicate) are not a slip (16/11)
+      const myBk = bkOfUnit.get(myId) || bkOfUnit.get(me);
+      e.dup = k && texts.has(k) ? texts.get(k).filter(u => u.id !== myId && u.unit !== me && !(myBk && bkOfUnit.get(u.id) && bkOfUnit.get(u.id) !== myBk)) : []; });
     // a name on a quota slot whose car is already in stock, the stock row still empty (lock forgotten): match it to the car
     for (const q of qNames) {
       const st = sheetStock.get(q.vin); if (!st) continue;
