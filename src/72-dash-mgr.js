@@ -151,13 +151,19 @@ function atVin(a) { return (a.match && a.match.vin) || (a.rec.flow && a.rec.flow
 function dashCars(D) {
   const A = dashAna(D, true), cars = [...D.cars.values()].filter(c => inBr(c) && !c.company);
   const o60 = cars.filter(c => (c.age ?? 0) > 60).length, o90 = cars.filter(c => (c.age ?? 0) > 90).length, free = cars.filter(c => c.status === 'free').length;
+  const V = stockValue(cars, D);
   return `${pageHead('รถยนต์', 'รถในสต็อกตอนนี้ · อายุรถนับจากวันผลิต (ถ้าไม่มี นับจากวันฝากศูนย์หรือวันเข้าสต็อก) · ไม่นับรถบริษัท')}
   ${dashTabs()}${brSeg()}
   ${tiles([
     tile('รถในสต็อก', fmtN(cars.length), { drill: { m: 'stk', label: 'ทั้งหมด' }, sub2: `ว่างขายได้ ${fmtN(free)} คัน` }),
     tile('รถเกิน 60 วัน', fmtN(o60), { tone: o60 ? 'warn' : '', drill: { m: 'stk', min: 60, label: 'เกิน 60 วัน' } }),
-    tile('รถเกิน 90 วัน', fmtN(o90), { tone: o90 ? 'bad' : '', drill: { m: 'stk', min: 90, label: 'เกิน 90 วัน' } })
-  ], 'sm:grid-cols-3')}
+    tile('รถเกิน 90 วัน', fmtN(o90), { tone: o90 ? 'bad' : '', drill: { m: 'stk', min: 90, label: 'เกิน 90 วัน' } }),
+    tile('มูลค่าสต็อก (ราคาขาย)', fmtB(V.tot.v), { sub2: `ว่างขายได้ ${fmtB(V.tot.fv)} · เกิน 90 วัน ${fmtB(V.tot.ov)}` })
+  ], 'sm:grid-cols-2 lg:grid-cols-4')}
+  ${dCard('มูลค่าสต็อกแยกรุ่น', `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>รุ่น</th><th class="text-right">คัน</th><th class="text-right">มูลค่า</th><th class="text-right">ว่างขายได้</th><th class="text-right">เกิน 90 วัน</th></tr></thead><tbody>
+    ${V.rows.map(r => `<tr><td class="nowrap">${esc(r.k)}</td><td class="num text-right">${fmtN(r.n)}</td><td class="num text-right font-semibold">${fmtN(r.v)}</td><td class="num text-right">${r.fn ? `${fmtN(r.fv)} <span class="text-muted">(${r.fn})</span>` : '–'}</td><td class="num text-right" ${r.on ? 'style="color:var(--bad)"' : ''}>${r.on ? `${fmtN(r.ov)} <span class="text-muted">(${r.on})</span>` : '–'}</td></tr>`).join('')}
+    <tr class="font-semibold"><td>รวม</td><td class="num text-right">${fmtN(V.tot.n)}</td><td class="num text-right">${fmtN(V.tot.v)}</td><td class="num text-right">${fmtN(V.tot.fv)} <span class="text-muted">(${V.tot.fn})</span></td><td class="num text-right">${fmtN(V.tot.ov)} <span class="text-muted">(${V.tot.on})</span></td></tr></tbody></table></div>`,
+    `คิดจากราคาขายในใบราคาของเว็บ (รถราคาเดิมตาม Model code ใช้ราคาเดิม) ไม่ใช่ราคาทุน · บาท · ในวงเล็บ = จำนวนคัน${V.noPrice ? ` · ไม่มีราคา ${V.noPrice} คัน (ไม่นับมูลค่า)` : ''}`)}
   <div class="grid lg:grid-cols-2 gap-5 my-5">${A.old}${A.idle}</div>`;
 }
 function dashAna(D, part) {
@@ -259,3 +265,16 @@ function dashAna(D, part) {
   </div>
   ${tradeCard(E, dCard, pctOf)}`;
 }
+
+// stock value at the list price (16/11): the price sheet's price for the car (the old price when its model code says so); not the cost
+function stockValue(cars, D) {
+  const m = new Map(), tot = { n: 0, v: 0, fn: 0, fv: 0, on: 0, ov: 0 }; let noPrice = 0;
+  for (const c of cars) {
+    const p = carListPrice(c.vin, c.model, c.grade, c.color, D), v = p ? Number(p.price) || 0 : 0; if (!v) noPrice++;
+    const r = m.get(c.model || 'ไม่ระบุ') || { k: c.model || 'ไม่ระบุ', n: 0, v: 0, fn: 0, fv: 0, on: 0, ov: 0 };
+    for (const o of [r, tot]) { o.n++; o.v += v; if (c.status === 'free') { o.fn++; o.fv += v; } if ((c.age ?? 0) > 90) { o.on++; o.ov += v; } }
+    m.set(r.k, r);
+  }
+  return { rows: [...m.values()].sort((a, b) => b.v - a.v), tot, noPrice };
+}
+function fmtB(v) { return v >= 1e6 ? (v / 1e6).toFixed(2) + ' ล้าน' : fmtN(v); }
