@@ -48,9 +48,14 @@ async function gseRun() {
       }
     }
     // a cell the web wrote itself (a live typed lock: stock cell and its quota slot) is already in the web, not an edit (12/11)
+    // also a lock made in the web for a booking (not typed): the sheet cell that names that booking's customer (first name: sheets carry
+    // "nick / first name") is the same lock (16/11)
+    const webName = new Map(); { const DD = derive(); for (const l of DD.locks) if (l.live && l.bkref && !l.typed) { const b = DD.bookingByKey.get(l.bkref), k = b && searchKey(String(b.cust || '').trim().split(/\s+/)[0] || ''); if (!k || k.length < 3) continue; if (l.vin) webName.set(l.vin, k); if (l.ref) webName.set('Q:' + l.ref, k); if (l.vin) for (const [ref, v] of qVin) if (v === l.vin) webName.set('Q:' + ref, k); } }
     const webTxt = new Map(); for (const l of derive().locks) if (l.live && l.typed) { const t = gseKey(ltTextOf(l)); if (l.vin) webTxt.set(l.vin, t); if (l.ref) webTxt.set('Q:' + l.ref, t); if (l.vin) for (const [ref, v] of qVin) if (v === l.vin) webTxt.set('Q:' + ref, t); }
     for (let i = edits.length - 1; i >= 0; i--) { const e = edits[i], k = e.src === 'quota' ? 'Q:' + e.key : e.key, vTo = e.src === 'quota' ? ((e.ch.find(c => c.f === 'vin') || {}).to || null) : null, w = webTxt.get(k) || (vTo && webTxt.get(vTo)); if (!w || e.src === 'warn') continue;
       e.ch = e.ch.filter(c => !((c.f === 'bknote' || c.f === 'vnote') && gseKey(c.to) === w)); if (!e.ch.length) edits.splice(i, 1); }
+    for (let i = edits.length - 1; i >= 0; i--) { const e = edits[i], k = e.src === 'quota' ? 'Q:' + e.key : e.key, vTo = e.src === 'quota' ? ((e.ch.find(c => c.f === 'vin') || {}).to || null) : null, nm = webName.get(k) || (vTo && webName.get(vTo)); if (!nm || e.src === 'warn') continue;
+      e.ch = e.ch.filter(c => !((c.f === 'bknote' || c.f === 'vnote') && c.to && searchKey(c.to).includes(nm))); if (!e.ch.length) edits.splice(i, 1); }
     // the same name typed on two cars / quota slots: shown on the row, and the manager of the seller's branch is told after saving
     edits.forEach(e => { e.on = true; const c = e.ch.find(c => c.f === 'bknote' || c.f === 'vnote'); const k = c && c.to ? gseKey(c.to) : ''; const me = e.src === 'quota' ? 'Quota ' + e.key : e.key;
       const myId = e.src === 'quota' ? ((e.ch.find(c => c.f === 'vin') || {}).to || qVin.get(e.key) || me) : e.key;
