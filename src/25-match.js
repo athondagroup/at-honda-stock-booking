@@ -58,7 +58,7 @@ function matchForms(at, idsB, cars, inv) {
   });
   // a fake-advance invoice (made-up buyer, car free to sell) is not this customer's deal: its car and spec must not replace the booking's
   const advFakeInv = i => { const v = S.vehicles.get(i.vin), a = v && v.advance; return !!(a && a.kind === 'fake' && a.inv && String(a.inv).replace(/^0+/, '') === String(i.inv || '').replace(/^0+/, '')); };
-  inv.forEach(i => { if (i.cust && !i.company && !advFakeInv(i)) recs.push({ kind: 'dl', key: 'inv:' + i.br + ':' + i.inv, name: i.cust, date: i.idate, model: i.model, grade: i.grade, color: i.color, br: i.br, no: i.no, sales: i.sales, vin: i.vin, ddate: i.ddate, row: i }); });
+  inv.forEach(i => { if (i.cust && !i.company && !advFakeInv(i)) recs.push({ kind: 'dl', key: 'inv:' + i.br + ':' + String(i.inv || '').replace(/^0+/, ''), name: i.cust, date: i.idate, model: i.model, grade: i.grade, color: i.color, br: i.br, no: i.no, sales: i.sales, vin: i.vin, ddate: i.ddate, row: i }); });
   // every AT booking is compared with every record: a name typed with a rank or a typo at the start must still be found
   recs.forEach(r => { r.k = nameKey(r.name); r.n = r.k.n; });
   const pairs = [];
@@ -69,7 +69,7 @@ function matchForms(at, idsB, cars, inv) {
     if (a.cancelled || a.demo) continue;
     const ak = nameKey(a.cust);
     // a person confirmed the pairing (or said "not this one") on the booking itself
-    const pick = a.rec.match_pick && a.rec.match_pick.key, skip = new Set(a.rec.match_skip || []);
+    const pick = matchKeyN(a.rec.match_pick && a.rec.match_pick.key), skip = new Set((a.rec.match_skip || []).map(matchKeyN));
     for (const r of recs) {
       if (skip.has(r.key) || altOf.has(r.key)) continue;
       if (pick && r.key === pick) { pairs.push({ a, r, score: 1000, same: true, manual: true }); continue; }
@@ -185,9 +185,12 @@ function matchForms(at, idsB, cars, inv) {
   const near = new Map();
   for (const a of at) {
     if (a.cancelled || a.demo || result.has(a.key)) continue;
-    const ak = nameKey(a.cust), hits = [], skip = new Set(a.rec.match_skip || []);
+    const ak = nameKey(a.cust), hits = [], skip = new Set((a.rec.match_skip || []).map(matchKeyN));
     for (const r of recs) { if (skip.has(r.key)) continue; const ns = keyScore(ak, r.k); if (ns >= 2) hits.push({ key: r.key, ns, kind: r.kind, br: r.br, no: r.no, inv: r.kind === 'dl' ? r.row.inv : null, date: r.date, ddate: r.ddate || null, name: r.name, model: r.model, grade: r.grade, usedBy: claimedBy.get(r.key) || null }); }
     if (hits.length) near.set(a.key, hits.sort((x, y) => y.ns - x.ns || (y.kind === 'dl') - (x.kind === 'dl')).slice(0, 3));
   }
   return { result, idsOnly, near, idsCx, idsGone, dupAsk };
 }
+
+// a DL key with or without the invoice number's leading 0 is one key (an upload read as numbers drops it, 16/11)
+function matchKeyN(k) { const m = /^inv:([^:]*):0*(.*)$/.exec(String(k || '')); return m ? `inv:${m[1]}:${m[2]}` : k; }

@@ -6,7 +6,7 @@
 function advOf(vin, inv) {
   const v = S.vehicles.get(vin), a = v && v.advance;
   if (!a || !a.kind) return null;
-  if (a.inv && inv && inv.inv && String(a.inv) !== String(inv.inv)) return null;
+  if (a.inv && inv && inv.inv && advInvNo(a.inv) !== advInvNo(inv.inv)) return null;   // "09200967" = "9200967" (a file read as a number drops the 0, 16/11)
   return a;
 }
 // the "no real customer" advance invoice of a car, whatever invoice the car has now (23/10): it counts as an invoice

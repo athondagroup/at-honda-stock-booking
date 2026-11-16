@@ -165,7 +165,7 @@ function execData(D, rng) {
   }
   D.X.inv.forEach(i => {
     if (i.company || !i.ddate || !inBrX(i)) return;
-    dlKeys.add('inv:' + i.br + ':' + i.inv);
+    dlKeys.add('inv:' + i.br + ':' + String(i.inv || '').replace(/^0+/, ''));
     if (inR(i.ddate)) { const a = i.vin && advs.get(i.vin); sales.push({ date: i.ddate, br: i.br, model: i.model, fin: i.fin || null, src: 'DL', ...det(i), ...(a ? { advFrom: advBr(i.vin, a, D), extra: 'จากรถ ADV' } : {}) }); }
   });
   D.at.forEach(a => {
