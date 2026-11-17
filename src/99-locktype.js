@@ -73,6 +73,8 @@ function ltCell(c, D, p) {
   if (t) return `<div class="lt-cell on"><input id="lt-in" class="lt-in" data-lt="${esc(ltKey(c))}" value="${esc(t.q || '')}" placeholder="ชื่อลูกค้า / เลขใบจอง / เซลล์" autocomplete="off">
     <button class="text-xs underline text-muted" data-act="lt-cancel">ยกเลิก</button>${ltDrop(c, D)}</div>`;
   const gone = !L ? ltGone(c, D) : null;
+  const req = !L ? ltLocks(c, D).find(l => l.status === 'pending' && !l.replaces) : null;
+  if (req) return `<div class="lt-cell"><span class="lt-txt" title="${esc(lockLabel(req))}">${esc(ltTextOf(req))}</span> <span class="chip" style="background:var(--warn-bg, #fef3c7);color:var(--warn)">รอผู้จัดการอนุมัติ</span>${isMgrRole() ? ` <button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="go" data-view="lock" data-sub="approve">ไปอนุมัติ</button>` : ''}${askTxt}</div>`;
   if (!L) return `<div class="lt-cell"><input class="lt-in idle" data-lt-open="${esc(ltKey(c))}" placeholder="พิมพ์ชื่อลูกค้า / เลขใบจอง" readonly>${gone ? `<div class="text-xs"><button class="underline" style="color:var(--accent, #2563eb)" data-act="lt-undo" data-id="${esc(gone.id)}" title="ปล่อยไปเมื่อ ${fmtDT(gone.rel.at)}">↶ ย้อนกลับ "${esc(ltTextOf(gone))}"</button></div>` : ''}</div>`;
   const txt = `<span class="lt-txt" title="${esc(lockLabel(L))}">${esc(ltTextOf(L))}</span>`;
   const own = ltMine(L);
