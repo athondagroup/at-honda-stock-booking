@@ -131,13 +131,13 @@ function sheetLockFields(u, D) {
   return { ...base, ...common, type: 'temp' };
 }
 function sheetSyncBox(D) {
-  const plan = sheetPlan(D), add = plan.filter(x => !x.update).length, upd = plan.length - add;
+  const plan = sheetPlan(D), add = plan.filter(x => !x.update).length, upd = plan.length - add, pend = D.locks.filter(l => l.status === 'pending' && l.imported && !l.replaces && !l.idsTook && branchOk(l.car_br)).length;
   return `<section class="mb-5"><h2 class="font-head text-lg font-semibold mb-1">ล็อกจากชีต Stock</h2>
     <div class="bg-surface border border-line rounded-lg p-4 text-sm">
-      <p>ทุกครั้งที่บันทึกไฟล์ Stock หรือ Quota ระบบดึงชื่อที่พิมพ์ไว้ในช่องเลขที่ใบจอง (เช่น "มด/เปิ้ล") มาเป็นคำขอล็อกให้ผู้จัดการอนุมัติ รถที่ IDS จัดสรรแล้ว (มีเลขที่ใบจอง) ใช้การจัดสรรจาก IDS</p>
-      <p class="mt-2">${plan.length ? `ข้อมูลตอนนี้มีข้อความที่ยังไม่มีคำขอ <b>${add}</b> รายการ${upd ? ` · ข้อความเปลี่ยน ต้องอัปเดตคำขอเดิม <b>${upd}</b> รายการ` : ''}` : '<span class="text-muted">ข้อความในชีตมีคำขอล็อกครบแล้ว</span>'}</p>
-      ${plan.length ? `<ul class="text-xs text-muted list-disc pl-5 mt-1">${plan.slice(0, 8).map(x => `<li><span class="code">${esc(x.u.vin || 'Quota ' + x.u.ref)}</span> ${esc(x.u.br)} · "${esc(x.u.text)}"${x.update ? ` (เดิม "${esc(sheetTextOf(x.update))}")` : ''}</li>`).join('')}</ul>
-        <button class="btn btn-dark btn-sm mt-3" data-act="sheet-sync" ${perms().write ? '' : 'disabled'}>สร้างคำขอล็อกจากชีต</button>` : ''}
+      <p>ทุกครั้งที่บันทึกไฟล์ Stock หรือ Quota ระบบดึงชื่อที่พิมพ์ไว้ในช่องเลขที่ใบจอง (เช่น "มด/เปิ้ล") มาล็อกให้เลย ไม่ต้องรออนุมัติ (ใบจอง ${LOCK_DAYS_BY.booking} วัน · ชั่วคราว ${LOCK_DAYS_BY.temp} วัน) รถที่ IDS จัดสรรแล้ว (มีเลขที่ใบจอง) ใช้การจัดสรรจาก IDS</p>
+      <p class="mt-2">${plan.length || pend ? `ข้อมูลตอนนี้มีข้อความที่ยังไม่ได้ล็อก <b>${add}</b> รายการ${upd ? ` · ข้อความเปลี่ยน <b>${upd}</b> รายการ` : ''}${pend ? ` · คำขอเดิมที่ค้างรออนุมัติ <b>${pend}</b> รายการ (กดแล้วอนุมัติให้เลย)` : ''}` : '<span class="text-muted">ข้อความในชีตล็อกครบแล้ว</span>'}</p>
+      ${plan.length || pend ? `<ul class="text-xs text-muted list-disc pl-5 mt-1">${plan.slice(0, 8).map(x => `<li><span class="code">${esc(x.u.vin || 'Quota ' + x.u.ref)}</span> ${esc(x.u.br)} · "${esc(x.u.text)}"${x.update ? ` (เดิม "${esc(sheetTextOf(x.update))}")` : ''}</li>`).join('')}</ul>
+        <button class="btn btn-dark btn-sm mt-3" data-act="sheet-sync" ${perms().write ? '' : 'disabled'}>ล็อกจากชีต</button>` : ''}
     </div></section>`;
 }
 // a request this person can decide: the manager of the car's branch (dealer trades: พี่อั้ม), the executive

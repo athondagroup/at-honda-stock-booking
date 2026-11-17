@@ -123,7 +123,7 @@ async function gseSave() {
     const id = newId('locks'); if (await saveLock(id, l, 'ล็อก (match จาก Quota ในชีต)', `"${e.text}" · หมด ${fmtD(l.end)}`)) { mt++; if (l.type !== 'temp') await settleUnit(derive(), l, id); ltSheet(id, e.text, ''); }
   }
   const sh = await syncSheetLocks();
-  S.idsGs = { ...S.idsGs, saving: false, edits: null, done: `บันทึกช่องที่แก้ในชีตแล้ว ${all.length} รายการ${mt ? ` · ล็อกรถจาก Quota ${mt} คัน` : ''}${sh.made ? ` · คำขอล็อกใหม่ ${sh.made}` : ''}${sh.updated ? ` · อัปเดตคำขอ ${sh.updated}` : ''}${rel ? ` · ปล่อยล็อกที่ลบ / แก้ในชีต ${rel}` : ''}` };
+  S.idsGs = { ...S.idsGs, saving: false, edits: null, done: `บันทึกช่องที่แก้ในชีตแล้ว ${all.length} รายการ${mt ? ` · ล็อกรถจาก Quota ${mt} คัน` : ''}${sh.made ? ` · ล็อกจากชีต (ไม่ต้องอนุมัติ) ${sh.made}` : ''}${sh.updated ? ` · อนุมัติ/อัปเดตล็อกเดิม ${sh.updated}` : ''}${rel ? ` · ปล่อยล็อกที่ลบ / แก้ในชีต ${rel}` : ''}` };
   render();
 }
 Object.assign(ACTIONS, {

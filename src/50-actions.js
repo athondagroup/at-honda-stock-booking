@@ -323,7 +323,7 @@ async function saveUploads() {
   // each car's history (in / out / IDS allocation) is kept beyond the stock table that each upload replaces
   try { await carlogUpdate(sel); } catch (e) { console.error('carlog', e); }
   const lk = sel.some(r => r.src !== 'invoice') ? await lockIdsSync().catch(e => { console.error('lockids', e); return { done: 0, ask: 0 }; }) : { done: 0, ask: 0 };
-  toast(`บันทึก ${ok} ตารางแล้ว${lk.done ? ` · ล็อกสำเร็จ (IDS จัดสรรให้ลูกค้าคนเดียวกัน) ${lk.done}` : ''}${lk.ask ? ` · IDS จัดสรรรถที่มีล็อกให้คนอื่น ${lk.ask} คัน รอผู้จัดการเลือก` : ''}${sh.made || sh.updated ? ` · คำขอล็อกจากชีตใหม่ ${sh.made}${sh.updated ? ` อัปเดต ${sh.updated}` : ''} รอผู้จัดการอนุมัติ` : ''}${dv ? ` · บันทึกส่งมอบจาก DL ${dv} ใบ` : ''}`);
+  toast(`บันทึก ${ok} ตารางแล้ว${lk.done ? ` · ล็อกสำเร็จ (IDS จัดสรรให้ลูกค้าคนเดียวกัน) ${lk.done}` : ''}${lk.ask ? ` · IDS จัดสรรรถที่มีล็อกให้คนอื่น ${lk.ask} คัน รอผู้จัดการเลือก` : ''}${sh.made || sh.updated ? ` · ล็อกจากชีต (ไม่ต้องอนุมัติ) ${sh.made}${sh.updated ? ` อัปเดต ${sh.updated}` : ''} รอผู้จัดการอนุมัติ` : ''}${dv ? ` · บันทึกส่งมอบจาก DL ${dv} ใบ` : ''}`);
   render();
 }
 
