@@ -32,7 +32,7 @@ function flowOf(a, today) {
     booked: !!String(a.rec.receipt_no || '').trim(),
     fin: isCash(a.rec) || !!(f.fin && f.fin.ok),
     // IDS allocating a car to this booking (VIN in Stock / DL) counts as the allocation, so nobody presses it twice
-    assign: !!(f.assign && f.assign.vin) || !!(m && m.vin),
+    assign: !!(f.assign && f.assign.vin) || !!(m && m.vin) || !!a.logVin,
     po: !!(f.po && f.po.at),
     down: payDone(a),
     delivered: !!(f.delivered && f.delivered.date && (f.delivered.plate || f.delivered.src === 'IDS')),
@@ -292,6 +292,17 @@ function deriveNow() {
   at.forEach(a => { const mw = a.rec.multi; if (mw && mw.with) mw.with.forEach(id => { const o = atByIdM.get(id); if (o) o.multiOf = a.id; }); });
   at.forEach(a => { if (a.near) a.near.forEach(h => { h.other = h.usedBy ? atByKey.get(h.usedBy) || null : null; }); });
   const atByIds = new Map(at.filter(a => a.ids && !a.cancelled).map(a => [a.ids.key, a]));
+  // 18/11: IDS allocated a car to this booking, then both the booking and the car left the IDS files (invoiced, DL not in yet):
+  // the car log still knows the pair, so the booking keeps its car until DL comes (no car on the booking from Stock / IDS any more)
+  { const logNo = new Map();
+    if (typeof carlogAll === 'function') for (const [vin, x] of carlogAll()) { const e = x.e || {}; if (!e.out || cars.has(vin)) continue; const al = (e.al || [])[(e.al || []).length - 1]; if (al && al.no) logNo.set(String(al.no).replace(/\D/g, ''), { vin, e }); }
+    const held = new Set(at.filter(a => !a.cancelled && !a.demo).map(a => (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || (a.match && a.match.vin)).filter(Boolean));
+    if (logNo.size) for (const a of at) {
+      if (a.cancelled || a.demo || (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || (a.match && a.match.vin)) continue;
+      const nos = [a.rec.booking_no, a.no, a.idsLeft && a.idsLeft.no, a.idsGone && a.idsGone.no, ...((a.match && a.match.recs) || []).map(r => r.no)].filter(Boolean).map(x => String(x).replace(/\D/g, ''));
+      const hit = nos.map(n => logNo.get(n)).find(Boolean);
+      if (hit && !held.has(hit.vin) && !X.inv.some(i => i.vin === hit.vin)) { a.logVin = hit.vin; a.logOut = hit.e.out; held.add(hit.vin); a.flow = flowOf(a, today); }
+    } }
 
   // still no seller on a car that a web booking holds (allocated or matched): the web booking's seller (9/11)
   for (const a of at) {
@@ -496,7 +507,7 @@ function deriveNow() {
   bookings.forEach(b => { if (b.ref) bkByRef.set(b.ref, b); if (b.ws) bkByRef.set(b.ws, b); });
   // a quota whose car or booking number was taken by a web booking (allocated in the booking, or the web booking's number) is not free (9/11)
   const atByVin = new Map(), atByNo = new Map();
-  at.forEach(a => { if (a.cancelled || a.demo) return; const v = (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || (a.match && a.match.vin); if (v) atByVin.set(v, a); if (a.no) atByNo.set(String(a.no), a); });
+  at.forEach(a => { if (a.cancelled || a.demo) return; const v = (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || (a.match && a.match.vin) || a.logVin; if (v) atByVin.set(v, a); if (a.no) atByNo.set(String(a.no), a); });
   const quota = X.quota.map(q => {
     const car = (q.vin && cars.get(q.vin)) || stockByRef.get(q.ref) || null;
     const vin = q.vin || car?.vin || null;

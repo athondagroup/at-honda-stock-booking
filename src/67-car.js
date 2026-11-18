@@ -46,7 +46,8 @@ function carFull(vin, D) {
   if (!a && !ib && !o && !lg) return null;
   const src = a || ib || {};
   return fill({ vin, br: (o && (o.branch || (o.moved && o.moved.to))) || src.br || e.br || null, model: src.model || e.m || null, grade: src.grade || e.g || null, color: src.color || e.c || null, prod: e.p || null,
-    status: 'unknown', out: 'unknown', src: a || ib ? 'ไม่อยู่ในไฟล์ Stock และ DL · ข้อมูลจากใบจอง' : 'ไม่อยู่ในไฟล์ Stock และ DL · ข้อมูลจากประวัติรถ', cust: src.cust || null, bkno: ib ? ib.no : null, fromInv: true });
+    status: 'unknown', out: 'unknown', src: a || ib ? 'ไม่อยู่ในไฟล์ Stock และ DL · ข้อมูลจากใบจอง' : 'ไม่อยู่ในไฟล์ Stock และ DL · ข้อมูลจากประวัติรถ', cust: src.cust || null, bkno: ib ? ib.no : null, fromInv: true,
+    ...(a && a.logVin === vin ? { status: 'assigned', src: `ออกจากไฟล์ Stock IDS แล้ว ${a.logOut && a.logOut.d ? fmtD(a.logOut.d) : ''} · IDS จัดให้ใบจอง ${a.no || ''} ${a.cust || ''} · รอไฟล์ DL ยืนยันใบกำกับ`, cust: a.cust, bkno: a.no || null } : {}) });
 }
 function carStChip(c) { return CAR_STATUS[c.status] ? statusChip(CAR_STATUS, c.status) : chip({ removed: 'นำออกจาก Stock', unknown: 'ไม่อยู่ใน Stock' }[c.status] || c.status || '–', 'muted'); }
 // where the car went / came from: taken out, moved between branches, handed over (data kept in vehicles/<vin> and the DL file)

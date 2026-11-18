@@ -165,6 +165,7 @@ function flowPanel(m, a, D) {
   const downLate = fl.done.delivered && stepAllowed(a, 'down') && (!isSales() || fix);
   const downBody = () => (fl.done.down || payItems(a).length || can('down') || downLate) ? payBody(a, m, who, perms().write && (can('down') || downLate || (payItems(a).length > 0 && stepAllowed(a, 'down') && (!fl.done.delivered || fix)))) : '';
   const assignBody = () => {
+    if (fl.done.assign && !(f.assign && f.assign.vin) && !(a.match && a.match.vin) && a.logVin) return `<div class="text-sm text-muted">IDS จัดสรรรถ <span class="code" data-act="car-open" data-vin="${esc(a.logVin)}" style="cursor:pointer;text-decoration:underline dotted">${esc(a.logVin)}</span> ให้ใบจองนี้แล้ว · รถออกจากไฟล์ Stock IDS ${a.logOut && a.logOut.d ? fmtD(a.logOut.d) : ''} (น่าจะออกใบกำกับแล้ว) · รอไฟล์ DL ยืนยัน</div>${bkLocks(a, D)}${swapHist(a)}`;
     if (fl.done.assign && !(f.assign && f.assign.vin)) return `<div class="text-sm text-muted">IDS จัดสรรรถ <span class="code">${esc(a.match.vin)}</span> ให้ใบจองนี้แล้ว (จากไฟล์ IDS)</div>${bkLocks(a, D)}${swapHist(a)}`;
     if (fl.done.assign) { const ac = D.cars.get(f.assign.vin); return `<div class="text-sm text-muted">รถ <span class="code">${esc(f.assign.vin)}</span>${ac ? ` · ${esc(ac.br)} · ${prodPlain(ac)}` : ''} · ${who(f.assign)}</div>${swapHist(a)}`; }
     if (!can('assign') && !mgrAssign(a)) return (fl.next === 'assign' ? '<div class="text-sm text-muted">รอแอดมินหรือผู้จัดการจัดสรรรถให้</div>' : '') + bkLocks(a, D);

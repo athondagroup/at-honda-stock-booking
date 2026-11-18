@@ -146,7 +146,7 @@ function mixOf(cur, prev, key) {
 // the finance company: what the sales confirmed, the booking form, or the invoice in DL (old form bookings have none)
 function finKey(a, D) { if (isCash(a.rec)) return 'ซื้อสด'; const k0 = finKey0(a, D); return k0 === 'HLTC' && a.rec.dsp ? 'HLTC · DSP' : k0; }
 function finKey0(a, D) { const v = atVin(a), i = v && D && D.invByVin.get(v); return String((a.rec.flow && a.rec.flow.fin && a.rec.flow.fin.company) || a.rec.finance || (i && i.fin) || 'ไฟแนนซ์ (ยังไม่ระบุบริษัท)').toUpperCase(); }
-function atVin(a) { return (a.match && a.match.vin) || (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || null; }
+function atVin(a) { return (a.match && a.match.vin) || (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || a.logVin || null; }
 // รถยนต์ (28/10): what the stock tells about the cars, moved here from ยอดขาย
 function dashCars(D) {
   const A = dashAna(D, true), cars = [...D.cars.values()].filter(c => inBr(c) && !c.company);
