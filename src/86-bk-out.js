@@ -130,7 +130,7 @@ function bkOutList(u, D) {
       ${can ? ` · <button class="underline" data-act="bkout-relink" data-id="${esc(u.id)}" data-i="${i}" data-key="${esc(auto.key)}">ยืนยัน (บันทึกเลขใหม่ในใบจองและชีต)</button>` : ''}</div></div>`;
     const head = `<div class="flex flex-wrap gap-x-4 items-center">${can && open ? `<input type="checkbox" class="w-4 h-4" data-bkout="${esc(u.id)}" data-i="${i}" ${F.sel[i] ? 'checked' : ''} aria-label="เลือกใบจอง ${esc(o.no)}">` : ''}
       <span class="code">${esc(o.no)}</span><span>${esc(o.cust || '')}</span><span class="text-muted">${specLabel(o.spec)}</span><span class="text-muted">${esc(o.sales || '')}</span>
-      ${o.res ? `<span style="color:var(--good)">ทำแล้ว: ${esc(o.res.text)}</span><span class="text-xs text-muted">${fmtDT(o.res.at)} ${esc(o.res.role || '')}</span>` : `<span style="color:var(--${o.flag ? 'bad' : 'muted'})">${esc(o.why)}</span>`}</div>`;
+      ${o.res ? `<span style="color:var(--good)">ทำแล้ว: ${esc(o.res.text)}</span><span class="text-xs text-muted">${fmtDT(o.res.at)} ${esc(o.res.role || '')}</span>${can && bkOutHeld(o) && !bkOutDelivered(o) ? ` <button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="bkout-undo" data-id="${esc(u.id)}" data-i="${i}" title="กลับไปเป็นรายการต้องตรวจ เลือกจับคู่ใบ IDS ใหม่ / ยกเลิก ได้อีกครั้ง">↶ กลับมาจัดการใหม่</button>` : ''}` : `<span style="color:var(--${o.flag ? 'bad' : 'muted'})">${esc(o.why)}</span>`}</div>`;
     if (bkOutPending(o, u.br) && !a && bkOutCanGone(u.br)) return `<div class="py-2 border-t border-line">${head}<div class="mt-1 flex flex-wrap gap-2 items-center"><span class="text-xs text-muted">ตรวจใน DL แล้ว ไม่พบ (ทั้งเลขใบจองและชื่อลูกค้า) · ตรวจใน IDS แล้วเลือก: ยังจองอยู่ = กลับเข้าคิว · ยกเลิก / ไม่มีแล้ว = ปิดใบนี้ (ไม่นับคิว)</span>
       <button class="btn btn-ghost btn-sm" data-act="bkout-gone" data-id="${esc(u.id)}" data-i="${i}" data-v="still">ยังจองอยู่ (ไฟล์ไม่ครบ)</button>
       <button class="btn btn-red btn-sm" data-act="bkout-gone" data-id="${esc(u.id)}" data-i="${i}" data-v="closed">ยกเลิก / ไม่มีแล้ว</button></div></div>`;
@@ -223,6 +223,13 @@ Object.assign(ACTIONS, {
     const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !bkOutCanGone(u.br) || !bkOutPending(u.out[i])) return;
     if (await bkOutHold(el.dataset.id, [i], 'ยังเก็บใบจองไว้ ไม่ match รอกรอกฟอร์ม (รถยังผูกอยู่)')) { toast('บันทึกแล้ว: ยังเก็บใบจองไว้ รถไม่ถูกปล่อย'); render(); }
   },
+  // 18/11: a booking put on hold (รอ DL / ยังเก็บ) can come back to be matched to a new IDS booking or cancelled
+  async 'bkout-undo'(el) {
+    const id = el.dataset.id, i = Number(el.dataset.i), u0 = S.uploads.get(id); if (!u0 || !bkOutCanGone(u0.br) || !bkOutHeld(u0.out[i])) return;
+    const u = await claimFresh('uploads', id, () => true); if (!u || !u.out[i]) return;
+    const prev = u.out[i].res; const o = { ...u.out[i] }; delete o.res; o.undone = [...(o.undone || []), { text: prev && prev.text, ...actor() }]; u.out[i] = o;
+    if (await write('uploads', id, u)) { toast('กลับมาเป็นรายการต้องตรวจแล้ว · เลือกจับคู่ / ยกเลิกได้'); render(); }
+  },
   async 'bkout-wait'(el) {
     const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !bkOutCanGone(u.br) || !bkOutPending(u.out[i])) return;
     if (await bkOutHold(el.dataset.id, [i], 'แจ้งขายแล้ว รออัปเดต DL')) { toast('บันทึกแล้ว: แจ้งขายแล้ว รออัปเดต DL (ใบจองยังอยู่)'); render(); }
@@ -284,3 +291,4 @@ function bkOutCarHint(o) {
   }
   return '';
 }
+function bkOutHeld(o) { const t = (o && o.res && o.res.text) || ''; return /^แจ้งขายแล้ว รออัปเดต DL|^ยังเก็บใบจองไว้/.test(t); }
