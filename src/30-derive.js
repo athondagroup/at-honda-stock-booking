@@ -70,11 +70,11 @@ let deriveCache = null;
 function derive() {
   const key = `${S.dataV}|${S.idsV}|${todayISO()}`;
   if (deriveCache && deriveCache.key === key) return deriveCache.D;
-  const D = deriveNow();
+  const D = deriveNow(key);
   deriveCache = { key, D };
   return D;
 }
-function deriveNow() {
+function deriveNow(key) {
   const today = todayISO(), X0 = idsData(), rpFile = (S.ref.get('honda_rpt') || {}).v || {};
   const X = Object.keys(rpFile).length ? { ...X0, inv: X0.inv.map(i => invByFile(i, rpFile)) } : X0;   // invoice month = the month of Honda's campaign file (2/11)
   const invByVin = new Map();
@@ -564,6 +564,7 @@ function deriveNow() {
   const receipts = [...S.receipts.entries()].filter(([, r]) => !r.hidden).map(([id, r]) => ({ id, ...r })).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
   const D = { today, X, cars, removed, deliveredOut, locks, idsB, at, bookings, demoRows, bookingByKey, bySpec, quota, specs, sum, receipts, invByVin, idsOnly: M.idsOnly };
   D.spCars = [...Map.prototype.values.call(cars)].filter(c => c.special); S.spCount = D.spCars.length;
+  if (key) deriveCache = { key, D };   // alerts may read derive() (bookings gone from IDS, 18/11): no recursion
   D.alerts = buildAlerts(D);
   return D;
 }
