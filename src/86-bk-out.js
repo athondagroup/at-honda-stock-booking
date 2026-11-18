@@ -141,8 +141,9 @@ function bkOutList(u, D) {
     return `<div class="py-2 border-t border-line">${head}
       <div class="text-xs text-muted mt-1">ใบจองในเว็บ: ${esc(a.cust)} · ${esc(a.sales || '')} · จอง ${fmtD(a.date)} <button class="underline" data-act="at-open" data-id="${esc(a.id)}">เปิด</button></div>
       ${sug.length ? `<div class="mt-1 flex flex-wrap gap-2 items-center"><span class="text-xs">ระบบเดาว่าเปลี่ยนเป็น:</span>${sug.map(b => `<button class="btn btn-ghost btn-sm" data-act="bkout-relink" data-id="${esc(u.id)}" data-i="${i}" data-key="${esc(b.key)}" title="เปลี่ยนใบจองในเว็บให้เป็นใบนี้">${esc(b.no)} · ${esc(b.cust)} · ${esc(b.color || '')}</button>`).join('')}</div>` : '<div class="text-xs text-muted mt-1">ไม่พบใบ IDS ใหม่ที่เซลล์ สาขา และรุ่นเดียวกัน</div>'}
-      <div class="mt-1 flex flex-wrap gap-2 items-end"><div class="field"><label class="text-xs" for="bko-${i}">หรือเลือกจับคู่เอง (ใบ IDS ที่ยังไม่มีฟอร์ม สาขา ${esc(a.br)})</label><select id="bko-${i}" data-bkoutpick="${esc(u.id)}" data-i="${i}"><option value="">–</option>${all.map(b => `<option value="${esc(b.key)}" ${pick === b.key ? 'selected' : ''}>${esc(opt(b))}</option>`).join('')}</select></div>
-        <button class="btn btn-dark btn-sm" data-act="bkout-relink" data-id="${esc(u.id)}" data-i="${i}" data-key="${esc(pick)}" ${pick ? '' : 'disabled'}>แก้ไขใบจองเป็นใบนี้</button>
+      ${bkOutCarHint(o)}
+      <div class="mt-1 flex flex-wrap gap-2 items-end">${all.length ? `<div class="field"><label class="text-xs" for="bko-${i}">หรือเลือกจับคู่เอง (ใบ IDS ที่ยังไม่มีฟอร์ม ทุกสาขา)</label><select id="bko-${i}" data-bkoutpick="${esc(u.id)}" data-i="${i}"><option value="">–</option>${all.map(b => `<option value="${esc(b.key)}" ${pick === b.key ? 'selected' : ''}>${esc(opt(b))}</option>`).join('')}</select></div>
+        <button class="btn btn-dark btn-sm" data-act="bkout-relink" data-id="${esc(u.id)}" data-i="${i}" data-key="${esc(pick)}" ${pick ? '' : 'disabled'}>แก้ไขใบจองเป็นใบนี้</button>` : `<div class="text-xs text-muted w-full">ไม่มีใบ IDS ที่ยังไม่มีฟอร์มให้จับคู่ (ใบจองใน IDS ตอนนี้มีฟอร์มครบแล้ว) · ถ้าเปลี่ยนใบจอง รอให้ใบใหม่เข้า IDS ก่อน</div>`}
         <button class="btn btn-red btn-sm" data-act="bkout-cancel" data-id="${esc(u.id)}" data-i="${i}">ยกเลิกใบจอง</button>
         <button class="btn btn-ghost btn-sm" data-act="bkout-keep" data-id="${esc(u.id)}" data-i="${i}" title="ใบจองและรถยังอยู่ในเว็บ ยังไม่จับคู่กับใบ IDS ใหม่ รอกรอกฟอร์ม">ยังเก็บ · ไม่ match รอกรอกฟอร์ม</button>
         <button class="btn btn-ghost btn-sm" data-act="bkout-wait" data-id="${esc(u.id)}" data-i="${i}" title="ใบจองยังอยู่ในเว็บ ไม่ยกเลิก รอไฟล์ DL รอบหน้า">แจ้งขายแล้ว รออัปเดต DL</button></div></div>`;
@@ -272,3 +273,14 @@ function bkOutCardBox(a, D) {
   return '';
 }
 Object.assign(ACTIONS, { 'bkout-goto'(el) { navPush(); S.modal = null; S.view = 'upload'; S.filters.uplOpen = el.dataset.id; setHash(); render(); } });
+
+// the car IDS allocated to this booking, from the car history: left the stock = most likely invoiced / sold (18/11)
+function bkOutCarHint(o) {
+  const no = String(o.no || '').replace(/\D/g, ''); if (!no) return '';
+  for (const [id, d] of S.ids) if (id.startsWith('carlog_') && d && d.cars) for (const [vin, e] of Object.entries(d.cars)) {
+    if (!(e.al || []).some(x => String(x.no || '').replace(/\D/g, '') === no)) continue;
+    return e.out ? `<div class="text-xs mt-1" style="color:var(--warn)">รถที่ IDS จัดให้ใบนี้ <span class="code">${esc(vin)}</span> ออกจากสต็อกแล้ว ${fmtD(e.out.d)} (${esc(e.out.why || '')}) · น่าจะขายแล้ว กด "แจ้งขายแล้ว รออัปเดต DL"</div>`
+      : `<div class="text-xs mt-1 text-muted">รถที่ IDS จัดให้ใบนี้ <span class="code">${esc(vin)}</span> ยังอยู่ในสต็อก</div>`;
+  }
+  return '';
+}
