@@ -586,6 +586,14 @@ function buildAlerts(D) {
     if (!a.active || a.match) continue;
     const ref = asof(a.br);
     const age = ref && a.date ? daysBetween(a.date, ref) : null;
+    // 18/11: the booking had an IDS booking number and a later Booking file no longer has it = it LEFT IDS (not "not in IDS yet")
+    const bo = typeof bkOutOf === 'function' ? bkOutOf(a) : null;
+    if (bo || a.logVin) {
+      if (a.logVin || !bkOutPending(bo.o, bo.u.br)) continue;   // handled already (car allocated and left stock / a reason chosen)
+      add('atids:' + a.id, { br: a.br, roles: ['admin', 'manager'] }, 'bad', 'ใบจองออกจาก IDS แล้ว · เลือกเหตุผล',
+        `${a.cust} · ${a.model} ${gradeShort(a.model, a.grade)} ${a.color || ''} · ใบจอง IDS ${bo.o.no || ''} หายจากไฟล์ Booking ที่อัปโหลด ${fmtD(bo.u.at)} · ไม่พบใน DL · เลือก: แก้ไขเป็นใบ IDS ใหม่ / ยกเลิก / แจ้งขายแล้ว รอ DL / ยังเก็บ`, { act: 'bkout-goto', id: bo.u.id, label: 'เลือกเหตุผล' });
+      continue;
+    }
     if (age === null || age < AT_TO_IDS_DAYS) continue;
     add('atids:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin', 'manager'] }, 'bad', 'ใบจองยังไม่อยู่ใน IDS',
       `${a.cust} · ${a.model} ${gradeShort(a.model, a.grade)} ${a.color || ''} · จอง ${fmtD(a.date)} ผ่านมา ${age} วันแล้วยังไม่พบใน IDS (Booking / Stock / DL) ณ ${fmtD(ref)} เซลล์คีย์ลง IDS / แอดมินอัปเดตไฟล์ IDS${a.near && a.near.some(h => h.other) ? ' · พบชื่อลูกค้านี้ในใบจองอื่นที่ส่งมอบแล้ว ตรวจว่าซ้ำหรือไม่' : ''}`, { act: 'at-open', id: a.id });

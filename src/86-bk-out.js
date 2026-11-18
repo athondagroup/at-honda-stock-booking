@@ -292,3 +292,9 @@ function bkOutCarHint(o) {
   return '';
 }
 function bkOutHeld(o) { const t = (o && o.res && o.res.text) || ''; return /^แจ้งขายแล้ว รออัปเดต DL|^ยังเก็บใบจองไว้/.test(t); }
+// the latest Booking upload that lost this web booking's IDS booking (18/11)
+function bkOutOf(a) {
+  if (!a) return null; let best = null;
+  for (const u of S.uploads.values()) { if (!u || u.src !== 'booking' || !Array.isArray(u.out)) continue; const o = u.out.find(x => x && x.atId === a.id); if (o && (!best || String(u.at || '') > String(best.u.at || ''))) best = { u, o }; }
+  return best;
+}
