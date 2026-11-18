@@ -112,7 +112,7 @@ function bkOutWebCx(o, br) {
   return null;
 }
 function bkOutList(u, D) {
-  const can = canApproveBr(u.br) && perms().write, F = S.bkOut && S.bkOut.id === u.id ? S.bkOut : { sel: {}, pick: {} };
+  const can = bkOutCanGone(u.br), F = S.bkOut && S.bkOut.id === u.id ? S.bkOut : { sel: {}, pick: {} };
   const todo = (u.out || []).filter(o => bkOutPending(o, u.br));
   const row = (o, i) => {
     const fl = (o.flag || o.why === 'ไม่มีใบจองในเว็บ') && !o.res;   // older uploads wrote the no-web case without the flag
@@ -186,7 +186,7 @@ async function bkOutMark(id, idxs, text) {
   return write('uploads', id, u);
 }
 async function bkOutCancel(id, idxs) {
-  const u0 = S.uploads.get(id); if (!u0 || !canApproveBr(u0.br)) return;
+  const u0 = S.uploads.get(id); if (!u0 || !bkOutCanGone(u0.br)) return;
   const F = bkOutState(id), note = (F.note || '').trim() || 'ยกเลิกใน IDS';
   F.busy = true; render();
   let n = 0, sheetBad = 0; const done = [];
@@ -219,16 +219,16 @@ Object.assign(ACTIONS, {
     }
   },
   async 'bkout-keep'(el) {
-    const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !canApproveBr(u.br) || !bkOutPending(u.out[i])) return;
+    const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !bkOutCanGone(u.br) || !bkOutPending(u.out[i])) return;
     if (await bkOutHold(el.dataset.id, [i], 'ยังเก็บใบจองไว้ ไม่ match รอกรอกฟอร์ม (รถยังผูกอยู่)')) { toast('บันทึกแล้ว: ยังเก็บใบจองไว้ รถไม่ถูกปล่อย'); render(); }
   },
   async 'bkout-wait'(el) {
-    const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !canApproveBr(u.br) || !bkOutPending(u.out[i])) return;
+    const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i); if (!u || !bkOutCanGone(u.br) || !bkOutPending(u.out[i])) return;
     if (await bkOutHold(el.dataset.id, [i], 'แจ้งขายแล้ว รออัปเดต DL')) { toast('บันทึกแล้ว: แจ้งขายแล้ว รออัปเดต DL (ใบจองยังอยู่)'); render(); }
   },
   async 'bkout-wait-sel'(el) {
     const F = bkOutState(el.dataset.id), u = S.uploads.get(el.dataset.id), idxs = Object.keys(F.sel).filter(k => F.sel[k] && u && bkOutPending(u.out[Number(k)])).map(Number);
-    if (!idxs.length || !canApproveBr(u.br)) return;
+    if (!idxs.length || !bkOutCanGone(u.br)) return;
     if (await bkOutHold(el.dataset.id, idxs, 'แจ้งขายแล้ว รออัปเดต DL')) { F.sel = {}; toast(`บันทึกแล้ว ${idxs.length} ใบ: แจ้งขายแล้ว รออัปเดต DL`); render(); }
   },
   async 'bkout-other-sel'(el) {
@@ -237,7 +237,7 @@ Object.assign(ACTIONS, {
     if (await bkOutMark(el.dataset.id, idxs, `อื่น ๆ: ${note}`)) { F.sel = {}; toast(`บันทึกแล้ว ${idxs.length} ใบ`); render(); }
   },
   async 'bkout-relink'(el) {
-    const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i), o = u && u.out[i], key = el.dataset.key; if (!o || !key || !canApproveBr(u.br)) return;
+    const u = S.uploads.get(el.dataset.id), i = Number(el.dataset.i), o = u && u.out[i], key = el.dataset.key; if (!o || !key || !bkOutCanGone(u.br)) return;
     const D = derive(), a = atById(o.atId), b = D.idsOnly.find(x => x.key === key) || D.idsB.find(x => x.key === key); if (!a || !b) { toast('ไม่พบใบจองนี้แล้ว', 'bad'); return; }
     if (!confirm(`เปลี่ยนใบจองในเว็บ ${a.cust} → ${b.cust} (IDS ${b.no} ${b.model} ${b.color || ''})?`)) return;
     const res = await bkTakeIds(a, { key: b.key, name: b.cust, model: b.model, grade: b.grade, color: b.color, no: b.no }, 'แก้ไขใบจองตาม IDS ใบใหม่', true);
