@@ -275,11 +275,20 @@ function bkOutCardBox(a, D) {
       <div class="text-sm mt-1">ใบจอง IDS <span class="code">${esc(o.no || '')}</span> (${esc(u.br)}) ไม่อยู่ในไฟล์ Booking ที่อัปโหลด ${fmtD(u.at)} · ไม่พบใน DL · ยังไม่มีใบ IDS ใหม่ที่ระบบจับให้ได้</div>
       ${diff ? `<div class="text-xs text-muted">IDS เดิมเป็น ${esc(specLabelText(o.spec))} · ฟอร์มเป็น ${esc(specLabelText(specKey(a.model, a.grade, a.color)))}</div>` : ''}
       <div class="text-xs text-muted mt-1">ตรวจใน IDS ว่า: ออกเลขใบจองใหม่ (ชื่อ / สีเปลี่ยน) → "แก้ไขใบจองเป็นใบนี้" · ลูกค้ายกเลิก → "ยกเลิกใบจอง" · ขายแล้วรอ DL → "แจ้งขายแล้ว รออัปเดต DL"</div>
-      <button class="btn btn-dark btn-sm mt-2" data-act="bkout-goto" data-id="${esc(u.id)}">ไปตรวจที่รายการอัปโหลด</button></section>`;
+      <button class="btn btn-dark btn-sm mt-2" data-act="bkout-goto" data-id="${esc(u.id)}" data-q="${esc(o.no || '')}">ไปเลือกเหตุผลที่รายการนี้</button></section>`;
   }
   return '';
 }
-Object.assign(ACTIONS, { 'bkout-goto'(el) { navPush(); S.modal = null; S.view = 'upload'; S.filters.uplOpen = el.dataset.id; setHash(); render(); } });
+// 19/11: lands on that booking's row (scrolled to and highlighted), not just the upload
+Object.assign(ACTIONS, { 'bkout-goto'(el) { navPush(); S.modal = null; S.view = 'upload'; S.filters.uplOpen = el.dataset.id; { const u = S.uploads.get(el.dataset.id); if (S.br && u && u.br !== S.br) S.br = null; } setHash(); render(); bkOutFocus(el.dataset.q); } });
+function bkOutFocus(no) {
+  no = String(no || '').replace(/\D/g, ''); if (!no) return;
+  let n = 0; const go = () => {
+    const c = [...document.querySelectorAll('.code')].find(x => x.textContent.replace(/\D/g, '') === no), row = c && (c.closest('.py-2') || c.parentElement);
+    if (!row) { if (++n < 10) setTimeout(go, 150); return; }
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' }); row.classList.add('bko-hl'); setTimeout(() => row.classList.remove('bko-hl'), 4000);
+  }; setTimeout(go, 80);
+}
 
 // the car IDS allocated to this booking, from the car history: left the stock = most likely invoiced / sold (18/11)
 function bkOutCarHint(o) {

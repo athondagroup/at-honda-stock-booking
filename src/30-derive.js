@@ -596,7 +596,7 @@ function buildAlerts(D) {
     if (bo || a.logVin) {
       if (a.logVin || !bkOutPending(bo.o, bo.u.br)) continue;   // handled already (car allocated and left stock / a reason chosen)
       add('atids:' + a.id, { br: a.br, roles: ['admin', 'manager'] }, 'bad', 'ใบจองออกจาก IDS แล้ว · เลือกเหตุผล',
-        `${a.cust} · ${a.model} ${gradeShort(a.model, a.grade)} ${a.color || ''} · ใบจอง IDS ${bo.o.no || ''} หายจากไฟล์ Booking ที่อัปโหลด ${fmtD(bo.u.at)} · ไม่พบใน DL · เลือก: แก้ไขเป็นใบ IDS ใหม่ / ยกเลิก / แจ้งขายแล้ว รอ DL / ยังเก็บ`, { act: 'bkout-goto', id: bo.u.id, label: 'เลือกเหตุผล' });
+        `${a.cust} · ${a.model} ${gradeShort(a.model, a.grade)} ${a.color || ''} · ใบจอง IDS ${bo.o.no || ''} หายจากไฟล์ Booking ที่อัปโหลด ${fmtD(bo.u.at)} · ไม่พบใน DL · เลือก: แก้ไขเป็นใบ IDS ใหม่ / ยกเลิก / แจ้งขายแล้ว รอ DL / ยังเก็บ`, { act: 'bkout-goto', id: bo.u.id, q: bo.o.no || '', label: 'เลือกเหตุผล' });
       continue;
     }
     if (age === null || age < AT_TO_IDS_DAYS) continue;
@@ -656,17 +656,17 @@ function buildAlerts(D) {
     const unit = l.vin ? l.vin : `Quota ${l.ref}`;
     const cust = l.booking ? l.booking.cust || '' : l.type === 'temp' ? l.prospect || '' : l.dealer_name || '';
     if (l.idsAsk && ['pending', 'approved', 'allocated'].includes(l.status)) add('idsask:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'bad', 'IDS จัดสรรรถที่มีล็อกให้ลูกค้าชื่ออื่น',
-      `${unit} · ล็อกให้ ${cust || '–'} (${who || ''}) · IDS จัดสรรให้ ${l.idsInfo.cust || '–'}${l.idsInfo.no ? ' ใบจอง ' + l.idsInfo.no : ''} · ผู้จัดการเลือกใบจองที่ตรง`, { act: 'go', view: 'lock', sub: 'active' });
+      `${unit} · ล็อกให้ ${cust || '–'} (${who || ''}) · IDS จัดสรรให้ ${l.idsInfo.cust || '–'}${l.idsInfo.no ? ' ใบจอง ' + l.idsInfo.no : ''} · ผู้จัดการเลือกใบจองที่ตรง`, { act: 'lock-goto', id: l.id, q: 'list', label: 'เลือกใบจองที่ตรง' });
     // IDS allocated this car to another deal (or it is sold / invoiced): the request or lock here must be closed
     if (l.idsTook && !l.idsTook.same && ['pending', 'approved'].includes(l.status)) {
       const t = l.idsTook, why = t.st === 'booked' ? `IDS จัดสรรให้ใบจอง ${t.no || ''}${t.cust ? ' ' + t.cust : ''} แล้ว` : `ส่งมอบแล้ว${t.cust ? ' ให้ ' + t.cust : ''}`;
       add('idstook:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'bad', `${l.status === 'pending' ? 'คำขอล็อก' : 'ล็อก'}ใช้ไม่ได้แล้ว: ${why}`,
-        `${unit} · ${specLabelText(l.spec)} · ${cust} · เซลล์ ${who || l.sales_nick || ''} · ผู้จัดการกด${l.status === 'pending' ? 'ไม่อนุมัติ' : 'ปล่อยล็อก'}เพื่อปิดรายการ`, { act: 'go', view: 'lock', sub: l.status === 'pending' ? 'approve' : 'active' });
+        `${unit} · ${specLabelText(l.spec)} · ${cust} · เซลล์ ${who || l.sales_nick || ''} · ผู้จัดการกด${l.status === 'pending' ? 'ไม่อนุมัติ' : 'ปล่อยล็อก'}เพื่อปิดรายการ`, { act: 'lock-goto', id: l.id });
       continue;
     }
     { const so = lockSpecOff(l, D); if (so) add('lkspec:' + l.id, { br: l.bk_br || (so.a && so.a.br) || l.car_br, roles: ['admin', 'manager'] }, 'warn', `ล็อกข้ามสเปก · แก้ไขใบจอง${so.ids ? 'ใน IDS' : ''}เป็นสเปกของรถ`,
       `${(so.a && so.a.cust) || so.b.cust || ''} · ${l.vin || 'Quota ' + (l.ref || '')} · ${specOffText(so)}`, so.a ? { act: 'at-open', id: so.a.id, label: 'เปิดใบจอง' } : null); }
-    if (l.status === 'pending' && !l.idsTook) add('lockp:' + l.id, { br, roles: ['manager'] }, 'warn', l.type === 'temp' ? 'ขอล็อกชั่วคราว รออนุมัติ' : l.type === 'dealer' ? 'ขอล็อกแลก/ขายดีลเลอร์ รออนุมัติ' : 'ขอล็อกให้ใบจอง รออนุมัติ', `${unit} · ${specLabelText(l.spec)} · ${who || l.sales_nick || ''}${l.sheet_text || l.imported ? ' · จากชีต Stock' : ''}`, { act: 'go', view: 'lock', sub: 'approve' });
+    if (l.status === 'pending' && !l.idsTook) add('lockp:' + l.id, { br, roles: ['manager'] }, 'warn', l.type === 'temp' ? 'ขอล็อกชั่วคราว รออนุมัติ' : l.type === 'dealer' ? 'ขอล็อกแลก/ขายดีลเลอร์ รออนุมัติ' : 'ขอล็อกให้ใบจอง รออนุมัติ', `${unit} · ${specLabelText(l.spec)} · ${who || l.sales_nick || ''}${l.sheet_text || l.imported ? ' · จากชีต Stock' : ''}`, { act: 'lock-goto', id: l.id });
     // the last day of a 15-day lock: the manager extends or releases; no update = the queue is released on releaseOn
     if (l.over && l.live) add(`lkage:${l.id}:${Math.floor((l.over - 1) / 7)}`, { sales: who, br, roles: ['sales', 'manager'] }, 'warn', `ล็อกค้างมา ${l.heldDays} วัน · ตรวจว่ายังใช้คันนี้ไหม`,
       `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · เซลล์ ${who || '–'} · เกินกำหนด ${l.days || ''} วันมา ${l.over} วัน · ยังใช้: ไม่ต้องทำอะไร · ไม่ใช้แล้ว: ปล่อยล็อก`, l.vin ? { act: 'xfer-open', id: l.vin, label: 'เปิดรถ' } : { act: 'go', view: 'lock', sub: 'active', label: 'ดูล็อก' });
@@ -675,16 +675,16 @@ function buildAlerts(D) {
     // a manager locked a car of another branch (2/11): the owner branch is told and may release it (with a reason); the asking branch is told when it is released
     if (l.req_br && l.req_br !== l.car_br) {
       if (['approved', 'allocated'].includes(l.status)) add('lockc:' + l.id, { br: l.car_br, roles: ['admin', 'manager'] }, 'warn', `รถของสาขา ${l.car_br} ถูกผู้จัดการสาขา ${l.req_br} ล็อกแล้ว`,
-        `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · ${l.status === 'approved' ? `ล็อกถึง ${fmtD(l.end)} · ` : ''}ไม่ว่างแล้ว · ผู้จัดการสาขา ${l.car_br} ปลดล็อกได้ (ต้องใส่เหตุผล)`, { act: 'go', view: 'lock', sub: 'active', label: 'ดู / ปลดล็อก' });
+        `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · ${l.status === 'approved' ? `ล็อกถึง ${fmtD(l.end)} · ` : ''}ไม่ว่างแล้ว · ผู้จัดการสาขา ${l.car_br} ปลดล็อกได้ (ต้องใส่เหตุผล)`, { act: 'lock-goto', id: l.id, label: 'ดู / ปลดล็อก' });
       if (l.status === 'released' && l.rel && !l.rel.self && daysBetween(l.rel.at.slice(0, 10), today) <= 7) add('lockrel:' + l.id, { br: l.req_br, roles: ['admin', 'manager'] }, 'bad', `ล็อกรถสาขา ${l.car_br} ที่สาขาคุณขอไว้ ถูกปลดแล้ว`,
-        `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · เหตุผล: ${l.rel.reason || '–'}`, { act: 'go', view: 'lock', sub: 'active', label: 'ดู' });
+        `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · เหตุผล: ${l.rel.reason || '–'}`, { act: 'lock-goto', id: l.id, label: 'ดู' });
     }
     if (l.finDue) add('lockf:' + l.id, { sales: who, br, roles: ['sales'] }, 'warn', 'ครบ 15 วัน อัปเดตสถานะไฟแนนซ์', `${unit} · ${cust} · ผู้จัดการต้องต่อล็อกภายใน ${fmtD(addDays(l.releaseOn, -1))} ไม่งั้นระบบปล่อยคิว`, l.booking && l.booking.app ? { act: 'at-open', id: l.booking.app.id } : null);
     else if (!l.mgrDue && l.status === 'approved' && !l.hold && l.live && l.daysLeft !== null && l.daysLeft <= 2 && l.daysLeft >= 0) add('locke:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'warn', `ล็อกจะหมดใน ${l.daysLeft} วัน`, `${unit} · ${l.type === 'temp' ? 'ลูกค้าที่จะมาจอง ' + (l.prospect || '') : cust}`, { act: 'go', view: 'lock', sub: 'active' });
     if (l.autoReleased && daysBetween(l.releaseOn, today) <= 3) add('lockr:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'muted', `ปล่อยคิวแล้ว: ครบ ${l.days} วัน ผู้จัดการไม่ได้ต่อ`, `${unit} · ${cust} · รถกลับเป็นว่าง ต้องการรถคันนี้ให้ขอล็อกใหม่`, { act: 'go', view: 'lock', sub: 'active' });
     if (l.type === 'temp' && l.status === 'bumped' && l.bumped_at && daysBetween(l.bumped_at.slice(0, 10), today) <= 3)
       add('lockb:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'bad', 'มีคนจองรถคันนี้ไปก่อนแล้ว',
-        `${unit} ที่${l.prospect ? ` ${l.owner || ''} ล็อกชั่วคราวไว้ให้ ${l.prospect}` : 'ล็อกชั่วคราวไว้'} ถูกล็อกให้ใบจองของ ${l.bumped_by || ''} ล็อกชั่วคราวถูกปล่อยแล้ว`, { act: 'go', view: 'lock', sub: 'history' });
+        `${unit} ที่${l.prospect ? ` ${l.owner || ''} ล็อกชั่วคราวไว้ให้ ${l.prospect}` : 'ล็อกชั่วคราวไว้'} ถูกล็อกให้ใบจองของ ${l.bumped_by || ''} ล็อกชั่วคราวถูกปล่อยแล้ว`, { act: 'lock-goto', id: l.id });
     if (l.type === 'temp' && (l.status === 'pending' || l.status === 'approved') && (l.bumped || l.challenged)) {
       const h = l.bumped || l.challenged;
       add('lockb:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'bad', l.bumped ? 'มีคนจองรถคันนี้ไปก่อนแล้ว' : 'มีคนแนบใบจองขอรถคันนี้ก่อน',

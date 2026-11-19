@@ -257,7 +257,7 @@ async function ltApproveChange(id) {
 function ltNotices(D, add) {
   for (const l of D.locks) {
     if (l.typed && l.live && l.sheet_sync && l.sheet_sync.conflict) add('ltconf:' + l.id, { br: l.car_br, roles: ['manager'] }, 'bad', 'ชื่อในชีตไม่ตรงกับล็อกในเว็บ · ไม่ได้เขียนทับ',
-      `${l.vin || 'Quota ' + (l.ref || '')} · เว็บล็อก "${ltTextOf(l)}" · ชีตมี "${l.sheet_sync.current || ''}" · ตัดสินที่ช่องล็อก (เขียนทับ หรือ แก้ / ปล่อยล็อกในเว็บ)`, { act: 'go', view: l.vin ? 'stock' : 'quota', label: 'ดู' });
+      `${l.vin || 'Quota ' + (l.ref || '')} · เว็บล็อก "${ltTextOf(l)}" · ชีตมี "${l.sheet_sync.current || ''}" · ตัดสินที่ช่องล็อก (เขียนทับ หรือ แก้ / ปล่อยล็อกในเว็บ)`, { act: 'lock-goto', id: l.id, label: 'ดู' });
     const owner = l.owner || l.sales || null, unit = l.vin || ('Quota ' + (l.ref || '')), cust = (l.booking && l.booking.cust) || l.prospect || l.dealer_name || '';
     const evs = [...(l.notices || [])];
     if (l.typed && (l.expired || l.autoReleased) && l.end) evs.push({ k: 'exp', at: l.end + 'T23:59:00.000Z', by: null });
