@@ -21,7 +21,7 @@ function carSheetSt(c, D) {
   if (!sheet || (sy && sy.error)) return { k: 'wait', web, why: sy && sy.error ? 'เขียนไม่สำเร็จ · ลองใหม่อัตโนมัติ' : 'ยังไม่ได้เขียนลงชีต', l, readAt };
   return { k: 'bad', web, sheet, l, readAt };
 }
-const SHEET_ST = { ok: ['✓ ตรงกับชีต', 'good'], wait: ['⏳ รอเขียนลงชีต', 'neutral'], bad: ['⚠ ไม่ตรง', 'bad'] };
+var SHEET_ST = { ok: ['✓ ตรงกับชีต', 'good'], wait: ['⏳ รอเขียนลงชีต', 'neutral'], bad: ['⚠ ไม่ตรง', 'bad'] };
 function sheetStCell(c, D) {
   const s = carSheetSt(c, D); if (!s) return '<span class="text-xs text-muted">–</span>';
   const can = typeof ltCan === 'function' && ltCan(), q = x => `"${esc(x || '')}"`;

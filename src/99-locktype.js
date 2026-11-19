@@ -132,8 +132,9 @@ function ltRetry(D) {
     ltRetried.add(l.id); ltSheet(l.id, ltTextOf(l), '', false, true);
   }
 }
+function ltAllLoaded() { return !!S.colsLoaded && COLS.every(c => S.colsLoaded.has(c)); }
 function ltSweep(D) {
-  if (!ltCan() || !window.__WEB) return;
+  if (!ltCan() || !window.__WEB || !ltAllLoaded()) return;
   ltRetry(D);
   ltReplacedSweep(D);
   for (const l of D.locks) if (l.bkFix && !(ltAutoTried = ltAutoTried || new Set()).has('bk:' + l.id)) { ltAutoTried.add('bk:' + l.id); ltSaveBkFix(l); }
@@ -338,7 +339,7 @@ async function ltReplacedSweep(D) {
 // The cell must still be what the web last read (empty, or the same text): anything else is left for a person (⚠ ไม่ตรง).
 var ltAutoTried;
 async function ltAutoSheet(id) {
-  if (!window.__WEB) return;
+  if (!window.__WEB || !ltAllLoaded()) return;
   const D = derive(), l = D.locks.find(x => x.id === id); if (!l || l.typed || !l.live || l.sheet_sync || !['approved', 'allocated'].includes(l.status)) return;
   const c = l.vin ? D.cars.get(l.vin) : null; if (l.vin && !(c && c.src === 'IDS')) return;
   if (c && (c.bkno || c.bk)) return;   // IDS already gives the car to a booking: the sheet shows that

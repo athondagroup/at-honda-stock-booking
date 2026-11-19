@@ -358,7 +358,7 @@ function deriveNow(key) {
   for (const l of locks) {
     l.type = l.type === 'customer' ? 'booking' : (l.type || 'booking');
     // 19/11: a "dealer" lock whose name is a booking number was meant for that booking (typed "5101138052"): read it as the booking's lock
-    if (l.type === 'dealer' && /^\d{8,12}$/.test(String(l.dealer_name || '').replace(/\s/g, ''))) { const no = String(l.dealer_name).replace(/\D/g, ''), b = bookings.find(x => String(x.no || '').replace(/\D/g, '') === no && x.state !== 'cancel');
+    if (l.type === 'dealer' && ['approved', 'allocated', 'pending'].includes(l.status) && /^\d{8,12}$/.test(String(l.dealer_name || '').replace(/\s/g, ''))) { const no = String(l.dealer_name).replace(/\D/g, ''), b = bookings.find(x => String(x.no || '').replace(/\D/g, '') === no && x.state !== 'cancel');
       if (b) { l.bkFix = { from: 'dealer', no }; l.type = 'booking'; l.bkref = b.app ? b.app.key : b.key; l.bk_br = b.br || l.bk_br || null; l.dealer_name = null; } }
     // a request read from the Stock sheet before the nickname was known: match the nickname again with today's list
     // (or the sales came from the matched booking): the old "ยังไม่รู้ว่า … คือเซลล์คนไหน" warning no longer applies
@@ -877,6 +877,7 @@ async function connect() {
     if (S.mode !== 'readonly') S.mode = 'shared';
     COLS.forEach(col => db.collection(col).onSnapshot(snap => {
       S[col] = new Map(snap.docs.map(d => [d.id, d.data()]));
+      (S.colsLoaded = S.colsLoaded || new Set()).add(col);   // 19/11: sweeps that write wait until every collection has arrived once
       if (col === 'ids') S.idsV++;
       S.dataV++;
       if (col === 'ids' && !S.seedTried && typeof carlogSeed === 'function') { S.seedTried = true; setTimeout(() => carlogSeed().catch(e => console.error('carlog seed', e)).then(() => perms().approve && perms().write && typeof lockIdsSync === 'function' ? lockIdsSync() : null).then(r => { if (r && (r.done || r.ask)) { toast(`ล็อกที่ IDS จัดสรรแล้ว: สำเร็จ ${r.done} · รอเลือกใบจอง ${r.ask}`); render(); } }).catch(e => console.error('lockids', e)), 6000); }
