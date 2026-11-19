@@ -384,7 +384,9 @@ function deriveNow(key) {
     l.releaseOn = due && l.type !== 'temp' ? addDays(l.end, MGR_GRACE + 1) : null;
     l.live = l.status === 'pending' || l.status === 'allocated' || (l.status === 'approved' && !l.autoReleased && !l.expired);
     // IDS has allocated this car / slot: our lock steps aside (the same deal = done, another deal = a manager closes it)
-    if (['pending', 'approved', 'allocated'].includes(l.status)) {
+    // 19/11: a car invoiced as an Advance with no real customer is free to sell: its invoice name is not a buyer, a lock on it never conflicts
+    const advFree = (() => { if (!l.vin) return false; const ar = advRec(l.vin), i = invByVin.get(l.vin); return !!(ar && i && !i.ddate && advInvNo(ar.inv) === advInvNo(i.inv)); })();
+    if (['pending', 'approved', 'allocated'].includes(l.status) && !advFree) {
       const gone = l.vin ? outByVin.get(l.vin) : null;
       const car = l.vin && !gone ? cars.get(l.vin) : null;
       const qb = !l.vin && l.ref ? idsRefBk.get(l.ref) : null;
