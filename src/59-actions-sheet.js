@@ -53,7 +53,11 @@ Object.assign(ACTIONS, {
       if (!b) { toast('ไม่พบใบจองนี้แล้ว', 'bad'); return; }
       if (c && c.hasCar) { toast('ใบจองนี้มีรถคันอื่นแล้ว เลือกใบอื่น', 'bad'); return; }
       const a = c ? c.a : b.app;
-      set = { type: 'booking', bkref: pick, bk_br: (a && a.br) || b.br || null, sales: (a && a.sales) || b.owner || L.sales || null, dealer_name: null };
+      set = { type: 'booking', bkref: pick, bk_br: (a && a.br) || b.br || null, sales: (a && a.sales) || b.owner || L.sales || null, dealer_name: null, spec_off: null };
+      // 19/11: another spec is allowed with a reason; the branch admin then edits the booking to the car's spec
+      const bs = (a && a.spec) || b.spec;
+      if (bs && bs !== L.spec) { const why = String(m.why || '').trim(); if (!why) { toast('สเปกไม่ตรง ใส่เหตุผลที่ล็อกข้ามสเปก', 'bad'); $('#lb-why')?.focus(); return; }
+        set.spec_off = { bk: bs, car: L.spec, why, at: new Date().toISOString(), by: roleLabel() }; }
       label = `ใบจอง ${b.no || ''} ${(a && a.cust) || b.cust || ''}`.trim();
     }
     const cur = await claimFresh('locks', m.id, x => x.status === 'pending');

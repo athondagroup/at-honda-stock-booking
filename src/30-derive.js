@@ -660,6 +660,8 @@ function buildAlerts(D) {
         `${unit} · ${specLabelText(l.spec)} · ${cust} · เซลล์ ${who || l.sales_nick || ''} · ผู้จัดการกด${l.status === 'pending' ? 'ไม่อนุมัติ' : 'ปล่อยล็อก'}เพื่อปิดรายการ`, { act: 'go', view: 'lock', sub: l.status === 'pending' ? 'approve' : 'active' });
       continue;
     }
+    { const so = lockSpecOff(l, D); if (so) add('lkspec:' + l.id, { br: l.bk_br || (so.a && so.a.br) || l.car_br, roles: ['admin', 'manager'] }, 'warn', `ล็อกข้ามสเปก · แก้ไขใบจอง${so.ids ? 'ใน IDS' : ''}เป็นสเปกของรถ`,
+      `${(so.a && so.a.cust) || so.b.cust || ''} · ${l.vin || 'Quota ' + (l.ref || '')} · ${specOffText(so)}`, so.a ? { act: 'at-open', id: so.a.id, label: 'เปิดใบจอง' } : null); }
     if (l.status === 'pending' && !l.idsTook) add('lockp:' + l.id, { br, roles: ['manager'] }, 'warn', l.type === 'temp' ? 'ขอล็อกชั่วคราว รออนุมัติ' : l.type === 'dealer' ? 'ขอล็อกแลก/ขายดีลเลอร์ รออนุมัติ' : 'ขอล็อกให้ใบจอง รออนุมัติ', `${unit} · ${specLabelText(l.spec)} · ${who || l.sales_nick || ''}${l.sheet_text || l.imported ? ' · จากชีต Stock' : ''}`, { act: 'go', view: 'lock', sub: 'approve' });
     // the last day of a 15-day lock: the manager extends or releases; no update = the queue is released on releaseOn
     if (l.mgrDue) add('lockx:' + l.id, { br, roles: ['manager'] }, 'warn', `ครบ ${l.days} วันแล้ว${l.finWait ? ' ไฟแนนซ์ยังไม่ผ่าน' : ''} ต่อล็อกหรือปล่อย`,

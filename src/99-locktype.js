@@ -57,6 +57,10 @@ function ltDrop(c, D) {
     ? it('temp', `＋ ล็อกชั่วคราว "${esc(q)}"`, `ยังไม่มีใบจอง · เซลล์ ${p.sales ? esc(p.sales) : `<span style="color:var(--warn)">ยังไม่รู้ว่า "${esc(p.who)}" คือใคร</span>`}${p.cust ? ` · ลูกค้า ${esc(p.cust)}` : ''} · ${LOCK_DAYS_BY.temp} วัน`)
     : `<div class="lt-hint">ยังไม่มีใบจอง: พิมพ์ "ชื่อเล่นเซลล์ / ชื่อลูกค้า" เช่น "มด / เปิ้ล" (ล็อก ${LOCK_DAYS_BY.temp} วัน)</div>`;
   const dealer = it('dealer', `＋ ขาย / แลกดีลเลอร์ "${esc(p.kind === 'dealer' ? p.dealer : q)}"`, `ไม่มีชื่อลูกค้า · ${LOCK_DAYS_BY.dealer} วัน`);
+  if (t.specAsk) { const a = t.specAsk; return `<div class="lt-drop" role="dialog"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>
+    <div class="lt-hint" style="color:var(--warn)">⚠ สเปกไม่ตรง: ใบจองเป็น <b>${esc(specLabelText(a.bk))}</b> · รถเป็น <b>${esc(specLabelText(c.spec))}</b><br>ล็อกได้ แต่ต้องใส่เหตุผล แล้วแอดมินสาขาต้องแก้ไขใบจองเป็นสเปกของรถคันนี้</div>
+    <div style="padding:6px 10px"><input id="lt-why" class="lt-in" style="width:100%" placeholder="เหตุผล เช่น ลูกค้าเปลี่ยนเป็นรุ่นนี้"></div>
+    <div style="padding:0 10px 8px;display:flex;gap:6px"><button class="btn btn-red btn-sm" data-act="lt-pick" data-vin="${esc(ltKey(c))}" data-k="${esc(a.k)}" data-why="1">ล็อกข้ามสเปก</button><button class="btn btn-ghost btn-sm" data-act="lt-specback">เลือกใบอื่น</button></div></div>`; }
   if (!q) return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${rows ? `<div class="lt-hint">ใบจองสเปกนี้ที่ยังไม่มีรถ (พิมพ์ชื่อ / เลขใบจอง / เซลล์ เพื่อหาใบอื่น)</div>${rows}` : (ltDemoCar(c) ? '<div class="lt-hint">รถบริษัท (Demo): ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo" · พิมพ์ชื่อลูกค้า / เลขใบจอง</div>' : `<div class="lt-hint">ไม่มีใบจองสเปกนี้รอรถ · พิมพ์ชื่อลูกค้า / เลขใบจอง หรือ "ชื่อเล่นเซลล์ / ชื่อลูกค้า"</div>`)}</div>`;
   return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${t.mode === 'ask' ? '<div class="lt-hint">ขอแก้ล็อกของคนอื่น: คนที่ล็อกไว้ต้องอนุมัติก่อน ล็อกเดิมยังอยู่</div>' : ''}
     ${rows ? `<div class="lt-hint">ใบจองที่ยังไม่มีรถ · สเปกตรงกันขึ้นก่อน</div>${rows}` : `<div class="lt-hint">ไม่พบใบจองที่ตรงกับ "${esc(q)}"</div>`}${ltDemoCar(c) ? '<div class="lt-hint">รถบริษัท (Demo): ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo"</div>' : temp + dealer}</div>`;
@@ -76,7 +80,8 @@ function ltCell(c, D, p) {
   const req = !L ? ltLocks(c, D).find(l => l.status === 'pending' && !l.replaces) : null;
   if (req) return `<div class="lt-cell"><span class="lt-txt" title="${esc(lockLabel(req))}">${esc(ltTextOf(req))}</span> <span class="chip" style="background:var(--warn-bg, #fef3c7);color:var(--warn)">รอผู้จัดการอนุมัติ</span>${isMgrRole() ? ` <button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="go" data-view="lock" data-sub="approve">ไปอนุมัติ</button>` : ''}${askTxt}</div>`;
   if (!L) return `<div class="lt-cell"><input class="lt-in idle" data-lt-open="${esc(ltKey(c))}" placeholder="พิมพ์ชื่อลูกค้า / เลขใบจอง" readonly>${gone ? `<div class="text-xs"><button class="underline" style="color:var(--accent, #2563eb)" data-act="lt-undo" data-id="${esc(gone.id)}" title="ปล่อยไปเมื่อ ${fmtDT(gone.rel.at)}">↶ ย้อนกลับ "${esc(ltTextOf(gone))}"</button></div>` : ''}</div>`;
-  const txt = `<span class="lt-txt" title="${esc(lockLabel(L))}">${esc(ltTextOf(L))}</span>`;
+  const so = lockSpecOff(L, D);
+  const txt = `<span class="lt-txt" title="${esc(lockLabel(L))}">${esc(ltTextOf(L))}</span>${so ? ` <span class="chip" style="background:var(--warn-bg,#fef3c7);color:var(--warn)" title="${esc(specOffText(so))}">ข้ามสเปก</span>` : ''}`;
   const own = ltMine(L);
   return `<div class="lt-cell">${txt} ${own
     ? `<button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="lt-edit" data-vin="${esc(ltKey(c))}">แก้</button> · <button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="lt-release" data-id="${esc(L.id)}">ปล่อย</button>`
@@ -162,7 +167,7 @@ new MutationObserver(() => ltPlace()).observe(document.documentElement, { childL
 window.addEventListener('scroll', ltPlace, true); window.addEventListener('resize', ltPlace);
 document.addEventListener('input', ev => {
   const t = ev.target; if (!t || !t.dataset || !t.dataset.lt || !S.lt) return;
-  S.lt.q = t.value; render();
+  S.lt.q = t.value; S.lt.specAsk = null; render();
 });
 document.addEventListener('focusin', ev => {
   const t = ev.target; if (!t || !t.dataset || !t.dataset.ltOpen) return;
@@ -178,6 +183,7 @@ Object.assign(ACTIONS, {
   'lt-cancel'() { S.lt = null; render(); },
   'lt-edit'(el) { const D = derive(), c = ltUnit(el.dataset.vin, D), L = c && ltLockOf(c, D); if (!L) return; S.lt = { vin: ltKey(c), q: '', mode: 'edit', old: L.id }; render(); setTimeout(() => { const i = document.getElementById('lt-in'); if (i) i.focus(); }, 0); },
   'lt-ask'(el) { const D = derive(), c = ltUnit(el.dataset.vin, D), L = c && ltLockOf(c, D); if (!L) return; S.lt = { vin: ltKey(c), q: '', mode: 'ask', old: L.id }; render(); setTimeout(() => { const i = document.getElementById('lt-in'); if (i) i.focus(); }, 0); },
+  'lt-specback'() { if (S.lt) { S.lt = { ...S.lt, specAsk: null }; render(); } },
   async 'lt-pick'(el) {
     if (!ltCan()) { toast('พิมพ์ล็อกได้เฉพาะผู้จัดการและผู้บริหาร', 'bad'); return; }
     const D = derive(), c = ltUnit(el.dataset.vin, D), t = S.lt || {}, k = el.dataset.k, q = String(t.q || '').trim();
@@ -190,6 +196,12 @@ Object.assign(ACTIONS, {
     const l = ltNew(c, D, k, q, ask ? { status: 'pending', start: null, end: null, approved_at: null, replaces: t.old, approver: old.typed_by || old.requested_by || null, approver_role: old.requested_role || null, notices: [] }
       : old ? { replaced: t.old } : null);
     if (!l) { toast('ไม่พบใบจองนี้', 'bad'); return; }
+    // 19/11: a booking of another spec may be locked, with a reason; the branch admin then edits the booking to this spec
+    if (l.type === 'booking' && !ask) { const bb = D.bookings.find(b => b.key === k || (b.app && b.app.key === k));
+      if (bb && bb.spec && bb.spec !== c.spec) {
+        if (!el.dataset.why) { S.lt = { ...t, specAsk: { k, bk: bb.spec } }; render(); setTimeout(() => $('#lt-why')?.focus(), 0); return; }
+        const why = String(($('#lt-why') || {}).value || '').trim(); if (!why) { toast('ใส่เหตุผลที่ล็อกข้ามสเปก', 'bad'); $('#lt-why')?.focus(); return; }
+        l.spec_off = { bk: bb.spec, car: c.spec, why, at: new Date().toISOString(), by: roleLabel() }; } }
     if (l.type === 'temp' && !l.sales && !l.prospect) { toast('พิมพ์ "ชื่อเล่นเซลล์ / ชื่อลูกค้า"', 'bad'); return; }
     const id = newId('locks');
     if (ask) {
@@ -284,3 +296,18 @@ Object.assign(ACTIONS, {
     }
   }
 });
+
+// 19/11: a live booking lock whose car is another spec than the booking (locked across specs with a reason, or older picks):
+// the branch admin must edit the booking (in IDS when the booking is in IDS) to the car's spec; resolves itself when the specs agree
+function lockSpecOff(l, D) {
+  if (!l || !l.live || l.type !== 'booking' || !l.bkref || !l.spec) return null;
+  const b = D.bookingByKey.get(l.bkref); if (!b) return null;
+  const a = b.app || D.at.find(x => x.key === l.bkref) || null, bs = (a && a.spec) || b.spec;
+  if (!bs || bs === l.spec || (a && a.cancelled)) return null;
+  return { bk: bs, car: l.spec, why: (l.spec_off && l.spec_off.why) || null, by: l.spec_off && l.spec_off.by, a, b, ids: !!((a && a.match) || b.no) };
+}
+function specOffText(o) { return `ใบจองเป็น ${specLabelText(o.bk)} · รถเป็น ${specLabelText(o.car)}${o.why ? ` · เหตุผล: ${o.why}` : ' · ไม่ได้ใส่เหตุผล'}`; }
+function bkSpecOffBox(a, D) {
+  const l = D.locks.find(x => x.live && x.type === 'booking' && (x.bkref === a.key || x.bkref === 'app:' + a.id)); const o = l && lockSpecOff(l, D); if (!o) return '';
+  return `<div class="mt-2 p-3 rounded-lg" style="background:var(--warn-bg,#fef3c7);color:var(--warn)"><b>⚠ ล็อกข้ามสเปก</b> · ${esc(l.vin || 'Quota ' + (l.ref || ''))}<br><span class="text-sm">${esc(specOffText(o))}</span><br><span class="text-sm">แอดมินสาขา: แก้ไขใบจอง${o.ids ? 'ใน IDS (และฟอร์ม)' : ''}เป็นสเปกของรถ · หรือปล่อยล็อกถ้าล็อกผิดคัน</span></div>`;
+}
