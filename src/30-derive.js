@@ -378,12 +378,11 @@ function deriveNow(key) {
     // 15-day locks (booking, dealer): on the last day the manager is alerted to extend or release;
     // with no update from the manager by MGR_GRACE days after that, the queue is released by itself.
     // Temporary locks (7 days) simply end.
-    l.mgrDue = due && l.type !== 'temp' && l.daysLeft <= 0 && l.daysLeft >= -MGR_GRACE;
-    l.autoReleased = due && l.type !== 'temp' && l.daysLeft < -MGR_GRACE;
-    l.expired = due && l.type === 'temp' && l.daysLeft < 0;
-    l.finDue = l.mgrDue && l.finWait;
-    l.needExt = l.mgrDue;
-    l.releaseOn = due && l.type !== 'temp' ? addDays(l.end, MGR_GRACE + 1) : null;
+    // 19/11: a lock never runs out by itself and needs no extending: past its days it stays, and the manager / sales are asked
+    // once a week whether the car is still needed (l.over = days past the lock's days)
+    l.mgrDue = false; l.autoReleased = false; l.expired = false; l.finDue = false; l.needExt = false; l.releaseOn = null;
+    l.over = due && l.daysLeft < 0 ? -l.daysLeft : 0;
+    l.heldDays = l.status === 'approved' && l.start ? daysBetween(l.start, today) : null;
     l.live = l.status === 'pending' || l.status === 'allocated' || (l.status === 'approved' && !l.autoReleased && !l.expired);
     if (l.live && replacedBy.has(l.id)) l.live = false;   // a newer typed lock replaced it (its release is on the way, 19/11)
     // IDS has allocated this car / slot: our lock steps aside (the same deal = done, another deal = a manager closes it)
@@ -669,6 +668,8 @@ function buildAlerts(D) {
       `${(so.a && so.a.cust) || so.b.cust || ''} · ${l.vin || 'Quota ' + (l.ref || '')} · ${specOffText(so)}`, so.a ? { act: 'at-open', id: so.a.id, label: 'เปิดใบจอง' } : null); }
     if (l.status === 'pending' && !l.idsTook) add('lockp:' + l.id, { br, roles: ['manager'] }, 'warn', l.type === 'temp' ? 'ขอล็อกชั่วคราว รออนุมัติ' : l.type === 'dealer' ? 'ขอล็อกแลก/ขายดีลเลอร์ รออนุมัติ' : 'ขอล็อกให้ใบจอง รออนุมัติ', `${unit} · ${specLabelText(l.spec)} · ${who || l.sales_nick || ''}${l.sheet_text || l.imported ? ' · จากชีต Stock' : ''}`, { act: 'go', view: 'lock', sub: 'approve' });
     // the last day of a 15-day lock: the manager extends or releases; no update = the queue is released on releaseOn
+    if (l.over && l.live) add(`lkage:${l.id}:${Math.floor((l.over - 1) / 7)}`, { sales: who, br, roles: ['sales', 'manager'] }, 'warn', `ล็อกค้างมา ${l.heldDays} วัน · ตรวจว่ายังใช้คันนี้ไหม`,
+      `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · เซลล์ ${who || '–'} · เกินกำหนด ${l.days || ''} วันมา ${l.over} วัน · ยังใช้: ไม่ต้องทำอะไร · ไม่ใช้แล้ว: ปล่อยล็อก`, l.vin ? { act: 'xfer-open', id: l.vin, label: 'เปิดรถ' } : { act: 'go', view: 'lock', sub: 'active', label: 'ดูล็อก' });
     if (l.mgrDue) add('lockx:' + l.id, { br, roles: ['manager'] }, 'warn', `ครบ ${l.days} วันแล้ว${l.finWait ? ' ไฟแนนซ์ยังไม่ผ่าน' : ''} ต่อล็อกหรือปล่อย`,
       `${unit} · ${cust} · เซลล์ ${who || ''} · ถ้าไม่ต่อ ระบบปล่อยคิววันที่ ${fmtD(l.releaseOn)}`, { act: 'go', view: 'lock', sub: 'active' });
     // a manager locked a car of another branch (2/11): the owner branch is told and may release it (with a reason); the asking branch is told when it is released

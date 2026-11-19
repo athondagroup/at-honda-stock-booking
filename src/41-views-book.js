@@ -379,7 +379,7 @@ function lockRow(l, D, o = {}) {
   const q = l.ref ? D.quota.find(x => x.ref === l.ref) : null;
   const br = l.car_br || car?.br || q?.br;
   const stTxt = l.status === 'pending' ? chip('รออนุมัติ', 'warn')
-    : l.status === 'approved' ? (l.mgrDue ? chip(`ครบกำหนด ผู้จัดการต่อหรือปล่อยภายใน ${fmtD(addDays(l.releaseOn, -1))}`, 'bad') : l.autoReleased ? chip(`ปล่อยคิวแล้ว ${fmtD(l.releaseOn)} (ผู้จัดการไม่ได้ต่อ)`, 'muted') : l.hold ? chip(`ถือไว้จนส่งมอบ ${fmtD(l.holdUntil)}`, 'red') : l.expired ? chip('หมดอายุ', 'bad') : chip(`ล็อก เหลือ ${l.daysLeft} วัน`, l.daysLeft <= 2 ? 'bad' : 'red'))
+    : l.status === 'approved' ? (l.mgrDue ? chip(`ครบกำหนด ผู้จัดการต่อหรือปล่อยภายใน ${fmtD(addDays(l.releaseOn, -1))}`, 'bad') : l.autoReleased ? chip(`ปล่อยคิวแล้ว ${fmtD(l.releaseOn)} (ผู้จัดการไม่ได้ต่อ)`, 'muted') : l.hold ? chip(`ถือไว้จนส่งมอบ ${fmtD(l.holdUntil)}`, 'red') : l.expired ? chip('หมดอายุ', 'bad') : (l.over ? chip(`ล็อกมา ${l.heldDays} วัน · เกินกำหนด ${l.over} วัน ตรวจว่ายังใช้ไหม`, 'warn') : chip(`ล็อก เหลือ ${l.daysLeft} วัน`, 'red')))
     : l.status === 'allocated' ? chip('จัดสรร (เว็บ)', 'ink') : l.status === 'rejected' ? chip('ไม่อนุมัติ', 'muted') : l.status === 'converted' ? chip('เปลี่ยนเป็นล็อกให้ใบจอง', 'muted') : l.status === 'bumped' ? chip(`มีคนจองก่อน (${l.bumped_by || ''})`, 'muted') : l.status === 'done' ? chip(l.ids_done ? 'สำเร็จ: IDS จัดสรรให้แล้ว' : l.type === 'dealer' ? 'ขายให้ดีลเลอร์แล้ว' : 'ส่งมอบแล้ว', 'good') : l.status === 'withdrawn' ? chip('ถอนคำขอแล้ว', 'muted') : chip('ปล่อยแล้ว', 'muted');
   const took = l.idsTook && !l.idsTook.same ? l.idsTook : null;
   const canDecide = p.write && l.status === 'pending' && (l.type === 'dealer' ? p.approveDealer : canLockMgr(l));
@@ -408,7 +408,7 @@ function lockRow(l, D, o = {}) {
   if (l.type === 'booking' && p.write && !o.compact && ['approved', 'allocated'].includes(l.status) && bk && bk.app && (canAllocBr(br) || mine)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(bk.app.id)}">ขายสำเร็จ · บันทึกส่งมอบ</button>`);
   if (l.status === 'approved' && p.write && !o.compact && l.live) {
     if (l.mgrDue && canLockMgr(l) && (l.finWait || (l.ext || 0) < MAX_EXT)) acts.push(`<button class="btn btn-red btn-sm" data-act="extend" data-id="${l.id}">ต่อ ${l.days} วัน${l.finWait ? ' (ไฟแนนซ์ยังไม่ผ่าน)' : ` (${l.ext || 0}/${MAX_EXT})`}</button>`);
-    else if (!l.mgrDue && canLockMgr(l) && (l.ext || 0) < MAX_EXT && !l.hold) acts.push(`<button class="btn btn-ghost btn-sm" data-act="extend" data-id="${l.id}">ต่ออายุ ${l.days} วัน (${l.ext || 0}/${MAX_EXT})</button>`);
+    else if (false && !l.mgrDue && canLockMgr(l) && (l.ext || 0) < MAX_EXT && !l.hold) acts.push(`<button class="btn btn-ghost btn-sm" data-act="extend" data-id="${l.id}">ต่ออายุ ${l.days} วัน (${l.ext || 0}/${MAX_EXT})</button>`);
     if (l.type === 'temp' && mine && !l.bumped) acts.push(`<button class="btn btn-dark btn-sm" data-act="lock-convert" data-id="${l.id}">ลูกค้ามาจองแล้ว</button>`);
     if (rec && mine && l.finDue) acts.push(`<button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(bk.app.id)}">อัปเดตไฟแนนซ์</button>`);
     // no "จัดสรรใน IDS แล้ว" button (ตกลง 2/11): a lock stays a lock until the uploaded IDS file shows the car under the booking
@@ -454,7 +454,7 @@ function activeList(D, vis) {
   const auto = vis.filter(l => l.autoReleased && !l.idsTook && daysBetween(l.releaseOn, D.today) <= 3);
   return `${lockIdsList(D, vis)}${close.length ? `<h2 class="font-head text-lg font-semibold mb-2" style="color:var(--bad)">IDS จัดสรรรถไปแล้ว ต้องปิดล็อกนี้ <span class="text-base">${close.length}</span></h2><div class="bg-surface border border-line rounded-lg divide-y divide-line mb-5">${close.map(l => lockRow(l, D)).join('')}</div>` : ''}
   <div class="bg-surface border border-line rounded-lg divide-y divide-line">${act.map(l => lockRow(l, D)).join('') || emptyBox('ยังไม่มีรถที่ล็อกอยู่', `เมื่อผู้จัดการอนุมัติ รถจะเปลี่ยนเป็นล็อกและนับถอยหลัง`)}</div>
-  <p class="text-xs text-muted mt-2">ล็อก ${LOCK_DAYS_BY.booking} วัน (ใบจอง / ดีลเลอร์): วันสุดท้ายแจ้งผู้จัดการให้ต่อหรือปล่อย ถ้าไม่ต่อภายใน ${MGR_GRACE} วันหลังครบกำหนด ระบบปล่อยคิวเอง · ล็อกชั่วคราว ${LOCK_DAYS_BY.temp} วัน หมดแล้วปล่อยเอง</p>
+  <p class="text-xs text-muted mt-2">ล็อกไม่หมดอายุเองและไม่ต้องต่ออายุ: ครบ ${LOCK_DAYS_BY.booking} วัน (ใบจอง / ดีลเลอร์) หรือ ${LOCK_DAYS_BY.temp} วัน (ชั่วคราว) แล้วระบบเตือนผู้จัดการและเซลล์สัปดาห์ละครั้งให้ตรวจว่ายังใช้คันนี้ไหม · ไม่ใช้แล้วกดปล่อยล็อก</p>
   ${auto.length ? `<h2 class="font-head text-lg font-semibold mt-6 mb-2">ปล่อยคิวอัตโนมัติ 3 วันล่าสุด <span class="text-muted text-base">${auto.length}</span></h2><div class="bg-surface border border-line rounded-lg divide-y divide-line">${auto.map(l => lockRow(l, D)).join('')}</div>` : ''}`;
 }
 function historyList(D) {

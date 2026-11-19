@@ -24,7 +24,7 @@ const isMine = name => isSales() && !!name && name === S.role.sales;
 function badgeCounts(D) {
   const mine = myAlerts(D);
   return {
-    alerts: mine.filter(a => a.tone !== 'muted').length,
+    alerts: mine.filter(a => a.tone !== 'muted' && (ntcKeep(a) || !ntcDone(a))).length,
     inbox: perms().approve ? inboxItems(D).length : myRequests(D).bookings.filter(x => x.pending).length,
     lock: S.role.role === 'admin' ? D.locks.filter(l => l.status === 'approved' && l.type !== 'temp' && l.car_br === myBranch()).length
       : D.locks.filter(l => l.status === 'pending' && (isSales() ? isMine(l.owner) : l.type === 'dealer' ? perms().approveDealer : canLockMgr(l))).length,
@@ -224,15 +224,28 @@ function alertRow(a) {
     <span class="mt-1.5 w-2.5 h-2.5 rounded-full shrink-0" style="background:var(--${a.tone === 'bad' ? 'bad' : a.tone === 'warn' ? 'warn' : 'muted'})" aria-hidden="true"></span>
     <div class="flex-1 min-w-0"><div class="font-medium">${esc(a.title)}</div><div class="text-sm text-muted">${esc(a.text)}</div></div>${act}</div>`;
 }
+// 19/11: งานวันนี้ = notifications: open to look, then clear (kept per person on this device). A request a manager must approve or
+// confirm (and the few confirmations asked of the sales / admin) stays until it is decided.
+const NTC_KEEP = ['chg:', 'lockp:', 'ownerd:', 'owner:', 'dealreq:', 'cxexec:', 'idsask:', 'xfer:', 'recv:', 'matchq:'];
+const ntcKeep = a => NTC_KEEP.some(k => a.id.startsWith(k));
+const ntcKey = () => 'atNtcDone:' + ((S.me && S.me.id) || S.role.role || 'x');
+let NTC_DONE = null;
+function ntcMap() { if (NTC_DONE) return NTC_DONE; try { NTC_DONE = JSON.parse(localStorage.getItem(ntcKey()) || '{}') || {}; } catch (e) { NTC_DONE = {}; } return NTC_DONE; }
+const ntcDone = a => !!ntcMap()[a.id];
+function ntcSave() { const m = ntcMap(), cut = Date.now() - 60 * 864e5; for (const k of Object.keys(m)) if (m[k] < cut) delete m[k]; try { localStorage.setItem(ntcKey(), JSON.stringify(m)); } catch (e) {} }
 function viewAlerts(D) {
-  const mine = myAlerts(D);
-  const groups = [['bad', 'ต้องทำทันที'], ['warn', 'รอดำเนินการ'], ['muted', 'ตรวจย้อนหลัง']];
+  const mine = myAlerts(D), keep = mine.filter(ntcKeep), rest = mine.filter(a => !ntcKeep(a)), open = rest.filter(a => !ntcDone(a)), done = rest.filter(ntcDone);
   const who = isSales() ? `เซลล์ ${S.role.sales}` : S.role.role === 'admin' ? `แอดมินสาขา ${S.role.branch}` : roleLabel();
+  const row = (a, clr) => alertRow(a).replace(/<\/div>$/, `${clr === 1 ? `<button class="text-xs text-muted underline shrink-0 self-center" data-act="ntc-clear" data-id="${esc(a.id)}" aria-label="ล้างแจ้งเตือน">ล้าง</button>` : clr === 2 ? `<button class="text-xs text-muted underline shrink-0 self-center" data-act="ntc-back" data-id="${esc(a.id)}">แสดงอีก</button>` : ''}</div>`);
+  const box = (list, clr) => `<div class="bg-surface border border-line rounded-lg divide-y divide-line">${list.slice(0, 150).map(a => row(a, clr)).join('')}</div>`;
+  const tones = [['bad', 'ด่วน'], ['warn', 'แจ้งเตือน'], ['muted', 'ให้ทราบ']];
   return `${pageHead('งานของฉัน', `รายการที่ ${esc(who)} ต้องทำ ระบบคำนวณใหม่ทุกครั้งที่ข้อมูลเปลี่ยน`)}
-  ${groups.map(([t, h]) => { const list = mine.filter(a => a.tone === t); return list.length ? `<section class="mb-5"><h2 class="font-head text-lg font-semibold mb-2">${h} <span class="text-muted text-base">${list.length}</span></h2>
-    <div class="bg-surface border border-line rounded-lg divide-y divide-line">${list.slice(0, 150).map(alertRow).join('')}</div></section>` : ''; }).join('')
-    || `<div class="bg-surface border border-line rounded-lg">${emptyBox('ไม่มีอะไรค้าง', 'เมื่อใบจองยังไม่อยู่ใน IDS มีคำขอล็อก หรือถึงขั้นตอนที่ต้องทำ รายการจะขึ้นที่นี่')}</div>`}
-  <p class="text-xs text-muted">ในระบบจริงจะส่งแจ้งเตือนเดียวกันนี้ทาง LINE หรือ Telegram ด้วย</p>`;
+  ${keep.length ? `<section class="mb-5"><h2 class="font-head text-lg font-semibold mb-1">ต้องอนุมัติ / ยืนยัน <span class="text-muted text-base">${keep.length}</span></h2><p class="text-xs text-muted mb-2">อยู่จนกว่าจะตัดสิน ล้างเองไม่ได้</p>${box(keep, 0)}</section>` : ''}
+  ${open.length ? `<section class="mb-5"><div class="flex flex-wrap items-baseline justify-between gap-2 mb-2"><h2 class="font-head text-lg font-semibold">การแจ้งเตือน <span class="text-muted text-base">${open.length}</span></h2><button class="btn btn-ghost btn-sm" data-act="ntc-clear-all">ล้างทั้งหมด</button></div>
+    ${tones.map(([t, h]) => { const l = open.filter(a => a.tone === t); return l.length ? `<h3 class="text-sm font-medium text-muted mt-3 mb-1">${h} ${l.length}</h3>${box(l, 1)}` : ''; }).join('')}</section>` : ''}
+  ${!keep.length && !open.length ? `<div class="bg-surface border border-line rounded-lg mb-4">${emptyBox('ไม่มีอะไรค้าง', 'คำขอที่ต้องอนุมัติและการแจ้งเตือนใหม่จะขึ้นที่นี่')}</div>` : ''}
+  ${done.length ? `<details class="mb-4"${S.ntcShowDone ? ' open' : ''}><summary class="text-sm text-muted cursor-pointer">ที่ล้างแล้ว ${done.length} รายการ (ยังเกิดอยู่ เปิดดูได้)</summary><div class="mt-2">${box(done, 2)}</div></details>` : ''}
+  <p class="text-xs text-muted">ล้างแล้วจำไว้ในเครื่องนี้ · เรื่องที่ล้างแล้วแต่ยังเกิดอยู่ ดูได้ใน "ที่ล้างแล้ว"</p>`;
 }
 
 // ---------- stock
