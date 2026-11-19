@@ -51,7 +51,8 @@ function flowOf(a, today) {
   // delivered in the IDS file this month: the delivery counts; the red plate and insurer can be added later
   // the sales may skip the PO for now (24/10): the flow moves on, the PO stays missing until made (before delivery)
   const poSkip = !done.po && !!(f.po_skip && f.po_skip.at);
-  const next = history ? null : lateUpdate ? (done.confirmed ? null : 'confirmed') : (FLOW.find(k => !done[k] && !(k === 'po' && poSkip)) || null);
+  // 19/11: no waiting for the manager after the delivery (the confirmation for commission stays optional)
+  const next = history ? null : lateUpdate ? null : (FLOW.find(k => !done[k] && k !== 'confirmed' && !(k === 'po' && poSkip)) || null);
   return { done, stage, next, poSkip, idsDelivered, history, lateUpdate, deliveredDate: (f.delivered && f.delivered.date) || idsDate || a.rec.delivered_date || null };
 }
 const r0 = a => a.rec || {};
@@ -713,7 +714,7 @@ function buildAlerts(D) {
   for (const r of D.receipts) if (r.status === 'pending') add('recv:' + r.id, { br: r.br, roles: ['admin', 'manager'] }, 'warn', 'รับรถเข้า รอยืนยัน', `${r.doc_no || ''} · ${(r.cars || []).length} คัน`, { act: 'recv-open', id: r.id });
   for (const a of D.at) {
     if (a.cancelled || a.demo) continue;
-    if ((a.flow.done.delivered || a.flow.lateUpdate) && !a.flow.done.confirmed) add('conf:' + a.id, { br: a.br, roles: ['manager'] }, 'warn', 'ส่งมอบแล้ว รอผู้จัดการยืนยัน', `${a.cust} · ${a.model} · เซลล์ ${a.sales}`, { act: 'at-open', id: a.id });
+    if (false && (a.flow.done.delivered || a.flow.lateUpdate) && !a.flow.done.confirmed) add('conf:' + a.id, { br: a.br, roles: ['manager'] }, 'warn', 'ส่งมอบแล้ว รอผู้จัดการยืนยัน', `${a.cust} · ${a.model} · เซลล์ ${a.sales}`, { act: 'at-open', id: a.id });
   }
   // a car asked for / sent to another branch: the other branch's admin and manager are told (ตกลง 2/11)
   for (const [vin, o] of S.vehicles) {

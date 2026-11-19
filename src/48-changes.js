@@ -19,6 +19,8 @@ function queuePick(path, q, a) {
 }
 const INSTANT_KEYS = { booking_no: 'เลขที่ใบจอง IDS', insurance: 'ประกันภัย', source: 'แหล่งที่มา', lead_id: 'Lead ID', delivery_plan: 'วันนัดรับรถ', note: 'หมายเหตุ' };
 const SPEC_KEYS = ['model', 'grade', 'color'];
+// 19/11: the branch admin changes the model / grade / colour without the manager (other main fields still need the manager)
+function editDirect(a, keys) { return canApproveBr(a.br) || (canAdminEdit(a) && !!keys && keys.length > 0 && keys.every(k => SPEC_KEYS.includes(k))); }
 const CANCEL_REASONS = ['ลูกค้ายกเลิก', 'ไฟแนนซ์ไม่ผ่าน', 'เปลี่ยนรุ่น ลงใบจองใหม่แล้ว', 'ลงฟอร์มซ้ำ', 'อื่น ๆ'];
 const REFUND = { refund: 'คืนเงินมัดจำ', forfeit: 'ไม่คืน (ริบมัดจำ)', transfer: 'โอนไปใช้กับใบจองใหม่' };
 const MULTI_REASONS = ['ซื้อเพิ่มอีกคัน (จอง 2 คัน)', 'เปลี่ยนรุ่น (ขอยกเลิกใบเดิม)', 'คนละคน ชื่อซ้ำ', 'อื่น ๆ'];
@@ -103,7 +105,7 @@ function changeBox(m, a) {
 const p_write = () => perms().write;
 // the edit form (opens inside the booking window)
 function editPanel(m, a) {
-  const e = m.edit, direct = canApproveBr(a.br), adm = canAdminEdit(a), locked = specLocked(a);
+  const e = m.edit, direct = editDirect(a, editKeyDiff(e, a)), adm = canAdminEdit(a), locked = specLocked(a);
   const grades = e.model ? Object.keys(CATALOG[e.model] || {}) : [];
   const colors = e.model && e.grade ? CATALOG[e.model]?.[e.grade] || [] : [];
   const F = (k, label, inner) => `<div class="field"><label for="ed-${k}">${label}</label>${inner}</div>`;

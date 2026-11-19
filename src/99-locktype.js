@@ -45,7 +45,7 @@ function ltCands(c, q, D) {
   const demo = ltDemoCar(c);
   return [...D.bookings, ...(D.demoRows || []).filter(b => !D.locks.some(l => l.live && l.bkref === b.key))].filter(b => ['waiting', 'noids', 'demo', 'democar'].includes(b.state) && !(b.app && b.app.demo) && (!demo || ltDemoBk(b)) && (k ? [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k)) : b.spec === c.spec) && (k || !isSales() || isMine(b.owner)))
     .map(b => ({ b, rank: b.spec === c.spec ? 0 : String(b.spec || '').split('|')[0] === model ? 1 : 2 }))
-    .sort((x, y) => x.rank - y.rank || String(x.b.qdate || x.b.date || '').localeCompare(String(y.b.qdate || y.b.date || ''))).slice(0, 6);
+    .sort((x, y) => x.rank - y.rank || String(x.b.qdate || x.b.date || '').localeCompare(String(y.b.qdate || y.b.date || ''))).slice(0, 200);
 }
 function ltDrop(c, D) {
   const t = S.lt, q = String(t.q || '').trim();
@@ -63,7 +63,7 @@ function ltDrop(c, D) {
     <div style="padding:0 10px 8px;display:flex;gap:6px"><button class="btn btn-red btn-sm" data-act="lt-pick" data-vin="${esc(ltKey(c))}" data-k="${esc(a.k)}" data-why="1">ล็อกข้ามสเปก</button><button class="btn btn-ghost btn-sm" data-act="lt-specback">เลือกใบอื่น</button></div></div>`; }
   if (!q) return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${rows ? `<div class="lt-hint">ใบจองสเปกนี้ที่ยังไม่มีรถ (พิมพ์ชื่อ / เลขใบจอง / เซลล์ เพื่อหาใบอื่น)</div>${rows}` : (ltDemoCar(c) ? '<div class="lt-hint">รถบริษัท (Demo): ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo" · พิมพ์ชื่อลูกค้า / เลขใบจอง</div>' : `<div class="lt-hint">ไม่มีใบจองสเปกนี้รอรถ · พิมพ์ชื่อลูกค้า / เลขใบจอง หรือ "ชื่อเล่นเซลล์ / ชื่อลูกค้า"</div>`)}</div>`;
   return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${t.mode === 'ask' ? '<div class="lt-hint">ขอแก้ล็อกของคนอื่น: คนที่ล็อกไว้ต้องอนุมัติก่อน ล็อกเดิมยังอยู่</div>' : ''}
-    ${rows ? `<div class="lt-hint">ใบจองที่ยังไม่มีรถ · สเปกตรงกันขึ้นก่อน</div>${rows}` : `<div class="lt-hint">ไม่พบใบจองที่ตรงกับ "${esc(q)}"</div>`}${ltDemoCar(c) ? '<div class="lt-hint">รถบริษัท (Demo): ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo"</div>' : temp + dealer}</div>`;
+    ${rows ? `<div class="lt-hint">พบ ${cands.length} ใบ · ใบจองที่ยังไม่มีรถ · สเปกตรงกันขึ้นก่อน${cands.length > 6 ? ' · เลื่อนดูเพิ่ม' : ''}</div>${rows}` : `<div class="lt-hint">ไม่พบใบจองที่ตรงกับ "${esc(q)}"</div>`}${ltDemoCar(c) ? '<div class="lt-hint">รถบริษัท (Demo): ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo"</div>' : temp + dealer}</div>`;
 }
 // the stock table's "ล็อก" cell for managers / the executive
 function ltCell(c, D, p) {
@@ -177,7 +177,10 @@ document.addEventListener('focusin', ev => {
 document.addEventListener('keydown', ev => {
   const t = ev.target; if (!t || !t.dataset || !t.dataset.lt) return;
   if (ev.key === 'Escape') { S.lt = null; render(); }
-  if (ev.key === 'Enter') { const first = document.querySelector('.lt-drop [data-act="lt-pick"]'); if (first) first.click(); }
+  // 19/11: Enter never picks the first of several: arrows move the highlight, Enter takes the highlighted one, or the only booking found
+  const its = [...document.querySelectorAll('.lt-drop [data-act="lt-pick"]')], cur = its.findIndex(b => b.classList.contains('hl'));
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { ev.preventDefault(); if (!its.length) return; const n = cur < 0 ? (ev.key === 'ArrowDown' ? 0 : its.length - 1) : (cur + (ev.key === 'ArrowDown' ? 1 : -1) + its.length) % its.length; its.forEach(b => b.classList.remove('hl')); its[n].classList.add('hl'); its[n].scrollIntoView({ block: 'nearest' }); return; }
+  if (ev.key === 'Enter') { ev.preventDefault(); if (cur >= 0) { its[cur].click(); return; } const bks = its.filter(b => !['temp', 'dealer'].includes(b.dataset.k)); if (bks.length === 1) bks[0].click(); else if (bks.length > 1) toast(`พบ ${bks.length} ใบ แตะเลือกใบที่ต้องการ (หรือใช้ลูกศรขึ้น/ลงแล้วกด Enter)`); }
 });
 Object.assign(ACTIONS, {
   'lt-cancel'() { S.lt = null; render(); },
@@ -230,7 +233,7 @@ Object.assign(ACTIONS, {
     if (l.typed) ltSheet(id, '', ltTextOf(l));
   },
   async 'lt-retry'(el) { const l = findLock(el.dataset.id); if (!l || !ltCan()) return; const r = await ltSheet(el.dataset.id, ltTextOf(l), '', false); if (r && r.ok) toast('ลงชีตแล้ว'); },
-  async 'lt-force'(el) { const l = findLock(el.dataset.id); if (!l || !ltCan()) return; await ltSheet(el.dataset.id, ltTextOf(l), '', true); toast('เขียนทับในชีตแล้ว'); },
+  async 'lt-force'(el) { const l = findLock(el.dataset.id); if (!l || !ltCan()) return; const r = await ltSheet(el.dataset.id, ltTextOf(l), '', true); if (r && r.ok) toast(r.preview ? 'เว็บตัวอย่าง: ไม่ได้เขียนชีตจริง' : 'เขียนทับในชีตแล้ว'); },
   async 'ntc-ack'(el) {
     const [id, at] = String(el.dataset.id || '').split('|'), l = findLock(id); if (!l || !S.me || !S.me.id) return;
     const acks = { ...(l.acks || {}) }; acks[S.me.id] = [...new Set([...(acks[S.me.id] || []), at])].slice(-20);

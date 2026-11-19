@@ -496,7 +496,7 @@ function flowTab(a) {
   const f = a.flow;
   if (f.history) return null;
   if (f.done.confirmed) return 'done';
-  if (f.done.delivered || f.lateUpdate) return 'confirmed';
+  if (f.done.delivered || f.lateUpdate) return 'done';   // 19/11: delivered = done, no manager confirmation to wait for
   if (f.done.assign) return 'delivered';
   return f.next;
 }

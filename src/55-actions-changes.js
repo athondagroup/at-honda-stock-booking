@@ -166,7 +166,7 @@ Object.assign(ACTIONS, {
   'edit-back'() { S.modal.edit = null; render(); },
   async 'edit-save'(el) {
     const a = atById(el.dataset.id), m = S.modal; if (!a || !m.edit || !canEditBooking(a)) return;
-    const e = m.edit, direct = canApproveBr(a.br), locked = specLocked(a);
+    const e = m.edit, locked = specLocked(a), direct = editDirect(a, editKeyDiff(e, a));
     if (!String(e.customer || '').trim()) { toast('ใส่ชื่อลูกค้า', 'bad'); return; }
     if (!locked && (!e.model || !e.grade || !e.color)) { toast('เลือกรุ่น เกรด และสีให้ครบ', 'bad'); return; }
     if (!e.sales) { toast('เลือกเซลล์เจ้าของเคส', 'bad'); return; }
@@ -190,7 +190,7 @@ Object.assign(ACTIONS, {
     if (direct && specEdit) { const bad = queueCheck(q); if (bad) { toast(bad, 'bad'); return; } }
     let spec = false;
     const log = changeText({ fields: { ...keyF, ...inst }, old: { ...keyOld, ...Object.fromEntries(Object.keys(inst).map(k => [k, a.rec[k] ?? null])) } }) + (direct && specEdit ? queueText(q) : '');
-    const r = await saveBk(a.id, direct ? 'แก้ไขใบจอง (ผู้จัดการ)' : nKey ? 'ขอแก้ไขใบจอง' : 'แก้ไขใบจอง', log, x => {
+    const r = await saveBk(a.id, direct ? (canApproveBr(a.br) ? 'แก้ไขใบจอง (ผู้จัดการ)' : 'แก้ไขรุ่น/เกรด/สี (แอดมินสาขา)') : nKey ? 'ขอแก้ไขใบจอง' : 'แก้ไขใบจอง', log, x => {
       Object.assign(x, inst);
       if (!nKey) return;
       if (direct) spec = applyFields(x, keyF, q);

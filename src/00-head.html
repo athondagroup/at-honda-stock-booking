@@ -151,9 +151,9 @@ tr.low td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 .lt-in.idle { width: 100px; border: 1px solid var(--line); background: var(--surface-2); cursor: text; }
 @media (pointer: coarse) { input, select, textarea, .lt-in { font-size: 16px !important; } }
 .lt-txt { font-weight: 500; }
-.lt-drop { position: absolute; left: 0; top: 28px; z-index: 30; width: 360px; max-width: 80vw; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.18); overflow: hidden; white-space: normal; }
+.lt-drop { position: absolute; left: 0; top: 28px; z-index: 30; width: 360px; max-width: 80vw; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.18); overflow: hidden auto; max-height: min(60vh, 520px); white-space: normal; }
 .lt-it { display: flex; flex-direction: column; width: 100%; text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
-.lt-it:hover, .lt-it:focus { background: var(--surface-2); }
+.lt-it:hover, .lt-it:focus, .lt-it.hl { background: var(--surface-2); }
 .lt-sub { font-size: 11px; color: var(--muted); }
 .lt-hint { font-size: 11px; color: var(--muted); padding: 5px 10px; background: var(--surface-2); }
 .tbl-xl .xl-pin { position: sticky; left: 0; z-index: 1; background: var(--surface); }

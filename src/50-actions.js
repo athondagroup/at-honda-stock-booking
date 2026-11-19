@@ -187,7 +187,7 @@ function removeModal(m, D) {
   <div class="flex flex-col gap-4">
     <div class="field"><label for="x-reason" class="req">เหตุผล</label><select id="x-reason" data-modal="reason">
       ${S.role.role === 'admin' ? (car.br === myBranch() ? `<option value="dealer" ${m.reason === 'dealer' ? 'selected' : ''}>ขาย/แลกให้ดีลเลอร์อื่น (ตัดออกจาก Stock)</option>
-      <option value="push" ${m.reason === 'push' ? 'selected' : ''}>ขายออกจากสาขาตัวเองไปให้สาขาอื่น (ปลายทางกดรับรถเข้า)</option>`
+      <option value="push" ${m.reason === 'push' ? 'selected' : ''}>ขายออกจากสาขาตัวเองไปให้สาขาอื่น (ย้าย Stock ทันที)</option>`
         : `<option value="pull" selected>นำรถเข้าสาขาตัวเอง (ขอไปสาขาต้นทาง ต้นทางกดยืนยันย้าย)</option>`)
       : `<option value="dealer" ${m.reason === 'dealer' ? 'selected' : ''}>ขาย/แลกให้ดีลเลอร์อื่น</option>
       <option value="move" ${m.reason === 'move' ? 'selected' : ''}>ย้ายไปสาขาอื่นของเรา</option>
@@ -198,7 +198,7 @@ function removeModal(m, D) {
     ${m.reason === 'move' ? `<div class="field"><label for="x-to" class="req">ย้ายไปสาขา</label><select id="x-to" data-modal="to">${BRS.filter(b => b !== car.br).map(b => `<option value="${b}" ${m.to === b ? 'selected' : ''}>${b} ${BR[b].name}</option>`).join('')}</select></div>` : ''}
     <div class="field"><label for="x-note" class="${m.reason === 'other' ? 'req' : ''}">หมายเหตุ</label><input id="x-note" data-modal="note" value="${esc(m.note || '')}"></div>
     <p class="text-xs text-muted">ข้อมูลการขาย/แลกกับดีลเลอร์อื่นไม่มีในไฟล์ IDS การบันทึกที่นี่ครั้งเดียวจึงไม่ใช่การลงซ้ำ และทำให้รถคันนี้ไม่ถูกแจ้งว่า "ไม่พบข้อมูล" ตอนอัปโหลด Stock รอบถัดไป</p>
-    <div class="flex justify-end gap-2"><button class="btn btn-ghost" data-act="close">ยกเลิก</button><button class="btn btn-red" data-act="remove-submit">${m.reason === 'move' ? 'ย้ายสาขา' : m.reason === 'pull' ? 'ส่งคำขอ' : m.reason === 'push' ? 'แจ้งปลายทาง' : 'นำออก'}</button></div>
+    <div class="flex justify-end gap-2"><button class="btn btn-ghost" data-act="close">ยกเลิก</button><button class="btn btn-red" data-act="remove-submit">${m.reason === 'move' ? 'ย้ายสาขา' : m.reason === 'pull' ? 'ส่งคำขอ' : m.reason === 'push' ? 'ขายให้สาขานี้' : 'นำออก'}</button></div>
   </div>`;
 }
 function noteModal(m) {
@@ -903,6 +903,8 @@ const ACTIONS = {
       const mine = myBranch(), to = m.reason === 'pull' ? mine : (m.to || BRS.find(b => b !== car.br)), spec = (car.model || car.grade || car.color) ? [car.model || '?', car.grade || '?', car.color || '?'].join('|') : (cur.moved && cur.moved.spec) || null;
       if (car.xfer) { toast('มีคำขอย้ายรถคันนี้ค้างอยู่แล้ว', 'bad'); return; }
       if (m.reason === 'pull' ? car.br === mine : car.br !== mine) { toast('สาขาไม่ตรงกับประเภทที่เลือก', 'bad'); return; }
+      // 19/11: selling a car to another branch needs no confirmation from that branch: the Stock moves at once
+      if (m.reason === 'push') { if (await write('vehicles', m.vin, { ...cur, branch: to, moved: { ...(cur.moved || {}), ...actor(), from: car.br, to, spec, via: 'push', note: (m.note || '').trim() || null } })) { S.modal = null; toast(`ขายรถให้สาขา ${to} แล้ว · ย้าย Stock ไปสาขา ${to}`); render(); } return; }
       if (await write('vehicles', m.vin, { ...cur, xfer: { dir: m.reason, from: car.br, to, spec, note: (m.note || '').trim() || null, ...actor() } })) { S.modal = null; toast(m.reason === 'pull' ? `ส่งคำขอไปสาขา ${car.br} แล้ว` : `แจ้งสาขา ${to} แล้ว`); render(); }
       return;
     }
