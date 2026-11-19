@@ -596,7 +596,7 @@ function buildAlerts(D) {
     if (bo || a.logVin) {
       if (a.logVin || !bkOutPending(bo.o, bo.u.br)) continue;   // handled already (car allocated and left stock / a reason chosen)
       add('atids:' + a.id, { br: a.br, roles: ['admin', 'manager'] }, 'bad', 'ใบจองออกจาก IDS แล้ว · เลือกเหตุผล',
-        `${a.cust} · ${a.model} ${gradeShort(a.model, a.grade)} ${a.color || ''} · ใบจอง IDS ${bo.o.no || ''} หายจากไฟล์ Booking ที่อัปโหลด ${fmtD(bo.u.at)} · ไม่พบใน DL · เลือก: แก้ไขเป็นใบ IDS ใหม่ / ยกเลิก / แจ้งขายแล้ว รอ DL / ยังเก็บ`, { act: 'bkout-goto', id: bo.u.id, q: bo.o.no || '', label: 'เลือกเหตุผล' });
+        `${a.cust} · ${a.model} ${gradeShort(a.model, a.grade)} ${a.color || ''} · ใบจอง IDS ${bo.o.no || ''} หายจากไฟล์ Booking ที่อัปโหลด ${fmtD(bo.u.at)} · ไม่พบใน DL · เลือก: แก้ไขเป็นใบ IDS ใหม่ / ยกเลิก / แจ้งขายแล้ว รอ DL / ยังเก็บ`, { act: 'bkout-goto', id: bo.u.id, q: bo.o.no || '', label: 'ดูในรายการอัปโหลด', inline: { u: bo.u.id, i: bo.u.out.indexOf(bo.o) } });
       continue;
     }
     if (age === null || age < AT_TO_IDS_DAYS) continue;

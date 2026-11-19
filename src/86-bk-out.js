@@ -111,10 +111,9 @@ function bkOutWebCx(o, br) {
   for (const [id, r] of S.bookings) if (r && r.status === 'cancelled' && (!br || r.br === br) && searchKey(r.customer || '') === k && (!r.booking_no || String(r.booking_no) === String(o.no))) return { id, rec: r };
   return null;
 }
-function bkOutList(u, D) {
+// one booking's row (also shown inside the notice, 19/11)
+function bkOutRow(u, o, i, D) {
   const can = bkOutCanGone(u.br), F = S.bkOut && S.bkOut.id === u.id ? S.bkOut : { sel: {}, pick: {} };
-  const todo = (u.out || []).filter(o => bkOutPending(o, u.br));
-  const row = (o, i) => {
     const fl = (o.flag || o.why === 'ไม่มีใบจองในเว็บ') && !o.res;   // older uploads wrote the no-web case without the flag
     const a = o.atId ? atById(o.atId) : null, auto = fl ? bkOutAuto(o) : null, open = bkOutPending(o, u.br) && a && !a.cancelled;
     const wcx = fl ? bkOutWebCx(o, u.br) : null;
@@ -147,7 +146,11 @@ function bkOutList(u, D) {
         <button class="btn btn-red btn-sm" data-act="bkout-cancel" data-id="${esc(u.id)}" data-i="${i}">ยกเลิกใบจอง</button>
         <button class="btn btn-ghost btn-sm" data-act="bkout-keep" data-id="${esc(u.id)}" data-i="${i}" title="ใบจองและรถยังอยู่ในเว็บ ยังไม่จับคู่กับใบ IDS ใหม่ รอกรอกฟอร์ม">ยังเก็บ · ไม่ match รอกรอกฟอร์ม</button>
         <button class="btn btn-ghost btn-sm" data-act="bkout-wait" data-id="${esc(u.id)}" data-i="${i}" title="ใบจองยังอยู่ในเว็บ ไม่ยกเลิก รอไฟล์ DL รอบหน้า">แจ้งขายแล้ว รออัปเดต DL</button></div></div>`;
-  };
+}
+function bkOutList(u, D) {
+  const can = bkOutCanGone(u.br), F = S.bkOut && S.bkOut.id === u.id ? S.bkOut : { sel: {}, pick: {} };
+  const todo = (u.out || []).filter(o => bkOutPending(o, u.br));
+  const row = (o, i) => bkOutRow(u, o, i, D);
   const sel = todo.filter(o => F.sel[(u.out || []).indexOf(o)]).length;
   const bar = can && todo.length ? `<div class="p-3 rounded-lg mb-2" style="background:var(--warn-soft)">
       <div class="font-medium mb-1">ใบจองที่หายจาก IDS ${todo.length} ใบ · เลือกแล้ว ${sel}</div>
@@ -266,7 +269,7 @@ function bkOutCanGone(br) { return perms().write && (canApproveBr(br) || (S.role
 // the booking card: its IDS booking left the IDS file and nobody has said why yet (13/11) – the answer is given on the upload, this says so
 function bkOutCardBox(a, D) {
   if (!a || a.cancelled || a.match) return '';
-  const ups = [...S.uploads.values()].filter(u => u && u.src === 'booking' && Array.isArray(u.out)).sort((x, y) => String(y.at || '').localeCompare(String(x.at || '')));
+  const ups = [...S.uploads.entries()].map(([id, u]) => u && { id, ...u }).filter(u => u && u.src === 'booking' && Array.isArray(u.out)).sort((x, y) => String(y.at || '').localeCompare(String(x.at || '')));
   for (const u of ups) {
     const o = u.out.find(x => x && x.atId === a.id); if (!o) continue;
     if (!bkOutPending(o, u.br)) return '';
@@ -285,7 +288,7 @@ function bkOutFocus(no) {
   no = String(no || '').replace(/\D/g, ''); if (!no) return;
   let n = 0; const go = () => {
     const c = [...document.querySelectorAll('.code')].find(x => x.textContent.replace(/\D/g, '') === no), row = c && (c.closest('.py-2') || c.parentElement);
-    if (!row) { if (++n < 10) setTimeout(go, 150); return; }
+    if (!row) { if (++n < 40) setTimeout(go, 150); return; }
     row.scrollIntoView({ block: 'center', behavior: 'smooth' }); row.classList.add('bko-hl'); setTimeout(() => row.classList.remove('bko-hl'), 4000);
   }; setTimeout(go, 80);
 }
@@ -304,6 +307,6 @@ function bkOutHeld(o) { const t = (o && o.res && o.res.text) || ''; return /^แ
 // the latest Booking upload that lost this web booking's IDS booking (18/11)
 function bkOutOf(a) {
   if (!a) return null; let best = null;
-  for (const u of S.uploads.values()) { if (!u || u.src !== 'booking' || !Array.isArray(u.out)) continue; const o = u.out.find(x => x && x.atId === a.id); if (o && (!best || String(u.at || '') > String(best.u.at || ''))) best = { u, o }; }
+  for (const [id, u0] of S.uploads) { if (!u0 || u0.src !== 'booking' || !Array.isArray(u0.out)) continue; const o = u0.out.find(x => x && x.atId === a.id); if (o && (!best || String(u0.at || '') > String(best.u.at || ''))) best = { u: { id, ...u0 }, o }; }   // the id is the map key (19/11 fix)
   return best;
 }

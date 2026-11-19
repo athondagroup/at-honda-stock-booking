@@ -217,12 +217,18 @@ const salesCell = (atName, idsName, chk) => {
 const crossChip = a => a && a.cross ? `<div class="mt-0.5">${chip(`ขายข้ามสาขา → ${a.delivBr}`, 'neutral')}</div>` : '';
 
 // ---------- alerts
+// 19/11: a notice that needs a choice shows the choice right here (bookings gone from IDS: the same buttons as on the upload)
+function alertInline(a) {
+  const x = a.act && a.act.inline; if (!x) return '';
+  const u = S.uploads.get(x.u), o = u && u.out && u.out[x.i]; if (!o) return '';
+  try { return `<div class="mt-1 text-sm">${bkOutRow({ id: x.u, ...u }, o, x.i, derive())}</div>`; } catch (e) { return ''; }
+}
 function alertRow(a) {
   const btn = (x, main) => `<button class="btn ${main ? 'btn-dark' : 'btn-ghost'} btn-sm" data-act="${x.act}" ${x.id ? `data-id="${esc(x.id)}"` : ''} ${x.view ? `data-view="${x.view}"` : ''} ${x.sub ? `data-sub="${x.sub}"` : ''} ${x.q ? `data-q="${esc(x.q)}"` : ''}>${esc(x.label || (x.act === 'ids-claim' ? 'ลงฟอร์ม AT' : 'เปิด'))}</button>`;
   const act = a.act ? `<div class="flex flex-wrap gap-1 justify-end shrink-0 max-w-[50%]">${btn(a.act, !!(a.act.more && a.act.more.length))}${(a.act.more || []).map(x => btn(x)).join('')}</div>` : '';
   return `<div class="p-3 md:px-4 flex gap-3 items-start">
     <span class="mt-1.5 w-2.5 h-2.5 rounded-full shrink-0" style="background:var(--${a.tone === 'bad' ? 'bad' : a.tone === 'warn' ? 'warn' : 'muted'})" aria-hidden="true"></span>
-    <div class="flex-1 min-w-0"><div class="font-medium">${esc(a.title)}</div><div class="text-sm text-muted">${esc(a.text)}</div></div>${act}</div>`;
+    <div class="flex-1 min-w-0"><div class="font-medium">${esc(a.title)}</div><div class="text-sm text-muted">${esc(a.text)}</div>${alertInline(a)}</div>${act}</div>`;
 }
 // 19/11: งานวันนี้ = notifications: open to look, then clear (kept per person on this device). A request a manager must approve or
 // confirm (and the few confirmations asked of the sales / admin) stays until it is decided.
@@ -406,22 +412,25 @@ const carActions = (c, p, D) => stockActions(c, p, D);
 function carTable(cars, D) {
   const f = S.filters, p = perms();
   let list = cars.filter(c => stMatch(c, f.status));
+  const shBar = !isSales() && typeof sheetStBar === 'function' ? sheetStBar(list, D) : '';
+  if (f.shst && typeof carSheetSt === 'function') list = list.filter(c => { const s = carSheetSt(c, D); return s && s.k === f.shst; });
   const ssort = ''; // the เรียง box was taken out (11/11): default order, the ▾ menus sort
   if (ssort === 'free') list = list.filter(c => c.status === 'free');
   if (ssort === 'model') list.sort((a, b) => (a.model || '').localeCompare(b.model || '', 'th'));   // by model only; cars of one model keep the list's order
   else list.sort(ssort === 'old' || ssort === 'free' ? (a, b) => (b.age ?? -1) - (a.age ?? -1) : (a, b) => (a.br || '').localeCompare(b.br || '') || a.spec.localeCompare(b.spec) || (b.age ?? -1) - (a.age ?? -1));
-  if (!list.length) return `<div class="bg-surface border border-line rounded-lg">${emptyBox('ไม่พบรถตามตัวกรองนี้', 'ลองล้างตัวกรองหรือค้นหาด้วยเลขอื่น')}</div>`;
+  if (!list.length) return `${shBar}<div class="bg-surface border border-line rounded-lg">${emptyBox('ไม่พบรถตามตัวกรองนี้', 'ลองล้างตัวกรองหรือค้นหาด้วยเลขอื่น')}</div>`;
   // laid out like the Excel sheet (10/11): VIN · model / grade · colour · customer · adviser · status · lock · production · in stock · branch,
   // tight rows with grid lines, the VIN column stays on screen when the table scrolls; the other buttons only on a computer
   if (typeof ltSweep === 'function') ltSweep(D);
   const sales = isSales(), lc = c => c.lock ? (c.lock.booking ? c.lock.booking.cust : c.lock.prospect) : null;
-  return `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl tbl-xl">
-    <thead><tr><th class="xl-pin">เลขตัวถัง</th><th>รุ่น / เกรด</th><th>สี</th><th>ชื่อลูกค้า</th><th>ล็อก</th><th>ที่ปรึกษา</th><th class="xl-st">สถานะ</th><th>วันผลิต</th><th class="text-right">อายุรถ</th><th>สาขา</th>${sales ? '' : '<th class="xl-desk"></th>'}</tr></thead>
+  return `${shBar}<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl tbl-xl">
+    <thead><tr><th class="xl-pin">เลขตัวถัง</th><th>รุ่น / เกรด</th><th>สี</th><th>ชื่อลูกค้า</th><th>ล็อก</th>${sales ? '' : '<th>ชีต</th>'}<th>ที่ปรึกษา</th><th class="xl-st">สถานะ</th><th>วันผลิต</th><th class="text-right">อายุรถ</th><th>สาขา</th>${sales ? '' : '<th class="xl-desk"></th>'}</tr></thead>
     <tbody>${list.map(c => `<tr>
       <td class="nowrap xl-pin">${vinLink(c)}${(() => { const xs = [c.mcode ? esc(c.mcode) : '', c.ref ? 'Ref ' + esc(c.ref) : '', c.src !== 'IDS' ? esc(c.src) : '', c.fromBr ? `โอนจาก ${esc(c.fromBr)}` : ''].filter(Boolean); return xs.length ? `<div class="text-xs text-muted xl-sub">${xs.join(' · ')}</div>` : ''; })()}</td>
       <td class="nowrap">${esc(c.model || '')} <span class="text-muted">${esc(gradeShort(c.model, c.grade) || c.grade || '')}</span>${carIsOldPrice(c) ? oldTag() : ''}</td><td class="nowrap">${esc(c.color || '')}</td>
       <td class="nowrap">${sales && c.lock ? '' : custCell(c.cust || c.bknote || (c.assignedTo && c.assignedTo.cust) || lc(c), c.sales || (c.assignedTo && c.assignedTo.sales), { company: c.company || c.status === 'company', seed: c.seed && ['booked', 'noted', 'sold', 'invoiced'].includes(c.status) })}${c.bk || (c.assignedTo && (c.assignedTo.no || c.assignedTo.rec.booking_no)) ? `<div class="code text-xs text-muted">${esc(c.bk || c.assignedTo.no || c.assignedTo.rec.booking_no)}</div>` : c.assignedTo ? '<div class="text-xs text-muted">จัดสรรในเว็บ · ยังไม่มีเลข IDS</div>' : ''}</td>
       <td class="nowrap">${sales ? (c.lock ? `<span class="text-xs">${lockText(c.lock)}</span>` : '') : (ltCan() ? ltCell(c, D, p) : stockActions(c, p, D, 'lock'))}</td>
+      ${sales ? '' : `<td style="min-width:180px">${typeof sheetStCell === 'function' ? sheetStCell(c, D) : ''}</td>`}
       <td class="nowrap">${esc(c.sales || (c.assignedTo && c.assignedTo.sales) || (c.lock && c.lock.owner) || '')}</td>
       <td class="xl-st" data-xf-tags="${esc(carTags(c).join('|'))}">${carStatusCell(c, D, true)}${c.lock ? `<div class="text-xs text-muted">${lockLabel(c.lock)}</div>` : ''}</td>
       <td class="nowrap text-sm">${c.prod ? `<div class="num">${fmtD(c.prod)}</div>` : '<div class="text-xs" style="color:var(--warn)">ยังไม่มี</div>'}<div class="text-xs text-muted">${[c.prod && c.prodSrc === 'key' ? 'คีย์' : '', c.prodDiff ? '<span style="color:var(--warn)">ไม่ตรง IDS</span>' : '', prodBtn(c, true)].filter(Boolean).join(' · ')}</div></td>

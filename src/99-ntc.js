@@ -20,7 +20,7 @@ function focusRow(sel, codeSel, text) {
     let el = document.querySelector('main ' + sel) || document.querySelector(sel);
     if (!el && text) el = [...document.querySelectorAll(codeSel)].find(x => x.textContent.includes(text));
     const row = el && (el.closest('.lk-row, tr, .p-3, .py-2, li') || el.parentElement);
-    if (!row) { if (++n < 10) setTimeout(go, 150); return; }
+    if (!row) { if (++n < 40) setTimeout(go, 150); return; }
     row.scrollIntoView({ block: 'center', behavior: 'smooth' }); row.classList.add('bko-hl'); setTimeout(() => row.classList.remove('bko-hl'), 4000);
   }; setTimeout(go, 80);
 }
