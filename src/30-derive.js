@@ -412,8 +412,10 @@ function deriveNow(key) {
   // the temporary one is not counted (ltSweep closes it as "converted")
   for (const t of locks) {
     if (!t.live || t.type !== 'temp') continue;
-    const fn = nameKey(String(t.prospect || '').split('/').pop() || ''); if (!fn) continue;
-    const b = locks.find(x => x.id !== t.id && x.live && x.type === 'booking' && ((t.vin && x.vin === t.vin) || (!t.vin && t.ref && x.ref === t.ref)) && x.booking && x.booking.cust && keyScore(nameKey(x.booking.cust), fn) >= 1);
+    const fn = nameKey(String(t.prospect || '').split('/').pop() || '');
+    // also: a temporary request read from the sheet, when the same sales' booking now holds the car (the sheet text moved on)
+    const b = locks.find(x => x.id !== t.id && x.live && x.type === 'booking' && ((t.vin && x.vin === t.vin) || (!t.vin && t.ref && x.ref === t.ref))
+      && ((fn.n && x.booking && x.booking.cust && keyScore(nameKey(x.booking.cust), fn) >= 1) || (t.imported && t.owner && x.owner && t.owner === x.owner)));
     if (b) { t.live = false; t.superseded = b.id; }
   }
   const pendByUnit = new Map();
@@ -674,7 +676,7 @@ function buildAlerts(D) {
     }
     { const so = lockSpecOff(l, D); if (so) add('lkspec:' + l.id, { br: l.bk_br || (so.a && so.a.br) || l.car_br, roles: ['admin', 'manager'] }, 'warn', `ล็อกข้ามสเปก · แก้ไขใบจอง${so.ids ? 'ใน IDS' : ''}เป็นสเปกของรถ`,
       `${(so.a && so.a.cust) || so.b.cust || ''} · ${l.vin || 'Quota ' + (l.ref || '')} · ${specOffText(so)}`, so.a ? { act: 'at-open', id: so.a.id, label: 'เปิดใบจอง' } : null); }
-    if (l.status === 'pending' && !l.idsTook) add('lockp:' + l.id, { br, roles: ['manager'] }, 'warn', l.type === 'temp' ? 'ขอล็อกชั่วคราว รออนุมัติ' : l.type === 'dealer' ? 'ขอล็อกแลก/ขายดีลเลอร์ รออนุมัติ' : 'ขอล็อกให้ใบจอง รออนุมัติ', `${unit} · ${specLabelText(l.spec)} · ${who || l.sales_nick || ''}${l.sheet_text || l.imported ? ' · จากชีต Stock' : ''}`, { act: 'lock-goto', id: l.id });
+    if (l.status === 'pending' && !l.idsTook && !l.superseded) add('lockp:' + l.id, { br, roles: ['manager'] }, 'warn', l.type === 'temp' ? 'ขอล็อกชั่วคราว รออนุมัติ' : l.type === 'dealer' ? 'ขอล็อกแลก/ขายดีลเลอร์ รออนุมัติ' : 'ขอล็อกให้ใบจอง รออนุมัติ', `${unit} · ${specLabelText(l.spec)} · ${who || l.sales_nick || ''}${l.sheet_text || l.imported ? ' · จากชีต Stock' : ''}`, { act: 'lock-goto', id: l.id });
     // the last day of a 15-day lock: the manager extends or releases; no update = the queue is released on releaseOn
     if (l.over && l.live) add(`lkage:${l.id}:${Math.floor((l.over - 1) / 7)}`, { sales: who, br, roles: ['sales', 'manager'] }, 'warn', `ล็อกค้างมา ${l.heldDays} วัน · ตรวจว่ายังใช้คันนี้ไหม`,
       `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · เซลล์ ${who || '–'} · เกินกำหนด ${l.days || ''} วันมา ${l.over} วัน · ยังใช้: ไม่ต้องทำอะไร · ไม่ใช้แล้ว: ปล่อยล็อก`, l.vin ? { act: 'xfer-open', id: l.vin, label: 'เปิดรถ' } : { act: 'go', view: 'lock', sub: 'active', label: 'ดูล็อก' });

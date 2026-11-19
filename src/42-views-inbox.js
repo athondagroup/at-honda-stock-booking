@@ -11,7 +11,7 @@ function inboxItems(D) {
   }
   for (const l of D.locks) {
     if (l.status === 'pending' && l.replaces) { if (l.approver && S.me && l.approver === S.me.id) out.push({ kind: 'lock', l, at: l.requested_at }); }   // a change to a typed lock: the one who locked decides (10/11)
-    else if (l.status === 'pending' && (l.type === 'dealer' ? p.approveDealer : canLockMgr(l))) out.push({ kind: 'lock', l, at: l.requested_at });
+    else if (l.status === 'pending' && !l.superseded && (l.type === 'dealer' ? p.approveDealer : canLockMgr(l))) out.push({ kind: 'lock', l, at: l.requested_at });
     else if (l.needExt && canLockMgr(l)) out.push({ kind: 'ext', l, at: l.end });
   }
   return out.sort((x, y) => (x.at || '').localeCompare(y.at || ''));
