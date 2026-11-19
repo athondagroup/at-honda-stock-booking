@@ -354,6 +354,7 @@ function deriveNow(key) {
   idsB.forEach(b => { if (b.match !== 'cancel') { if (b.ref) idsRefBk.set(b.ref, b); if (b.ws) idsRefBk.set(b.ws, b); } });
   X.quota.forEach(q => { if (q.bk && !idsRefBk.has(q.ref)) idsRefBk.set(q.ref, bkByNo.get(q.bk) || { no: q.bk }); });
   const outByVin = new Map(deliveredOut.map(c => [c.vin, c]));
+  const replacedBy = new Set(locks.filter(x => x.replaced && ['approved', 'allocated'].includes(x.status)).map(x => x.replaced));
   for (const l of locks) {
     l.type = l.type === 'customer' ? 'booking' : (l.type || 'booking');
     // a request read from the Stock sheet before the nickname was known: match the nickname again with today's list
@@ -384,6 +385,7 @@ function deriveNow(key) {
     l.needExt = l.mgrDue;
     l.releaseOn = due && l.type !== 'temp' ? addDays(l.end, MGR_GRACE + 1) : null;
     l.live = l.status === 'pending' || l.status === 'allocated' || (l.status === 'approved' && !l.autoReleased && !l.expired);
+    if (l.live && replacedBy.has(l.id)) l.live = false;   // a newer typed lock replaced it (its release is on the way, 19/11)
     // IDS has allocated this car / slot: our lock steps aside (the same deal = done, another deal = a manager closes it)
     // 19/11: a car invoiced as an Advance with no real customer is free to sell: its invoice name is not a buyer, a lock on it never conflicts
     const advFree = (() => { if (!l.vin) return false; const ar = advRec(l.vin), i = invByVin.get(l.vin); return !!(ar && i && !i.ddate && advInvNo(ar.inv) === advInvNo(i.inv)); })();

@@ -135,6 +135,7 @@ function ltRetry(D) {
 function ltSweep(D) {
   if (!ltCan() || !window.__WEB) return;
   ltRetry(D);
+  ltReplacedSweep(D);
   if (typeof bltConvertSweep === 'function') bltConvertSweep(D);
   for (const l of D.locks) {
     if (!l.typed || l.sheet_cleared || ltSwept.has(l.id) || l.live || !(l.vin || l.ref) || !(l.sheet_sync && l.sheet_sync.value && !l.sheet_sync.conflict)) continue;
@@ -211,8 +212,9 @@ Object.assign(ACTIONS, {
       if (!await saveLock(id, l, 'ขอแก้ล็อก (พิมพ์ในหน้า Stock)', `"${ltTextOf(old)}" → "${l.sheet_text}" · รอ${l.approver_role || 'คนล็อก'}อนุมัติ`)) return;
       S.lt = null; toast(`ส่งคำขอแก้แล้ว รอ${l.approver_role || 'คนที่ล็อก'}อนุมัติ · ล็อกเดิมยังอยู่`); return;
     }
-    if (old) { old.status = 'released'; old.rel = { at: new Date().toISOString(), by: roleLabel(), self: true, reason: 'แก้ไขล็อก (พิมพ์ใหม่)' }; old.sheet_cleared = new Date().toISOString(); await saveLock(t.old, old, 'แก้ไขล็อก', `เปลี่ยนเป็น "${l.sheet_text}"`); }
+    // 19/11: the new lock is saved first, then the old one let go: a dropped connection never leaves the car with no lock
     if (!await saveLock(id, l, old ? 'แก้ไขล็อก (พิมพ์ในหน้า Stock)' : 'ล็อก (พิมพ์ในหน้า Stock)', `"${l.sheet_text}" · หมด ${fmtD(l.end)}`)) return;
+    if (old && !await ltReleaseReplaced(t.old, l.sheet_text)) toast('ล็อกใหม่บันทึกแล้ว แต่ล็อกเดิมยังไม่ถูกปล่อย ระบบจะปล่อยให้เองเมื่อเปิดหน้าเว็บครั้งถัดไป', 'bad');
     if (l.type !== 'temp') await settleUnit(derive(), l, id);
     S.lt = null;
     toast(`ล็อกแล้วถึง ${fmtD(l.end)} · แจ้งสาขา ${c.br} แล้ว${window.__WEB ? '' : ' · เว็บตัวอย่าง: ไม่เขียนชีตจริง'}`);
@@ -313,4 +315,15 @@ function specOffText(o) { return `ใบจองเป็น ${specLabelText(o.
 function bkSpecOffBox(a, D) {
   const l = D.locks.find(x => x.live && x.type === 'booking' && (x.bkref === a.key || x.bkref === 'app:' + a.id)); const o = l && lockSpecOff(l, D); if (!o) return '';
   return `<div class="mt-2 p-3 rounded-lg" style="background:var(--warn-bg,#fef3c7);color:var(--warn)"><b>⚠ ล็อกข้ามสเปก</b> · ${esc(l.vin || 'Quota ' + (l.ref || ''))}<br><span class="text-sm">${esc(specOffText(o))}</span><br><span class="text-sm">แอดมินสาขา: แก้ไขใบจอง${o.ids ? 'ใน IDS (และฟอร์ม)' : ''}เป็นสเปกของรถ · หรือปล่อยล็อกถ้าล็อกผิดคัน</span></div>`;
+}
+
+// let go of the lock a new typed lock replaced (19/11); true when done (or nothing left to do)
+async function ltReleaseReplaced(oldId, text) {
+  const old = findLock(oldId); if (!old || !['approved', 'allocated', 'pending'].includes(old.status)) return true;
+  old.status = 'released'; old.rel = { at: new Date().toISOString(), by: roleLabel(), self: true, reason: 'แก้ไขล็อก (พิมพ์ใหม่)' }; old.sheet_cleared = new Date().toISOString();
+  return !!await saveLock(oldId, old, 'แก้ไขล็อก', `เปลี่ยนเป็น "${text || ''}"`);
+}
+// a new lock that replaced an old one whose release did not get saved: let the old one go now (run with the sweep)
+async function ltReplacedSweep(D) {
+  for (const l of D.locks) if (l.replaced && l.live) { const o = D.locks.find(x => x.id === l.replaced); if (o && o.live && canLockMgr(o)) await ltReleaseReplaced(o.id, ltTextOf(l)); }
 }
