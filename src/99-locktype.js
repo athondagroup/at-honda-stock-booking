@@ -47,11 +47,19 @@ function ltCands(c, q, D) {
     .map(b => ({ b, rank: b.spec === c.spec ? 0 : String(b.spec || '').split('|')[0] === model ? 1 : 2 }))
     .sort((x, y) => x.rank - y.rank || String(x.b.qdate || x.b.date || '').localeCompare(String(y.b.qdate || y.b.date || ''))).slice(0, 200);
 }
+// 20/11: editing a lock: its own booking is listed first (it already has this car, so the waiting list leaves it out)
+function ltCandsAll(c, q, D) {
+  const list = ltCands(c, q, D), t = S.lt, oldL = t && t.old ? D.locks.find(x => x.id === t.old) : null, b = oldL && oldL.booking;
+  if (!b) return list;
+  const k = searchKey(q || ''), hit = !k || [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k));
+  const key = b.app ? b.app.key : b.key;
+  return hit ? [{ b, rank: b.spec === c.spec ? 0 : String(b.spec || '').split('|')[0] === String(c.spec).split('|')[0] ? 1 : 2, cur: true }, ...list.filter(x => (x.b.app ? x.b.app.key : x.b.key) !== key)] : list;
+}
 function ltDrop(c, D) {
   const t = S.lt, q = String(t.q || '').trim();
-  const p = parseSheetText(q), cands = ltCands(c, q, D);
+  const p = parseSheetText(q), cands = ltCandsAll(c, q, D);
   const it = (k, body, sub) => `<button class="lt-it" data-act="lt-pick" data-vin="${esc(ltKey(c))}" data-k="${esc(k)}"><span>${body}</span>${sub ? `<span class="lt-sub">${sub}</span>` : ''}</button>`;
-  const rows = cands.map(({ b, rank }) => it(b.app ? b.app.key : b.key, `<b>${esc(b.cust || '–')}</b>${b.no ? ` · ${esc(b.no)}` : ' · <span class="text-muted">ยังไม่มีเลข IDS</span>'} <span class="text-muted">${esc(b.br || '')}</span>${b.noIds ? ' <span class="lt-sub" style="display:inline;color:var(--warn)">ฟอร์มยังไม่อยู่ใน IDS</span>' : ''}`,
+  const rows = cands.map(({ b, rank, cur }) => it(b.app ? b.app.key : b.key, `${cur ? '<span class="chip" style="background:var(--good-bg, #dcfce7);color:var(--good)">ใบจองของล็อกนี้</span> ' : ''}<b>${esc(b.cust || '–')}</b>${b.no ? ` · ${esc(b.no)}` : ' · <span class="text-muted">ยังไม่มีเลข IDS</span>'} <span class="text-muted">${esc(b.br || '')}</span>${b.noIds ? ' <span class="lt-sub" style="display:inline;color:var(--warn)">ฟอร์มยังไม่อยู่ใน IDS</span>' : ''}`,
     `เซลล์ ${esc(b.owner || b.sales || '–')} · จอง ${fmtD(b.qdate || b.date)} · ${esc(specLabelText(b.spec))} · ${rank === 0 ? '<span style="color:var(--good)">สเปกตรง</span>' : '<span style="color:var(--warn)">สเปกไม่ตรง</span>'} · ล็อก ${LOCK_DAYS_BY.booking} วัน`)).join('');
   const temp = p.kind === 'named' || p.kind === 'nick'
     ? it('temp', `＋ ล็อกชั่วคราว "${esc(q)}"`, `ยังไม่มีใบจอง · เซลล์ ${p.sales ? esc(p.sales) : `<span style="color:var(--warn)">ยังไม่รู้ว่า "${esc(p.who)}" คือใคร</span>`}${p.cust ? ` · ลูกค้า ${esc(p.cust)}` : ''} · ${LOCK_DAYS_BY.temp} วัน`)
@@ -61,7 +69,7 @@ function ltDrop(c, D) {
     <div class="lt-hint" style="color:var(--warn)">⚠ สเปกไม่ตรง: ใบจองเป็น <b>${esc(specLabelText(a.bk))}</b> · รถเป็น <b>${esc(specLabelText(c.spec))}</b><br>ล็อกได้ แต่ต้องใส่เหตุผล แล้วแอดมินสาขาต้องแก้ไขใบจองเป็นสเปกของรถคันนี้</div>
     <div style="padding:6px 10px"><input id="lt-why" class="lt-in" style="width:100%" placeholder="เหตุผล เช่น ลูกค้าเปลี่ยนเป็นรุ่นนี้"></div>
     <div style="padding:0 10px 8px;display:flex;gap:6px"><button class="btn btn-red btn-sm" data-act="lt-pick" data-vin="${esc(ltKey(c))}" data-k="${esc(a.k)}" data-why="1">ล็อกข้ามสเปก</button><button class="btn btn-ghost btn-sm" data-act="lt-specback">เลือกใบอื่น</button></div></div>`; }
-  if (!q) return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${rows ? `<div class="lt-hint">ใบจองสเปกนี้ที่ยังไม่มีรถ (พิมพ์ชื่อ / เลขใบจอง / เซลล์ เพื่อหาใบอื่น)</div>${rows}` : (ltDemoCar(c) ? '<div class="lt-hint">รถบริษัท (Demo): ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo" · พิมพ์ชื่อลูกค้า / เลขใบจอง</div>' : `<div class="lt-hint">ไม่มีใบจองสเปกนี้รอรถ · พิมพ์ชื่อลูกค้า / เลขใบจอง หรือ "ชื่อเล่นเซลล์ / ชื่อลูกค้า"</div>`)}</div>`;
+  if (!q) return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${rows ? `<div class="lt-hint">${t.old ? 'ใบจองของล็อกนี้ + ' : ''}ใบจองสเปกนี้ที่ยังไม่มีรถ (พิมพ์ชื่อ / เลขใบจอง / เซลล์ เพื่อหาใบอื่น)</div>${rows}` : (ltDemoCar(c) ? '<div class="lt-hint">รถบริษัท (Demo): ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo" · พิมพ์ชื่อลูกค้า / เลขใบจอง</div>' : `<div class="lt-hint">ไม่มีใบจองสเปกนี้รอรถ · พิมพ์ชื่อลูกค้า / เลขใบจอง หรือ "ชื่อเล่นเซลล์ / ชื่อลูกค้า"</div>`)}</div>`;
   return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${t.mode === 'ask' ? '<div class="lt-hint">ขอแก้ล็อกของคนอื่น: คนที่ล็อกไว้ต้องอนุมัติก่อน ล็อกเดิมยังอยู่</div>' : ''}
     ${rows ? `<div class="lt-hint">พบ ${cands.length} ใบ · ใบจองที่ยังไม่มีรถ · สเปกตรงกันขึ้นก่อน${cands.length > 6 ? ' · เลื่อนดูเพิ่ม' : ''}</div>${rows}` : `<div class="lt-hint">ไม่พบใบจองที่ตรงกับ "${esc(q)}"</div>`}${ltDemoCar(c) ? '<div class="lt-hint">รถบริษัท (Demo): ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo"</div>' : temp + dealer}</div>`;
 }
@@ -72,7 +80,8 @@ function ltCell(c, D, p) {
   const asks = ltLocks(c, D).filter(l => l.status === 'pending' && l.replaces);
   const askTxt = asks.length ? `<div class="text-xs" style="color:var(--warn)">${asks.map(l => `${esc(ltRoleShort(l))} ขอแก้เป็น "${esc(ltTextOf(l))}" รอ${esc(l.approver_role || 'คนล็อก')}อนุมัติ`).join('<br>')}</div>` : '';
   const ss = L && L.sheet_sync;
-  const warn = ss && ss.conflict ? `<div class="text-xs" style="color:var(--bad)">ชีตมี "${esc(ss.current || '')}" ยังไม่ได้เขียน <button class="underline" data-act="lt-force" data-id="${esc(L.id)}">เขียนทับ</button></div>`
+  const stOk = ss && ss.conflict && typeof carSheetSt === 'function' && (carSheetSt(c, D) || {}).k === 'ok';
+  const warn = ss && ss.conflict && !stOk ? `<div class="text-xs" style="color:var(--bad)">ชีตมี "${esc(ss.current || '')}" ยังไม่ได้เขียน <button class="underline" data-act="lt-force" data-id="${esc(L.id)}">เขียนทับ</button></div>`
     : ss && ss.error && ss.value ? `<div class="text-xs" style="color:var(--warn)">ยังไม่ได้ลงชีต (${ss.error === 'not_found' ? 'ไม่มีรถในชีต · เขียนให้เองเมื่อรถเข้าชีต' : 'เขียนไม่สำเร็จ'}) <button class="underline" data-act="lt-retry" data-id="${esc(L.id)}">ลองอีกครั้ง</button></div>` : '';
   if (t) return `<div class="lt-cell on"><input id="lt-in" class="lt-in" data-lt="${esc(ltKey(c))}" value="${esc(t.q || '')}" placeholder="ชื่อลูกค้า / เลขใบจอง / เซลล์" autocomplete="off">
     <button class="text-xs underline text-muted" data-act="lt-cancel">ยกเลิก</button>${ltDrop(c, D)}</div>`;
