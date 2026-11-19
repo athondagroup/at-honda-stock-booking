@@ -56,7 +56,7 @@ function ltDrop(c, D) {
   const temp = p.kind === 'named' || p.kind === 'nick'
     ? it('temp', `＋ ล็อกชั่วคราว "${esc(q)}"`, `ยังไม่มีใบจอง · เซลล์ ${p.sales ? esc(p.sales) : `<span style="color:var(--warn)">ยังไม่รู้ว่า "${esc(p.who)}" คือใคร</span>`}${p.cust ? ` · ลูกค้า ${esc(p.cust)}` : ''} · ${LOCK_DAYS_BY.temp} วัน`)
     : `<div class="lt-hint">ยังไม่มีใบจอง: พิมพ์ "ชื่อเล่นเซลล์ / ชื่อลูกค้า" เช่น "มด / เปิ้ล" (ล็อก ${LOCK_DAYS_BY.temp} วัน)</div>`;
-  const dealer = it('dealer', `＋ ขาย / แลกดีลเลอร์ "${esc(p.kind === 'dealer' ? p.dealer : q)}"`, `ไม่มีชื่อลูกค้า · ${LOCK_DAYS_BY.dealer} วัน`);
+  const dealer = p.kind === 'bkno' ? `<div class="lt-hint">${cands.length ? 'เลขใบจอง: เลือกใบจองด้านบน' : `ไม่พบใบจองเลข ${esc(p.no)} ที่ยังไม่มีรถ`}</div>` : it('dealer', `＋ ขาย / แลกดีลเลอร์ "${esc(p.kind === 'dealer' ? p.dealer : q)}"`, `ไม่มีชื่อลูกค้า · ${LOCK_DAYS_BY.dealer} วัน`);
   if (t.specAsk) { const a = t.specAsk; return `<div class="lt-drop" role="dialog"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>
     <div class="lt-hint" style="color:var(--warn)">⚠ สเปกไม่ตรง: ใบจองเป็น <b>${esc(specLabelText(a.bk))}</b> · รถเป็น <b>${esc(specLabelText(c.spec))}</b><br>ล็อกได้ แต่ต้องใส่เหตุผล แล้วแอดมินสาขาต้องแก้ไขใบจองเป็นสเปกของรถคันนี้</div>
     <div style="padding:6px 10px"><input id="lt-why" class="lt-in" style="width:100%" placeholder="เหตุผล เช่น ลูกค้าเปลี่ยนเป็นรุ่นนี้"></div>
@@ -136,6 +136,7 @@ function ltSweep(D) {
   if (!ltCan() || !window.__WEB) return;
   ltRetry(D);
   ltReplacedSweep(D);
+  for (const l of D.locks) if (l.bkFix && !(ltAutoTried = ltAutoTried || new Set()).has('bk:' + l.id)) { ltAutoTried.add('bk:' + l.id); ltSaveBkFix(l); }
   for (const t of D.locks) if (t.superseded && ['approved', 'pending'].includes(t.status) && !(ltAutoTried = ltAutoTried || new Set()).has('sup:' + t.id)) { ltAutoTried.add('sup:' + t.id); ltCloseSuperseded(t.id, t.superseded); }
   for (const l of D.locks) if (!l.typed && l.live && !l.sheet_sync && ['approved', 'allocated'].includes(l.status) && !(ltAutoTried = ltAutoTried || new Set()).has(l.id)) { ltAutoTried.add(l.id); ltAutoSheet(l.id); }
   if (typeof bltConvertSweep === 'function') bltConvertSweep(D);
@@ -349,4 +350,11 @@ async function ltCloseSuperseded(id, by) {
   const x = findLock(id); if (!x || !['approved', 'pending'].includes(x.status)) return;
   x.status = x.status === 'pending' ? 'rejected' : 'converted'; x.converted_to = by; x.sheet_cleared = x.sheet_cleared || new Date().toISOString();
   await saveLock(id, x, 'ปิดล็อกชั่วคราว (รถคันนี้ล็อกให้ใบจองของลูกค้า / เซลล์คนเดียวกันแล้ว)', '');
+}
+
+// write down a dealer lock that was really a booking number (19/11)
+async function ltSaveBkFix(l) {
+  const x = findLock(l.id); if (!x || x.type !== 'dealer') return;
+  Object.assign(x, { type: 'booking', bkref: l.bkref, bk_br: l.bk_br, dealer_name: null, end: x.start ? addDays(x.start, LOCK_DAYS_BY.booking) : x.end });
+  await saveLock(l.id, x, 'แก้ประเภทล็อก: เลขใบจอง ไม่ใช่ดีลเลอร์', l.bkFix.no);
 }

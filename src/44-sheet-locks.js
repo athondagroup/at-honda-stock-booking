@@ -24,7 +24,15 @@ function parseSheetText(text) {
   const sales = salesOfNick(who);
   if (cust) return { kind: 'named', who, sales, cust, text: t };
   if (sales || i >= 0) return { kind: 'nick', who, sales, cust: '', text: t };
-  return { kind: 'dealer', who: '', sales: null, cust: '', dealer: t.replace(/^(ขายให้|ขาย|แลกให้|แลก)\s*/, '').trim() || t, text: t };
+  const d = t.replace(/^(ขายให้|ขาย|แลกให้|แลก)\s*/, '').trim() || t;
+  // 19/11: a booking number (51xxxxxxxx) is a booking, not a dealer's name
+  if (/^\d{8,12}$/.test(d.replace(/\D/g, '')) && /^[\d\s-]+$/.test(d)) return { kind: 'bkno', who: '', sales: null, cust: '', no: d.replace(/\D/g, ''), text: t };
+  return { kind: 'dealer', who: '', sales: null, cust: '', dealer: d, text: t };
+}
+// the open booking (web form or IDS) with this booking number
+function bookingByNo(no, D) {
+  no = String(no || '').replace(/\D/g, ''); if (!no) return null;
+  return D.bookings.find(b => String(b.no || '').replace(/\D/g, '') === no && b.state !== 'cancel') || null;
 }
 // the customer typed in the sheet is usually short (a first name or nickname): it is found inside the booking's name
 const sheetNameHit = (full, cust) => { const k = normName(String(cust || '').split(/\s+/)[0]); return k.length >= 2 && normName(full || '').includes(k); };
@@ -125,6 +133,7 @@ function sheetLockFields(u, D) {
   const base = { vin: u.vin, ref: u.ref, car_br: u.br, spec: u.spec, reason: 'นำเข้าจากชื่อที่พิมพ์ไว้ในชีต Stock', note: `ข้อความเดิม: "${u.text}"`, sheet_text: u.text, imported: true,
     dealer_name: null, prospect: null, sales: null, sales_nick: null, bkref: null, bk_br: null, warnings: [] };
   if (p.kind === 'dealer') return { ...base, type: 'dealer', dealer_name: p.dealer };
+  if (p.kind === 'bkno') { const b = bookingByNo(p.no, D); return b ? { ...base, type: 'booking', bkref: b.app ? b.app.key : b.key, bk_br: b.br || null, sales: b.owner || b.sales || null } : { ...base, type: 'temp', prospect: 'ใบจอง ' + p.no, warnings: [`ไม่พบใบจองเลข ${p.no}`] }; }
   const warn = p.sales ? [] : [`ยังไม่รู้ว่า "${p.who}" คือเซลล์คนไหน`];
   const a = p.kind === 'named' ? sheetAutoMatch(u.spec, p, D) : null;
   const common = { sales: p.sales || (a && a.sales) || null, sales_nick: p.sales ? null : p.who || null, prospect: p.cust || null, warnings: warn };

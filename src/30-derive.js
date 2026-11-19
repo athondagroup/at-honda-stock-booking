@@ -357,6 +357,9 @@ function deriveNow(key) {
   const replacedBy = new Set(locks.filter(x => x.replaced && ['approved', 'allocated'].includes(x.status)).map(x => x.replaced));
   for (const l of locks) {
     l.type = l.type === 'customer' ? 'booking' : (l.type || 'booking');
+    // 19/11: a "dealer" lock whose name is a booking number was meant for that booking (typed "5101138052"): read it as the booking's lock
+    if (l.type === 'dealer' && /^\d{8,12}$/.test(String(l.dealer_name || '').replace(/\s/g, ''))) { const no = String(l.dealer_name).replace(/\D/g, ''), b = bookings.find(x => String(x.no || '').replace(/\D/g, '') === no && x.state !== 'cancel');
+      if (b) { l.bkFix = { from: 'dealer', no }; l.type = 'booking'; l.bkref = b.app ? b.app.key : b.key; l.bk_br = b.br || l.bk_br || null; l.dealer_name = null; } }
     // a request read from the Stock sheet before the nickname was known: match the nickname again with today's list
     // (or the sales came from the matched booking): the old "ยังไม่รู้ว่า … คือเซลล์คนไหน" warning no longer applies
     if (l.sales_nick || (l.warnings || []).length) {
