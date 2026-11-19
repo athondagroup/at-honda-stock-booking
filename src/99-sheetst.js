@@ -15,6 +15,7 @@ function carSheetSt(c, D) {
   const first = shN(String(cust).split(/\s+/)[0] || '');
   const same = shN(sheet) === shN(web) || (first.length >= 3 && shN(sheet).includes(first));
   if (sy && sy.conflict) return { k: 'bad', web, sheet: sy.current != null ? sy.current : sheet, l, readAt };
+  if (sy && sy.at && String(sy.at) > readAt && sy.value && !sy.error && !sy.conflict && shN(sy.value) !== shN(web)) return { k: 'wait', web, why: `ชีตมี "${sy.value}" ยังไม่ครบ · กำลังเขียนใหม่`, l, readAt };
   if (same) return { k: 'ok', why: sheet, l, readAt };
   if (sy && sy.at && !sy.error && String(sy.at) > readAt) return { k: 'ok', why: `เขียนลงชีตแล้ว ${fmtDT(sy.at)} (รออ่านชีตรอบหน้า)`, l, readAt };
   if (!sheet || (sy && sy.error)) return { k: 'wait', web, why: sy && sy.error ? 'เขียนไม่สำเร็จ · ลองใหม่อัตโนมัติ' : 'ยังไม่ได้เขียนลงชีต', l, readAt };

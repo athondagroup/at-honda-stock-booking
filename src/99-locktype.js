@@ -138,6 +138,9 @@ function ltSweep(D) {
   ltReplacedSweep(D);
   for (const l of D.locks) if (l.bkFix && !(ltAutoTried = ltAutoTried || new Set()).has('bk:' + l.id)) { ltAutoTried.add('bk:' + l.id); ltSaveBkFix(l); }
   for (const t of D.locks) if (t.superseded && ['approved', 'pending'].includes(t.status) && !(ltAutoTried = ltAutoTried || new Set()).has('sup:' + t.id)) { ltAutoTried.add('sup:' + t.id); ltCloseSuperseded(t.id, t.superseded); }
+  // a cell written before the booking was loaded ("นุดา /"): written again with the customer's name, if the sheet still has that text
+  for (const l of D.locks) { const sy = l.sheet_sync; if (l.typed || !l.live || !sy || sy.error || sy.conflict || !sy.value || !/\/\s*$/.test(sy.value)) continue;
+    const full = ltTextOf(l); if (/\/\s*$/.test(full) || full === sy.value || (ltAutoTried = ltAutoTried || new Set()).has('fx:' + l.id)) continue; ltAutoTried.add('fx:' + l.id); ltSheet(l.id, full, sy.value, false, true); }
   for (const l of D.locks) if (!l.typed && l.live && !l.sheet_sync && ['approved', 'allocated'].includes(l.status) && !(ltAutoTried = ltAutoTried || new Set()).has(l.id)) { ltAutoTried.add(l.id); ltAutoSheet(l.id); }
   if (typeof bltConvertSweep === 'function') bltConvertSweep(D);
   for (const l of D.locks) {
@@ -340,6 +343,7 @@ async function ltAutoSheet(id) {
   const c = l.vin ? D.cars.get(l.vin) : null; if (l.vin && !(c && c.src === 'IDS')) return;
   if (c && (c.bkno || c.bk)) return;   // IDS already gives the car to a booking: the sheet shows that
   const txt = ltTextOf(l), cur = c ? String(c.bknote || '').trim() : '';
+  if (/\/\s*$/.test(txt) && l.type === 'booking') return;   // the booking is not loaded yet: never write a name without its customer
   if (cur) return;   // the sheet already says something (the same, or another name = ⚠ ไม่ตรง for a person)
   const r = await ltSheet(id, txt, '', false, true);
   if (r && r.ok) { const x = findLock(id); if (x && !x.auto_sheet) { x.auto_sheet = true; await write('locks', id, x); } }
