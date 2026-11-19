@@ -34,7 +34,14 @@ async function gseRun() {
           const o = old.get(x.vin); if (!o) { newCars++; continue; }
           // a blank in the sheet clears only the typed name: booking no. / customer / dates come from IDS and the sheet columns are often left empty (17/11)
           const ch = GSE_STOCK.filter(f => gseN(x[f]) !== gseN(o[f]) && (f === 'bknote' || gseN(x[f]))).map(f => ({ f, from: o[f] ?? null, to: x[f] ?? null }));
-          if (ch.length) edits.push({ src: 'stock', docId, br: r.br, key: x.vin, ch });
+          // 19/11: the car is allocated in IDS (booking no. in the web): a name typed in the sheet is not a new queue —
+          // the same customer → nothing to import; another name → shown against the IDS allocation, not against "(ว่าง)", and not ticked
+          if (gseN(o.bkno) && !gseN(x.bkno)) {
+            const fn = searchKey(String(o.cust || '').trim().split(/\s+/)[0] || ''), c = ch.find(c => c.f === 'bknote');
+            if (c && c.to && fn.length >= 3 && searchKey(c.to).includes(fn)) ch.splice(ch.indexOf(c), 1);
+            else if (c) { c.ids = `IDS จัดสรรแล้ว: ${o.bkno}${o.cust ? ' · ' + o.cust : ''}`; c.off = true; }
+          }
+          if (ch.length) edits.push({ src: 'stock', docId, br: r.br, key: x.vin, ch, ...(ch.some(c => c.off) ? { idsAl: true } : {}) });
         }
       } else if (r.src === 'quota') {
         for (const m of r.months || []) {
@@ -66,7 +73,7 @@ async function gseRun() {
         e.ch.forEach(c => { if ((c.f === 'bknote' || c.f === 'vnote') && !gseN(c.from)) c.web = `ล็อกให้${b ? ' ' + (b.cust || '') : l.prospect ? ' ' + l.prospect : ''}${said ? ` ("${said}")` : ''} ถึง ${fmtD(l.end)}`; });
         if (!e.ch.length) edits.splice(i, 1); } }
     // the same name typed on two cars / quota slots: shown on the row, and the manager of the seller's branch is told after saving
-    edits.forEach(e => { e.on = true; const c = e.ch.find(c => c.f === 'bknote' || c.f === 'vnote'); const k = c && c.to ? gseKey(c.to) : ''; const me = e.src === 'quota' ? 'Quota ' + e.key : e.key;
+    edits.forEach(e => { e.on = !e.idsAl; const c = e.ch.find(c => c.f === 'bknote' || c.f === 'vnote'); const k = c && c.to ? gseKey(c.to) : ''; const me = e.src === 'quota' ? 'Quota ' + e.key : e.key;
       const myId = e.src === 'quota' ? ((e.ch.find(c => c.f === 'vin') || {}).to || qVin.get(e.key) || me) : e.key;
       // two cars each locked in the web to its own booking (the customer books 2 cars, marked not a duplicate) are not a slip (16/11)
       const myBk = bkOfUnit.get(myId) || bkOfUnit.get(me);
@@ -87,7 +94,7 @@ function gseBox() {
   const v = x => x === null || x === '' ? '<span class="text-muted">(ว่าง)</span>' : esc(String(x));
   return `<div class="mt-3 p-3 rounded-lg" style="background:var(--surface-2)"><b>ช่องที่แก้ในชีต ${E.length} รายการ</b> <span class="text-sm text-muted">บันทึกแล้วเปลี่ยนเฉพาะช่องเหล่านี้ · ข้อความที่พิมพ์กลายเป็นล็อกตามกติกาเดิม · ช่องที่ถูกลบ ปล่อยล็อกที่มาจากข้อความนั้น</span>
     <div class="scroll-x mt-2 max-h-80 overflow-auto"><table class="tbl text-sm"><thead><tr><th><input type="checkbox" data-gseall="1" ${E.every(e => e.on) ? 'checked' : ''} aria-label="เลือกทั้งหมด"></th><th>สาขา</th><th>รถ / Quota</th><th>ช่อง</th><th>ในเว็บ</th><th>ในชีตตอนนี้</th></tr></thead><tbody>
-    ${E.flatMap((e, ei) => e.ch.map((c, ci) => `<tr${e.on ? '' : ' style="opacity:.5"'}><td>${ci || e.src === 'warn' ? '' : `<input type="checkbox" data-gse="${ei}" ${e.on ? 'checked' : ''} aria-label="นำเข้า">`}</td><td>${esc(e.br)}</td><td class="code nowrap">${esc(e.src === 'quota' ? 'Quota ' + e.key : e.key)}${e.src === 'match' ? `<div class="text-xs" style="color:var(--good);font-family:inherit">match จาก Quota ${esc(e.ref)} → Stock · ล็อกที่รถทันที</div>` : e.src === 'warn' ? `<div class="text-xs" style="color:var(--bad);font-family:inherit">${esc(e.note)}</div>` : ''}</td><td class="nowrap">${GSE_T[c.f] || c.f}</td><td>${v(c.from)}${c.web ? `<div class="text-xs" style="color:var(--accent,#2563eb)">เว็บ: ${esc(c.web)}</div>` : ''}</td><td><b>${v(c.to)}</b>${(c.f === 'bknote' || c.f === 'vnote') && e.dup && e.dup.length ? `<div class="text-xs" style="color:var(--bad)">ชื่อซ้ำกับ ${e.dup.map(u => esc(u.br + ' ' + u.unit)).join(', ')}</div>` : ''}</td></tr>`)).join('')}</tbody></table></div>
+    ${E.flatMap((e, ei) => e.ch.map((c, ci) => `<tr${e.on ? '' : ' style="opacity:.5"'}><td>${ci || e.src === 'warn' ? '' : `<input type="checkbox" data-gse="${ei}" ${e.on ? 'checked' : ''} aria-label="นำเข้า">`}</td><td>${esc(e.br)}</td><td class="code nowrap">${esc(e.src === 'quota' ? 'Quota ' + e.key : e.key)}${e.src === 'match' ? `<div class="text-xs" style="color:var(--good);font-family:inherit">match จาก Quota ${esc(e.ref)} → Stock · ล็อกที่รถทันที</div>` : e.src === 'warn' ? `<div class="text-xs" style="color:var(--bad);font-family:inherit">${esc(e.note)}</div>` : ''}</td><td class="nowrap">${GSE_T[c.f] || c.f}</td><td>${c.ids && !gseN(c.from) ? '' : v(c.from)}${c.web ? `<div class="text-xs" style="color:var(--accent,#2563eb)">เว็บ: ${esc(c.web)}</div>` : ''}${c.ids ? `<div class="text-xs" style="color:var(--warn)">${esc(c.ids)} · ชื่อในชีตไม่ตรง ตรวจก่อนนำเข้า</div>` : ''}</td><td><b>${v(c.to)}</b>${(c.f === 'bknote' || c.f === 'vnote') && e.dup && e.dup.length ? `<div class="text-xs" style="color:var(--bad)">ชื่อซ้ำกับ ${e.dup.map(u => esc(u.br + ' ' + u.unit)).join(', ')}</div>` : ''}</td></tr>`)).join('')}</tbody></table></div>
     ${G.newCars ? `<p class="text-xs text-muted mt-1">มีรถในชีตที่ยังไม่อยู่ในเว็บ ${G.newCars} คัน ไม่ได้เพิ่ม (ใช้ "ดึงจาก Google Sheet" แบบเต็ม)</p>` : ''}
     <div class="flex gap-2 mt-2"><button class="btn btn-red btn-sm" data-act="gse-save" ${G.saving ? 'disabled' : ''}>${G.saving ? '<span class="spin"></span> กำลังบันทึก…' : `นำเข้า ${E.filter(e => e.on && e.src !== 'warn').length} รายการที่เลือก`}</button><button class="btn btn-ghost btn-sm" data-act="gse-cancel">ยกเลิก</button></div></div>`;
 }
