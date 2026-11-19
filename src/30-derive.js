@@ -195,7 +195,7 @@ function deriveNow(key) {
       else if (!i && !ab && x.flag) st = 'review';
       if (!st) continue;
       const [m, g, c] = String(x.spec || '||').split('|');
-      cars.set(vin, { vin, br: u.br, model: m || null, grade: g || null, color: c || null, st, prod: x.p || null, bkno: x.bk || null, cust: st === 'invoiced' ? (i.cust || x.cust || null) : x.cust || null,
+      cars.set(vin, { vin, br: u.br, model: m || null, grade: g || null, color: c || null, st, prod: x.p || null, bkno: x.bk || (i && !i.company && i.no) || (bkByVin.get(vin) || {}).no || null, cust: st === 'invoiced' ? (i.cust || x.cust || null) : x.cust || null,
         gone: { at: u.at, asof: u.asof || null, upload: u.id || null }, src: st === 'review' ? 'ไม่อยู่ในไฟล์ IDS ล่าสุด · รอตรวจ' : 'ออกใบกำกับแล้ว · ไม่อยู่ในไฟล์ Stock IDS ล่าสุด' });
     } }
   // a car invoiced by a branch is that branch's car (ตกลง 11/11): moved there automatically, the old branch kept as "โอนจาก"
