@@ -136,9 +136,10 @@ function ltSweep(D) {
   if (!ltCan() || !window.__WEB) return;
   ltRetry(D);
   ltReplacedSweep(D);
+  for (const l of D.locks) if (!l.typed && l.live && !l.sheet_sync && ['approved', 'allocated'].includes(l.status) && !(ltAutoTried = ltAutoTried || new Set()).has(l.id)) { ltAutoTried.add(l.id); ltAutoSheet(l.id); }
   if (typeof bltConvertSweep === 'function') bltConvertSweep(D);
   for (const l of D.locks) {
-    if (!l.typed || l.sheet_cleared || ltSwept.has(l.id) || l.live || !(l.vin || l.ref) || !(l.sheet_sync && l.sheet_sync.value && !l.sheet_sync.conflict)) continue;
+    if (!(l.typed || l.auto_sheet) || l.sheet_cleared || ltSwept.has(l.id) || l.live || !(l.vin || l.ref) || !(l.sheet_sync && l.sheet_sync.value && !l.sheet_sync.conflict)) continue;
     if (D.locks.some(x => x.id !== l.id && x.live && ltSameL(x, l) && x.typed)) { ltSwept.add(l.id); continue; }   // the cell now belongs to the next typed lock
     ltSwept.add(l.id); ltSheet(l.id, '', ltTextOf(l));
   }
@@ -326,4 +327,18 @@ async function ltReleaseReplaced(oldId, text) {
 // a new lock that replaced an old one whose release did not get saved: let the old one go now (run with the sweep)
 async function ltReplacedSweep(D) {
   for (const l of D.locks) if (l.replaced && l.live) { const o = D.locks.find(x => x.id === l.replaced); if (o && o.live && canLockMgr(o)) await ltReleaseReplaced(o.id, ltTextOf(l)); }
+}
+
+// 19/11: write a lock that was not typed (allocated in the web / an approved request) into the sheet's booking cell, once.
+// The cell must still be what the web last read (empty, or the same text): anything else is left for a person (⚠ ไม่ตรง).
+var ltAutoTried;
+async function ltAutoSheet(id) {
+  if (!window.__WEB) return;
+  const D = derive(), l = D.locks.find(x => x.id === id); if (!l || l.typed || !l.live || l.sheet_sync || !['approved', 'allocated'].includes(l.status)) return;
+  const c = l.vin ? D.cars.get(l.vin) : null; if (l.vin && !(c && c.src === 'IDS')) return;
+  if (c && (c.bkno || c.bk)) return;   // IDS already gives the car to a booking: the sheet shows that
+  const txt = ltTextOf(l), cur = c ? String(c.bknote || '').trim() : '';
+  if (cur) return;   // the sheet already says something (the same, or another name = ⚠ ไม่ตรง for a person)
+  const r = await ltSheet(id, txt, '', false, true);
+  if (r && r.ok) { const x = findLock(id); if (x && !x.auto_sheet) { x.auto_sheet = true; await write('locks', id, x); } }
 }

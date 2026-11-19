@@ -490,7 +490,10 @@ function resetBooking() {
 function findLock(id) { const l = S.locks.get(id); return l ? { ...l, history: [...(l.history || [])] } : null; }
 async function saveLock(id, l, act, note) {
   l.history = [...(l.history || []), { ...actor(), act, note: note || '' }].slice(-40);
-  return write('locks', id, l);
+  const ok = await write('locks', id, l);
+  // 19/11: a lock made by allocating / approving (not typed in the lock box) goes into the sheet too, from the session that made it
+  if (ok && !l.typed && ['approved', 'allocated'].includes(l.status) && !l.sheet_sync && typeof ltAutoSheet === 'function') setTimeout(() => ltAutoSheet(id), 300);
+  return ok;
 }
 // a car and the quota slot it came from are the same unit
 function unitKeysOf(l, D) {
