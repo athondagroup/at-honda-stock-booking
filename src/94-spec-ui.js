@@ -22,7 +22,7 @@ function carWhyBox(c, D, inv, bk, hideCust) {
   }[c.status] || (CAR_STATUS[c.status] || [c.status])[0];
   const advT = c.advance ? ` · ${esc(advLabel(c.advance))}${c.advance.cust ? ` (ชื่อในใบกำกับ ${name(c.advance.cust)})` : ''}` : '';
   return `<div class="p-3 rounded-lg text-sm mb-3" style="background:var(--surface-2)"><b>รถคันนี้ติดอะไร:</b> ${t}${advT}
-    ${bk && (!isSales() || isMine(bk.sales)) ? `<div class="mt-1"><button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(bk.id)}">เปิดใบจอง ${esc(bk.cust)}</button></div>` : ''}</div>`;
+    ${(() => { const b = bk || (l && l.booking && l.booking.app) || null; return b && (!isSales() || isMine(b.sales)) ? `<div class="mt-1"><button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(b.id)}">เปิดใบจอง ${esc(b.cust)}</button></div>` : ''; })()}</div>`;
 }
 // who holds a quota slot (9/11): seller + customer of each lock / temporary lock; sales see names only on their own
 function quotaHolders(q) {
