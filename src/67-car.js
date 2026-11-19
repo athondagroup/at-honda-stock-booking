@@ -66,7 +66,7 @@ function carModal(m, D) {
   // a car that left the Stock file is still in the car log: show its history instead of "not found"
   if (!c && !isSales() && typeof carlogAll === 'function' && carlogAll().has(m.vin)) return carHistModal(m, D);
   if (!c) return `<p>ไม่พบรถคันนี้แล้ว</p><div class="flex justify-end mt-3"><button class="btn btn-ghost" data-act="close">ปิด</button></div>`;
-  const p = perms(), inv = D.invByVin.get(c.vin), hideCust = (isSales() && !(c.lock && isMine(c.lock.owner))) || ((c.company || c.status === 'company') && !c.lock);
+  const p = perms(), inv = D.invByVin.get(c.vin), hideCust = isSales() && !(c.lock && isMine(c.lock.owner));
   const q = c.ref ? D.quota.find(x => x.ref === c.ref) : null;
   const bk = D.at.find(a => !a.cancelled && ((a.match && a.match.vin === c.vin) || (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin === c.vin)));
   const row = (k, v) => v === null || v === undefined || v === '' ? '' : `<tr><td class="text-muted nowrap">${k}</td><td>${v}</td></tr>`;
@@ -96,7 +96,7 @@ function carModal(m, D) {
       ${row('ที่มาข้อมูล', esc(c.src || 'IDS'))}
       ${row('หมายเหตุใน IDS', esc(c.note || ''))}
       ${!isSales() ? row('ข้อความในชีต', c.bknote ? `"${esc(c.bknote)}"` : '') : ''}
-      ${row('ใบจองใน IDS', c.bkno ? `<span class="code">${esc(c.bkno)}</span>${c.bkdate ? ` · จอง ${fmtD(c.bkdate)}` : ''}${c.cust && !hideCust ? ` · ${esc(c.cust)}` : c.cust && !(c.company || c.status === 'company') ? ' · ลูกค้าของเซลล์อื่น' : ''}` : '')}
+      ${row('ใบจองใน IDS', c.bkno ? `<span class="code">${esc(c.bkno)}</span>${c.bkdate ? ` · จอง ${fmtD(c.bkdate)}` : ''}${c.cust && !hideCust ? ` · ${esc(c.cust)}` : c.cust ? ' · ลูกค้าของเซลล์อื่น' : ''}` : '')}
       ${row('วันที่จัดสรร', c.alloc ? fmtD(c.alloc) : '')}
       ${carOutRows(c, D, row)}
       ${inv ? row('ใบกำกับ (DL)', `${esc(inv.inv || '')} · ${fmtD(inv.idate)}${inv.ddate ? ` · ส่งมอบ ${fmtD(inv.ddate)}` : ' · ยังไม่ส่งมอบ'}${inv.company ? ' · รถบริษัท' : ''}${inv.sales && !isSales() ? ` · ${esc(inv.sales)}` : ''}`) : ''}

@@ -11,7 +11,7 @@ function carWhyBox(c, D, inv, bk, hideCust) {
     booked: `IDS จัดสรรให้ใบจอง ${esc(c.bk || (ib && ib.no) || '')} · ลูกค้า ${name(c.cust || (ib && ib.cust))}${ib && ib.sales ? ` · เซลล์ใน IDS ${esc(ib.sales)}` : ''}${c.alloc ? ` · จัดสรร ${fmtD(c.alloc)}` : ''}`,
     sold: `แจ้งขายใน IDS แล้ว${c.cust ? ` · ลูกค้า ${name(c.cust)}` : ''} · รอใบกำกับ / ส่งมอบ`,
     invoiced: `ออกใบกำกับแล้ว${inv ? ` เลข ${esc(inv.inv)} วันที่ ${fmtD(inv.idate)}` : ''}${inv && inv.cust ? ` · ${name(inv.cust)}` : ''} · ยังไม่ส่งมอบ (กด "ส่งมอบ" เมื่อลูกค้ารับรถ)`,
-    company: `รถบริษัท (Demo / ทดลองขับ)${c.bk ? ` ใบจอง ${esc(c.bk)}` : ''} เช่น รถทดลองขับ / รถใช้งาน / ออกใบกำกับในนามบริษัท · ไม่นับเป็นรถว่าง และไม่นับยอดขาย`,
+    company: `รถบริษัท: ใน IDS ลูกค้าคือบริษัท AT Honda เอง${c.cust ? ` ("${esc(c.cust)}")` : ''}${c.bk ? ` ใบจอง ${esc(c.bk)}` : ''} เช่น รถทดลองขับ / รถใช้งาน / ออกใบกำกับในนามบริษัท · ไม่นับเป็นรถว่าง และไม่นับยอดขาย`,
     pending: `มีคำขอล็อกรออนุมัติ${l ? ` · ${l.type === 'dealer' ? 'ดีลเลอร์ ' + esc(l.dealer_name || '') : 'ให้ ' + name(l.owner || l.sales_nick)}` : ''}`,
     locked: `ล็อกในเว็บนี้แล้ว${l ? ` · ${l.type === 'dealer' ? 'ดีลเลอร์ ' + esc(l.dealer_name || '') : l.type === 'temp' ? 'ชั่วคราว ' + name(l.owner || l.sales_nick) : 'ใบจองของ ' + name(l.owner)}${l.hold ? ' · ถือไว้จนส่งมอบ' : l.end ? ` · หมด ${fmtD(l.end)}` : ''}` : ''} · IDS ยังไม่จัดสรร`,
     allocated: 'แอดมินแจ้งว่าจัดสรรใน IDS แล้ว รอไฟล์ IDS รอบหน้ายืนยัน',
