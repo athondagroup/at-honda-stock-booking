@@ -46,6 +46,7 @@ function bookRows(D) {
   const rows = [], used = new Set();
   for (const a of D.at) {
     if (a.demo) { const dr = D.bookingByKey.get(a.key); if (dr && dr.state === 'demo') rows.push({ key: a.key, a, b: null, row: dr, date: a.date, no: null, cust: 'รถ Demo', owner: a.sales, br: a.br, spec: a.spec, model: a.model, vin: null, demoRow: true }); continue; }
+    if (a.demoCar && !a.match && !a.ids) continue;   // 19/11: a "รถ Demon" form not matched to IDS is not listed
     const ib = a.ids || a.idsLeft || a.idsGone;   // a cancelled booking keeps its IDS booking that is still open (one row, not two)
     if (ib) used.add(ib.key);
     ((a.match && a.match.alt) || []).forEach(x => used.add(x.key)); ((a.rec && a.rec.ids_alt) || []).forEach(k => used.add(k));   // the old number IDS replaced: same booking, no second row

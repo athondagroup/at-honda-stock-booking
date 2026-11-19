@@ -224,8 +224,7 @@ function deriveNow(key) {
       key: 'app:' + id, id, src: 'AT', rec: r, no: r.booking_no || null, date: r.booking_date, br: r.br, sales: salesCanon(r.sales),
       cust: r.customer, model: r.model, grade: r.grade, color: r.color, spec: specKey(r.model, r.grade, r.color),
       deposit: (Number(r.deposit) || 0) + (r.deposit_from ? Number(r.deposit_from.amount) || 0 : 0), slip: (r.slip_imgs || []).length > 0 || r.slip === true || !!r.doc_url || !!r.deposit_from,
-      cancelled: r.status === 'cancelled', demo: !!r.demo || !!r.hidden || demoSaleRec(r), demoCar: demoSaleRec(r),   // 19/11: forms marked "รถ Demon" are taken out of the bookings (no queue, no IDS check, no notices)
-      created_at: r.created_at,
+      cancelled: r.status === 'cancelled', demo: (!!r.demo && !demoSaleRec(r)) || !!r.hidden, demoCar: demoSaleRec(r), created_at: r.created_at,
       // a model change approved later puts the booking at the back of the queue
       qdate: r.queue_date || r.booking_date
     });
@@ -589,7 +588,7 @@ function buildAlerts(D) {
     add('idsal:' + a.id, { br: c ? c.br : a.br, roles: ['admin'] }, 'warn', 'จัดสรรในเว็บแล้ว ต้องจัดสรรใน IDS', `${a.cust} · ${v}${c ? ' · ' + (c.model || '') + ' ' + (c.color || '') : ''} · ${a.sales || ''} · อัปโหลดไฟล์ IDS ที่มีเลขใบจองและชื่อลูกค้าเต็ม ระบบปิดรายการนี้เอง`, { act: 'at-open', id: a.id });
   }
   for (const a of D.at) {
-    if (!a.active || a.match) continue;
+    if (!a.active || a.match || a.demoCar) continue;   // 19/11: "รถ Demon" forms are not chased into IDS
     const ref = asof(a.br);
     const age = ref && a.date ? daysBetween(a.date, ref) : null;
     // 18/11: the booking had an IDS booking number and a later Booking file no longer has it = it LEFT IDS (not "not in IDS yet")
