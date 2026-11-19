@@ -224,7 +224,8 @@ function deriveNow(key) {
       key: 'app:' + id, id, src: 'AT', rec: r, no: r.booking_no || null, date: r.booking_date, br: r.br, sales: salesCanon(r.sales),
       cust: r.customer, model: r.model, grade: r.grade, color: r.color, spec: specKey(r.model, r.grade, r.color),
       deposit: (Number(r.deposit) || 0) + (r.deposit_from ? Number(r.deposit_from.amount) || 0 : 0), slip: (r.slip_imgs || []).length > 0 || r.slip === true || !!r.doc_url || !!r.deposit_from,
-      cancelled: r.status === 'cancelled', demo: (!!r.demo && !demoSaleRec(r)) || !!r.hidden, demoCar: demoSaleRec(r), created_at: r.created_at,
+      cancelled: r.status === 'cancelled', demo: !!r.demo || !!r.hidden || demoSaleRec(r), demoCar: demoSaleRec(r),   // 19/11: forms marked "รถ Demon" are taken out of the bookings (no queue, no IDS check, no notices)
+      created_at: r.created_at,
       // a model change approved later puts the booking at the back of the queue
       qdate: r.queue_date || r.booking_date
     });
@@ -340,7 +341,7 @@ function deriveNow(key) {
   bookings.forEach(b => { bookingByKey.set(b.key, b); if (b.app) bookingByKey.set(b.app.key, b); });
   // a "รถ Demon" form: the branch keeps a stock car as its demo, so the car must not show free (12/11). It never queues; it is a row
   // that a manager locks to a car (the lock holds until IDS turns the car into a company car).
-  const demoRows = at.filter(a => a.demo && !a.cancelled && !a.done).map(a => ({ key: a.key, app: a, state: 'demo', match: 'demo', spec: a.spec, model: a.model, grade: a.grade, color: a.color, cust: 'รถ Demo', no: null, br: a.br, owner: a.sales, sales: a.sales, date: a.date, qdate: a.date }));
+  const demoRows = at.filter(a => a.demo && !a.demoCar && !a.cancelled && !a.done).map(a => ({ key: a.key, app: a, state: 'demo', match: 'demo', spec: a.spec, model: a.model, grade: a.grade, color: a.color, cust: 'รถ Demo', no: null, br: a.br, owner: a.sales, sales: a.sales, date: a.date, qdate: a.date }));
   demoRows.forEach(b => bookingByKey.set(b.key, b));
   at.forEach(a => { a.row = bookingByKey.get(a.key) || null; });
 
