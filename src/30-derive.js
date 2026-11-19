@@ -408,6 +408,14 @@ function deriveNow(key) {
       }
     }
   }
+  // 19/11: a temporary lock and a booking lock on the same unit for the same customer = one lock: the booking lock wins,
+  // the temporary one is not counted (ltSweep closes it as "converted")
+  for (const t of locks) {
+    if (!t.live || t.type !== 'temp') continue;
+    const fn = nameKey(String(t.prospect || '').split('/').pop() || ''); if (!fn) continue;
+    const b = locks.find(x => x.id !== t.id && x.live && x.type === 'booking' && ((t.vin && x.vin === t.vin) || (!t.vin && t.ref && x.ref === t.ref)) && x.booking && x.booking.cust && keyScore(nameKey(x.booking.cust), fn) >= 1);
+    if (b) { t.live = false; t.superseded = b.id; }
+  }
   const pendByUnit = new Map();
   locks.filter(l => l.status === 'pending').sort((a, b) => (a.requested_at || '').localeCompare(b.requested_at || ''))
     .forEach(l => { const k = l.vin ? 'V:' + l.vin : 'R:' + l.ref; (pendByUnit.get(k) || pendByUnit.set(k, []).get(k)).push(l); });

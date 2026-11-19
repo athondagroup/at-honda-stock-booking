@@ -136,6 +136,7 @@ function ltSweep(D) {
   if (!ltCan() || !window.__WEB) return;
   ltRetry(D);
   ltReplacedSweep(D);
+  for (const t of D.locks) if (t.superseded && t.status === 'approved' && !(ltAutoTried = ltAutoTried || new Set()).has('sup:' + t.id)) { ltAutoTried.add('sup:' + t.id); ltCloseSuperseded(t.id, t.superseded); }
   for (const l of D.locks) if (!l.typed && l.live && !l.sheet_sync && ['approved', 'allocated'].includes(l.status) && !(ltAutoTried = ltAutoTried || new Set()).has(l.id)) { ltAutoTried.add(l.id); ltAutoSheet(l.id); }
   if (typeof bltConvertSweep === 'function') bltConvertSweep(D);
   for (const l of D.locks) {
@@ -341,4 +342,11 @@ async function ltAutoSheet(id) {
   if (cur) return;   // the sheet already says something (the same, or another name = ⚠ ไม่ตรง for a person)
   const r = await ltSheet(id, txt, '', false, true);
   if (r && r.ok) { const x = findLock(id); if (x && !x.auto_sheet) { x.auto_sheet = true; await write('locks', id, x); } }
+}
+
+// a temporary lock the same customer's booking lock now covers (19/11): closed as converted, the booking lock stays
+async function ltCloseSuperseded(id, by) {
+  const x = findLock(id); if (!x || x.status !== 'approved') return;
+  x.status = 'converted'; x.converted_to = by; x.sheet_cleared = x.sheet_cleared || new Date().toISOString();
+  await saveLock(id, x, 'ปิดล็อกชั่วคราว (มีล็อกให้ใบจองของลูกค้าคนเดียวกันแล้ว)', '');
 }
