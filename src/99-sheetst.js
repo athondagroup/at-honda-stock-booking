@@ -13,8 +13,12 @@ function carSheetSt(c, D) {
   if (!l) return sheet ? { k: 'bad', web: '', sheet, readAt } : { k: 'ok', why: 'ว่างทั้งสองฝั่ง', readAt };
   const web = ltTextOf(l), sy = l.sheet_sync || null, cust = (l.booking && l.booking.cust) || l.prospect || l.dealer_name || '';
   const first = shN(String(cust).split(/\s+/)[0] || '');
-  const same = shN(sheet) === shN(web) || (first.length >= 3 && shN(sheet).includes(first));
-  if (sy && sy.conflict) return { k: 'bad', web, sheet: sy.current != null ? sy.current : sheet, l, readAt };
+  // the newest known sheet text: what a write found in the cell (conflict) if that is newer than the last read
+  const now = sy && sy.conflict && sy.current != null && (!readAt || String(sy.at) > readAt) ? String(sy.current) : sheet;
+  // 19/11: the same customer (first name in the cell) or the same text counts as the same, nickname spelt any way
+  const same = !!now && (shN(now) === shN(web) || (first.length >= 3 && shN(now).includes(first)));
+  if (same) return { k: 'ok', why: now, l, readAt };
+  if (sy && sy.conflict) return { k: 'bad', web, sheet: now, l, readAt };
   if (sy && sy.at && String(sy.at) > readAt && sy.value && !sy.error && !sy.conflict && shN(sy.value) !== shN(web)) return { k: 'wait', web, why: `ชีตมี "${sy.value}" ยังไม่ครบ · กำลังเขียนใหม่`, l, readAt };
   if (same) return { k: 'ok', why: sheet, l, readAt };
   if (sy && sy.at && !sy.error && String(sy.at) > readAt) return { k: 'ok', why: `เขียนลงชีตแล้ว ${fmtDT(sy.at)} (รออ่านชีตรอบหน้า)`, l, readAt };
