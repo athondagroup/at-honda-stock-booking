@@ -128,15 +128,8 @@ function deriveNow(key) {
   // a car invoiced to another AT Honda branch has moved there: it is that branch's stock from now on
   // (the old branch's file may still list it). If the new branch's file has it too, its own row is used.
   const stockBrs = new Map(); X.cars.forEach(c => { if (!stockBrs.has(c.vin)) stockBrs.set(c.vin, new Set()); stockBrs.get(c.vin).add(c.br); });
-  X.cars.forEach(c0 => {
-    const to = c0.company ? atBranchOf(c0.cust) : null;
-    let c = c0;
-    if (to && to !== c0.br) {
-      if (stockBrs.get(c0.vin).has(to)) return;
-      c = { ...c0, br: to, fromBr: c0.br, company: false, sold: false, bkno: null, bknote: null, cust: null, note: [c0.note, `โอนจาก ${c0.br}`].filter(Boolean).join(' · ') };
-    }
-    const car = { ...c, src: 'IDS', prodIds: c.prod || null };
-    if (!car.st) car.st = carStatus(car, invByVin.get(car.vin), bkByVin);
+  // the booking / customer / seller / Advance a car gets from IDS + the invoice: every car row, also one gone from the Stock file (20/11)
+  function carEnrich(car) {
     // invoiced but not handed over (advance invoice, ตกลง 22/10): what the branch said about it
     const inv0 = invByVin.get(car.vin), adv = ['invoiced', 'sold'].includes(car.st) && !(inv0 && (inv0.company || inv0.ddate)) ? advOf(car.vin, inv0) : null;
     if (adv) {
@@ -149,6 +142,17 @@ function deriveNow(key) {
     car.cust = car.cust || b?.cust || null;
     // once invoiced, IDS drops the booking from its Booking report: the seller then comes from the invoice (DL) (9/11)
     car.sales = b?.sales || (!car.advFake && inv0 && !inv0.company && inv0.sales) || null;
+  }
+  X.cars.forEach(c0 => {
+    const to = c0.company ? atBranchOf(c0.cust) : null;
+    let c = c0;
+    if (to && to !== c0.br) {
+      if (stockBrs.get(c0.vin).has(to)) return;
+      c = { ...c0, br: to, fromBr: c0.br, company: false, sold: false, bkno: null, bknote: null, cust: null, note: [c0.note, `โอนจาก ${c0.br}`].filter(Boolean).join(' · ') };
+    }
+    const car = { ...c, src: 'IDS', prodIds: c.prod || null };
+    if (!car.st) car.st = carStatus(car, invByVin.get(car.vin), bkByVin);
+    carEnrich(car);
     cars.set(car.vin, car);
   });
   const removed = [];
@@ -195,9 +199,12 @@ function deriveNow(key) {
       else if (!i && !ab && x.flag) st = 'review';
       if (!st) continue;
       const [m, g, c] = String(x.spec || '||').split('|');
-      const no = x.bk || (i && !i.company && i.no) || (bkByVin.get(vin) || {}).no || null;   // 20/11: the 51… number (the table shows car.bk)
-      cars.set(vin, { vin, br: u.br, model: m || null, grade: g || null, color: c || null, st, prod: x.p || null, bkno: no, bk: no, cust: st === 'invoiced' ? (i.cust || x.cust || null) : x.cust || null,
+      // 20/11: everything known about the frame number stays (the car log keeps the last Stock row: production date, year, IDS allocation)
+      const e = (typeof carlogAll === 'function' && (carlogAll().get(vin) || {}).e) || {}, al = Array.isArray(e.al) && e.al.length ? e.al[e.al.length - 1] : null;
+      const no = x.bk || (i && !i.company && i.no) || (bkByVin.get(vin) || {}).no || (al && al.no) || null;
+      cars.set(vin, { vin, br: u.br, model: m || e.m || null, grade: g || e.g || null, color: c || e.c || null, year: e.y || null, st, prod: x.p || e.p || null, prodIds: x.p || e.p || null, bkno: no, bk: no, cust: st === 'invoiced' ? (i.cust || x.cust || (al && al.cust) || null) : x.cust || (al && al.cust) || null,
         gone: { at: u.at, asof: u.asof || null, upload: u.id || null }, src: st === 'review' ? 'ไม่อยู่ในไฟล์ IDS ล่าสุด · รอตรวจ' : 'ออกใบกำกับแล้ว · ไม่อยู่ในไฟล์ Stock IDS ล่าสุด' });
+      carEnrich(cars.get(vin));
     } }
   // a car invoiced by a branch is that branch's car (ตกลง 11/11): moved there automatically, the old branch kept as "โอนจาก"
   for (const car of cars.values()) {
@@ -207,7 +214,7 @@ function deriveNow(key) {
   }
   // IDS is the reference; the keyed date is used only while IDS has none. Car age counts from the production date.
   for (const car of cars.values()) {
-    car.prodIds = car.src === 'IDS' ? car.prodIds || null : null;
+    car.prodIds = car.src === 'IDS' || car.gone ? car.prodIds || null : null;
     car.prodKey = car.prodKey || null;
     car.prod = car.prodIds || car.prodKey || null;
     car.prodSrc = car.prodIds ? 'IDS' : car.prodKey ? 'key' : null;
