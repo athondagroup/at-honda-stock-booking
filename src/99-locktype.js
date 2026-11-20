@@ -104,7 +104,9 @@ async function ltSheet(id, value, expect, force, quiet) {
   const l = findLock(id); if (!l) return null;
   const live = !!(window.__WEB), D = derive();
   // the stock tab when the car is in stock; the quota tab's "Vin Number" cell when the unit has a quota slot (by frame number or Ref)
-  const qs = D.quota.find(q => (l.vin && q.vin === l.vin) || (!l.vin && l.ref && q.ref === l.ref)) || null;
+  const car = l.vin ? D.cars.get(l.vin) : null;
+  // 20/11: a car whose quota row in the sheet has no frame number yet (Vin Number holds a name): found by the car's Ref
+  let qs = D.quota.find(q => (l.vin && q.vin === l.vin) || (!l.vin && l.ref && q.ref === l.ref)) || null;
   const call = async input => {
     try { const mcp = await gsUse(); if (!mcp) throw { code: 'nomcp' }; const r = await mcp.callTool('Google Sheets', 'stock_cell', input, { cache: false }); let x = r && r.payload; if (typeof x === 'string') { try { x = JSON.parse(x); } catch (e) { x = null; } } return x || { code: 'error' }; }
     catch (e) { return { code: (e && e.code) || 'error' }; }
@@ -114,6 +116,7 @@ async function ltSheet(id, value, expect, force, quiet) {
   else {
     if (l.vin) res = await call({ br: l.car_br, vin: l.vin, value, expect: expect ?? '', force: !!force });
     // a stock row was written, or there is none (a quota slot not in stock / a car missing from the stock tab): the quota slot follows
+    if (!qs && res && res.code === 'not_found' && car && typeof carQuotaRow === 'function') qs = carQuotaRow(car, D);
     if (qs && (!res || res.ok || res.code === 'not_found')) qres = await call({ target: 'quota', vin: qs.vin || '', ref: qs.ref, br: qs.br, value, expect: expect ?? '', force: !!force });
     if (!res || (res.code === 'not_found' && qres && (qres.ok || qres.code === 'conflict'))) { res = qres; qres = null; }
   }
