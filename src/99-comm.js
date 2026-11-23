@@ -66,9 +66,11 @@ function campKeysFor(x) {
   return k ? [k] : [];
 }
 // the months whose campaigns this sale may use
+// 23/11: the booking month (while its campaign's "รับรถภายใน" date has not passed) and the release month: the invoice month,
+// or this month while the invoice has not come out (the car can be released this month on this month's campaign)
 function termsMonths(x) {
-  const bm = x.bookDate ? x.bookDate.slice(0, 7) : null, im = x.inv ? x.inv.slice(0, 7) : null;
-  return x.adv ? [im].filter(Boolean) : [...new Set([bm, im].filter(Boolean))];
+  const bm = x.bookDate ? x.bookDate.slice(0, 7) : null, im = x.inv ? x.inv.slice(0, 7) : null, cm = todayISO().slice(0, 7);
+  return x.adv ? [im].filter(Boolean) : [...new Set([bm, im || (bm && cm > bm ? cm : null)].filter(Boolean))];
 }
 // a month not keyed yet: the latest month there is (with a warning)
 function termsMonthUse(rows, M) { if (rows.some(r => r.month === M)) return M; const ms = [...new Set(rows.map(r => r.month))].sort(); return ms.filter(m => m <= M).pop() || ms.pop() || null; }
@@ -83,13 +85,15 @@ function campOptions(x) {
   termsMonths(x).forEach(M => {
     const use = termsMonthUse(all, M); if (!use) return;
     if (use !== M) warns.push(`ยังไม่มีแคมเปญเดือน ${fmtM(M)} ใน Sheet · ใช้ของเดือน ${fmtM(use)} ไปก่อน ตรวจอีกครั้ง`);
-    const by = x.adv ? 'เดือนใบกำกับ Advance' : M === bm && M === im ? 'เดือนจองและเดือนใบกำกับ' : M === bm ? 'เดือนจอง' : 'เดือนใบกำกับ';
+    const by = x.adv ? 'เดือนใบกำกับ Advance' : M === bm && M === im ? 'เดือนจองและเดือนใบกำกับ' : M === bm ? 'เดือนจอง' : im ? 'เดือนใบกำกับ' : 'เดือนปัจจุบัน · ถ้าออกใบกำกับเดือนนี้';
     all.filter(r => r.month === use).forEach(r => {
       let ok = true, why = '';
       // booked in this campaign's month: the invoice has to come out by the campaign's delivery date
       if (use === M && M === bm && M !== im && !x.adv) {
         if (r.book_from && x.bookDate < r.book_from || r.book_to && x.bookDate > r.book_to) { ok = false; why = `จองนอกช่วง ${fmtD(r.book_from)}–${fmtD(r.book_to)}`; }
         else if (x.inv && r.deliver_by && x.inv > r.deliver_by) { ok = false; why = `ใบกำกับ ${fmtD(x.inv)} เกินกำหนดรับรถ ${fmtD(r.deliver_by)}`; }
+        // not invoiced yet and the campaign's last release date has passed: this month's campaign is the one to use (23/11)
+        else if (!x.inv && r.deliver_by && todayISO() > r.deliver_by) { ok = false; why = `ต้องรับรถภายใน ${fmtD(r.deliver_by)} · เลยกำหนดแล้ว ใช้แคมเปญเดือนปัจจุบันแทน`; }
       }
       out.push({ value: r.month + '|' + r.id, month: r.month, name: r.name, sup: num(r.sup), grade: r.grade || '', gname: r.group || '', group: `แคมเปญ ${fmtM(r.month)} (${by}) · ${r.group}`, ok, why, deliver_by: r.deliver_by });
     });
@@ -185,7 +189,7 @@ function termsFields(x, v, f) {
     const os = opts.filter(y => y.group === gname).map(y => `<option value="${esc(y.value)}" ${o.campaign_id === y.value ? 'selected' : ''} ${y.ok ? '' : 'disabled'}>${esc(y.name)}${y.ok ? '' : ` · ใช้ไม่ได้: ${esc(y.why)}`}</option>`).join('');
     return gname ? `<optgroup label="${esc(gname)}">${os}</optgroup>` : os; }).join('')}</select>
     ${warns.map(w => `<span class="text-xs" style="color:var(--warn)">${esc(w)}</span>`).join('')}
-    ${!x.inv && !x.adv ? '<span class="text-xs text-muted">ถ้าออกใบกำกับเดือนถัดไป จะเลือกแคมเปญของเดือนใบกำกับได้ด้วย</span>' : ''}</div>
+    ${!x.inv && !x.adv ? '<span class="text-xs text-muted">เลือกได้: แคมเปญเดือนจอง (ถ้ารับรถทันกำหนดของแคมเปญนั้น) หรือแคมเปญเดือนที่ปล่อยรถ · ยังไม่ออกใบกำกับ = แคมเปญเดือนปัจจุบัน</span>' : ''}</div>
     ${o.campaign_id === 'other' ? `<div class="field sm:col-span-3"><label for="${f.idp}-ct">ชื่อแคมเปญ</label><input id="${f.idp}-ct" ${f.attr}="${f.pre}.campaign_text" value="${esc(o.campaign_text ?? '')}" ${dis} autocomplete="off"></div>` : ''}`;
   const step = x.cash ? '' : `<div class="field"><label for="${f.idp}-step">AT แคมเปญ (ช่อง Step)</label><select id="${f.idp}-step" ${f.attr}="${f.pre}.at_step" ${dis}>
     <option value="" ${!o.at_step ? 'selected' : ''}>ไม่มี</option><option value="1" ${o.at_step === '1' ? 'selected' : ''}>Step ช่อง 1 · +${money(st.step1)}</option><option value="2" ${o.at_step === '2' ? 'selected' : ''}>Step ช่อง 2 · +${money(st.step2)}</option></select></div>`;
