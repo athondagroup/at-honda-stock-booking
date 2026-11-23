@@ -47,10 +47,10 @@ function idsPasteBox() {
   if (!p.upload) return '';
   return `<div class="mt-4 pt-4 border-t border-line"><h2 class="font-head text-lg font-semibold mb-1">หรือวางข้อมูลจาก Excel (ไม่ต้องเลือกไฟล์)</h2>
     <ol class="text-sm text-muted list-decimal pl-5 mb-3"><li>เปิดไฟล์ IDS ใน Excel คลิกในตาราง แล้วกด <b>Ctrl+A</b> → <b>Ctrl+C</b> (ให้ติดแถวหัวตารางมาด้วย)</li>
-      <li>คลิกในกล่องด้านล่าง แล้วกด <b>Ctrl+V</b> ระบบรู้เองว่าเป็น Stock / Booking / Quota / DL และสาขาไหน</li>
+      <li>คลิกในกล่องด้านล่าง แล้วกด <b>Ctrl+V</b> ระบบรู้เองว่าเป็น Stock / Booking / Quota / DL และสาขาไหน · รายงานสถานะใบจอง (มีคอลัมน์ "เหตุผลการลดหนี้เงินจอง") ใช้ตรวจอย่างเดียว ไม่แทนตาราง Booking</li>
       <li>วางต่อได้ทีละตาราง ทุกตารางจะเข้ารายการตรวจด้านล่าง ตรวจจำนวนแล้วกด "บันทึก" (ยังไม่บันทึกจนกว่าจะกด)</li></ol>
     <textarea data-idspaste="1" rows="3" class="w-full font-mono text-xs border border-line rounded-lg p-3 bg-surface" placeholder="คลิกที่นี่ แล้วกด Ctrl+V" aria-label="วางข้อมูลจาก Excel" ${can ? '' : 'disabled'}></textarea>
-    ${P.msg ? `<p class="text-sm mt-2" style="color:var(--${P.bad ? 'bad' : 'good'})" role="status">${esc(P.msg)}</p>` : ''}</div>`;
+    ${P.msg ? `<p class="text-sm mt-2" style="color:var(--${P.bad ? 'bad' : 'good'})" role="status">${esc(P.msg)}</p>` : ''}${S.bkstat && typeof bkstatPanel === 'function' ? bkstatPanel(derive()) : ''}</div>`;
 }
 function idsPasteRead(text) {
   const p = perms(), U = S.upl;
@@ -58,6 +58,9 @@ function idsPasteRead(text) {
   const rows = idsPasteDates(idsTsv(text));
   S.idsPaste = S.idsPaste || { n: 0 };
   if (rows.length < 2) { S.idsPaste = { ...S.idsPaste, msg: 'ไม่พบตารางในข้อความที่วาง ก๊อปจาก Excel ทั้งตาราง (Ctrl+A → Ctrl+C) แล้ววางใหม่', bad: true }; render(); return; }
+  // the IDS booking status report (สถานะใบจอง + เหตุผลการลดหนี้เงินจอง) only checks, it does not replace the Booking table (11/11)
+  const bs = typeof bkstatParse === 'function' ? bkstatParse(rows) : null;
+  if (bs) { S.bkstat = bs; S.idsPaste = { ...S.idsPaste, msg: `สถานะใบจอง IDS ${fmtN(bs.rows.length)} ใบ · ดูผลตรวจด้านล่าง (ไม่แทนตาราง Booking)`, bad: !bs.rows.length }; render(); return; }
   const n = ++S.idsPaste.n;
   const r = IDS.parseSheet(rows, `วางครั้งที่ ${n}`, 'วางจาก Excel');
   if (!r) { S.idsPaste = { ...S.idsPaste, msg: `วางครั้งที่ ${n}: ไม่พบหัวตาราง Stock / Booking / Quota / DL ของ IDS ก๊อปให้ติดแถวหัวตารางมาด้วย`, bad: true }; render(); return; }

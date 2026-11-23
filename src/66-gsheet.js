@@ -30,7 +30,8 @@ function gsRow(r) {
   const tail = [c(19), c(20)], delivered = tail.some(x => /^DELIVERED/i.test(x)), cancelled = c(2) === 'ยกเลิก' || tail.includes('ยกเลิก');
   const webId = tail.find(x => x && !/^DELIVERED/i.test(x) && x !== 'ยกเลิก') || null;
   if (c(2) === 'คีย์ซ้ำ') return { id: 'F_' + m[1], keyDup: true, webId, doc: { customer: c(5) } };
-  const demo = /ทดลองขับ|เทสไดร์/.test(c(6)) || c(2) === 'รถ Demon';
+  // "รถ Demon" in the status column = the customer buys a demo car (a real booking, 12/11); ทดลองขับ / เทสไดร์ = a test drive, no booking
+  const demo = /ทดลองขับ|เทสไดร์/.test(c(6)), demoCar = !demo && c(2) === 'รถ Demon';
   const mg = gsModel(c(6), c(7)), fit = fitSpec({ model: mg.model, grade: mg.grade, color: c(8).slice(0, 3).toUpperCase(), text: `${c(6)} ${c(7)} ${c(8)}` });
   const sales = gsSales(c(4));
   return { id: 'F_' + m[1], webId, doc: {
@@ -38,7 +39,7 @@ function gsRow(r) {
     customer: c(5), source: c(17) || null, model: fit.model || mg.model, grade: fit.grade || mg.grade, color: fit.color || c(8).slice(0, 3).toUpperCase(), model_text: `${c(6)} ${c(7)} ${c(8)}`,
     purchase: c(9) || null, finance: null, insurance: ({ 'ฮอนด้าแถม': 'Honda แถม', 'เอที แถม': 'AT แถม', 'ไฟแนนซ์แถม': 'ไฟแนนซ์แถม' })[c(10)] || c(10) || null,
     discount: gsNum(c(11)), foc_total: gsNum(c(12)), note: c(13) || null, lead_id: c(18) || null, doc_url: c(15), doc_imgs: [], slip_imgs: [], slip: false, deposit: null,
-    demo, delivered_flag: delivered, status: cancelled ? 'cancelled' : 'active', imported: true,
+    demo, ...(demoCar ? { demo_car: true } : {}), delivered_flag: delivered, status: cancelled ? 'cancelled' : 'active', imported: true,
     created_at: gsTs(c(0)) || new Date().toISOString(), created_by: S.me.id || null, created_role: 'นำเข้าจากฟอร์ม Google (ดึงจากหน้าเว็บ)', fin_status: null, delivery_date: null } };
 }
 async function gsCheck(manual) {

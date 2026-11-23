@@ -164,7 +164,7 @@ function carHistView(D) {
   return `${pageHead('สต็อกรถ', 'ประวัติรถรายคัน: เข้าสต็อกเมื่อไร IDS จัดสรรให้ใคร ใครเคยล็อก ออกใบกำกับ / ส่งมอบให้ใคร (ผู้บริหารและผู้จัดการ)', '')}
   ${brSeg()}
   <div class="flex flex-wrap items-center justify-between gap-3 mb-3">${stockSeg('hist')}</div>
-  <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
+  <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3 flt2">
     ${sel('ch-m', 'chModel', 'รุ่น', models)}${sel('ch-g', 'chGrade', 'เกรด', grades)}${sel('ch-c', 'chColor', 'สี', colors)}
     <div class="field"><label for="ch-s">สถานะ</label><select id="ch-s" data-filter="chState">${st.map(([k, t]) => `<option value="${k}" ${(f.chState || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
     <div class="field"><label for="ch-f">เข้าตั้งแต่</label><input id="ch-f" type="date" data-filter="chFrom" value="${esc(f.chFrom || '')}" ${f.chAt ? 'disabled' : ''}></div>

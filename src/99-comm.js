@@ -66,9 +66,11 @@ function campKeysFor(x) {
   return k ? [k] : [];
 }
 // the months whose campaigns this sale may use
+// 23/11: the booking month (while its campaign's "รับรถภายใน" date has not passed) and the release month: the invoice month,
+// or this month while the invoice has not come out (the car can be released this month on this month's campaign)
 function termsMonths(x) {
-  const bm = x.bookDate ? x.bookDate.slice(0, 7) : null, im = x.inv ? x.inv.slice(0, 7) : null;
-  return x.adv ? [im].filter(Boolean) : [...new Set([bm, im].filter(Boolean))];
+  const bm = x.bookDate ? x.bookDate.slice(0, 7) : null, im = x.inv ? x.inv.slice(0, 7) : null, cm = todayISO().slice(0, 7);
+  return x.adv ? [im].filter(Boolean) : [...new Set([bm, im || (bm && cm > bm ? cm : null)].filter(Boolean))];
 }
 // a month not keyed yet: the latest month there is (with a warning)
 function termsMonthUse(rows, M) { if (rows.some(r => r.month === M)) return M; const ms = [...new Set(rows.map(r => r.month))].sort(); return ms.filter(m => m <= M).pop() || ms.pop() || null; }
@@ -83,15 +85,17 @@ function campOptions(x) {
   termsMonths(x).forEach(M => {
     const use = termsMonthUse(all, M); if (!use) return;
     if (use !== M) warns.push(`ยังไม่มีแคมเปญเดือน ${fmtM(M)} ใน Sheet · ใช้ของเดือน ${fmtM(use)} ไปก่อน ตรวจอีกครั้ง`);
-    const by = x.adv ? 'เดือนใบกำกับ Advance' : M === bm && M === im ? 'เดือนจองและเดือนใบกำกับ' : M === bm ? 'เดือนจอง' : 'เดือนใบกำกับ';
+    const by = x.adv ? 'เดือนใบกำกับ Advance' : M === bm && M === im ? 'เดือนจองและเดือนใบกำกับ' : M === bm ? 'เดือนจอง' : im ? 'เดือนใบกำกับ' : 'เดือนปัจจุบัน · ถ้าออกใบกำกับเดือนนี้';
     all.filter(r => r.month === use).forEach(r => {
       let ok = true, why = '';
       // booked in this campaign's month: the invoice has to come out by the campaign's delivery date
       if (use === M && M === bm && M !== im && !x.adv) {
         if (r.book_from && x.bookDate < r.book_from || r.book_to && x.bookDate > r.book_to) { ok = false; why = `จองนอกช่วง ${fmtD(r.book_from)}–${fmtD(r.book_to)}`; }
         else if (x.inv && r.deliver_by && x.inv > r.deliver_by) { ok = false; why = `ใบกำกับ ${fmtD(x.inv)} เกินกำหนดรับรถ ${fmtD(r.deliver_by)}`; }
+        // not invoiced yet and the campaign's last release date has passed: this month's campaign is the one to use (23/11)
+        else if (!x.inv && r.deliver_by && todayISO() > r.deliver_by) { ok = false; why = `ต้องรับรถภายใน ${fmtD(r.deliver_by)} · เลยกำหนดแล้ว ใช้แคมเปญเดือนปัจจุบันแทน`; }
       }
-      out.push({ value: r.month + '|' + r.id, month: r.month, name: r.name, sup: num(r.sup), group: `แคมเปญ ${fmtM(r.month)} (${by}) · ${r.group}`, ok, why, deliver_by: r.deliver_by });
+      out.push({ value: r.month + '|' + r.id, month: r.month, name: r.name, sup: num(r.sup), grade: r.grade || '', gname: r.group || '', group: `แคมเปญ ${fmtM(r.month)} (${by}) · ${r.group}`, ok, why, deliver_by: r.deliver_by });
     });
   });
   return { opts: [...out, { value: 'pending', name: 'รอเลือกแคมเปญ (ยังไม่ตัดสินใจ)', sup: 0, group: '', ok: true }, { value: 'none', name: 'ไม่ใช้แคมเปญ Honda (ดอกเบี้ยมาตรฐาน / นอกตาราง)', sup: 0, group: '', ok: true }, { value: 'other', name: 'อื่น ๆ (พิมพ์เอง)', sup: 0, group: '', ok: true }], warns: [...new Set(warns)] };
@@ -142,18 +146,27 @@ function termEmpty(v) { return v === '' || v === null || v === undefined; }
 // fills the worked-out values (amount financed, default margins, total) without writing them into the draft
 function termsFill(x, v, paint) {
   const o = { ...v }, { opts } = campOptions(x), camp = opts.find(y => y.value === o.campaign_id), st = marginStdFor(x, o.campaign_id);
-  o.fin_amount = x.cash ? null : commFinAmount({ price: o.price, discount: o.disc, down: o.down });
-  const base = num(o.price) ? num(o.price) - num(paint) : 0;
+  // ค่าประกันคุ้มครองสินเชื่อ (10/11): taken out of the down payment, it raises the amount financed (finance letter: ดาวน์สุทธิ = ดาวน์ − ประกัน, ยอดจัด = ราคา − ดาวน์สุทธิ)
+  const insOff = !x.cash && o.ins_credit_by === 'down' ? num(o.ins_credit) : 0;
+  o.down_net = x.cash || termEmpty(o.down) ? null : num(o.down) - insOff;
+  o.fin_amount = x.cash ? null : commFinAmount({ price: o.price, discount: o.disc, down: num(o.down) - insOff });
+  const base = x.mbase ? x.mbase : num(o.price) ? num(o.price) - num(o.price_add) - num(paint) : 0;
   const pv = privDefault(x, o, camp);
   const def = { margin_car: base ? Math.round(base * st.pct) : 0, margin_at: o.at_step === '1' ? st.step1 : o.at_step === '2' ? st.step2 : 0, margin_honda: camp && camp.ok ? camp.sup : 0, margin_priv: pv.amt };
   ['margin_car', 'margin_at', 'margin_honda', 'margin_priv'].forEach(k => { if (termEmpty(o[k])) o[k] = def[k]; });
   if (x.cash) { o.margin_at = 0; o.at_step = ''; }
-  o.margin = num(o.margin_car) + num(o.margin_at) + num(o.margin_honda) + num(o.margin_priv);
+  // ลูกค้าชำระเพิ่ม (10/11): items the customer pays for on top, each with its value, counted in the margin
+  o.extra_pay = xpArr(o.extra_pay);
+  o.margin_extra = o.extra_pay.reduce((n, y) => n + num(y && y.v), 0);
+  o.margin = num(o.margin_car) + num(o.margin_at) + num(o.margin_honda) + num(o.margin_priv) + o.margin_extra;
   return { o, camp, st, base, def, pv };
 }
 // the fields: price + discount (unless the booking form has them), down / instalments, campaign, margin
 // f: { attr: 'data-modal' | 'data-draft', pre, idp, ro, paint, priceDisc: bool, lockPrice, priceNote }
 function termsFields(x, v, f) {
+  // VAT is always the first line of ลูกค้าชำระเพิ่ม (11/11): ready to fill, left empty when there is none (only the form being keyed)
+  // the list lives on the form being keyed itself (the booking form passes a copy): typed values go to the same array (12/11 fix)
+  if (v && !f.ro) { const tgt = xpTarget(f) || v; tgt.extra_pay = xpArr(tgt.extra_pay); if (!tgt.extra_pay.some(xpVat)) tgt.extra_pay.unshift({ l: 'VAT', v: '' }); v.extra_pay = tgt.extra_pay; }
   const { o, st, base, pv } = termsFill(x, v, f.paint), { opts, warns } = campOptions(x), dis = f.ro ? 'disabled' : '';
   const S2 = (k, label, list) => `<div class="field"><label for="${f.idp}-${k}">${label}</label><select id="${f.idp}-${k}" ${f.attr}="${f.pre}.${k}" ${dis}>${list.map(([val, t, off]) => `<option value="${val}" ${String(o[k] || '') === val ? 'selected' : ''} ${off ? 'disabled' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
   const N = (k, label, extra = '') => `<div class="field"><label for="${f.idp}-${k}">${label}</label><input id="${f.idp}-${k}" type="number" min="0" inputmode="decimal" ${f.attr}="${f.pre}.${k}" value="${esc(o[k] ?? '')}" ${dis} ${extra}></div>`;
@@ -167,37 +180,48 @@ function termsFields(x, v, f) {
     ${N('margin_priv', '4. สิทธิพิเศษ Honda (บาท)')}</div>
     <div class="text-xs text-muted mt-1">${pv.pr.miss ? `เดือน ${fmtM(pv.pr.req)} ไม่มียอดในตาราง (Gen to Gen ของแคมเปญเดือนนี้ขึ้นกับปีที่ครอบครองรถเดิม) ใส่ยอดเองในช่อง 4 และดูเงื่อนไขในเอกสารแคมเปญ` : `ยอดตามแท็บสิทธิพิเศษ Honda เดือน ${fmtM(pv.pr.month)}`} · ฮอนด้าเคียงข้างคุณใช้ร่วมกับ Gen to Gen / Local Native ไม่ได้${pv.pr.td ? '<br>e:N2 Test Drive: ต้องมีบันทึกทดลองขับใน SPEAR ชื่อตรงผู้ซื้อ และจอง/รับรถกับผู้จำหน่ายเดียวกับที่ทดลองขับ (ไม่รวม Fleet / Leasing)' : ''}</div></div>`;
   const price = f.priceDisc ? `<div class="field"><label for="${f.idp}-price" class="req">ราคารถ (ราคาเต็ม)</label><input id="${f.idp}-price" type="number" min="0" step="100" inputmode="decimal" ${f.attr}="${f.pre}.price" value="${esc(o.price ?? '')}" ${f.lockPrice || f.ro ? 'readonly style="background:var(--surface-2)"' : ''}>${f.priceNote ? `<span class="text-xs text-muted">${f.priceNote}</span>` : ''}</div>` + (f.priceAdd ? N('price_add', 'บวกราคารถ (บาท)', 'step="100" placeholder="ถ้าราคาจริงสูงกว่าราคาในเว็บ"') : '') + N('disc', 'ส่วนลดราคารถ', 'step="100"') : '';
-  const fin = x.cash ? '' : N('down', 'เงินดาวน์', 'step="100"') + N('down_disc', 'ส่วนลดดาวน์', 'step="100"') + RO('ยอดจัด', o.fin_amount, 'ราคารถ − ส่วนลด − ดาวน์ (คิดให้เอง)') + N('rate', 'ดอกเบี้ย (% ต่อปี)', 'step="0.01" max="30"') + N('term', 'จำนวนงวด (เดือน)', 'step="1" max="120"');
+  const fco = f.finCo ? S2('fin_co', 'บริษัทไฟแนนซ์', [['', 'เลือกบริษัทไฟแนนซ์'], ...FINANCE.map(n => [n, n])]) : '';
+  const insCr = N('ins_credit', 'ค่าประกันคุ้มครองสินเชื่อ (บาท)', 'step="1"') + S2('ins_credit_by', 'ค่าประกันคุ้มครองสินเชื่อ ชำระแบบ', [['', 'ไม่มี / ยังไม่ระบุ'], ['down', 'หักจากเงินดาวน์ (ยอดจัดเพิ่ม)'], ['pay', 'ลูกค้าชำระวันรับรถ']]);
+  const fin = x.cash ? '' : fco + N('down', 'เงินดาวน์', 'step="100"') + insCr + (o.ins_credit_by === 'down' && num(o.ins_credit) ? RO('เงินดาวน์สุทธิ', o.down_net, 'ดาวน์ − ค่าประกันคุ้มครองสินเชื่อ') : '') + N('down_disc', 'ส่วนลดดาวน์', 'step="100"') + RO('ยอดจัด', o.fin_amount, o.ins_credit_by === 'down' && num(o.ins_credit) ? 'ราคารถ − ส่วนลด − ดาวน์สุทธิ (คิดให้เอง)' : 'ราคารถ − ส่วนลด − ดาวน์ (คิดให้เอง)') + N('rate', 'ดอกเบี้ย (% ต่อปี)', 'step="0.01" max="30"') + `<div class="field"><label for="${f.idp}-term">จำนวนงวด (เดือน)</label><input id="${f.idp}-term" type="number" min="0" inputmode="decimal" ${f.attr}="${f.pre}.term" value="${esc(o.term ?? '')}" ${dis} step="1" max="120">
+      <label class="tf-chk"><input type="checkbox" ${f.attr}="${f.pre}.adv_inst" ${o.adv_inst ? 'checked' : ''} ${dis}> ผ่อนต้นงวด (ชำระงวดแรกวันรับรถ)</label>${(() => { const mo = typeof dealMonthly === 'function' ? dealMonthly(o) : null; return mo ? `<span class="text-xs text-muted">ค่างวดโดยประมาณ ${money(mo)} บาท / เดือน</span>` : ''; })()}</div>`;
   const groups = [...new Set(opts.map(y => y.group))];
   const sel = `<div class="field sm:col-span-3"><label for="${f.idp}-camp">แคมเปญ Honda <span class="text-xs text-muted">(ยังไม่เลือกได้)</span></label><select id="${f.idp}-camp" ${f.attr}="${f.pre}.campaign_id" ${dis}><option value="">เลือกแคมเปญ</option>${groups.map(gname => {
     const os = opts.filter(y => y.group === gname).map(y => `<option value="${esc(y.value)}" ${o.campaign_id === y.value ? 'selected' : ''} ${y.ok ? '' : 'disabled'}>${esc(y.name)}${y.ok ? '' : ` · ใช้ไม่ได้: ${esc(y.why)}`}</option>`).join('');
     return gname ? `<optgroup label="${esc(gname)}">${os}</optgroup>` : os; }).join('')}</select>
     ${warns.map(w => `<span class="text-xs" style="color:var(--warn)">${esc(w)}</span>`).join('')}
-    ${!x.inv && !x.adv ? '<span class="text-xs text-muted">ถ้าออกใบกำกับเดือนถัดไป จะเลือกแคมเปญของเดือนใบกำกับได้ด้วย</span>' : ''}</div>
+    ${!x.inv && !x.adv ? '<span class="text-xs text-muted">เลือกได้: แคมเปญเดือนจอง (ถ้ารับรถทันกำหนดของแคมเปญนั้น) หรือแคมเปญเดือนที่ปล่อยรถ · ยังไม่ออกใบกำกับ = แคมเปญเดือนปัจจุบัน</span>' : ''}</div>
     ${o.campaign_id === 'other' ? `<div class="field sm:col-span-3"><label for="${f.idp}-ct">ชื่อแคมเปญ</label><input id="${f.idp}-ct" ${f.attr}="${f.pre}.campaign_text" value="${esc(o.campaign_text ?? '')}" ${dis} autocomplete="off"></div>` : ''}`;
   const step = x.cash ? '' : `<div class="field"><label for="${f.idp}-step">AT แคมเปญ (ช่อง Step)</label><select id="${f.idp}-step" ${f.attr}="${f.pre}.at_step" ${dis}>
     <option value="" ${!o.at_step ? 'selected' : ''}>ไม่มี</option><option value="1" ${o.at_step === '1' ? 'selected' : ''}>Step ช่อง 1 · +${money(st.step1)}</option><option value="2" ${o.at_step === '2' ? 'selected' : ''}>Step ช่อง 2 · +${money(st.step2)}</option></select></div>`;
   const WHO = [['', 'ไม่มี'], ['AT แถม', 'AT แถม'], ['Honda แถม', 'Honda แถม'], ['ลูกค้าซื้อ', 'ลูกค้าซื้อ']], WHO_REG = WHO.filter(y => y[0] !== 'Honda แถม'), REG_TYPES = [['บุคคลธรรมดา', 'บุคคลธรรมดา'], ['นิติบุคคล', 'นิติบุคคล']];
   const insBox = `<div class="mt-3 p-3 rounded-lg border border-line"><div class="font-medium text-sm mb-2">ประกันภัยและทะเบียน (ไปขึ้นในใบสั่งแต่งรถ)</div><div class="grid grid-cols-2 gap-3">
     ${f.noIns1 ? '' : S2('ins1_by', 'ประกันภัยชั้น 1 + พ.ร.บ. ปีที่ 1', WHO) + S2('ins1_kind', 'บริษัทประกัน ปีที่ 1', INS_KINDS)}${S2('ins2_by', 'ประกันภัยชั้น 1 + พ.ร.บ. ปีที่ 2', WHO)}${S2('ins2_kind', 'บริษัทประกัน ปีที่ 2', INS_KINDS)}${S2('ins3_by', 'ประกันภัยชั้น 1 + พ.ร.บ. ปีที่ 3', WHO)}${S2('ins3_kind', 'บริษัทประกัน ปีที่ 3', INS_KINDS)}${S2('reg_by', 'ค่าจดทะเบียน', WHO_REG)}${S2('reg_type', 'ค่าจดทะเบียนของ', REG_TYPES)}</div></div>`;
-  return `<div class="grid sm:grid-cols-3 gap-3">${price}${fin}${f.adm ? campAdminBox(f, o, v, sel, opts) : sel}</div>
+  return `<div class="grid sm:grid-cols-3 gap-3 tf-grid">${price}${fin}${f.adm ? campAdminBox(f, o, v, sel, opts) : sel}</div>
     ${insBox}
     <div class="mt-3 p-3 rounded-lg border border-line" style="background:var(--surface)"><div class="font-medium text-sm mb-2">Margin (แก้ตัวเลขได้)</div>
       <div class="grid sm:grid-cols-3 gap-3">${N('margin_car', `1. Margin รถ ${Math.round(st.pct * 100)}%`)}${step}${x.cash ? '' : N('margin_at', '2. AT แคมเปญ (บาท)')}${N('margin_honda', `${x.cash ? '2' : '3'}. Honda แคมเปญ (บาท)`)}</div>
-      <div class="text-xs text-muted mt-1">Margin รถ คิดจากราคาไม่รวมค่าสี ${base ? `${money(base)} บาท${f.paint ? ` (ค่าสี ${money(f.paint)})` : ''}` : '(ใส่ราคารถก่อน)'} · ตาราง Margin เดือน ${fmtM(st.month)}${x.cash ? ' · ซื้อสดไม่มี Step AT' : ''}</div>
+      <div class="text-xs text-muted mt-1">Margin รถ คิดจากราคารถจริง ไม่รวมค่าสี ไม่รวมบวก/ลดราคารถ ${base ? `${money(base)} บาท${f.paint ? ` (ค่าสี ${money(f.paint)})` : ''}` : '(ใส่ราคารถก่อน)'} · ตาราง Margin เดือน ${fmtM(st.month)}${x.cash ? ' · ซื้อสดไม่มี Step AT' : ''}</div>
       ${st.warn ? `<div class="text-xs" style="color:var(--warn)">${esc(st.warn)}</div>` : ''}
       ${privBox}
+      <div class="mt-3 pt-3 border-t border-line"><div class="font-medium text-sm mb-2">${x.cash ? '4' : '5'}. ลูกค้าชำระเพิ่ม <span class="text-xs text-muted font-normal">(รวมใน Margin)</span></div>
+        ${o.extra_pay.map((y, i) => `<div class="flex gap-2 items-end mb-2"><div class="field grow"><label for="${f.idp}-xp${i}l">รายการ</label>${xpVat(y) ? `<div class="p-2 rounded-lg border border-line" style="background:var(--surface-2)">VAT <span class="text-xs text-muted">(ไม่มีเว้นว่างได้)</span></div>` : `<input id="${f.idp}-xp${i}l" ${f.attr}="${f.pre}.extra_pay.${i}.l" value="${esc((y && y.l) || '')}" placeholder="เช่น ฟิล์มเกรดสูงกว่าแพ็กเกจ" autocomplete="off" ${dis}>`}</div>
+          <div class="field w-36"><label for="${f.idp}-xp${i}v">มูลค่า (บาท)</label><input id="${f.idp}-xp${i}v" type="number" min="0" step="1" inputmode="decimal" ${f.attr}="${f.pre}.extra_pay.${i}.v" value="${esc((y && y.v) ?? '')}" ${dis}></div>
+          ${f.ro || xpVat(y) ? '' : `<button type="button" class="btn btn-ghost btn-sm" data-act="terms-xp-del" data-attr="${f.attr}" data-pre="${f.pre}" data-i="${i}" aria-label="ลบรายการ">ลบ</button>`}</div>`).join('')}
+        ${f.ro ? '' : `<button type="button" class="btn btn-ghost btn-sm" data-act="terms-xp-add" data-attr="${f.attr}" data-pre="${f.pre}">+ เพิ่มรายการ</button>`}
+        ${o.margin_extra ? `<span class="text-sm ml-2">รวม <b class="num">${money(o.margin_extra)}</b> บาท</span>` : ''}</div>
       <div class="text-sm mt-2">รวม Margin <b class="num">${money(o.margin)}</b> บาท</div></div>`;
 }
 // what is saved: numbers, the campaign's text and month, the margin parts and total
 function termsRecord(x, v, paint) {
   const { o, camp, pv } = termsFill(x, v, paint), n = k => termEmpty(o[k]) ? null : num(o[k]);
   return { price: n('price'), disc: n('disc'), down: x.cash ? null : n('down'), down_disc: x.cash ? null : n('down_disc'), fin_amount: x.cash ? null : o.fin_amount,
-    rate: x.cash || termEmpty(o.rate) ? null : Number(o.rate), term: x.cash || termEmpty(o.term) ? null : parseInt(o.term, 10),
+    fin_co: x.cash ? null : (o.fin_co || null), ins_credit: x.cash ? null : n('ins_credit'), ins_credit_by: x.cash || !num(o.ins_credit) ? null : (o.ins_credit_by || null), down_net: x.cash ? null : o.down_net,
+    rate: x.cash || termEmpty(o.rate) ? null : Number(o.rate), term: x.cash || termEmpty(o.term) ? null : parseInt(o.term, 10), adv_inst: !x.cash && !!o.adv_inst,
     campaign_id: o.campaign_id || null, campaign: camp ? (camp.value === 'other' ? String(o.campaign_text || '').trim() || 'อื่น ๆ' : (camp.group ? camp.group + ' · ' : '') + camp.name) : null, campaign_text: o.campaign_id === 'other' ? String(o.campaign_text || '').trim() : null,
     camp_month: camp && camp.month ? camp.month : null, at_step: x.cash ? null : (o.at_step || null), margin_car: num(o.margin_car), margin_at: num(o.margin_at), margin_honda: num(o.margin_honda), margin: o.margin, paint: num(paint),
     priv_gtg: pv.bl.gtg ? null : (o.priv_gtg || null), priv_ln: pv.bl.ln ? null : (o.priv_ln || null), priv_td: o.priv_td && pv.pr.td ? o.priv_td : null, priv_hk: n('priv_hk'), margin_priv: num(o.margin_priv), privileges: privText({ ...o, priv_td: pv.pr.td ? o.priv_td : '' }) || null,
-    ins1_by: o.ins1_by || null, ins1_kind: o.ins1_kind || null, ins2_by: o.ins2_by || null, ins3_by: o.ins3_by || null, ins2_kind: o.ins2_kind || null, ins3_kind: o.ins3_kind || null, reg_by: o.reg_by || null, reg_type: o.reg_by ? (o.reg_type || 'บุคคลธรรมดา') : null };
+    extra_pay: o.extra_pay.filter(y => y && (num(y.v) || (String(y.l || '').trim() && !xpVat(y)))).map(y => ({ l: String(y.l || '').trim(), v: num(y.v) })), margin_extra: o.margin_extra,
+    ins1_by: o.ins1_by || null, ins1_kind: o.ins1_kind || null, ins2_by: o.ins2_by || null, ins3_by: o.ins3_by || null, ins2_kind: o.ins2_kind || null, ins3_kind: o.ins3_kind || null, reg_by: o.reg_by || null, reg_type: o.reg_type || (o.reg_by ? 'บุคคลธรรมดา' : null) };
 }
 function termsCheck(x, v) {
   if (termEmpty(v.price) || !num(v.price)) return { err: 'ใส่ราคารถ', id: 'price' };
@@ -205,9 +229,12 @@ function termsCheck(x, v) {
   if (!x.cash) {
     if (termEmpty(v.down)) return { err: 'ใส่เงินดาวน์', id: 'down' };
     if (num(v.down_disc) > num(v.down)) return { err: 'ส่วนลดดาวน์มากกว่าเงินดาวน์', id: 'down_disc' };
+    if (num(v.ins_credit) && !v.ins_credit_by) return { err: 'เลือกว่าค่าประกันคุ้มครองสินเชื่อ หักจากเงินดาวน์ หรือชำระวันรับรถ', id: 'ins_credit_by' };
+    if (v.ins_credit_by === 'down' && num(v.ins_credit) > num(v.down)) return { err: 'ค่าประกันคุ้มครองสินเชื่อมากกว่าเงินดาวน์', id: 'ins_credit' };
     if (termEmpty(v.rate) || !(Number(v.rate) >= 0) || Number(v.rate) > 30) return { err: 'ใส่ดอกเบี้ย (0–30%)', id: 'rate' };
     const t = Number(v.term); if (!(t >= 1 && t <= 120 && t === Math.round(t))) return { err: 'ใส่จำนวนงวด 1–120 เดือน', id: 'term' };
   }
+  if (xpArr(v.extra_pay).some(y => y && num(y.v) && !String(y.l || '').trim())) return { err: 'ลูกค้าชำระเพิ่ม: ใส่ชื่อรายการ', id: 'xp0l' };
   if (num(v.priv_hk) && (num(v.priv_hk) < 25000 || num(v.priv_hk) > 70000)) return { err: 'ฮอนด้าเคียงข้างคุณ 25,000–70,000 บาท', id: 'priv_hk' };
   if (num(v.priv_hk) && (v.priv_gtg || v.priv_ln)) return { err: 'ฮอนด้าเคียงข้างคุณ ใช้ร่วมกับ Gen to Gen / Local Native ไม่ได้', id: 'priv_hk' };
   // not chosen yet is allowed (ตกลง 30/10): it is kept as "รอเลือกแคมเปญ" and the admin picks it later
@@ -221,7 +248,9 @@ function termsCheck(x, v) {
 // the sale on a booking: model, cash/finance, booking date, the invoice (or the Advance invoice) of its car
 function termsCtxAt(a, D) {
   const vin = atVin(a), adv = vin ? advRec(vin) : null, inv = adv ? adv.idate : (vin && D.invByVin.get(vin) && D.invByVin.get(vin).idate) || (a.rec.inv_man && a.rec.inv_man.idate) || null;
-  return { model: a.model, grade: a.grade, color: a.color, cash: isCash(a.rec), bookDate: a.date || a.rec.booking_date || null, inv: inv || null, adv: !!adv };
+  // the margin on the car is worked out on the real car price (web price list, no paint): never on a price added to or cut (10/11)
+  const web = typeof dealWeb === 'function' ? dealWeb(a, D) : null;
+  return { model: a.model, grade: a.grade, color: a.color, cash: isCash(a.rec), bookDate: a.date || a.rec.booking_date || null, inv: inv || null, adv: !!adv, mbase: web && web.base > 0 ? web.base : null };
 }
 // ---- the booking form: the same fields, price from the price list and the discount from the booking's own field
 function bookTermsCtx(d) { return { model: d.model, grade: d.grade, color: d.color, cash: d.purchase === 'ซื้อสด', bookDate: d.booking_date || todayISO(), inv: null, adv: false }; }
@@ -230,23 +259,23 @@ function bookTermsBox(d) {
   if (!d.model || !d.grade || !d.color) return `<fieldset class="p-4 rounded-lg border border-line"><legend class="font-head font-semibold px-1">เงื่อนไขการขาย</legend><p class="text-sm text-muted">เลือกรุ่น เกรด สี ก่อน แล้วจะเลือกดาวน์ ผ่อน แคมเปญ และ Margin ได้</p></fieldset>`;
   d.deal = d.deal || {};
   const x = bookTermsCtx(d), p = bookTermsPrice(d);
-  const v = { ...d.deal, price: p ? p.price : d.deal.price, disc: d.discount, ins1_by: d.insurance, ins1_kind: d.insurance_kind };
+  const v = bookTermsV(d, x, p);
   return `<fieldset class="p-4 rounded-lg border border-line"><legend class="font-head font-semibold px-1">เงื่อนไขการขาย (${x.cash ? 'ซื้อสด' : 'ไฟแนนซ์'})</legend>
     <p class="text-sm text-muted mb-2">ส่วนลดไม่มีเว้นว่างได้ · หลังบันทึก เซลล์ขอแก้ได้อีก 1 ครั้งตอนไฟแนนซ์ผ่าน (แอดมินอนุมัติ)</p>
     <div class="grid sm:grid-cols-3 gap-3 mb-3">
       ${p ? `<div class="field"><label>ราคารถ (ราคาเต็ม)</label><div class="num p-2 rounded-lg border border-line" style="background:var(--surface-2)">${money(p.price)}</div><span class="text-xs text-muted">ตามใบราคาในเว็บ${p.paint ? ` · รวมค่าสี ${money(p.paint)}` : ''}</span></div>`
         : `<div class="field"><label for="bt-price" class="req">ราคารถ (ราคาเต็ม)</label><input id="bt-price" type="number" min="0" step="100" inputmode="decimal" data-draft="booking.deal.price" value="${esc(d.deal.price ?? '')}"><span class="text-xs" style="color:var(--warn)">ยังไม่มีราคาสีนี้ในเว็บ ใส่เอง</span></div>`}
-      <div class="field"><label for="b-discount">ส่วนลดราคารถ (บาท)</label><input id="b-discount" type="number" min="0" step="100" inputmode="numeric" data-draft="booking.discount" value="${esc(d.discount ?? '')}" placeholder="ไม่มีเว้นว่าง"></div></div>
+      <div class="field"><label for="b-discount">${x.cash ? 'ส่วนลดราคารถ (บาท)' : 'ส่วนลด (บาท) · ไฟแนนซ์ลงเป็นส่วนลดดาวน์'}</label><input id="b-discount" type="number" min="0" step="100" inputmode="numeric" data-draft="booking.discount" value="${esc(d.discount ?? '')}" placeholder="ไม่มีเว้นว่าง"></div></div>
     ${termsFields(x, v, { attr: 'data-draft', pre: 'booking.deal', idp: 'bt', paint: p ? p.paint : 0, priceDisc: false, noIns1: true })}</fieldset>`;
 }
 function bookTermsMissing(d) {
   if (!d.model || !d.grade || !d.color) return null;
-  const x = bookTermsCtx(d), p = bookTermsPrice(d), v = { ...(d.deal || {}), price: p ? p.price : (d.deal || {}).price, disc: d.discount, ins1_by: d.insurance, ins1_kind: d.insurance_kind };
+  const x = bookTermsCtx(d), p = bookTermsPrice(d), v = bookTermsV(d, x, p);
   return termsCheck(x, v).err || null;
 }
 function bookTermsRec(d) {
   if (!d.model || !d.grade || !d.color) return null;
-  const x = bookTermsCtx(d), p = bookTermsPrice(d), v = { ...(d.deal || {}), price: p ? p.price : (d.deal || {}).price, disc: d.discount, ins1_by: d.insurance, ins1_kind: d.insurance_kind };
+  const x = bookTermsCtx(d), p = bookTermsPrice(d), v = bookTermsV(d, x, p);
   return { ...termsRecord(x, v, p ? p.paint : 0), price_src: p ? 'ใบราคาในเว็บ' : 'ใส่เอง', cash: x.cash, ...actor(), first: actor(), hist: [], src: 'ใบจอง' };
 }
 // ---- after delivery: the commission data is the sale terms (changed in the finance step), shown here
@@ -255,7 +284,7 @@ function commForm(a, m, D) {
   if (!(d && d.at)) return `<div class="mt-2 p-3 rounded-lg text-sm" style="background:var(--warn-soft)">ยังไม่ได้ใส่เงื่อนไขการขาย (ราคา ดาวน์ ผ่อน แคมเปญ Margin) · ใส่ที่ขั้น "ไฟแนนซ์ผ่าน" ด้านบน ใช้ทำค่าคอม${cm.price ? ` · มีข้อมูลค่าคอมเดิม ราคา ${money(cm.price)}${cm.margin ? ` Margin ${money(cm.margin)}` : ''}` : ''}</div>`;
   return `<div class="mt-2 p-3 rounded-lg border border-line text-sm"><b>ข้อมูลค่าคอม</b> ใช้เงื่อนไขการขายในขั้นไฟแนนซ์ · ${esc(d.campaign || 'ไม่ได้เลือกแคมเปญ')}
     ${d.privileges ? `<div class="mt-1">สิทธิพิเศษ: ${esc(d.privileges)}</div>` : ''}
-    <div class="mt-1">Margin รถ ${money(d.margin_car)} + AT แคมเปญ ${money(d.margin_at)} + Honda แคมเปญ ${money(d.margin_honda)} + สิทธิพิเศษ ${money(d.margin_priv)} = <b class="num">${money(d.margin)}</b> บาท</div></div>`;
+    <div class="mt-1">Margin รถ ${money(d.margin_car)} + AT แคมเปญ ${money(d.margin_at)} + Honda แคมเปญ ${money(d.margin_honda)} + สิทธิพิเศษ ${money(d.margin_priv)}${num(d.margin_extra) ? ` + ลูกค้าชำระเพิ่ม ${money(d.margin_extra)}` : ''} = <b class="num">${money(d.margin)}</b> บาท</div></div>`;
 }
 // picking a campaign or a Step column puts that margin part back to its default (it can be typed over after);
 // on 'input', because the page redraws on a select's input and its 'change' then never reaches the document
@@ -341,3 +370,26 @@ Object.assign(ACTIONS, {
   },
   'camp-use'(el) { const d = S.modal && S.modal.deal; if (!d) return; d.campaign_id = el.dataset.cid; d.margin_honda = ''; d.margin_priv = ''; d.adm_mode = 'own'; d.adm_file = (S.modal.campMatch || {}).file || null; render(); }
 });
+
+Object.assign(ACTIONS, {
+  'terms-xp-add'(el) { const root = el.dataset.attr === 'data-modal' ? S.modal : S.draft; if (!root) return; const k = el.dataset.pre + '.extra_pay';
+    let o = root; for (const p of k.split('.').slice(0, -1)) { if (!o[p]) o[p] = {}; o = o[p]; } o.extra_pay = xpArr(o.extra_pay); o.extra_pay.push({ l: '', v: '' }); render(); },
+  'terms-xp-del'(el) { const root = el.dataset.attr === 'data-modal' ? S.modal : S.draft; if (!root) return;
+    let o = root; for (const p of el.dataset.pre.split('.')) { if (!o[p]) return; o = o[p]; } if (Array.isArray(o.extra_pay)) o.extra_pay.splice(Number(el.dataset.i), 1); render(); }
+});
+
+function xpVat(y) { return !!y && /^\s*(vat|แวต|ภาษีมูลค่าเพิ่ม)\s*$/i.test(String(y.l || '')); }
+
+// the booking form's discount (11/11): cash = discount on the car price · finance = the down-payment discount first
+function bookTermsV(d, x, p) {
+  const dl = d.deal || {}, fin = !x.cash;
+  return { ...dl, price: p ? p.price : dl.price, disc: fin ? (dl.disc ?? '') : d.discount, down_disc: fin && termEmpty(dl.down_disc) ? (d.discount ?? '') : dl.down_disc, ins1_by: d.insurance, ins1_kind: d.insurance_kind };
+}
+
+// extra_pay as an array, also when a typed value made it an object ({0: {...}}) (12/11)
+function xpArr(x) { return Array.isArray(x) ? x : x && typeof x === 'object' ? Object.keys(x).filter(k => /^\d+$/.test(k)).sort((a, b) => a - b).map(k => x[k]) : []; }
+function xpTarget(f) {
+  let o = f.attr === 'data-modal' ? S.modal : f.attr === 'data-draft' ? S.draft : null; if (!o) return null;
+  for (const k of String(f.pre || '').split('.').filter(Boolean)) { if (!o[k] || typeof o[k] !== 'object') o[k] = {}; o = o[k]; }
+  return o;
+}

@@ -165,7 +165,7 @@ function execData(D, rng) {
   }
   D.X.inv.forEach(i => {
     if (i.company || !i.ddate || !inBrX(i)) return;
-    dlKeys.add('inv:' + i.br + ':' + i.inv);
+    dlKeys.add('inv:' + i.br + ':' + String(i.inv || '').replace(/^0+/, ''));
     if (inR(i.ddate)) { const a = i.vin && advs.get(i.vin); sales.push({ date: i.ddate, br: i.br, model: i.model, fin: i.fin || null, src: 'DL', ...det(i), ...(a ? { advFrom: advBr(i.vin, a, D), extra: 'จากรถ ADV' } : {}) }); }
   });
   D.at.forEach(a => {
@@ -185,8 +185,8 @@ function execData(D, rng) {
   const trades = [];
   D.at.forEach(a => {
     if (a.cancelled || a.demo || !inBrX(a)) return;
-    const f = a.rec.flow || {}, t = f.down && f.down.tradein; if (!t || !t.has) return;
-    const date = (f.delivered && f.delivered.date) || (a.match && a.match.ddate) || f.down.date;
+    const t = tradeOf(a); if (!t) return;
+    const date = tradeDate(a, D);
     if (inR(date)) trades.push({ date, br: a.delivBr || a.br, ...t, cust: a.cust, sales: a.sales, newModel: a.model, id: a.id });
   });
   const books = D.at.filter(a => !a.demo && inBr(a) && inR(a.date));

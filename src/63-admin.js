@@ -8,11 +8,11 @@
 function adminCan() { return S.role.role === 'exec' || !!MGR_OF[S.role.role]; }
 // หลังบ้าน: executive edits, managers only look, branch admins have no access
 function adminWrite(br) { if (S.view === 'admin' && S.role.role !== 'exec') return false; return perms().write && perms().approve && (!br || canApproveBr(br)); }
-function adminTabs() { return [...(window.__WEB && window.__WEB.role === 'exec' ? [['users', 'ผู้ใช้งานเว็บ']] : []), ...(window.__WEB && window.__WEB.role === 'exec' ? [['money', 'ประวัติแก้ไข เงิน/แคมเปญ']] : []), ['sales', 'รายชื่อเซลล์'], ['cat', 'รุ่น เกรด สี'], ['fee', 'ค่าจดทะเบียน/ประกัน/FOC'], ['book', 'ใบจอง'], ['lock', 'ล็อกรถ'], ['file', 'แก้ผ่าน Excel / Google Sheet'], ['log', 'ประวัติหลังบ้าน']]; }
+function adminTabs() { return [...(window.__WEB && window.__WEB.role === 'exec' ? [['users', 'ผู้ใช้งานเว็บ']] : []), ...(window.__WEB && window.__WEB.role === 'exec' ? [['money', 'ประวัติแก้ไข เงิน/แคมเปญ']] : []), ['sales', 'รายชื่อเซลล์'], ['cat', 'รุ่น เกรด สี'], ['fee', 'ค่าจดทะเบียน/ประกัน/FOC'], ['gift', 'รายการที่ใช้บ่อย'], ['book', 'ใบจอง'], ['lock', 'ล็อกรถ'], ['file', 'แก้ผ่าน Excel / Google Sheet'], ['log', 'ประวัติหลังบ้าน']]; }
 function viewAdmin(D) {
   if (!adminCan()) return `${pageHead('หลังบ้าน', '')}<div class="bg-surface border border-line rounded-lg">${emptyBox('บทบาทนี้เข้าหลังบ้านไม่ได้', 'สำหรับผู้บริหาร (แก้ได้) และผู้จัดการ (ดูได้)')}</div>`;
   const sub = adminTabs().some(t => t[0] === S.sub.admin) ? S.sub.admin : 'sales';
-  const body = sub === 'users' ? adminUsers() : sub === 'book' ? adminBook(D) : sub === 'lock' ? adminLock(D) : sub === 'file' ? adminFile(D) : sub === 'log' ? adminLog(D) : sub === 'money' ? adminMoney(D) : sub === 'cat' ? adminCatalog(D) : sub === 'fee' ? adminFees() : adminSales(D);
+  const body = sub === 'users' ? adminUsers() : sub === 'book' ? adminBook(D) : sub === 'lock' ? adminLock(D) : sub === 'file' ? adminFile(D) : sub === 'log' ? adminLog(D) : sub === 'money' ? adminMoney(D) : sub === 'cat' ? adminCatalog(D) : sub === 'fee' ? adminFees() : sub === 'gift' ? adminGifts() : adminSales(D);
   return `${pageHead('หลังบ้าน', 'ตรวจและแก้ข้อมูลโดยตรง ทุกการแก้เก็บประวัติว่าใครแก้ เมื่อไหร่ จากอะไรเป็นอะไร')}
   ${tabs('admin', adminTabs())}${!adminWrite() ? '<p class="text-sm text-muted mb-3">ผู้จัดการดูและดาวน์โหลดได้ การแก้ในหลังบ้านทำโดยผู้บริหาร</p>' : ''}${body}`;
 }
@@ -49,7 +49,7 @@ function adminBookList(D, all) {
 }
 function adminBook(D) {
   const list = adminBookList(D), f = S.filters;
-  return `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
+  return `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3 flt2">
     <div class="field col-span-2 sm:grow sm:max-w-sm"><label for="f-adq">ค้นหาชื่อลูกค้า / เซลล์ / เลขที่ใบจอง / เลขที่ใบเสร็จ</label><input id="f-adq" type="search" data-filter="adq" value="${esc(f.adq || '')}"></div>
     <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-5 h-5" data-filter="adOut" ${f.adOut ? 'checked' : ''}> แสดงที่เอาออกแล้ว</label></div>
   <p class="text-sm mb-2">${list.length} ใบ${list.length > 200 ? ' · แสดง 200 ใบล่าสุด' : ''}</p>
@@ -108,7 +108,7 @@ function adminLock(D) {
   const list = [...S.locks.entries()].map(([id, l]) => ({ id, l })).filter(x => (showOut || !x.l.hidden) && (!S.br || x.l.car_br === S.br) && (S.role.role !== 'admin' || x.l.car_br === S.role.branch))
     .filter(x => !q || [x.l.vin, x.l.ref, x.l.sales, x.l.prospect, x.l.dealer_name, x.id].some(v => v && searchKey(v).includes(q)))
     .sort((a, b) => (b.l.requested_at || '').localeCompare(a.l.requested_at || ''));
-  return `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
+  return `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3 flt2">
     <div class="field col-span-2 sm:grow sm:max-w-sm"><label for="f-alq">ค้นหา VIN / Quota / เซลล์ / ลูกค้า / ดีลเลอร์</label><input id="f-alq" type="search" data-filter="alq" value="${esc(S.filters.alq || '')}"></div>
     <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-5 h-5" data-filter="alOut" ${showOut ? 'checked' : ''}> แสดงที่เอาออกแล้ว</label></div>
   <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl"><thead><tr><th>รถ / Quota</th><th>ประเภท</th><th>สถานะ</th><th>เซลล์ / ลูกค้า / ดีลเลอร์</th><th>ขอเมื่อ</th><th></th></tr></thead><tbody>

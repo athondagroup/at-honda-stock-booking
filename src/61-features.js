@@ -163,7 +163,7 @@ function cancelHistory(D) {
       <td class="nowrap">${esc(a.sales || '')}<div class="text-xs text-muted">${esc(a.br || '')}</div></td><td>${esc(c.reason || '–')}${c.req_note ? `<div class="text-xs text-muted">${esc(c.req_note)}</div>` : ''}</td>
       <td class="text-xs">${c.req ? `ขอ: ${who(c.req)}<br>` : ''}${c.at ? `อนุมัติ: ${who(c)}` : ''}</td><td class="text-sm">${dep}</td>
       <td class="nowrap text-right"><button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(a.id)}">เปิด</button>${c.at ? ` <button class="btn btn-ghost btn-sm" data-act="cancel-print" data-id="${esc(a.id)}">ใบอนุมัติยกเลิก</button>` : ''}${rf && rf.at ? ` <button class="btn btn-ghost btn-sm" data-act="refund-print" data-id="${esc(a.id)}">ใบคืนเงิน</button>` : ''}</td></tr>`; }).join('');
-  return `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
+  return `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3 flt2">
     <div class="field"><label for="f-cxm">เดือนที่ยกเลิก</label><select id="f-cxm" data-filter="cxM"><option value="">ทุกเดือน</option>${months.map(x => `<option value="${x}" ${f.cxM === x ? 'selected' : ''}>${fmtM(x)}</option>`).join('')}</select></div>
     <div class="field"><label for="f-cxr">เงินมัดจำ</label><select id="f-cxr" data-filter="cxR"><option value="">ทั้งหมด</option>${Object.entries(REFUND).map(([k, t]) => `<option value="${k}" ${f.cxR === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
   </div><p class="text-sm mb-2">${list.length} ใบ</p>

@@ -110,7 +110,7 @@ function spModal(m, D) {
 Object.assign(ACTIONS, {
   'sp-open'(el) {
     if (!spCan()) return;
-    const vin = el.dataset.vin, D = derive(), c = carAny(vin, D); if (!c) return;
+    const vin = el.dataset.vin, D = derive(), c = carAny(vin, D) || carFull(vin, D); if (!c) { toast('ไม่พบข้อมูลรถคันนี้', 'bad'); return; }
     const sp = c.special, inv = D.invByVin.get(vin);
     // dates and invoice the system already has are used as they are (locked); only what is missing is typed
     const lg = typeof carlogAll === 'function' ? carlogAll().get(vin) : null, lo = lg && lg.e.out && /ส่งมอบ/.test(lg.e.out.why || '') ? lg.e.out.d : null;

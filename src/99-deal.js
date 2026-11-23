@@ -34,19 +34,25 @@ function dealRows(d, cash) {
   const r = [['ราคารถ (ราคาเต็ม)', money(d.price)]];
   if (d.price_add) r.push(['บวกราคารถ', `${money(d.price_add)}${d.price_add_note ? ' · ' + d.price_add_note : ''}`]);
   r.push(['ส่วนลดราคารถ', money(d.disc)]);
-  if (!cash) r.push(['เงินดาวน์', money(d.down)], ['ส่วนลดดาวน์', money(d.down_disc)], ['ยอดจัด', money(d.fin_amount)], ['ดอกเบี้ย', d.rate !== null && d.rate !== undefined ? d.rate + ' %' : '–'], ['จำนวนงวด', d.term ? d.term + ' งวด' : '–']);
-  const mo = cash ? null : dealMonthly(d); if (mo) r.push(['ค่างวดโดยประมาณ', `${money(mo)} บาท / เดือน`]);
+  if (!cash && d.fin_co) r.push(['บริษัทไฟแนนซ์', d.fin_co]);
+  if (!cash) r.push(['เงินดาวน์', money(d.down)]);
+  if (!cash && num(d.ins_credit)) r.push(['ค่าประกันคุ้มครองสินเชื่อ', `${money(d.ins_credit)} · ${d.ins_credit_by === 'down' ? 'หักจากเงินดาวน์' : d.ins_credit_by === 'pay' ? 'ชำระวันรับรถ' : 'ยังไม่ระบุ'}`]);
+  if (!cash && d.ins_credit_by === 'down' && num(d.ins_credit)) r.push(['เงินดาวน์สุทธิ', money(num(d.down) - num(d.ins_credit))]);
+  if (!cash) r.push(['ส่วนลดดาวน์', money(d.down_disc)], ['ยอดจัด', money(d.fin_amount)], ['ดอกเบี้ย', d.rate !== null && d.rate !== undefined ? d.rate + ' %' : '–'], ['จำนวนงวด', d.term ? d.term + ' งวด' : '–']);
+  const mo = cash ? null : dealMonthly(d); if (mo) r.push(['ค่างวดโดยประมาณ', `${money(mo)} บาท / เดือน${d.adv_inst ? ' · ผ่อนต้นงวด (ชำระงวดแรกวันรับรถ)' : ''}`]);
   if (d.paint) r.push(['ค่าสี', money(d.paint)]);
   if (d.sales_camp && d.sales_camp_id !== d.campaign_id) r.push(['เซลล์เลือกแคมเปญ', d.sales_camp]);
   r.push([d.sales_camp && d.sales_camp_id !== d.campaign_id ? 'แคมเปญ Honda (แอดมินเลือก)' : 'แคมเปญ Honda', d.campaign || '–'], ['Margin รถ', money(d.margin_car)]);
   if (!cash) r.push([`AT แคมเปญ${d.at_step ? ` (Step ช่อง ${d.at_step})` : ''}`, money(d.margin_at)]);
   r.push(['Honda แคมเปญ', money(d.margin_honda)]);
   if (d.privileges) r.push(['สิทธิพิเศษ Honda', d.privileges]);
-  r.push(['สิทธิพิเศษ (Margin)', money(d.margin_priv)], ['รวม Margin', money(d.margin)]);
+  r.push(['สิทธิพิเศษ (Margin)', money(d.margin_priv)]);
+  xpArr(d.extra_pay).forEach(y => r.push(['ลูกค้าชำระเพิ่ม · ' + (y.l || ''), money(y.v)]));
+  r.push(['รวม Margin', money(d.margin)]);
   return r;
 }
 function dealDiff(old, nw) {
-  const L = { price: 'ราคารถ', disc: 'ส่วนลด', down: 'ดาวน์', down_disc: 'ส่วนลดดาวน์', fin_amount: 'ยอดจัด', rate: 'ดอกเบี้ย', term: 'งวด', campaign: 'แคมเปญ', margin_car: 'Margin รถ', margin_at: 'AT แคมเปญ', margin_honda: 'Honda แคมเปญ', privileges: 'สิทธิพิเศษ', margin_priv: 'สิทธิพิเศษ (Margin)', margin: 'รวม Margin' };
+  const L = { price: 'ราคารถ', disc: 'ส่วนลด', down: 'ดาวน์', fin_co: 'บริษัทไฟแนนซ์', ins_credit: 'ค่าประกันคุ้มครองสินเชื่อ', ins_credit_by: 'ชำระประกันคุ้มครองสินเชื่อ', margin_extra: 'ลูกค้าชำระเพิ่ม', down_disc: 'ส่วนลดดาวน์', fin_amount: 'ยอดจัด', rate: 'ดอกเบี้ย', term: 'งวด', campaign: 'แคมเปญ', margin_car: 'Margin รถ', margin_at: 'AT แคมเปญ', margin_honda: 'Honda แคมเปญ', privileges: 'สิทธิพิเศษ', margin_priv: 'สิทธิพิเศษ (Margin)', margin: 'รวม Margin' };
   return Object.keys(L).filter(k => (old[k] ?? null) !== (nw[k] ?? null)).map(k => `${L[k]} ${['campaign', 'privileges', 'rate', 'term'].includes(k) ? esc(old[k] ?? '–') : money(old[k])} → <b>${['campaign', 'privileges', 'rate', 'term'].includes(k) ? esc(nw[k] ?? '–') : money(nw[k])}</b>`);
 }
 // the web price plus what the sales add on top (a price above the list, e.g. extras); the add-on and why are kept (2/11)
@@ -69,7 +75,7 @@ function dealBoxIn(a, m, D) {
       : m.dealMode === 'req' ? 'ขอแก้ได้ครั้งเดียว · ส่งแล้วรอแอดมินสาขาหรือผู้จัดการอนุมัติ ตัวเลขเดิมยังใช้อยู่จนกว่าจะอนุมัติ' : 'แอดมินขึ้นไปแก้ได้เลย ระบบเก็บตัวเลขเดิมไว้ในประวัติ';
     const swapSel = swap ? `<div class="field mb-2"><label for="dl-purchase_to">เงื่อนไขการซื้อ</label><select id="dl-purchase_to" data-modal="deal.purchase_to"><option ${cash ? 'selected' : ''}>ซื้อสด</option><option ${cash ? '' : 'selected'}>ไฟแนนซ์</option></select>${(m.deal.purchase_to === 'ซื้อสด') !== isCash(a.rec) ? `<span class="text-xs" style="color:var(--warn)">เปลี่ยนจาก${isCash(a.rec) ? 'ซื้อสด' : 'ไฟแนนซ์'} · ${cash ? 'ข้ามขั้นไฟแนนซ์ ไม่ต้องใส่ดาวน์/ผ่อน' : 'ต้องมีขั้นไฟแนนซ์ผ่านและใส่ดาวน์ ดอกเบี้ย งวด'}</span>` : ''}</div>` : '';
     return `<div class="mt-2 p-3 rounded-lg border border-line" style="background:var(--surface-2)">${title}<div class="mt-2">${swapSel}
-      ${termsFields(x, v, { attr: 'data-modal', pre: 'deal', idp: 'dl', paint, priceDisc: true, lockPrice, priceNote, priceAdd: !!web, adm: st.admin && m.dealMode !== 'req' })}</div>
+      ${termsFields(x, v, { attr: 'data-modal', pre: 'deal', idp: 'dl', paint, priceDisc: true, lockPrice, priceNote, priceAdd: !!web, adm: st.admin && m.dealMode !== 'req', finCo: true })}</div>
       ${m.dealMode === 'admin' && poLocked(a) ? `<div class="field mt-2"><label for="dl-why" class="req">เหตุผลที่แก้หลังส่งมอบ (บังคับ · เก็บในประวัติ)</label><input id="dl-why" data-modal="dealWhy" value="${esc(m.dealWhy || '')}" autocomplete="off" placeholder="เช่น Honda แจ้งเปลี่ยนทางเลือก / บัญชีตรวจพบ"></div>` : ''}
       ${m.dealMode === 'req' ? `<div class="field mt-2"><label for="dl-why" class="req">เหตุผลที่ขอแก้</label><input id="dl-why" data-modal="dealWhy" value="${esc(m.dealWhy || '')}" autocomplete="off" placeholder="เช่น ไฟแนนซ์อนุมัติดาวน์ 25%"></div>` : ''}
       <div class="text-xs text-muted mt-2">${note}</div>
@@ -96,15 +102,17 @@ function commDeal(a) {
   const o = { price: dl.price, discount: dl.disc, down: dl.down, down_disc: dl.down_disc, fin_amount: dl.fin_amount, rate: dl.rate, term: dl.term, campaign: dl.campaign, margin: dl.margin, margin_car: dl.margin_car, margin_at: dl.margin_at, margin_honda: dl.margin_honda, margin_priv: dl.margin_priv, privileges: dl.privileges };
   return Object.fromEntries(Object.entries(o).filter(([, x]) => x !== null && x !== undefined));
 }
-function dealOld(d) { return Object.fromEntries(['price', 'price_add', 'price_add_note', 'disc', 'down', 'down_disc', 'fin_amount', 'rate', 'term', 'campaign_id', 'campaign', 'campaign_text', 'camp_month', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'priv_gtg', 'priv_ln', 'priv_td', 'priv_hk', 'ins1_by', 'ins1_kind', 'ins2_by', 'ins3_by', 'ins2_kind', 'ins3_kind', 'reg_by', 'reg_type', 'privileges', 'margin_priv', 'margin', 'paint', 'at', 'by', 'role', 'how', 'why'].map(k => [k, d[k] ?? null])); }
+function dealOld(d) { return Object.fromEntries(['price', 'price_add', 'price_add_note', 'disc', 'down', 'fin_co', 'ins_credit', 'ins_credit_by', 'extra_pay', 'margin_extra', 'down_disc', 'fin_amount', 'rate', 'term', 'campaign_id', 'campaign', 'campaign_text', 'camp_month', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'priv_gtg', 'priv_ln', 'priv_td', 'priv_hk', 'ins1_by', 'ins1_kind', 'ins2_by', 'ins3_by', 'ins2_kind', 'ins3_kind', 'reg_by', 'reg_type', 'privileges', 'margin_priv', 'margin', 'paint', 'at', 'by', 'role', 'how', 'why'].map(k => [k, d[k] ?? null])); }
 Object.assign(ACTIONS, {
   'deal-open'(el) {
     const a = atById(el.dataset.id); if (!a) return;
     const d = a.rec.deal || {}, cm = a.rec.comm || {}, r = a.rec, web = dealWeb(a, derive());
-    const keep = ['price', 'price_add', 'price_add_note', 'disc', 'down', 'down_disc', 'rate', 'term', 'campaign_id', 'campaign_text', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'priv_gtg', 'priv_ln', 'priv_td', 'priv_hk', 'margin_priv', 'ins1_by', 'ins1_kind', 'ins2_by', 'ins3_by', 'ins2_kind', 'ins3_kind', 'reg_by', 'reg_type'];
+    const keep = ['price', 'price_add', 'price_add_note', 'disc', 'down', 'fin_co', 'ins_credit', 'ins_credit_by', 'extra_pay', 'down_disc', 'rate', 'term', 'campaign_id', 'campaign_text', 'at_step', 'margin_car', 'margin_at', 'margin_honda', 'priv_gtg', 'priv_ln', 'priv_td', 'priv_hk', 'margin_priv', 'ins1_by', 'ins1_kind', 'ins2_by', 'ins3_by', 'ins2_kind', 'ins3_kind', 'reg_by', 'reg_type', 'adv_inst'];
     // a first entry starts from what the booking or the old commission data already has
-    S.modal.deal = d.at ? Object.fromEntries(keep.map(k => [k, d[k] ?? ''])) : { price: (web && web.price) || num(cm.price) || num(r.price) || '', disc: num(r.discount) || num(cm.discount) || '', down: num(cm.down) || '', down_disc: num(cm.down_disc) || '', rate: cm.rate ?? '', term: cm.term ?? '', campaign_id: '', at_step: '' };
+    S.modal.deal = d.at ? Object.fromEntries(keep.map(k => [k, k === 'extra_pay' ? xpArr(d.extra_pay).map(y => ({ ...y })) : d[k] ?? ''])) : { price: (web && web.price) || num(cm.price) || num(r.price) || '', ...(isCash(r) ? { disc: num(r.discount) || num(cm.discount) || '', down_disc: num(cm.down_disc) || '' } : { disc: '', down_disc: num(cm.down_disc) || num(r.discount) || num(cm.discount) || '' }), down: num(cm.down) || '', rate: cm.rate ?? '', term: cm.term ?? '', campaign_id: '', at_step: '' };
     // the sales' own campaign pick is kept; the admin decides the one that counts (same as the sales / own pick / uploaded sheet)
+    // the finance company: the one confirmed at "ไฟแนนซ์ผ่าน", else the one applied to on the booking (10/11)
+    if (!S.modal.deal.fin_co) S.modal.deal.fin_co = (r.flow && r.flow.fin && r.flow.fin.company) || (FINANCE.includes(r.finance) ? r.finance : '') || '';
     const dd = S.modal.deal; dd.sales_camp_id = d.sales_camp_id ?? (d.at && !/แอดมิน/.test(String(d.how || '')) ? d.campaign_id || '' : ''); dd.sales_camp = d.sales_camp ?? (dd.sales_camp_id && d.campaign ? d.campaign : '');
     dd.adm_mode = d.adm_mode || (dd.sales_camp_id && (!dd.campaign_id || dd.campaign_id === dd.sales_camp_id) ? 'same' : 'own');
     if (dd.adm_mode === 'same' && dd.sales_camp_id) dd.campaign_id = dd.sales_camp_id;
@@ -112,6 +120,16 @@ Object.assign(ACTIONS, {
     const pk = (((S.ref.get('honda_pay') || {}).picks || {})[String(atVin(a) || '').toUpperCase()]) || null;
     if (pk && dealState(a).admin && (!dd.campaign_id || dd.campaign_id === 'pending') && campOptions(termsCtxAt(a, derive())).opts.some(y => y.ok && y.value === pk.cid)) { dd.campaign_id = pk.cid; dd.margin_honda = ''; dd.margin_priv = ''; dd.adm_mode = 'own'; dd.adm_file = 'รายงานสรุปแคมเปญ'; }
     S.modal.campMatch = null;
+    // a margin on the car saved by the old rule (on the price with the add-on / cut) is worked out again on the real car price (10/11)
+    if (d.at && !termEmpty(dd.margin_car)) { const xx = termsCtxAt(a, derive()), stp = marginStdFor(xx, dd.campaign_id), oldAuto = Math.round((num(d.price) - num(d.paint)) * stp.pct);
+      if (xx.mbase && num(dd.margin_car) === oldAuto && Math.round(xx.mbase * stp.pct) !== oldAuto) dd.margin_car = ''; }
+    // a price taken from the price list under the old grade lookup ("EL+" read as "EL", fixed 11/11): the list price now, and the
+    // car margin worked out again from it
+    if (d.at && /^ใบราคา/.test(String(d.price_src || '')) && web && web.price && num(d.price) !== web.price && num(d.price_add) === 0) {
+      const xx = termsCtxAt(a, derive()), stp = marginStdFor(xx, dd.campaign_id), oldAuto = Math.round((num(d.price) - num(d.paint)) * stp.pct);
+      toast(`ราคาตามใบราคาเป็น ${money(web.price)} บาท (ที่บันทึกไว้ ${money(num(d.price))}) ใส่ราคาใหม่ให้แล้ว ตรวจแล้วกดบันทึก`, 'bad');
+      dd.price = web.price; if (num(dd.margin_car) === oldAuto) dd.margin_car = '';
+    }
     dd.purchase_to = isCash(r) ? 'ซื้อสด' : 'ไฟแนนซ์';
     S.modal.dealMode = el.dataset.mode || 'first'; S.modal.dealWhy = ''; render();
   },
@@ -140,6 +158,7 @@ Object.assign(ACTIONS, {
     if (!first && poLocked(a) && !lockWhy) { toast('ส่งมอบแล้ว ต้องใส่เหตุผลที่แก้', 'bad'); $('#dl-why')?.focus(); return; }
     const rec = { ...(first ? {} : prev), ...vals, ...actor(), how: first ? null : (lockWhy ? 'แอดมินแก้หลังส่งมอบ' : 'แอดมินแก้'), why: lockWhy || null, first: first ? actor() : prev.first || { at: prev.at, by: prev.by, role: prev.role }, hist: first ? [] : [...(prev.hist || []), dealOld(prev)], src: first ? 'ขั้นไฟแนนซ์' : prev.src };
     if (await saveFlow(a, { deal: rec }, first ? 'บันทึกเงื่อนไขการขายแล้ว' : 'แก้ไขเงื่อนไขแล้ว')) {
+      if (vals.fin_co && vals.fin_co !== a.rec.finance && !x.cash) await saveBk(a.id, 'เปลี่ยนบริษัทไฟแนนซ์', `${a.rec.finance || '–'} → ${vals.fin_co}`, r => { r.finance = vals.fin_co; });
       if (newPur) await saveBk(a.id, 'เปลี่ยนเงื่อนไขการซื้อ', `${wasCash ? 'ซื้อสด' : 'ไฟแนนซ์'} → ${newPur}${lockWhy ? ' · ' + lockWhy : ''}`, r => { r.purchase = newPur; });
       S.modal.deal = null; S.modal.dealMode = null; render(); }
   },
@@ -158,7 +177,7 @@ Object.assign(ACTIONS, {
   },
   async 'po-skip'(el) {
     const a = atById(el.dataset.id); if (!a) return;
-    if (!stepAllowed(a, 'po') || !stepOpen(a, 'po') || a.flow.done.po || poLocked(a)) { toast('ข้ามใบสั่งแต่งรถไม่ได้ในขั้นตอนนี้', 'bad'); return; }   // any time before delivery, not only when it is the next step (ตกลง 3/11)
-    await saveFlow(a, { flow: { po_skip: { ...actor() } } }, 'ข้ามใบสั่งแต่งรถ ไว้ก่อนแล้ว ทำใบสั่งแต่งรถ ภายหลังได้จนถึงก่อนส่งมอบ');
+    if (!stepAllowed(a, 'po') || !(stepOpen(a, 'po') || poLocked(a)) || a.flow.done.po || a.flow.poSkip || poRO(a)) { toast('ข้ามใบสั่งแต่งรถไม่ได้ในขั้นตอนนี้', 'bad'); return; }   // any time before delivery, not only when it is the next step (ตกลง 3/11)
+    await saveFlow(a, { flow: { po_skip: { ...actor() } } }, poLocked(a) ? 'ข้ามใบสั่งแต่งรถแล้ว (ส่งมอบแล้ว) · แอดมินขึ้นไปทำใบสั่งแต่งรถภายหลังได้' : 'ข้ามใบสั่งแต่งรถ ไว้ก่อนแล้ว ทำใบสั่งแต่งรถ ภายหลังได้จนถึงก่อนส่งมอบ');
   }
 });

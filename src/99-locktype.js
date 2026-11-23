@@ -1,0 +1,384 @@
+// ------------------------------------------------------------------ the lock typed on the stock page (ตกลง 10/11)
+// Managers / the executive type in the "ล็อก" cell like they type in the IDS stock sheet: a customer / booking no. / seller,
+// then pick a booking (15 days), "nick / customer" with no booking yet (7 days) or a dealer (15 days). It locks at once (no approval),
+// the branch is told (a notice that goes away once read) and the booking-no cell of the car's row in the IDS stock sheet gets the text.
+// Own lock: change or let go at once (no reason, logged). Somebody else's lock: ask to change it; the one who locked approves,
+// the old lock stays until then. Let go / expired / not approved: the sheet cell is cleared. Cars IDS already booked or invoiced:
+// no typing (the old lock button). Sales only look.
+// Only function declarations / ACTIONS here: the first render runs before this part of the file.
+function ltCan() { const p = perms(); return !!(p.write && p.approve); }
+// a unit is a stock car, or a quota slot not in stock yet (typed on the Quota page too, 11/11): { quota, ref, vin, br, spec }
+function ltUnitQ(q) { return { quota: q, ref: q.ref, vin: q.vin || null, br: q.br, spec: q.spec }; }
+const ltKey = c => c.quota ? 'Q:' + c.ref : c.vin;
+function ltUnit(key, D) { key = String(key || ''); if (key.startsWith('Q:')) { const q = D.quota.find(x => x.ref === key.slice(2)); return q ? ltUnitQ(q) : null; } return D.cars.get(key) || null; }
+// the same unit: a quota slot's lock has no VIN (only its Ref) until the car comes
+const ltSameU = (l, c) => c.quota ? ((!l.vin && l.ref === c.ref) || (!!c.vin && l.vin === c.vin)) : l.vin === c.vin;
+const ltSameL = (x, l) => l.vin ? x.vin === l.vin : (!x.vin && !!l.ref && x.ref === l.ref);
+function ltOpenCar(c) {
+  if (c && c.quota) { const q = c.quota; return (q.st === 'waiting' || q.st === 'vin') && !q.bk && !q.booking && !q.atb && !q.car; }
+  return !!c && carLockable(c) && !c.bkno && !['invoiced', 'sold', 'booked', 'delivered', 'company'].includes(c.status);
+}
+// a company (demo) car can be locked only to an IDS booking marked "ไม่ต้องมีฟอร์ม · รถ Demo" (12/11)
+function ltDemoCar(c) { return !!(c && !c.quota && c.status === 'company'); }   // its IDS booking is the company's own
+function ltDemoBk(b) { return !!(b && ((b.skip && /demo/i.test(b.skip.reason || '')) || (b.app && b.app.demoCar))); }
+function ltLocks(c, D) { return c.quota ? D.locks.filter(l => ltSameU(l, c) && (l.live || l.status === 'pending')).filter(lockVisible) : carLocks(c, D); }
+// the live lock on a car that the cell shows (pending requests to change it are listed under it)
+function ltLockOf(c, D) { return ltLocks(c, D).find(l => l.live && l.status !== 'pending') || null; }
+function ltNick(sales) {
+  const nk = (S.ref.get('sales') && S.ref.get('sales').nick) || {};
+  const hit = Object.entries(nk).find(([, full]) => full === sales);
+  return hit ? hit[0] : String(sales || '').split(' ')[0];
+}
+// the text that goes into the sheet, in the sheet's own way of writing it ("nick / customer", "ขาย dealer")
+function ltTextOf(l) {
+  if (l.sheet_text) return l.sheet_text;
+  if (l.type === 'dealer') return 'ขาย ' + (l.dealer_name || '');
+  const cust = (l.booking && l.booking.cust) || l.prospect || '';
+  return `${ltNick(l.owner || l.sales) || ''} / ${cust}`.trim();
+}
+const ltMine = l => !!(l && S.me && S.me.id && (l.typed_by === S.me.id || (!l.typed_by && l.requested_by === S.me.id)));
+// bookings without a car, the same spec first, then the same model, then the rest; matched on customer, booking no. or seller
+// (11/11) web forms not in IDS yet count too (marked); with nothing typed yet, the bookings of the same spec show
+function ltCands(c, q, D) {
+  const k = searchKey(q || '');
+  const [model] = String(c.spec).split('|');
+  const demo = ltDemoCar(c);
+  return [...D.bookings, ...(D.demoRows || []).filter(b => !D.locks.some(l => l.live && l.bkref === b.key))].filter(b => ['waiting', 'noids', 'demo', 'democar'].includes(b.state) && !(b.app && b.app.demo) && (!demo || ltDemoBk(b)) && (k ? [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k)) : b.spec === c.spec) && (k || !isSales() || isMine(b.owner)))
+    .map(b => ({ b, rank: b.spec === c.spec ? 0 : String(b.spec || '').split('|')[0] === model ? 1 : 2 }))
+    .sort((x, y) => x.rank - y.rank || String(x.b.qdate || x.b.date || '').localeCompare(String(y.b.qdate || y.b.date || ''))).slice(0, 200);
+}
+// 20/11: editing a lock: its own booking is listed first (it already has this car, so the waiting list leaves it out)
+function ltCandsAll(c, q, D) {
+  const list = ltCands(c, q, D), t = S.lt, oldL = t && t.old ? D.locks.find(x => x.id === t.old) : null, b = oldL && oldL.booking;
+  if (!b) return list;
+  const k = searchKey(q || ''), hit = !k || [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k));
+  const key = b.app ? b.app.key : b.key;
+  return hit ? [{ b, rank: b.spec === c.spec ? 0 : String(b.spec || '').split('|')[0] === String(c.spec).split('|')[0] ? 1 : 2, cur: true }, ...list.filter(x => (x.b.app ? x.b.app.key : x.b.key) !== key)] : list;
+}
+function ltDrop(c, D) {
+  const t = S.lt, q = String(t.q || '').trim();
+  const p = parseSheetText(q), cands = ltCandsAll(c, q, D);
+  const it = (k, body, sub) => `<button class="lt-it" data-act="lt-pick" data-vin="${esc(ltKey(c))}" data-k="${esc(k)}"><span>${body}</span>${sub ? `<span class="lt-sub">${sub}</span>` : ''}</button>`;
+  const rows = cands.map(({ b, rank, cur }) => it(b.app ? b.app.key : b.key, `${cur ? '<span class="chip" style="background:var(--good-bg, #dcfce7);color:var(--good)">ใบจองของล็อกนี้</span> ' : ''}<b>${esc(b.cust || '–')}</b>${b.no ? ` · ${esc(b.no)}` : ' · <span class="text-muted">ยังไม่มีเลข IDS</span>'} <span class="text-muted">${esc(b.br || '')}</span>${b.noIds ? ' <span class="lt-sub" style="display:inline;color:var(--warn)">ฟอร์มยังไม่อยู่ใน IDS</span>' : ''}`,
+    `เซลล์ ${esc(b.owner || b.sales || '–')} · จอง ${fmtD(b.qdate || b.date)} · ${esc(specLabelText(b.spec))} · ${rank === 0 ? '<span style="color:var(--good)">สเปกตรง</span>' : '<span style="color:var(--warn)">สเปกไม่ตรง</span>'} · ล็อก ${LOCK_DAYS_BY.booking} วัน`)).join('');
+  const temp = p.kind === 'named' || p.kind === 'nick'
+    ? it('temp', `＋ ล็อกชั่วคราว "${esc(q)}"`, `ยังไม่มีใบจอง · เซลล์ ${p.sales ? esc(p.sales) : `<span style="color:var(--warn)">ยังไม่รู้ว่า "${esc(p.who)}" คือใคร</span>`}${p.cust ? ` · ลูกค้า ${esc(p.cust)}` : ''} · ${LOCK_DAYS_BY.temp} วัน`)
+    : `<div class="lt-hint">ยังไม่มีใบจอง: พิมพ์ "ชื่อเล่นเซลล์ / ชื่อลูกค้า" เช่น "มด / เปิ้ล" (ล็อก ${LOCK_DAYS_BY.temp} วัน)</div>`;
+  const dealer = p.kind === 'bkno' ? `<div class="lt-hint">${cands.length ? 'เลขใบจอง: เลือกใบจองด้านบน' : `ไม่พบใบจองเลข ${esc(p.no)} ที่ยังไม่มีรถ`}</div>` : it('dealer', `＋ ขาย / แลกดีลเลอร์ "${esc(p.kind === 'dealer' ? p.dealer : q)}"`, `ไม่มีชื่อลูกค้า · ${LOCK_DAYS_BY.dealer} วัน`);
+  if (t.specAsk) { const a = t.specAsk; return `<div class="lt-drop" role="dialog"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>
+    <div class="lt-hint" style="color:var(--warn)">⚠ สเปกไม่ตรง: ใบจองเป็น <b>${esc(specLabelText(a.bk))}</b> · รถเป็น <b>${esc(specLabelText(c.spec))}</b><br>ล็อกได้ แต่ต้องใส่เหตุผล แล้วแอดมินสาขาต้องแก้ไขใบจองเป็นสเปกของรถคันนี้</div>
+    <div style="padding:6px 10px"><input id="lt-why" class="lt-in" style="width:100%" placeholder="เหตุผล เช่น ลูกค้าเปลี่ยนเป็นรุ่นนี้"></div>
+    <div style="padding:0 10px 8px;display:flex;gap:6px"><button class="btn btn-red btn-sm" data-act="lt-pick" data-vin="${esc(ltKey(c))}" data-k="${esc(a.k)}" data-why="1">ล็อกข้ามสเปก</button><button class="btn btn-ghost btn-sm" data-act="lt-specback">เลือกใบอื่น</button></div></div>`; }
+  if (!q) return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${rows ? `<div class="lt-hint">${t.old ? 'ใบจองของล็อกนี้ + ' : ''}ใบจองสเปกนี้ที่ยังไม่มีรถ (พิมพ์ชื่อ / เลขใบจอง / เซลล์ เพื่อหาใบอื่น)</div>${rows}` : (ltDemoCar(c) ? '<div class="lt-hint">รถบริษัท (Demo): ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo" · พิมพ์ชื่อลูกค้า / เลขใบจอง</div>' : `<div class="lt-hint">ไม่มีใบจองสเปกนี้รอรถ · พิมพ์ชื่อลูกค้า / เลขใบจอง หรือ "ชื่อเล่นเซลล์ / ชื่อลูกค้า"</div>`)}</div>`;
+  return `<div class="lt-drop" role="listbox"><button type="button" class="lt-x" data-act="lt-cancel" aria-label="ปิด">✕ ปิด</button>${t.mode === 'ask' ? '<div class="lt-hint">ขอแก้ล็อกของคนอื่น: คนที่ล็อกไว้ต้องอนุมัติก่อน ล็อกเดิมยังอยู่</div>' : ''}
+    ${rows ? `<div class="lt-hint">พบ ${cands.length} ใบ · ใบจองที่ยังไม่มีรถ · สเปกตรงกันขึ้นก่อน${cands.length > 6 ? ' · เลื่อนดูเพิ่ม' : ''}</div>${rows}` : `<div class="lt-hint">ไม่พบใบจองที่ตรงกับ "${esc(q)}"</div>`}${ltDemoCar(c) ? '<div class="lt-hint">รถบริษัท (Demo): ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo"</div>' : temp + dealer}</div>`;
+}
+// the stock table's "ล็อก" cell for managers / the executive
+function ltCell(c, D, p) {
+  const L = ltLockOf(c, D), t = S.lt && S.lt.vin === ltKey(c) ? S.lt : null;
+  if (!ltOpenCar(c) && !ltDemoCar(c) && !L) return c.quota ? null : stockActions(c, p, D, 'lock');
+  const asks = ltLocks(c, D).filter(l => l.status === 'pending' && l.replaces);
+  const askTxt = asks.length ? `<div class="text-xs" style="color:var(--warn)">${asks.map(l => `${esc(ltRoleShort(l))} ขอแก้เป็น "${esc(ltTextOf(l))}" รอ${esc(l.approver_role || 'คนล็อก')}อนุมัติ`).join('<br>')}</div>` : '';
+  const ss = L && L.sheet_sync;
+  const stOk = ss && ss.conflict && typeof carSheetSt === 'function' && (carSheetSt(c, D) || {}).k === 'ok';
+  const warn = ss && ss.conflict && !stOk ? `<div class="text-xs" style="color:var(--bad)">ชีตมี "${esc(ss.current || '')}" ยังไม่ได้เขียน <button class="underline" data-act="lt-force" data-id="${esc(L.id)}">เขียนทับ</button></div>`
+    : ss && ss.error && ss.value ? `<div class="text-xs" style="color:var(--warn)">ยังไม่ได้ลงชีต (${ss.error === 'not_found' ? 'ไม่มีรถในชีต · เขียนให้เองเมื่อรถเข้าชีต' : 'เขียนไม่สำเร็จ'}) <button class="underline" data-act="lt-retry" data-id="${esc(L.id)}">ลองอีกครั้ง</button></div>` : '';
+  if (t) return `<div class="lt-cell on"><input id="lt-in" class="lt-in" data-lt="${esc(ltKey(c))}" value="${esc(t.q || '')}" placeholder="ชื่อลูกค้า / เลขใบจอง / เซลล์" autocomplete="off">
+    <button class="text-xs underline text-muted" data-act="lt-cancel">ยกเลิก</button>${ltDrop(c, D)}</div>`;
+  const gone = !L ? ltGone(c, D) : null;
+  const req = !L ? ltLocks(c, D).find(l => l.status === 'pending' && !l.replaces) : null;
+  if (req) return `<div class="lt-cell"><span class="lt-txt" title="${esc(lockLabel(req))}">${esc(ltTextOf(req))}</span> <span class="chip" style="background:var(--warn-bg, #fef3c7);color:var(--warn)">รอผู้จัดการอนุมัติ</span>${isMgrRole() ? ` <button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="go" data-view="lock" data-sub="approve">ไปอนุมัติ</button>` : ''}${askTxt}</div>`;
+  if (!L) return `<div class="lt-cell"><input class="lt-in idle" data-lt-open="${esc(ltKey(c))}" placeholder="พิมพ์ชื่อลูกค้า / เลขใบจอง" readonly>${gone ? `<div class="text-xs"><button class="underline" style="color:var(--accent, #2563eb)" data-act="lt-undo" data-id="${esc(gone.id)}" title="ปล่อยไปเมื่อ ${fmtDT(gone.rel.at)}">↶ ย้อนกลับ "${esc(ltTextOf(gone))}"</button></div>` : ''}</div>`;
+  const so = lockSpecOff(L, D);
+  const txt = `<span class="lt-txt" title="${esc(lockLabel(L))}">${esc(ltTextOf(L))}</span>${so ? ` <span class="chip" style="background:var(--warn-bg,#fef3c7);color:var(--warn)" title="${esc(specOffText(so))}">ข้ามสเปก</span>` : ''}`;
+  const own = ltMine(L);
+  return `<div class="lt-cell">${txt} ${own
+    ? `<button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="lt-edit" data-vin="${esc(ltKey(c))}">แก้</button> · <button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="lt-release" data-id="${esc(L.id)}">ปล่อย</button>`
+    : `<button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="lt-ask" data-vin="${esc(ltKey(c))}">ขอแก้</button>`}${own && L.replaced && ltRecent(L.requested_at) ? ` · <button class="text-xs underline" style="color:var(--accent, #2563eb)" data-act="lt-undo" data-id="${esc(L.id)}">↶ ย้อนกลับการแก้</button>` : ''}${warn}${askTxt}</div>`;
+}
+// the Quota page's "ล็อก" cell (11/11): typed like the stock page; a slot whose car is in stock types on the car
+function ltQuotaCell(q, D, p) { const u = q.car || ltUnitQ(q); return ltOpenCar(u) || ltLockOf(u, D) ? ltCell(u, D, p) : null; }
+const ltRoleShort = l => String(l.requested_role || '').replace(/\s*\(.*\)$/, '') || 'ผู้จัดการ';
+// ---- write / clear the sheet cell (only on the real web; the preview never touches the real sheet)
+async function ltSheet(id, value, expect, force, quiet) {
+  const l = findLock(id); if (!l) return null;
+  const live = !!(window.__WEB), D = derive();
+  // the stock tab when the car is in stock; the quota tab's "Vin Number" cell when the unit has a quota slot (by frame number or Ref)
+  const car = l.vin ? D.cars.get(l.vin) : null;
+  // 20/11: a car whose quota row in the sheet has no frame number yet (Vin Number holds a name): found by the car's Ref
+  let qs = D.quota.find(q => (l.vin && q.vin === l.vin) || (!l.vin && l.ref && q.ref === l.ref)) || null;
+  const call = async input => {
+    try { const mcp = await gsUse(); if (!mcp) throw { code: 'nomcp' }; const r = await mcp.callTool('Google Sheets', 'stock_cell', input, { cache: false }); let x = r && r.payload; if (typeof x === 'string') { try { x = JSON.parse(x); } catch (e) { x = null; } } return x || { code: 'error' }; }
+    catch (e) { return { code: (e && e.code) || 'error' }; }
+  };
+  let res = null, qres = null;
+  if (!live) res = { ok: true, preview: true };
+  else {
+    if (l.vin) res = await call({ br: l.car_br, vin: l.vin, value, expect: expect ?? '', force: !!force });
+    // a stock row was written, or there is none (a quota slot not in stock / a car missing from the stock tab): the quota slot follows
+    if (!qs && res && res.code === 'not_found' && car && typeof carQuotaRow === 'function') qs = carQuotaRow(car, D);
+    if (qs && (!res || res.ok || res.code === 'not_found')) qres = await call({ target: 'quota', vin: qs.vin || '', ref: qs.ref, br: qs.br, value, expect: expect ?? '', force: !!force });
+    if (!res || (res.code === 'not_found' && qres && (qres.ok || qres.code === 'conflict'))) { res = qres; qres = null; }
+  }
+  const cur = findLock(id) || l, now = new Date().toISOString();
+  cur.sheet_sync = res && res.ok ? { at: now, value, range: res.range || null, preview: !!res.preview }
+    : { at: now, value, conflict: res && res.code === 'conflict', current: res && res.current, error: res && res.code !== 'conflict' ? (res && res.code) || 'error' : null };
+  if (qres) cur.sheet_quota = qres.ok ? { at: now, range: qres.range } : { at: now, error: qres.code || 'error', current: qres.current };
+  if (value === '' && res && res.ok) cur.sheet_cleared = now;
+  await write('locks', id, cur);
+  if (quiet) { if (res && res.ok) toast(`ลงชีตให้แล้ว "${value}" (${l.vin || 'Quota ' + l.ref})`); }
+  else if (res && res.code === 'conflict') toast(`ยังไม่ได้เขียนลงชีต: ช่องในชีตตอนนี้เป็น "${res.current || ''}" ไม่ตรงกับที่เว็บรู้ · ล็อกในเว็บบันทึกแล้ว`, 'bad');
+  else if (!(res && res.ok)) toast(res && res.code === 'not_found' ? 'ไม่พบรถ / Quota นี้ในชีต Stock IDS (ล็อกในเว็บบันทึกแล้ว)' : 'เขียนชีตไม่สำเร็จ ล็อกในเว็บบันทึกแล้ว ลองใหม่ภายหลัง', 'bad');
+  return res;
+}
+// typed locks that ended (let go, expired, not approved, replaced): clear their sheet cell once (managers' sessions)
+let ltSwept = new Set();
+// typed locks the sheet does not hold yet (the car / slot was not in the sheet, or the write failed): written once the IDS stock or
+// quota is updated after the try (the car is in the sheet now), or once per opening of the web for other errors. Only into an empty
+// cell: a cell holding another name is not overwritten, the cell shows it and the branch managers are told (11/11)
+let ltRetried = new Set();
+function ltRetry(D) {
+  for (const l of D.locks) {
+    const ss = l.sheet_sync; if (!l.typed || !l.live || !ss || !ss.error || !ss.value || ltRetried.has(l.id)) continue;
+    if (ss.error === 'not_found') { const newer = [...S.ids.entries()].some(([k, d]) => /^(stock|quota)_/.test(k) && d && d.at && d.at > ss.at); if (!newer) continue; }
+    ltRetried.add(l.id); ltSheet(l.id, ltTextOf(l), '', false, true);
+  }
+}
+function ltAllLoaded() { return !!S.colsLoaded && COLS.every(c => S.colsLoaded.has(c)); }
+function ltSweep(D) {
+  if (!ltCan() || !window.__WEB || !ltAllLoaded()) return;
+  ltRetry(D);
+  ltReplacedSweep(D);
+  for (const l of D.locks) if (l.bkFix && !(ltAutoTried = ltAutoTried || new Set()).has('bk:' + l.id)) { ltAutoTried.add('bk:' + l.id); ltSaveBkFix(l); }
+  // 23/11: a request for a booking IDS already gave a car to (matched / delivered) is closed as not needed
+  for (const t of D.locks) if (t.bkDone && t.status === 'pending' && !(ltAutoTried = ltAutoTried || new Set()).has('bkd:' + t.id)) { ltAutoTried.add('bkd:' + t.id); ltCloseBkDone(t.id, t.bkDone); }
+  for (const t of D.locks) if (t.superseded && ['approved', 'pending'].includes(t.status) && !(ltAutoTried = ltAutoTried || new Set()).has('sup:' + t.id)) { ltAutoTried.add('sup:' + t.id); ltCloseSuperseded(t.id, t.superseded); }
+  // a cell written before the booking was loaded ("นุดา /"): written again with the customer's name, if the sheet still has that text
+  for (const l of D.locks) { const sy = l.sheet_sync; if (l.typed || !l.live || !sy || sy.error || sy.conflict || !sy.value || !/\/\s*$/.test(sy.value)) continue;
+    const full = ltTextOf(l); if (/\/\s*$/.test(full) || full === sy.value || (ltAutoTried = ltAutoTried || new Set()).has('fx:' + l.id)) continue; ltAutoTried.add('fx:' + l.id); ltSheet(l.id, full, sy.value, false, true); }
+  for (const l of D.locks) if (!l.typed && l.live && !l.sheet_sync && ['approved', 'allocated'].includes(l.status) && !(ltAutoTried = ltAutoTried || new Set()).has(l.id)) { ltAutoTried.add(l.id); ltAutoSheet(l.id); }
+  if (typeof bltConvertSweep === 'function') bltConvertSweep(D);
+  for (const l of D.locks) {
+    if (!(l.typed || l.auto_sheet) || l.sheet_cleared || ltSwept.has(l.id) || l.live || !(l.vin || l.ref) || !(l.sheet_sync && l.sheet_sync.value && !l.sheet_sync.conflict)) continue;
+    if (D.locks.some(x => x.id !== l.id && x.live && ltSameL(x, l) && x.typed)) { ltSwept.add(l.id); continue; }   // the cell now belongs to the next typed lock
+    ltSwept.add(l.id); ltSheet(l.id, '', ltTextOf(l));
+  }
+}
+// ---- the lock itself
+function ltNew(c, D, k, q, extra) {
+  const p = parseSheetText(q), now = new Date().toISOString();
+  let type = 'temp', b = null, owner = null, prospect = null, dealer = null, text;
+  if (k === 'dealer') { type = 'dealer'; dealer = (p.kind === 'dealer' ? p.dealer : q).trim(); text = 'ขาย ' + dealer; }
+  else if (k === 'temp') { owner = p.sales || null; prospect = p.cust || null; text = q.trim(); }
+  else { b = D.bookingByKey.get(k); if (!b) return null; type = 'booking'; owner = b.owner || b.sales || null; text = b.state === 'demo' ? `${ltNick(owner)} / รถ Demo`.trim() : `${ltNick(owner)} / ${b.cust || ''}`.trim(); }
+  return {
+    vin: c.vin || null, ref: c.quota ? c.ref : null, car_br: c.br, spec: c.spec, type, bkref: b ? (b.app ? b.app.key : b.key) : null, bk_br: b ? b.br : null, sales: owner,
+    sales_nick: type === 'temp' && !owner ? p.who || null : null, prospect, dealer_name: dealer, reason: 'พิมพ์ล็อกในหน้า Stock', note: '', warnings: [],
+    status: 'approved', requested_at: now, requested_by: S.me.id || null, requested_role: roleLabel(), ext: 0, history: [], convert_from: null,
+    req_br: (b ? b.br : null) || (owner ? salesBranch(owner) : null) || c.br, start: todayISO(), end: addDays(todayISO(), LOCK_DAYS_BY[type] || 15), approved_at: now,
+    typed: true, typed_by: S.me.id || null, sheet_text: text, notices: [{ k: 'new', at: now, by: S.me.id || null, role: roleLabel() }], ...(extra || {})
+  };
+}
+// the list floats over the page (the table scrolls inside its box and would cut it off)
+function ltPlace() {
+  const i = document.getElementById('lt-in'), d = document.querySelector('.lt-drop'); if (!i || !d) return;
+  const r = i.getBoundingClientRect(), w = Math.min(360, window.innerWidth - 16);
+  d.style.position = 'fixed'; d.style.width = w + 'px'; d.style.top = (r.bottom + 4) + 'px'; d.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+}
+new MutationObserver(() => ltPlace()).observe(document.documentElement, { childList: true, subtree: true });
+window.addEventListener('scroll', ltPlace, true); window.addEventListener('resize', ltPlace);
+document.addEventListener('input', ev => {
+  const t = ev.target; if (!t || !t.dataset || !t.dataset.lt || !S.lt) return;
+  S.lt.q = t.value; S.lt.specAsk = null; render();
+});
+document.addEventListener('focusin', ev => {
+  const t = ev.target; if (!t || !t.dataset || !t.dataset.ltOpen) return;
+  S.lt = { vin: t.dataset.ltOpen, q: '', mode: 'new' }; render();
+  setTimeout(() => { const i = document.getElementById('lt-in'); if (i) i.focus(); }, 0);
+});
+document.addEventListener('keydown', ev => {
+  const t = ev.target; if (!t || !t.dataset || !t.dataset.lt) return;
+  if (ev.key === 'Escape') { S.lt = null; render(); }
+  // 19/11: Enter never picks the first of several: arrows move the highlight, Enter takes the highlighted one, or the only booking found
+  const its = [...document.querySelectorAll('.lt-drop [data-act="lt-pick"]')], cur = its.findIndex(b => b.classList.contains('hl'));
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { ev.preventDefault(); if (!its.length) return; const n = cur < 0 ? (ev.key === 'ArrowDown' ? 0 : its.length - 1) : (cur + (ev.key === 'ArrowDown' ? 1 : -1) + its.length) % its.length; its.forEach(b => b.classList.remove('hl')); its[n].classList.add('hl'); its[n].scrollIntoView({ block: 'nearest' }); return; }
+  if (ev.key === 'Enter') { ev.preventDefault(); if (cur >= 0) { its[cur].click(); return; } const bks = its.filter(b => !['temp', 'dealer'].includes(b.dataset.k)); if (bks.length === 1) bks[0].click(); else if (bks.length > 1) toast(`พบ ${bks.length} ใบ แตะเลือกใบที่ต้องการ (หรือใช้ลูกศรขึ้น/ลงแล้วกด Enter)`); }
+});
+Object.assign(ACTIONS, {
+  'lt-cancel'() { S.lt = null; render(); },
+  'lt-edit'(el) { const D = derive(), c = ltUnit(el.dataset.vin, D), L = c && ltLockOf(c, D); if (!L) return; S.lt = { vin: ltKey(c), q: '', mode: 'edit', old: L.id }; render(); setTimeout(() => { const i = document.getElementById('lt-in'); if (i) i.focus(); }, 0); },
+  'lt-ask'(el) { const D = derive(), c = ltUnit(el.dataset.vin, D), L = c && ltLockOf(c, D); if (!L) return; S.lt = { vin: ltKey(c), q: '', mode: 'ask', old: L.id }; render(); setTimeout(() => { const i = document.getElementById('lt-in'); if (i) i.focus(); }, 0); },
+  'lt-specback'() { if (S.lt) { S.lt = { ...S.lt, specAsk: null }; render(); } },
+  async 'lt-pick'(el) {
+    if (!ltCan()) { toast('พิมพ์ล็อกได้เฉพาะผู้จัดการและผู้บริหาร', 'bad'); return; }
+    const D = derive(), c = ltUnit(el.dataset.vin, D), t = S.lt || {}, k = el.dataset.k, q = String(t.q || '').trim();
+    if (!c) return;
+    const old = t.old ? findLock(t.old) : null, oldD = t.old ? D.locks.find(x => x.id === t.old) : null;
+    if (!old && ltDemoCar(c) && !(k !== 'temp' && k !== 'dealer' && ltDemoBk(D.bookings.find(b => b.key === k || (b.app && b.app.key === k))))) { toast('รถบริษัท (Demo) ล็อกได้เฉพาะใบจองที่บันทึก "ไม่ต้องมีฟอร์ม · รถ Demo"', 'bad'); return; }
+    if (!old && !ltOpenCar(c) && !ltDemoCar(c)) { toast('รถคันนี้ล็อกแบบพิมพ์ไม่ได้ (IDS จัดสรรหรือออกใบกำกับแล้ว) ใช้ปุ่มขอล็อก', 'bad'); return; }
+    if (!old && ltLockOf(c, D)) { toast('รถคันนี้มีล็อกแล้ว กดแก้ / ขอแก้แทน', 'bad'); return; }
+    const ask = t.mode === 'ask' && old && !ltMine(oldD || old);
+    const l = ltNew(c, D, k, q, ask ? { status: 'pending', start: null, end: null, approved_at: null, replaces: t.old, approver: old.typed_by || old.requested_by || null, approver_role: old.requested_role || null, notices: [] }
+      : old ? { replaced: t.old } : null);
+    if (!l) { toast('ไม่พบใบจองนี้', 'bad'); return; }
+    // 19/11: a booking of another spec may be locked, with a reason; the branch admin then edits the booking to this spec
+    if (l.type === 'booking' && !ask) { const bb = D.bookings.find(b => b.key === k || (b.app && b.app.key === k));
+      if (bb && bb.spec && bb.spec !== c.spec) {
+        if (!el.dataset.why) { S.lt = { ...t, specAsk: { k, bk: bb.spec } }; render(); setTimeout(() => $('#lt-why')?.focus(), 0); return; }
+        const why = String(($('#lt-why') || {}).value || '').trim(); if (!why) { toast('ใส่เหตุผลที่ล็อกข้ามสเปก', 'bad'); $('#lt-why')?.focus(); return; }
+        l.spec_off = { bk: bb.spec, car: c.spec, why, at: new Date().toISOString(), by: roleLabel() }; } }
+    if (l.type === 'temp' && !l.sales && !l.prospect) { toast('พิมพ์ "ชื่อเล่นเซลล์ / ชื่อลูกค้า"', 'bad'); return; }
+    const id = newId('locks');
+    if (ask) {
+      if (!await saveLock(id, l, 'ขอแก้ล็อก (พิมพ์ในหน้า Stock)', `"${ltTextOf(old)}" → "${l.sheet_text}" · รอ${l.approver_role || 'คนล็อก'}อนุมัติ`)) return;
+      S.lt = null; toast(`ส่งคำขอแก้แล้ว รอ${l.approver_role || 'คนที่ล็อก'}อนุมัติ · ล็อกเดิมยังอยู่`); return;
+    }
+    // 19/11: the new lock is saved first, then the old one let go: a dropped connection never leaves the car with no lock
+    if (!await saveLock(id, l, old ? 'แก้ไขล็อก (พิมพ์ในหน้า Stock)' : 'ล็อก (พิมพ์ในหน้า Stock)', `"${l.sheet_text}" · หมด ${fmtD(l.end)}`)) return;
+    if (old && !await ltReleaseReplaced(t.old, l.sheet_text)) toast('ล็อกใหม่บันทึกแล้ว แต่ล็อกเดิมยังไม่ถูกปล่อย ระบบจะปล่อยให้เองเมื่อเปิดหน้าเว็บครั้งถัดไป', 'bad');
+    if (l.type !== 'temp') await settleUnit(derive(), l, id);
+    S.lt = null;
+    toast(`ล็อกแล้วถึง ${fmtD(l.end)} · แจ้งสาขา ${c.br} แล้ว${window.__WEB ? '' : ' · เว็บตัวอย่าง: ไม่เขียนชีตจริง'}`);
+    // a change to another car / slot (from the booking page, 11/11): the old unit's cell is cleared, the new one written from what it holds
+    const same = old && ltSameL(old, l);
+    if (old && !same && old.typed) ltSheet(t.old, '', ltTextOf(old));
+    ltSheet(id, l.sheet_text, same ? ltTextOf(old) : (c.quota ? (c.quota.vnote || '') : (c.bknote || '')));
+  },
+  async 'lt-release'(el) {
+    const id = el.dataset.id, l = await claimFresh('locks', id, x => x.status === 'approved' || x.status === 'allocated');
+    if (!l) return;
+    if (!ltMine(l)) { toast('ล็อกของคนอื่น: กดขอแก้ หรือให้ผู้จัดการปล่อยจากหน้าล็อก', 'bad'); return; }
+    l.status = 'released'; l.rel = { at: new Date().toISOString(), by: roleLabel(), self: true, reason: 'ปล่อยเอง' };
+    l.notices = [...(l.notices || []), { k: 'rel', at: l.rel.at, by: S.me.id || null, role: roleLabel() }];
+    markUndo(l, 'ปล่อยล็อก', 'approved');
+    if (!await saveLock(id, l, 'ปล่อยล็อก (เจ้าของล็อก)', '')) return;
+    toast('ปล่อยล็อกแล้ว รถกลับเป็นว่าง');
+    if (l.typed) ltSheet(id, '', ltTextOf(l));
+  },
+  async 'lt-retry'(el) { const l = findLock(el.dataset.id); if (!l || !ltCan()) return; const r = await ltSheet(el.dataset.id, ltTextOf(l), '', false); if (r && r.ok) toast('ลงชีตแล้ว'); },
+  async 'lt-force'(el) { const l = findLock(el.dataset.id); if (!l || !ltCan()) return; const r = await ltSheet(el.dataset.id, ltTextOf(l), '', true); if (r && r.ok) toast(r.preview ? 'เว็บตัวอย่าง: ไม่ได้เขียนชีตจริง' : 'เขียนทับในชีตแล้ว'); },
+  async 'ntc-ack'(el) {
+    const [id, at] = String(el.dataset.id || '').split('|'), l = findLock(id); if (!l || !S.me || !S.me.id) return;
+    const acks = { ...(l.acks || {}) }; acks[S.me.id] = [...new Set([...(acks[S.me.id] || []), at])].slice(-20);
+    await write('locks', id, { ...l, acks });
+  }
+});
+// a request to change somebody's typed lock, approved by the one who locked: the old lock goes, the new one starts, the sheet follows
+async function ltApproveChange(id) {
+  const l = findLock(id); if (!l || !l.replaces) return;
+  const old = findLock(l.replaces);
+  if (old && ['approved', 'allocated'].includes(old.status)) {
+    old.status = 'released'; old.rel = { at: new Date().toISOString(), by: roleLabel(), self: true, reason: 'เปลี่ยนตามคำขอแก้' }; old.sheet_cleared = new Date().toISOString();
+    await saveLock(l.replaces, old, 'ปล่อยล็อก (อนุมัติคำขอแก้)', `เปลี่ยนเป็น "${ltTextOf(l)}"`);
+  }
+  const cur = findLock(id); cur.notices = [...(cur.notices || []), { k: 'new', at: new Date().toISOString(), by: S.me.id || null, role: roleLabel() }]; await write('locks', id, cur);
+  ltSheet(id, ltTextOf(cur), old ? ltTextOf(old) : '');
+}
+// notices that go away once read (managers' typed locks and requests decided at once): new lock, let go, expired
+function ltNotices(D, add) {
+  for (const l of D.locks) {
+    if (l.typed && l.live && l.sheet_sync && l.sheet_sync.conflict) add('ltconf:' + l.id, { br: l.car_br, roles: ['manager'] }, 'bad', 'ชื่อในชีตไม่ตรงกับล็อกในเว็บ · ไม่ได้เขียนทับ',
+      `${l.vin || 'Quota ' + (l.ref || '')} · เว็บล็อก "${ltTextOf(l)}" · ชีตมี "${l.sheet_sync.current || ''}" · ตัดสินที่ช่องล็อก (เขียนทับ หรือ แก้ / ปล่อยล็อกในเว็บ)`, { act: 'lock-goto', id: l.id, label: 'ดู' });
+    const owner = l.owner || l.sales || null, unit = l.vin || ('Quota ' + (l.ref || '')), cust = (l.booking && l.booking.cust) || l.prospect || l.dealer_name || '';
+    const evs = [...(l.notices || [])];
+    if (l.typed && (l.expired || l.autoReleased) && l.end) evs.push({ k: 'exp', at: l.end + 'T23:59:00.000Z', by: null });
+    for (const n of evs) {
+      if (!n.at || daysBetween(String(n.at).slice(0, 10), D.today) > 7) continue;
+      const title = n.k === 'new' ? `${n.role || 'ผู้จัดการ'} ล็อกรถ ${specLabelText(l.spec)}` : n.k === 'rel' ? `ปล่อยล็อกแล้ว ${specLabelText(l.spec)} · รถกลับเป็นว่าง` : `ล็อกหมดอายุ ${specLabelText(l.spec)} · ${l.typed ? 'ล้างช่องในชีตแล้ว · ' : ''}รถกลับเป็นว่าง`;
+      const text = `${unit} · สาขา ${l.car_br || ''}${cust ? ' · ' + cust : ''}${owner ? ' · เซลล์ ' + owner : ''}${n.k === 'new' && l.end ? ' · ถึง ' + fmtD(l.end) : ''}`;
+      add('ntc:' + l.id + ':' + n.k + ':' + n.at, { br: l.car_br, sales: owner, roles: ['admin', 'manager', 'sales'] }, 'warn', title, text, { act: 'ntc-ack', id: l.id + '|' + n.at, label: 'รับทราบ', ack: true, by: n.by || null, acks: l.acks || {} });
+    }
+  }
+}
+
+// ---- undo (11/11): typing makes it easy to let go / change by mistake. Within 24 hours the one who did it puts it back.
+const ltRecent = at => !!at && Date.now() - new Date(at).getTime() < 24 * 3600 * 1000;
+function ltGone(c, D) {
+  if (!S.me || !S.me.id) return null;
+  const xs = D.locks.filter(l => ltSameU(l, c) && l.typed && l.status === 'released' && l.rel && ltRecent(l.rel.at) && l.rel.reason !== 'แก้ไขล็อก (พิมพ์ใหม่)' && l.rel.reason !== 'ย้อนกลับการแก้'
+    && ((l.history || []).slice(-1)[0] || {}).by === S.me.id);
+  return xs.sort((a, b) => String(b.rel.at).localeCompare(String(a.rel.at)))[0] || null;
+}
+Object.assign(ACTIONS, {
+  async 'lt-undo'(el) {
+    if (!ltCan()) return;
+    const id = el.dataset.id, l = findLock(id), D = derive(); if (!l) return;
+    if (l.status === 'released') {
+      if (D.locks.some(x => x.id !== id && ltSameL(x, l) && x.live)) { toast('ย้อนกลับไม่ได้ รถคันนี้มีล็อกใหม่แล้ว', 'bad'); return; }
+      const cur = { ...l, status: 'approved' }; delete cur.rel; delete cur.sheet_cleared; delete cur.undo;
+      if (!await saveLock(id, cur, 'ย้อนกลับ: ปล่อยล็อก', 'กดผิด')) return;
+      toast(`ย้อนกลับแล้ว ล็อก "${ltTextOf(cur)}" ถึง ${fmtD(cur.end)}`);
+      ltSheet(id, ltTextOf(cur), '');
+      return;
+    }
+    if (l.replaced) {
+      const old = findLock(l.replaced); if (!old) { toast('ไม่พบล็อกเดิม', 'bad'); return; }
+      const now = new Date().toISOString();
+      if (!await saveLock(id, { ...l, status: 'released', rel: { at: now, by: roleLabel(), self: true, reason: 'ย้อนกลับการแก้' }, sheet_cleared: now }, 'ย้อนกลับการแก้', `กลับไปเป็น "${ltTextOf(old)}"`)) return;
+      const back = { ...old, status: 'approved' }; delete back.rel; delete back.sheet_cleared;
+      await saveLock(l.replaced, back, 'ย้อนกลับ: แก้ไขล็อก', 'กดผิด');
+      toast(`ย้อนกลับแล้ว ล็อกกลับเป็น "${ltTextOf(back)}"`);
+      ltSheet(l.replaced, ltTextOf(back), ltTextOf(l));
+    }
+  }
+});
+
+// 19/11: a live booking lock whose car is another spec than the booking (locked across specs with a reason, or older picks):
+// the branch admin must edit the booking (in IDS when the booking is in IDS) to the car's spec; resolves itself when the specs agree
+function lockSpecOff(l, D) {
+  if (!l || !l.live || l.type !== 'booking' || !l.bkref || !l.spec) return null;
+  const b = D.bookingByKey.get(l.bkref); if (!b) return null;
+  const a = b.app || D.at.find(x => x.key === l.bkref) || null, bs = (a && a.spec) || b.spec;
+  if (!bs || bs === l.spec || (a && a.cancelled)) return null;
+  return { bk: bs, car: l.spec, why: (l.spec_off && l.spec_off.why) || null, by: l.spec_off && l.spec_off.by, a, b, ids: !!((a && a.match) || b.no) };
+}
+function specOffText(o) { return `ใบจองเป็น ${specLabelText(o.bk)} · รถเป็น ${specLabelText(o.car)}${o.why ? ` · เหตุผล: ${o.why}` : ' · ไม่ได้ใส่เหตุผล'}`; }
+function bkSpecOffBox(a, D) {
+  const l = D.locks.find(x => x.live && x.type === 'booking' && (x.bkref === a.key || x.bkref === 'app:' + a.id)); const o = l && lockSpecOff(l, D); if (!o) return '';
+  return `<div class="mt-2 p-3 rounded-lg" style="background:var(--warn-bg,#fef3c7);color:var(--warn)"><b>⚠ ล็อกข้ามสเปก</b> · ${esc(l.vin || 'Quota ' + (l.ref || ''))}<br><span class="text-sm">${esc(specOffText(o))}</span><br><span class="text-sm">แอดมินสาขา: แก้ไขใบจอง${o.ids ? 'ใน IDS (และฟอร์ม)' : ''}เป็นสเปกของรถ · หรือปล่อยล็อกถ้าล็อกผิดคัน</span></div>`;
+}
+
+// let go of the lock a new typed lock replaced (19/11); true when done (or nothing left to do)
+async function ltReleaseReplaced(oldId, text) {
+  const old = findLock(oldId); if (!old || !['approved', 'allocated', 'pending'].includes(old.status)) return true;
+  old.status = 'released'; old.rel = { at: new Date().toISOString(), by: roleLabel(), self: true, reason: 'แก้ไขล็อก (พิมพ์ใหม่)' }; old.sheet_cleared = new Date().toISOString();
+  return !!await saveLock(oldId, old, 'แก้ไขล็อก', `เปลี่ยนเป็น "${text || ''}"`);
+}
+// a new lock that replaced an old one whose release did not get saved: let the old one go now (run with the sweep)
+async function ltReplacedSweep(D) {
+  for (const l of D.locks) if (l.replaced && l.live) { const o = D.locks.find(x => x.id === l.replaced); if (o && o.live && canLockMgr(o)) await ltReleaseReplaced(o.id, ltTextOf(l)); }
+}
+
+// 19/11: write a lock that was not typed (allocated in the web / an approved request) into the sheet's booking cell, once.
+// The cell must still be what the web last read (empty, or the same text): anything else is left for a person (⚠ ไม่ตรง).
+var ltAutoTried;
+async function ltAutoSheet(id) {
+  if (!window.__WEB || !ltAllLoaded()) return;
+  const D = derive(), l = D.locks.find(x => x.id === id); if (!l || l.typed || !l.live || l.sheet_sync || !['approved', 'allocated'].includes(l.status)) return;
+  const c = l.vin ? D.cars.get(l.vin) : null; if (l.vin && !(c && c.src === 'IDS')) return;
+  if (c && (c.bkno || c.bk)) return;   // IDS already gives the car to a booking: the sheet shows that
+  const txt = ltTextOf(l), cur = c ? String(c.bknote || '').trim() : '';
+  if (/\/\s*$/.test(txt) && l.type === 'booking') return;   // the booking is not loaded yet: never write a name without its customer
+  if (cur) return;   // the sheet already says something (the same, or another name = ⚠ ไม่ตรง for a person)
+  const r = await ltSheet(id, txt, '', false, true);
+  if (r && r.ok) { const x = findLock(id); if (x && !x.auto_sheet) { x.auto_sheet = true; await write('locks', id, x); } }
+}
+
+// a temporary lock the same customer's booking lock now covers (19/11): closed as converted, the booking lock stays
+async function ltCloseBkDone(id, d) {
+  const x = findLock(id); if (!x || x.status !== 'pending') return;
+  x.status = 'rejected'; x.closed_why = 'bkdone';
+  await saveLock(id, x, 'ปิดคำขอล็อก (ไม่ต้องอนุมัติแล้ว)', `ใบจอง ${d.no || ''} IDS จัดสรรรถ ${d.vin}${d.delivered ? ` · ส่งมอบแล้ว ${fmtD(d.ddate)}` : ''}`);
+}
+async function ltCloseSuperseded(id, by) {
+  const x = findLock(id); if (!x || !['approved', 'pending'].includes(x.status)) return;
+  x.status = x.status === 'pending' ? 'rejected' : 'converted'; x.converted_to = by; x.sheet_cleared = x.sheet_cleared || new Date().toISOString();
+  await saveLock(id, x, 'ปิดล็อกชั่วคราว (รถคันนี้ล็อกให้ใบจองของลูกค้า / เซลล์คนเดียวกันแล้ว)', '');
+}
+
+// write down a dealer lock that was really a booking number (19/11)
+async function ltSaveBkFix(l) {
+  const x = findLock(l.id); if (!x || x.type !== 'dealer') return;
+  Object.assign(x, { type: 'booking', bkref: l.bkref, bk_br: l.bk_br, dealer_name: null, end: x.start ? addDays(x.start, LOCK_DAYS_BY.booking) : x.end });
+  await saveLock(l.id, x, 'แก้ประเภทล็อก: เลขใบจอง ไม่ใช่ดีลเลอร์', l.bkFix.no);
+}

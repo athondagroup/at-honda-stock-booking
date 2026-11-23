@@ -27,7 +27,8 @@ function bkxBox(m, a) {
       <div class="field"><label for="xf-why">เหตุผล</label><input id="xf-why" data-modal="xf_why" value="${esc(m.xf_why ?? '')}" autocomplete="off" placeholder="เช่น ลูกค้าออกรถที่สาขาที่มีรถ"></div></div>
       <div class="text-xs text-muted mt-1">ใบจองยังนับเป็นยอดจองของสาขา ${esc(a.br)} และเซลล์เดิม · ต้องถอนจองและคีย์ใหม่ใน IDS เอง</div>
       <div class="flex gap-2 mt-2"><button class="btn btn-dark btn-sm" data-act="bkx-save" data-id="${esc(a.id)}">โอนลูกค้า</button><button class="btn btn-ghost btn-sm" data-act="bkx-close">ยกเลิก</button></div>`);
-  } else out += `<div><button class="btn btn-ghost btn-sm" data-act="bkx-open">โอนลูกค้าไปสาขาอื่น</button></div>`;
+  } else if (!m.cx_open) out += `<div class="flex flex-wrap gap-2"><button class="btn btn-ghost btn-sm" data-act="bkx-open">โอนลูกค้าไปสาขาอื่น</button>${cxCarBtn(a)}</div>`;
+  if (m.cx_open) out += cxCarBox(m, a);
   return out;
 }
 Object.assign(ACTIONS, {
@@ -55,5 +56,38 @@ Object.assign(ACTIONS, {
       x.flow.down = payDown({ rec: x }, items);
     });
     if (r) { delete m['xf_rc' + i]; toast('บันทึกเลขที่ใบเสร็จใหม่แล้ว'); }
+  }
+});
+
+// ---- send the booking's car to another branch (ตกลง 11/11): the booking, its count and seller stay; the car joins that branch's stock
+function cxCar(a) { const vin = atVin(a), c = vin ? derive().cars.get(vin) : null; return c || null; }
+function cxCarCan(a, c) { return !!(c && perms().write && !isSales() && (canApproveBr(c.br) || (S.role.role === 'admin' && myBranch() === c.br))); }
+function cxCarBtn(a) {
+  const c = cxCar(a);
+  if (!c) return `<button class="btn btn-ghost btn-sm" disabled title="ยังไม่มีรถที่จัดสรร">โอนรถไปสาขาอื่น</button>`;
+  return cxCarCan(a, c) ? `<button class="btn btn-ghost btn-sm" data-act="cxc-open">โอนรถไปสาขาอื่น</button>` : '';
+}
+function cxCarBox(m, a) {
+  const c = cxCar(a); if (!c) return '';
+  return box('surface', `<b>โอนรถไปสาขาอื่น</b>
+    <div class="text-sm text-muted mt-1">รถที่จัดสรรให้ใบจองนี้: <b style="color:var(--fg)">${esc(c.vin)}</b> · ${specLabel(c.spec)} · อยู่สาขา <b style="color:var(--fg)">${esc(c.br)}</b></div>
+    <div class="grid sm:grid-cols-2 gap-3 mt-2"><div class="field"><label for="cxc-to" class="req">สาขาปลายทาง</label><select id="cxc-to" data-modal="cx_to">${opt(BRS.filter(b => b !== c.br), m.cx_to, 'เลือกสาขา')}</select></div>
+    <div class="field"><label for="cxc-why">เหตุผล</label><input id="cxc-why" data-modal="cx_why" value="${esc(m.cx_why ?? '')}" placeholder="เช่น ลูกค้าออกรถที่ภาษีเจริญ" autocomplete="off"></div></div>
+    <div class="text-xs text-muted mt-1">ใบจอง ยอดจอง และเซลล์ไม่เปลี่ยน · รถย้ายไปสต็อกสาขาปลายทางทันที ล็อกและการจัดสรรตามไปด้วย · อย่าลืมโอนย้ายรถใน IDS</div>
+    <div class="flex gap-2 mt-2"><button class="btn btn-dark btn-sm" data-act="cxc-save" data-id="${esc(a.id)}">โอนรถ</button><button class="btn btn-ghost btn-sm" data-act="cxc-close">ยกเลิก</button></div>`);
+}
+Object.assign(ACTIONS, {
+  'cxc-open'() { if (!S.modal) return; S.modal.cx_open = true; S.modal.xf_open = false; render(); },
+  'cxc-close'() { if (!S.modal) return; S.modal.cx_open = false; render(); },
+  async 'cxc-save'(el) {
+    const a = atById(el.dataset.id), m = S.modal, c = a && cxCar(a);
+    if (!c || !cxCarCan(a, c)) { toast('โอนรถคันนี้ไม่ได้', 'bad'); return; }
+    const to = m.cx_to; if (!BRS.includes(to) || to === c.br) { toast('เลือกสาขาปลายทาง', 'bad'); return; }
+    const cur = S.vehicles.get(c.vin) || { added: null, removed: null, branch: null }, at = new Date().toISOString();
+    const log = [...(cur.branch_log || []), { from: c.br, to, why: (m.cx_why || '').trim() || null, booking: a.id, ...actor() }].slice(-20);
+    if (!await write('vehicles', c.vin, { ...cur, branch: to, branch_log: log })) return;
+    for (const [id, l] of S.locks) if (l.vin === c.vin && ['pending', 'approved', 'allocated'].includes(l.status) && l.car_br !== to) await saveLock(id, { ...l, car_br: to }, 'โอนรถไปสาขาอื่น', `${c.br} → ${to}`);
+    if (typeof saveBk === 'function') await saveBk(a.id, 'โอนรถไปสาขาอื่น', `${c.vin} ${c.br} → ${to}${m.cx_why ? ' · ' + m.cx_why : ''}`, x => { x.car_xfer = [...(x.car_xfer || []), { vin: c.vin, from: c.br, to, why: m.cx_why || null, at }]; });
+    m.cx_open = false; toast(`โอนรถ ${c.vin} ไปสาขา ${to} แล้ว · อย่าลืมโอนย้ายใน IDS`); render();
   }
 });

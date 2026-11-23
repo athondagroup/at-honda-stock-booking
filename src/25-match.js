@@ -58,7 +58,7 @@ function matchForms(at, idsB, cars, inv) {
   });
   // a fake-advance invoice (made-up buyer, car free to sell) is not this customer's deal: its car and spec must not replace the booking's
   const advFakeInv = i => { const v = S.vehicles.get(i.vin), a = v && v.advance; return !!(a && a.kind === 'fake' && a.inv && String(a.inv).replace(/^0+/, '') === String(i.inv || '').replace(/^0+/, '')); };
-  inv.forEach(i => { if (i.cust && !i.company && !advFakeInv(i)) recs.push({ kind: 'dl', key: 'inv:' + i.br + ':' + i.inv, name: i.cust, date: i.idate, model: i.model, grade: i.grade, color: i.color, br: i.br, no: i.no, sales: i.sales, vin: i.vin, ddate: i.ddate, row: i }); });
+  inv.forEach(i => { if (i.cust && !i.company && !advFakeInv(i)) recs.push({ kind: 'dl', key: 'inv:' + i.br + ':' + String(i.inv || '').replace(/^0+/, ''), name: i.cust, date: i.idate, model: i.model, grade: i.grade, color: i.color, br: i.br, no: i.no, sales: i.sales, vin: i.vin, ddate: i.ddate, row: i }); });
   // every AT booking is compared with every record: a name typed with a rank or a typo at the start must still be found
   recs.forEach(r => { r.k = nameKey(r.name); r.n = r.k.n; });
   const pairs = [];
@@ -69,7 +69,7 @@ function matchForms(at, idsB, cars, inv) {
     if (a.cancelled || a.demo) continue;
     const ak = nameKey(a.cust);
     // a person confirmed the pairing (or said "not this one") on the booking itself
-    const pick = a.rec.match_pick && a.rec.match_pick.key, skip = new Set(a.rec.match_skip || []);
+    const pick = matchKeyN(a.rec.match_pick && a.rec.match_pick.key), skip = new Set((a.rec.match_skip || []).map(matchKeyN));
     for (const r of recs) {
       if (skip.has(r.key) || altOf.has(r.key)) continue;
       if (pick && r.key === pick) { pairs.push({ a, r, score: 1000, same: true, manual: true }); continue; }
@@ -124,6 +124,17 @@ function matchForms(at, idsB, cars, inv) {
     if (b) idsCx.set(b.key, a);
   }
   idsOnly = idsOnly.filter(b => !idsCx.has(b.key));
+  // the same, when IDS already shows the booking as 'waiting to be cancelled' (9/11): it is this cancelled form's own IDS record —
+  // one case, not a cancelled form plus a second IDS row; both records are kept and shown together
+  const idsGone = new Map(), goneUsed = new Set();
+  const goneFree = idsB.filter(b => !b.seed && !b.skip && (b.match === 'cancel' || b.ids === CANCEL) && !matchedIds.has(b.key) && !idsCx.has(b.key));
+  for (const a of at) {
+    if (!a.cancelled || a.demo || [...idsCx.values()].includes(a)) continue;
+    const pick = a.rec.match_pick && a.rec.match_pick.key, ak = nameKey(a.cust);
+    const b = goneFree.find(x => !goneUsed.has(x.key) && (x.key === pick || (a.no && x.no === a.no) || (a.rec.booking_no && String(x.no) === String(a.rec.booking_no))))
+      || goneFree.find(x => !goneUsed.has(x.key) && keyScore(ak, nameKey(x.cust)) >= 2 && x.model === a.model && a.date && x.date && Math.abs(daysBetween(a.date, x.date)) <= 25);
+    if (b) { idsGone.set(b.key, a); goneUsed.add(b.key); }
+  }
   // the same customer, model, grade, colour and branch twice in IDS: usually IDS re-issued the booking (e.g. 'postponed' then a new number
   // when the car came). A person confirms: same booking (old number kept as an alias) or two different bookings.
   const isCx = r => !!(r.row && (r.row.match === 'cancel' || r.row.ids === CANCEL));
@@ -134,7 +145,24 @@ function matchForms(at, idsB, cars, inv) {
     const no = new Set(a.rec.dup_no || []), ak = nameKey(bk.name || a.cust);
     const y = idsOnly.find(x => x.key !== bk.key && !no.has(x.key) && x.cust && keyScore(ak, nameKey(x.cust)) >= 2 && x.model === bk.model && x.grade === bk.grade
       && String(x.color || '').toUpperCase() === String(bk.color || '').toUpperCase() && (x.br === bk.br || isCx(bk)));   // another branch: only when the old booking was withdrawn (a customer moved to another branch)
-    if (!y) continue;
+    if (!y) {
+      // the customer moved branch (13/11): the same customer, same model / grade / colour, booked in IDS at another branch while the old one
+      // is still open. One case, one row: the form keeps the live one (with a car, else the newer number), the other is its old number.
+      const isCo = /บริษัท|หจก|ห้างหุ้นส่วน|จำกัด|co\.|ltd/i.test(String(bk.name || bk.cust || a.cust || ''));   // a company books several cars of one spec on purpose
+      const z = isCo ? null : idsOnly.find(x => x.key !== bk.key && !no.has(x.key) && x.cust && keyScore(ak, nameKey(x.cust)) >= 2 && x.model === bk.model && x.grade === bk.grade
+        && String(x.color || '').toUpperCase() === String(bk.color || '').toUpperCase() && x.br !== bk.br && x.date && bk.date && Math.abs(daysBetween(x.date, bk.date)) <= 120);
+      const zr = z && recs.find(x => x.key === z.key);
+      if (zr) {
+        const hasCar = r => !!((r.row && r.row.vin) || r.vin), keepZ = hasCar(zr) && !hasCar(bk) || (!hasCar(bk) && !hasCar(zr) && (zr.date || '') > (bk.date || ''));
+        if (keepZ) {
+          res.recs = res.recs.map(r => r === bk ? zr : r);
+          res.no = zr.no || res.no; res.idsSales = zr.sales || res.idsSales; res.vin = res.recs.find(r => r.vin)?.vin || null;
+          if (res.recs[0] === zr) { res.idsBr = zr.br; res.idsModel = zr.model; res.idsGrade = zr.grade; res.idsColor = zr.color; res.kind = 'booking'; }
+        }
+        (res.alt = res.alt || []).push(keepZ ? bk : zr); res.autoAlt = true; res.moveAlt = true; idsOnly = idsOnly.filter(x => x.key !== z.key);
+      }
+      continue;
+    }
     // sure case: one number is 'postponed' with no car, the other is live with a car: IDS re-issued the booking. No one needs to click.
     const live = r => !!((r.row && r.row.vin) || r.vin), post = r => !!(r.ids === 'เลื่อนการรับรถ' || (r.row && r.row.ids === 'เลื่อนการรับรถ')) && !live(r);
     const yr = recs.find(x => x.key === y.key);
@@ -157,9 +185,12 @@ function matchForms(at, idsB, cars, inv) {
   const near = new Map();
   for (const a of at) {
     if (a.cancelled || a.demo || result.has(a.key)) continue;
-    const ak = nameKey(a.cust), hits = [], skip = new Set(a.rec.match_skip || []);
+    const ak = nameKey(a.cust), hits = [], skip = new Set((a.rec.match_skip || []).map(matchKeyN));
     for (const r of recs) { if (skip.has(r.key)) continue; const ns = keyScore(ak, r.k); if (ns >= 2) hits.push({ key: r.key, ns, kind: r.kind, br: r.br, no: r.no, inv: r.kind === 'dl' ? r.row.inv : null, date: r.date, ddate: r.ddate || null, name: r.name, model: r.model, grade: r.grade, usedBy: claimedBy.get(r.key) || null }); }
     if (hits.length) near.set(a.key, hits.sort((x, y) => y.ns - x.ns || (y.kind === 'dl') - (x.kind === 'dl')).slice(0, 3));
   }
-  return { result, idsOnly, near, idsCx, dupAsk };
+  return { result, idsOnly, near, idsCx, idsGone, dupAsk };
 }
+
+// a DL key with or without the invoice number's leading 0 is one key (an upload read as numbers drops it, 16/11)
+function matchKeyN(k) { const m = /^inv:([^:]*):0*(.*)$/.exec(String(k || '')); return m ? `inv:${m[1]}:${m[2]}` : k; }

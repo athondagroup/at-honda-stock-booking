@@ -8,8 +8,11 @@ function startView() {
   return r === 'sales' ? 'dash' : r === 'admin' ? 'datafix' : r === 'exec' ? 'dash' : perms().approve ? 'inbox' : 'alerts';
 }
 // ---- ages: days in stock and days since production, never one number with a *
-function ageCell(c) {
+function ageCell(c, plain) {
   if (!c) return '–';
+  // the stock table (11/11): two lines of numbers, the colour tells the age (over 90 days orange, over 180 red), no bar
+  if (plain) { const n = a => a === null ? '–' : `<b class="num" style="color:${a > 180 ? 'var(--bad)' : a > 90 ? 'var(--warn)' : 'inherit'}">${a}</b>`;
+    return `<div class="text-xs leading-tight"><div>สต็อก ${n(c.stockAge ?? null)}</div><div>${c.prodAge == null ? '<span style="color:var(--warn)">ผลิต รอระบุ</span>' : 'ผลิต ' + n(c.prodAge)}</div></div>`; }
   const st = c.stockAge ?? null, pr = c.prodAge ?? null;
   return `<div class="text-xs leading-tight"><div>สต็อก ${st === null ? '–' : ageBar(st)}</div><div>${pr === null ? '<span style="color:var(--warn)">ผลิต: รอระบุ</span>' : `ผลิต ${ageBar(pr)}`}</div></div>`;
 }
@@ -52,7 +55,7 @@ function datafixItems(D) {
   const at = D.at.filter(a => inBr(a));
   const upl = [...S.uploads.values()].filter(u => inBr(u));
   const outStock = upl.filter(u => u.src === 'stock').reduce((n, u) => n + (u.out || []).filter(o => outOpen(u, o)).length, 0);
-  const outBk = upl.filter(u => u.src === 'booking').reduce((n, u) => n + (u.out || []).filter(o => typeof bkOutPending === 'function' ? bkOutPending(o) : o.flag && !o.res).length, 0);
+  const outBk = upl.filter(u => u.src === 'booking').reduce((n, u) => n + (u.out || []).filter(o => typeof bkOutPending === 'function' ? bkOutPending(o, u.br) : o.flag && !o.res).length, 0);
   return [
     ['ไฟล์ IDS', [
       ['DL (ใบกำกับ/ส่งมอบ) ไม่ได้อัปเดต', f.stale.map(r => r.b).join(', ') || 0, 'bad', { act: 'go', view: 'upload' }],
@@ -142,7 +145,7 @@ function nextStepBox(a, D, mine) {
   const ro = !a.cancelled && !a.done && !(perms().write && canEditBooking(a)) ? `<div class="text-xs p-2 rounded" style="background:var(--surface-2)">ดูได้อย่างเดียว: ใบจองสาขา ${esc(a.br)} แก้ได้โดยเซลล์เจ้าของ (${esc(a.sales || '–')}) แอดมินสาขา ${esc(a.br)} และผู้จัดการสาขา ${esc(a.br)}${mgrNameOf(a.br) ? ` (${esc(mgrNameOf(a.br))})` : ''} · บทบาทตอนนี้: ${esc(roleLabel())}</div>` : '';
   const holdTxt = n && n !== 'fin' && n !== 'booked' && a.rec.delivery_plan ? '<div class="text-xs" style="color:var(--good)">ไฟแนนซ์ผ่านและยืนยันวันออกรถแล้ว: ล็อกคิวไว้จนส่งมอบ ไม่ปลดล็อก ไม่ถามซ้ำ</div>' : '';
   return `<div class="p-3 rounded-lg border-2 mb-4 flex flex-col gap-2" style="border-color:${a.cancelled || a.done ? 'var(--line)' : 'var(--red)'}">${head}<div class="flex flex-col">${body}</div>${holdTxt}${ro}
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">${dates.map(([k, v]) => `<div><div class="text-muted">${k}</div><div class="num">${v}</div></div>`).join('')}</div>${saleSumBox(a, D)}</div>`;
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">${dates.map(([k, v]) => `<div><div class="text-muted">${k}</div><div class="num">${v}</div></div>`).join('')}${!a.cancelled && !isSales() && typeof commCell === 'function' && (commBase(a, D).d || a.rec.comm_month || perms().approve) ? `<div><div class="text-muted">เบิกค่าคอม</div><div>${commCell(a, D)}</div></div>` : ''}</div>${saleSumBox(a, D)}</div>`;
 }
 Object.assign(ACTIONS, { 'scroll-flow'(el) { const t = document.querySelector('#modal-root [data-flow-steps]') || document.querySelector('#modal-root h3'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
 // ---- one search for everything: customers, booking numbers, VIN (the last 6 digits are enough), quota Ref
@@ -180,7 +183,7 @@ function gsearchResults(m, D) {
     : `<p class="text-xs text-muted mb-2">ค้นใน${scope === 'all' ? 'ทุกสาขา' : ' ' + S.br} ตามสิทธิ์ที่เห็นได้${isSales() ? ' (เซลล์เห็นชื่อลูกค้าเฉพาะของตัวเอง)' : ''}</p>
     ${sec('รถ', cars.length, cars.map(c => btn(`data-act="car-open" data-vin="${esc(c.vin)}"`, `<span class="code">${vinShow(c.vin)}</span><span class="block text-xs text-muted">${carSub(c)}</span>${!isSales() && (c.lgOut || c.removed || c.dlOnly) ? stockOutWhere(c.vin, D) : ''}`)).join(''))}
     ${sec('ใบจอง', bks.length, bks.map(r => btn(r.a ? `data-act="at-open" data-id="${esc(r.a.id)}"` : `data-act="go" data-view="book" data-q="${esc(r.no || '')}"`, `<b>${(!isSales() || isMine(r.owner)) ? esc(r.cust || '') : 'ลูกค้าของเซลล์อื่น'}</b><span class="block text-xs text-muted">${esc(r.no || 'ยังไม่อยู่ใน IDS')} · ${esc(r.br || '')} · ${esc(r.owner || '')} · ${specLabelText(r.spec)}${r.vin ? ` · VIN …${esc(String(r.vin).slice(-6))}` : ''}</span>`)).join(''))}
-    ${sec('Quota', qs.length, qs.map(x => btn(`data-act="go" data-view="quota"`, `<b>Ref ${esc(x.ref || '')}</b><span class="block text-xs text-muted">${specLabelText(x.spec)} · ${esc(x.br || '')}${x.vin ? ` · VIN …${esc(String(x.vin).slice(-6))}` : ''}</span>`)).join(''))}`;
+    ${sec('Quota', qs.length, qs.map(x => btn(`data-act="quota-open" data-ref="${esc(x.ref || '')}"`, `<b>Ref ${esc(x.ref || '')}</b><span class="block text-xs text-muted">${specLabelText(x.spec)} · ${esc(x.br || '')}${x.vin ? ` · VIN …${esc(String(x.vin).slice(-6))}` : ''}</span>`)).join(''))}`;
 }
 Object.assign(ACTIONS, {
   'gsearch-open'() { S.modal = { kind: 'gsearch', q: '', all: true }; render(); setTimeout(() => { const i = document.getElementById('gs-q'); if (i) i.focus(); }, 30); },

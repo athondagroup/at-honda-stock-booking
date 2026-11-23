@@ -343,11 +343,13 @@ function viewUploadBase(D) {
           <td><b>${esc(r.br || '?')}</b></td>
           <td>${r.error ? '–' : `<input type="date" data-upl-date="${i}" value="${esc(r.asof || '')}" max="${todayISO()}" style="background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 6px">`}</td>
           <td class="num text-right">${r.rows.length}</td>
-          <td class="text-xs">${r.src === 'invoice' && r.diff && !r.error ? uplInvCell(r, i) : r.diff ? `เดิม ${r.diff.prevN} → ใหม่ ${r.rows.length}${r.src === 'stock' ? `<div>ออก <b>${r.diff.out.length}</b> · เข้าใหม่ <b>${r.diff.inN}</b>${r.diff.out.filter(o => o.flag).length ? ` · <span style="color:var(--bad)">ไม่พบข้อมูล ${r.diff.out.filter(o => o.flag).length}</span>` : ''}</div>` : ''}${r.diff.baseSample ? '<div class="text-muted">(เทียบกับข้อมูลตัวอย่าง)</div>' : ''}${uplKeepCell(r, i)}` : '–'}</td>
+          <td class="text-xs">${r.src === 'invoice' && r.diff && !r.error ? uplInvCell(r, i) : r.diff ? `เดิม ${r.diff.prevN} → ใหม่ ${r.rows.length}${r.src === 'stock' && !uplPartial(r) ? `<div>ออก <b>${r.diff.out.length}</b> · เข้าใหม่ <b>${r.diff.inN}</b>${r.diff.out.filter(o => o.flag).length ? ` · <span style="color:var(--bad)">ไม่พบข้อมูล ${r.diff.out.filter(o => o.flag).length}</span>` : ''}</div>` : ''}${r.diff.baseSample ? '<div class="text-muted">(เทียบกับข้อมูลตัวอย่าง)</div>' : ''}${uplModeCell(r, i)}${uplKeepCell(r, i)}` : '–'}</td>
           <td class="text-xs">${r.error ? `<span style="color:var(--bad)">${esc(r.error)}</span>` : ''}${r.block ? `<div style="color:var(--bad)">${esc(r.block)}</div>` : ''}${uplGateCell(r)}${r.older ? `<div style="color:var(--warn)">${esc(r.older)}</div>` : ''}${r.note ? `<div class="text-muted">${esc(r.note)}</div>` : ''}${r.warn.slice(0, 3).map(w => `<div style="color:var(--warn)">${esc(w)}</div>`).join('')}${r.warn.length > 3 ? `<div class="text-muted">และอีก ${r.warn.length - 3} ข้อ</div>` : ''}</td></tr>`).join('')}</tbody></table></div>
+      ${U.fill && U.results.length ? uplFillBox(U.fill) : ''}
       <div class="flex flex-wrap gap-3 items-center mt-3">
-        <button class="btn btn-red" data-act="upl-save" ${sel.length && !U.busy && !sel.some(uplNeedsChoice) ? '' : 'disabled'}>${U.busy ? '<span class="spin"></span> กำลังบันทึก…' : `บันทึก ${sel.length} ตาราง`}</button>
+        <button class="btn btn-red" data-act="upl-save" ${sel.length && !U.busy && !sel.some(uplNeedsChoice) && !sel.some(uplModeAsk) ? '' : 'disabled'}>${U.busy ? '<span class="spin"></span> กำลังบันทึก…' : `บันทึก ${sel.length} ตาราง`}</button>
         <button class="btn btn-ghost" data-act="upl-clear">ล้าง</button>
+        ${U.results.some(r => r.src === 'stock' && !r.error && r.rows.length) && perms().write ? '<button class="btn btn-ghost" data-act="upl-fill" title="เติม Model code / เลขเครื่อง ให้รถที่มีในเว็บ ไม่เปลี่ยนรายการรถ">เติมข้อมูลรถอย่างเดียว</button>' : ''}
         <span class="text-xs text-muted">${sel.some(uplNeedsChoice) ? '<span style="color:var(--bad)">ตาราง DL: เลือกก่อนว่าจะใช้ชื่อเดิมหรือข้อมูลใหม่</span>' : 'ตาราง Stock ที่บันทึกจะเก็บประวัติรถที่ออกและเข้าไว้ด้านล่าง'}</span></div>
     </div>` : ''}
   </section>
@@ -363,8 +365,8 @@ function viewUploadBase(D) {
   <!--UPL-EXTRA-->
   ${brSeg()}
   <section><h2 class="font-head text-lg font-semibold mb-2">ประวัติการอัปโหลด</h2>
-    <div class="bg-surface border border-line rounded-lg divide-y divide-line">${hist.filter((u, i) => i < 40 || (u.out || []).some(o => u.src === 'booking' ? bkOutPending(o) : outOpen(u, o))).map(u => {
-      const open = S.filters.uplOpen === u.id, flagged = (u.out || []).filter(o => u.src === 'booking' ? bkOutPending(o) : outOpen(u, o)).length;
+    <div class="bg-surface border border-line rounded-lg divide-y divide-line">${hist.filter((u, i) => i < 40 || u.id === S.filters.uplOpen || (u.out || []).some(o => u.src === 'booking' ? bkOutPending(o, u.br) : outOpen(u, o))).map(u => {
+      const open = S.filters.uplOpen === u.id, flagged = (u.out || []).filter(o => u.src === 'booking' ? bkOutPending(o, u.br) : outOpen(u, o)).length;
       return `<div class="p-3 md:px-4">
         <div class="flex flex-wrap gap-x-5 gap-y-1 items-center text-sm">
           <span class="w-32 num text-muted">${fmtDT(u.at)}</span><span class="w-36 font-medium">${SRC_LABEL[u.src]} ${esc(u.br)}${u.m ? ' ' + fmtM(u.m) : ''}</span>

@@ -12,7 +12,8 @@ function atBranchOf(name) {
   const w = [['ภาษีเจริญ', 'PSC'], ['เอกชัย', 'ATE'], ['บางบอน', 'ATE'], ['สามพราน', 'SPH'], ['กำแพงแสน', 'KPA']].find(([k]) => t.includes(k));
   return w ? w[1] : null;
 }
-function specCat(st) { return st === 'free' ? 'free' : st === 'company' ? 'company' : ['locked', 'pending', 'allocated', 'noted', 'temp'].includes(st) ? 'lock' : 'held'; }
+// ติดจอง = allocated (web or IDS), invoiced / sold with a customer · ล็อก = a queue lock not allocated yet (9/11)
+function specCat(st) { return st === 'free' ? 'free' : st === 'company' ? 'company' : ['locked', 'pending', 'noted', 'temp'].includes(st) ? 'lock' : 'held'; }
 function carStatus(c, inv, bkByVin) {
   if (inv && !inv.company) return inv.ddate ? 'delivered' : 'invoiced';
   if (c.company) return 'company';
@@ -31,7 +32,7 @@ function flowOf(a, today) {
     booked: !!String(a.rec.receipt_no || '').trim(),
     fin: isCash(a.rec) || !!(f.fin && f.fin.ok),
     // IDS allocating a car to this booking (VIN in Stock / DL) counts as the allocation, so nobody presses it twice
-    assign: !!(f.assign && f.assign.vin) || !!(m && m.vin),
+    assign: !!(f.assign && f.assign.vin) || !!(m && m.vin) || !!a.logVin,
     po: !!(f.po && f.po.at),
     down: payDone(a),
     delivered: !!(f.delivered && f.delivered.date && (f.delivered.plate || f.delivered.src === 'IDS')),
@@ -50,7 +51,8 @@ function flowOf(a, today) {
   // delivered in the IDS file this month: the delivery counts; the red plate and insurer can be added later
   // the sales may skip the PO for now (24/10): the flow moves on, the PO stays missing until made (before delivery)
   const poSkip = !done.po && !!(f.po_skip && f.po_skip.at);
-  const next = history ? null : lateUpdate ? (done.confirmed ? null : 'confirmed') : (FLOW.find(k => !done[k] && !(k === 'po' && poSkip)) || null);
+  // 19/11: no waiting for the manager after the delivery (the confirmation for commission stays optional)
+  const next = history ? null : lateUpdate ? null : (FLOW.find(k => !done[k] && k !== 'confirmed' && !(k === 'po' && poSkip)) || null);
   return { done, stage, next, poSkip, idsDelivered, history, lateUpdate, deliveredDate: (f.delivered && f.delivered.date) || idsDate || a.rec.delivered_date || null };
 }
 const r0 = a => a.rec || {};
@@ -69,17 +71,18 @@ let deriveCache = null;
 function derive() {
   const key = `${S.dataV}|${S.idsV}|${todayISO()}`;
   if (deriveCache && deriveCache.key === key) return deriveCache.D;
-  const D = deriveNow();
+  const D = deriveNow(key);
   deriveCache = { key, D };
   return D;
 }
-function deriveNow() {
+function deriveNow(key) {
   const today = todayISO(), X0 = idsData(), rpFile = (S.ref.get('honda_rpt') || {}).v || {};
   const X = Object.keys(rpFile).length ? { ...X0, inv: X0.inv.map(i => invByFile(i, rpFile)) } : X0;   // invoice month = the month of Honda's campaign file (2/11)
   const invByVin = new Map();
   // latest invoice per car; on the same date the sale to a customer wins over the sale between AT Honda branches
   // (PSC sells to SPH on 31/03 and SPH sells to the customer the same day: the car is SPH's customer's)
-  X.inv.forEach(i => { const p = invByVin.get(i.vin), a = i.idate || '', b = p ? p.idate || '' : '';
+  // a DL row with no invoice date counts on its delivery date (11/11: the customer invoice must not lose to an older transfer invoice)
+  X.inv.forEach(i => { const p = invByVin.get(i.vin), a = i.idate || i.ddate || '', b = p ? p.idate || p.ddate || '' : '';
     if (!p || a > b || (a === b && p.company && !i.company) || (a === b && !!p.company === !!i.company && !p.ddate && i.ddate)) invByVin.set(i.vin, i); });
 
   // IDS bookings
@@ -88,7 +91,22 @@ function deriveNow() {
   // booking file is older and still shows no frame number (so it must not sit in the "รอรถ" queue)
   const invByNo = new Map();
   X.inv.forEach(i => { if (i.no && i.vin && !i.company) invByNo.set(String(i.no), i); });
-  const idsB = X.bookings.map(idsFixApply).map(b => {
+  // IDS updates never make a booking vanish (ตกลง 10/11): an IDS booking a later Booking file lacks, with no web form and
+  // no invoice, stays as "ไม่อยู่ในไฟล์ IDS ล่าสุด" (not in the queue) until the manager answers; "ยังจองอยู่" puts it back in the queue
+  const goneBk = []; { const last = new Map();
+    for (const [uid, u] of S.uploads) {
+      if (u.src !== 'booking' || !Array.isArray(u.out) || !u.at || daysBetween(String(u.at).slice(0, 10), today) > 60) continue;
+      for (const x of u.out) if (x.no) { const p = last.get(String(x.no)); if (!p || String(p.u.at) < String(u.at)) last.set(String(x.no), { u, x }); }
+    }
+    const have = new Set(X.bookings.map(b => String(b.no)));
+    for (const [no, { u, x }] of last) {
+      if (have.has(no) || x.atId || invByNo.has(no) || !(x.flag || x.why === 'ไม่มีใบจองในเว็บ' || (x.res && x.res.still))) continue;
+      if (x.res && !x.res.still) continue;
+      if (!(x.res && x.res.still) && typeof bkOutWebCx === 'function' && bkOutWebCx({ ...x, atId: null }, u.br)) continue;   // the web booking of that customer is cancelled (12/11)
+      const [m, g, c] = String(x.spec || '||').split('|');
+      goneBk.push({ br: u.br, no, date: x.date || null, model: m || null, grade: g || null, color: c || null, sales: x.sales || null, cust: x.cust || null, ids: null, vin: null, ref: null, ws: null, gone: !(x.res && x.res.still), goneAt: u.at });
+    } }
+  const idsB = [...X.bookings, ...goneBk].map(idsFixApply).map(b => {
     const iv = !b.vin && b.ids !== CANCEL ? invByNo.get(String(b.no)) : null;
     if (iv) b = { ...b, vin: iv.vin };
     // model / grade / colour empty in IDS (no MTO) but the frame number is known: offer what Stock or DL says (needs a confirm click)
@@ -110,15 +128,8 @@ function deriveNow() {
   // a car invoiced to another AT Honda branch has moved there: it is that branch's stock from now on
   // (the old branch's file may still list it). If the new branch's file has it too, its own row is used.
   const stockBrs = new Map(); X.cars.forEach(c => { if (!stockBrs.has(c.vin)) stockBrs.set(c.vin, new Set()); stockBrs.get(c.vin).add(c.br); });
-  X.cars.forEach(c0 => {
-    const to = c0.company ? atBranchOf(c0.cust) : null;
-    let c = c0;
-    if (to && to !== c0.br) {
-      if (stockBrs.get(c0.vin).has(to)) return;
-      c = { ...c0, br: to, fromBr: c0.br, company: false, sold: false, bkno: null, bknote: null, cust: null, note: [c0.note, `โอนจาก ${c0.br}`].filter(Boolean).join(' · ') };
-    }
-    const car = { ...c, src: 'IDS', prodIds: c.prod || null };
-    if (!car.st) car.st = carStatus(car, invByVin.get(car.vin), bkByVin);
+  // the booking / customer / seller / Advance a car gets from IDS + the invoice: every car row, also one gone from the Stock file (20/11)
+  function carEnrich(car) {
     // invoiced but not handed over (advance invoice, ตกลง 22/10): what the branch said about it
     const inv0 = invByVin.get(car.vin), adv = ['invoiced', 'sold'].includes(car.st) && !(inv0 && (inv0.company || inv0.ddate)) ? advOf(car.vin, inv0) : null;
     if (adv) {
@@ -129,7 +140,19 @@ function deriveNow() {
     if (b && car.fromBr && b.br && b.br !== car.br) b = null;
     car.bk = car.bk || car.bkno || b?.no || null;
     car.cust = car.cust || b?.cust || null;
-    car.sales = b?.sales || null;
+    // once invoiced, IDS drops the booking from its Booking report: the seller then comes from the invoice (DL) (9/11)
+    car.sales = b?.sales || (!car.advFake && inv0 && !inv0.company && inv0.sales) || null;
+  }
+  X.cars.forEach(c0 => {
+    const to = c0.company ? atBranchOf(c0.cust) : null;
+    let c = c0;
+    if (to && to !== c0.br) {
+      if (stockBrs.get(c0.vin).has(to)) return;
+      c = { ...c0, br: to, fromBr: c0.br, company: false, sold: false, bkno: null, bknote: null, cust: null, note: [c0.note, `โอนจาก ${c0.br}`].filter(Boolean).join(' · ') };
+    }
+    const car = { ...c, src: 'IDS', prodIds: c.prod || null };
+    if (!car.st) car.st = carStatus(car, invByVin.get(car.vin), bkByVin);
+    carEnrich(car);
     cars.set(car.vin, car);
   });
   const removed = [];
@@ -137,11 +160,16 @@ function deriveNow() {
     const car0 = cars.get(vin);
     if (o.added && !car0) cars.set(vin, { ...o.added, vin, st: 'free', src: 'รับเข้าในระบบนี้ รอไฟล์ IDS' });
     // pulled back into stock as a special car (company Advance / Demon / returned by the customer): IDS no longer lists it
-    else if (o.special && !car0 && !o.removed) { const i = invByVin.get(vin) || {}, sp = o.special;
-      cars.set(vin, { vin, br: sp.br || i.br, model: i.model, grade: i.grade, color: i.color, st: spStatus(sp), src: 'ดึงกลับเข้า Stock พิเศษ (ไม่อยู่ในไฟล์ Stock IDS)', special: sp, fromInv: false }); }
+    else if (o.special && !car0 && !o.removed) { const i = invByVin.get(vin) || {}, sp = o.special, e = (!i.model && typeof carlogAll === 'function' && (carlogAll().get(vin) || {}).e) || {};
+      cars.set(vin, { vin, br: sp.br || i.br || e.br, model: i.model || e.m, grade: i.grade || e.g, color: i.color || e.c, st: spStatus(sp), src: 'ดึงกลับเข้า Stock พิเศษ (ไม่อยู่ในไฟล์ Stock IDS)', special: sp, fromInv: false }); }
     // keyed as sold/moved to this branch from another branch's Stock upload: it is this branch's stock until its own IDS file lists the car
     else if (o.moved && !car0 && !o.removed) { const [m, g, c] = String(o.moved.spec || '').split('|'), q = v => (v && v !== '?' ? v : null);
       cars.set(vin, { vin, br: o.moved.to, fromBr: o.moved.from, model: q(m), grade: q(g), color: q(c), st: 'free', note: `โอนจาก ${o.moved.from}`, src: `ย้ายมาจาก ${o.moved.from} รอไฟล์ Stock สาขา ${o.moved.to}` }); }
+    // an Advance invoice with no real customer (the car is free to sell): IDS drops invoiced cars from its Stock file, the car stays
+    // here as a free Advance car while its invoice is not handed over (10/11)
+    else if (o.advance && o.advance.kind === 'fake' && !car0 && !o.removed && !o.special) { const i = invByVin.get(vin), ad = i && !i.ddate && !i.company ? advOf(vin, i) : null;
+      if (ad) cars.set(vin, { vin, br: ad.br || i.br, model: i.model, grade: i.grade, color: i.color, st: 'free', advFake: true, advance: { ...ad, cust: i.cust || null }, advCust: i.cust || null, cust: null, bk: null, bkno: null,
+        src: 'Advance · ออกใบกำกับไว้ก่อน (ไม่อยู่ในไฟล์ Stock IDS)', fromAdv: true }); }
     else if (o.added && car0) car0.received = o.added;
     const car = cars.get(vin);
     if (!car) continue;
@@ -153,9 +181,40 @@ function deriveNow() {
     car.prodInfo = o.prod_info || null;
     if (o.removed) { removed.push({ ...car, removed: o.removed }); cars.delete(vin); }
   }
+  // IDS updates only change a car's status, they never make it vanish (ตกลง 10/11): a car an earlier Stock file had and a later
+  // one lacks stays. Invoiced, not handed over = stays as invoiced; no invoice, no move, no removal, nobody answered "where did it go"
+  // = stays as "รอตรวจ" (not free, cannot be locked) until the admin / manager answers (the answer on the upload, as before).
+  { const lastOut = new Map();
+    for (const [uid, u0] of S.uploads) { const u = { ...u0, id: uid };
+      if (u.src !== 'stock' || !Array.isArray(u.out) || !u.at || daysBetween(String(u.at).slice(0, 10), today) > 60) continue;
+      for (const x of u.out) { const p = lastOut.get(x.vin); if (!p || String(p.u.at) < String(u.at)) lastOut.set(x.vin, { u, x }); }
+    }
+    for (const [vin, { u, x }] of lastOut) {
+      if (cars.has(vin) || x.res) continue;
+      const o = S.vehicles.get(vin) || {};
+      if (o.removed || o.moved || o.special) continue;
+      const i = invByVin.get(vin), ab = [...S.bookings.values()].find(r => r && r.status !== 'cancelled' && !r.demo && r.flow && r.flow.assign && r.flow.assign.vin === vin);
+      let st = null;
+      if (i && !i.other && !i.ddate) st = 'invoiced';
+      else if (!i && !ab && x.flag) st = 'review';
+      if (!st) continue;
+      const [m, g, c] = String(x.spec || '||').split('|');
+      // 20/11: everything known about the frame number stays (the car log keeps the last Stock row: production date, year, IDS allocation)
+      const e = (typeof carlogAll === 'function' && (carlogAll().get(vin) || {}).e) || {}, al = Array.isArray(e.al) && e.al.length ? e.al[e.al.length - 1] : null;
+      const no = x.bk || (i && !i.company && i.no) || (bkByVin.get(vin) || {}).no || (al && al.no) || null;
+      cars.set(vin, { vin, br: u.br, model: m || e.m || null, grade: g || e.g || null, color: c || e.c || null, year: e.y || null, st, prod: x.p || e.p || null, prodIds: x.p || e.p || null, bkno: no, bk: no, cust: st === 'invoiced' ? (i.cust || x.cust || (al && al.cust) || null) : x.cust || (al && al.cust) || null,
+        gone: { at: u.at, asof: u.asof || null, upload: u.id || null }, src: st === 'review' ? 'ไม่อยู่ในไฟล์ IDS ล่าสุด · รอตรวจ' : 'ออกใบกำกับแล้ว · ไม่อยู่ในไฟล์ Stock IDS ล่าสุด' });
+      carEnrich(cars.get(vin));
+    } }
+  // a car invoiced by a branch is that branch's car (ตกลง 11/11): moved there automatically, the old branch kept as "โอนจาก"
+  for (const car of cars.values()) {
+    const i = invByVin.get(car.vin);
+    if (!i || i.company || i.other || car.special || !BRS.includes(i.br) || i.br === car.br) continue;
+    car.invMoved = { from: car.br, to: i.br, idate: i.idate || null }; car.fromBr = car.fromBr || car.br; car.br = i.br;
+  }
   // IDS is the reference; the keyed date is used only while IDS has none. Car age counts from the production date.
   for (const car of cars.values()) {
-    car.prodIds = car.src === 'IDS' ? car.prodIds || null : null;
+    car.prodIds = car.src === 'IDS' || car.gone ? car.prodIds || null : null;
     car.prodKey = car.prodKey || null;
     car.prod = car.prodIds || car.prodKey || null;
     car.prodSrc = car.prodIds ? 'IDS' : car.prodKey ? 'key' : null;
@@ -173,7 +232,7 @@ function deriveNow() {
       key: 'app:' + id, id, src: 'AT', rec: r, no: r.booking_no || null, date: r.booking_date, br: r.br, sales: salesCanon(r.sales),
       cust: r.customer, model: r.model, grade: r.grade, color: r.color, spec: specKey(r.model, r.grade, r.color),
       deposit: (Number(r.deposit) || 0) + (r.deposit_from ? Number(r.deposit_from.amount) || 0 : 0), slip: (r.slip_imgs || []).length > 0 || r.slip === true || !!r.doc_url || !!r.deposit_from,
-      cancelled: r.status === 'cancelled', demo: !!r.demo || !!r.hidden, created_at: r.created_at,
+      cancelled: r.status === 'cancelled', demo: (!!r.demo && !demoSaleRec(r)) || !!r.hidden, demoCar: demoSaleRec(r), created_at: r.created_at,
       // a model change approved later puts the booking at the back of the queue
       qdate: r.queue_date || r.booking_date
     });
@@ -181,17 +240,19 @@ function deriveNow() {
   const M = matchForms(at, idsB, [...cars.values()], X.inv);
   const idsByKey = new Map(idsB.map(b => [b.key, b]));
   for (const [k, a] of M.idsCx) a.idsLeftKey = k;
+  for (const [k, a] of M.idsGone || []) a.idsGoneKey = k;
   for (const a of at) {
     a.match = M.result.get(a.key) || null;
     a.near = M.near.get(a.key) || null;
     a.dupAsk = M.dupAsk.get(a.key) || null;
     a.idsLeft = a.idsLeftKey ? idsByKey.get(a.idsLeftKey) || null : null;
+    a.idsGone = a.idsGoneKey ? idsByKey.get(a.idsGoneKey) || null : null;   // cancelled here and already 'waiting to be cancelled' in IDS
     const bk = a.match && a.match.recs.find(r => r.kind === 'booking');
     a.ids = bk ? idsByKey.get(bk.key) : null;
     // matched to an IDS booking whose name is spelt differently: IDS is the reference, the form's spelling is kept beside it
     if (a.ids && a.ids.cust && normName(a.ids.cust) !== normName(a.cust)) { a.custForm = a.cust; a.cust = a.ids.cust; }
     if (!a.no && a.match) a.no = a.match.no;
-    a.idsSales = a.match ? a.match.idsSales : a.idsLeft ? a.idsLeft.sales || null : null;
+    a.idsSales = a.match ? a.match.idsSales : a.idsLeft ? a.idsLeft.sales || null : a.idsGone ? a.idsGone.sales || null : null;
     // IDS is the reference for model / grade / colour; the booking keeps its place in the queue and nobody retypes it.
     // Any difference in model / grade / colour is shown side by side for a person to confirm first (still in progress);
     // delivered bookings take the IDS values straight away.
@@ -240,7 +301,24 @@ function deriveNow() {
   at.forEach(a => { const mw = a.rec.multi; if (mw && mw.with) mw.with.forEach(id => { const o = atByIdM.get(id); if (o) o.multiOf = a.id; }); });
   at.forEach(a => { if (a.near) a.near.forEach(h => { h.other = h.usedBy ? atByKey.get(h.usedBy) || null : null; }); });
   const atByIds = new Map(at.filter(a => a.ids && !a.cancelled).map(a => [a.ids.key, a]));
+  // 18/11: IDS allocated a car to this booking, then both the booking and the car left the IDS files (invoiced, DL not in yet):
+  // the car log still knows the pair, so the booking keeps its car until DL comes (no car on the booking from Stock / IDS any more)
+  { const logNo = new Map();
+    if (typeof carlogAll === 'function') for (const [vin, x] of carlogAll()) { const e = x.e || {}; if (!e.out || cars.has(vin)) continue; const al = (e.al || [])[(e.al || []).length - 1]; if (al && al.no) logNo.set(String(al.no).replace(/\D/g, ''), { vin, e }); }
+    const held = new Set(at.filter(a => !a.cancelled && !a.demo).map(a => (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || (a.match && a.match.vin)).filter(Boolean));
+    if (logNo.size) for (const a of at) {
+      if (a.cancelled || a.demo || (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || (a.match && a.match.vin)) continue;
+      const nos = [a.rec.booking_no, a.no, a.idsLeft && a.idsLeft.no, a.idsGone && a.idsGone.no, ...((a.match && a.match.recs) || []).map(r => r.no)].filter(Boolean).map(x => String(x).replace(/\D/g, ''));
+      const hit = nos.map(n => logNo.get(n)).find(Boolean);
+      if (hit && !held.has(hit.vin) && !X.inv.some(i => i.vin === hit.vin)) { a.logVin = hit.vin; a.logOut = hit.e.out; held.add(hit.vin); a.flow = flowOf(a, today); }
+    } }
 
+  // still no seller on a car that a web booking holds (allocated or matched): the web booking's seller (9/11)
+  for (const a of at) {
+    if (a.cancelled || a.demo) continue;
+    const v = (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || (a.match && a.match.vin), car = v && cars.get(v);
+    if (car && !car.sales && !car.advFake && a.sales) car.sales = a.sales;
+  }
   // queue rows: IDS bookings (linked to their AT form when found) + AT bookings not yet in IDS
   const bookings = [];
   // the form was cancelled in the web but IDS still has the booking: it leaves the queue, the IDS admin is told to cancel it in IDS (2/11)
@@ -263,10 +341,15 @@ function deriveNow() {
   idsB.forEach(b => { if (cxByIds.has(b.key)) { b.cxForm = cxByIds.get(b.key); b.state = 'cxform'; return; } b.app = atByIds.get(b.key) || null; b.owner = b.app ? b.app.sales : b.sales; b.qdate = b.app && b.app.rec.queue_date ? b.app.rec.queue_date : b.date; bookings.push(b); });
   at.filter(a => !a.ids && a.active).forEach(a => {
     const kind = a.match ? a.match.kind : null;
-    bookings.push({ ...a, app: a, owner: a.sales, match: kind === 'stock' ? 'car' : kind === 'dl' ? 'car' : 'waiting', vin: a.match ? a.match.vin : null });
+    // a web form with no IDS booking (yet) is not counted as waiting and does not queue for a car (ตกลง 10/11)
+    bookings.push({ ...a, app: a, owner: a.sales, match: kind === 'stock' ? 'car' : kind === 'dl' ? 'car' : 'waiting', vin: a.match ? a.match.vin : null, noIds: !kind });
   });
   const bookingByKey = new Map();
   bookings.forEach(b => { bookingByKey.set(b.key, b); if (b.app) bookingByKey.set(b.app.key, b); });
+  // a "รถ Demon" form: the branch keeps a stock car as its demo, so the car must not show free (12/11). It never queues; it is a row
+  // that a manager locks to a car (the lock holds until IDS turns the car into a company car).
+  const demoRows = at.filter(a => a.demo && !a.demoCar && !a.cancelled && !a.done).map(a => ({ key: a.key, app: a, state: 'demo', match: 'demo', spec: a.spec, model: a.model, grade: a.grade, color: a.color, cust: 'รถ Demo', no: null, br: a.br, owner: a.sales, sales: a.sales, date: a.date, qdate: a.date }));
+  demoRows.forEach(b => bookingByKey.set(b.key, b));
   at.forEach(a => { a.row = bookingByKey.get(a.key) || null; });
 
   // locks: a unit is a car (VIN) or a quota slot (Ref); several temporary locks may queue on one unit
@@ -279,8 +362,12 @@ function deriveNow() {
   idsB.forEach(b => { if (b.match !== 'cancel') { if (b.ref) idsRefBk.set(b.ref, b); if (b.ws) idsRefBk.set(b.ws, b); } });
   X.quota.forEach(q => { if (q.bk && !idsRefBk.has(q.ref)) idsRefBk.set(q.ref, bkByNo.get(q.bk) || { no: q.bk }); });
   const outByVin = new Map(deliveredOut.map(c => [c.vin, c]));
+  const replacedBy = new Set(locks.filter(x => x.replaced && ['approved', 'allocated'].includes(x.status)).map(x => x.replaced));
   for (const l of locks) {
     l.type = l.type === 'customer' ? 'booking' : (l.type || 'booking');
+    // 19/11: a "dealer" lock whose name is a booking number was meant for that booking (typed "5101138052"): read it as the booking's lock
+    if (l.type === 'dealer' && ['approved', 'allocated', 'pending'].includes(l.status) && /^\d{8,12}$/.test(String(l.dealer_name || '').replace(/\s/g, ''))) { const no = String(l.dealer_name).replace(/\D/g, ''), b = bookings.find(x => String(x.no || '').replace(/\D/g, '') === no && x.state !== 'cancel');
+      if (b) { l.bkFix = { from: 'dealer', no }; l.type = 'booking'; l.bkref = b.app ? b.app.key : b.key; l.bk_br = b.br || l.bk_br || null; l.dealer_name = null; } }
     // a request read from the Stock sheet before the nickname was known: match the nickname again with today's list
     // (or the sales came from the matched booking): the old "ยังไม่รู้ว่า … คือเซลล์คนไหน" warning no longer applies
     if (l.sales_nick || (l.warnings || []).length) {
@@ -294,23 +381,25 @@ function deriveNow() {
     l.owner = l.sales || (bk ? bk.owner : null);
     // finance approved (or cash) and the delivery date confirmed: the queue stays locked, no release, no more asking (ตกลง 19/10)
     const finOk = !!(bk && bk.app && bk.app.flow && bk.app.flow.done && bk.app.flow.done.fin) || !!(rec && rec.fin_status === 'ผ่าน');
-    l.hold = !!(l.type === 'booking' && rec && rec.delivery_plan && finOk && l.status === 'approved');
-    l.holdUntil = l.hold ? rec.delivery_plan : null;
+    l.hold = !!(l.type === 'booking' && rec && rec.delivery_plan && finOk && l.status === 'approved') || !!(bk && bk.state === 'demo' && l.status === 'approved');
+    l.holdUntil = l.hold && rec && rec.delivery_plan && !(bk && bk.state === 'demo') ? rec.delivery_plan : null;
     l.daysLeft = l.status === 'approved' && l.end ? daysBetween(today, l.end) : null;
     l.finWait = !!(l.type === 'booking' && rec && rec.purchase === 'ไฟแนนซ์' && rec.fin_status !== 'ผ่าน');
     const due = l.status === 'approved' && !l.hold && l.daysLeft !== null;
     // 15-day locks (booking, dealer): on the last day the manager is alerted to extend or release;
     // with no update from the manager by MGR_GRACE days after that, the queue is released by itself.
     // Temporary locks (7 days) simply end.
-    l.mgrDue = due && l.type !== 'temp' && l.daysLeft <= 0 && l.daysLeft >= -MGR_GRACE;
-    l.autoReleased = due && l.type !== 'temp' && l.daysLeft < -MGR_GRACE;
-    l.expired = due && l.type === 'temp' && l.daysLeft < 0;
-    l.finDue = l.mgrDue && l.finWait;
-    l.needExt = l.mgrDue;
-    l.releaseOn = due && l.type !== 'temp' ? addDays(l.end, MGR_GRACE + 1) : null;
+    // 19/11: a lock never runs out by itself and needs no extending: past its days it stays, and the manager / sales are asked
+    // once a week whether the car is still needed (l.over = days past the lock's days)
+    l.mgrDue = false; l.autoReleased = false; l.expired = false; l.finDue = false; l.needExt = false; l.releaseOn = null;
+    l.over = due && l.daysLeft < 0 ? -l.daysLeft : 0;
+    l.heldDays = l.status === 'approved' && l.start ? daysBetween(l.start, today) : null;
     l.live = l.status === 'pending' || l.status === 'allocated' || (l.status === 'approved' && !l.autoReleased && !l.expired);
+    if (l.live && replacedBy.has(l.id)) l.live = false;   // a newer typed lock replaced it (its release is on the way, 19/11)
     // IDS has allocated this car / slot: our lock steps aside (the same deal = done, another deal = a manager closes it)
-    if (['pending', 'approved', 'allocated'].includes(l.status)) {
+    // 19/11: a car invoiced as an Advance with no real customer is free to sell: its invoice name is not a buyer, a lock on it never conflicts
+    const advFree = (() => { if (!l.vin) return false; const ar = advRec(l.vin), i = invByVin.get(l.vin); return !!(ar && i && !i.ddate && advInvNo(ar.inv) === advInvNo(i.inv)); })();
+    if (['pending', 'approved', 'allocated'].includes(l.status) && !advFree) {
       const gone = l.vin ? outByVin.get(l.vin) : null;
       const car = l.vin && !gone ? cars.get(l.vin) : null;
       const qb = !l.vin && l.ref ? idsRefBk.get(l.ref) : null;
@@ -329,6 +418,22 @@ function deriveNow() {
         if (gone || same || byName) { l.idsTook = info; l.live = false; } else { l.idsInfo = info; l.idsAsk = !l.ids_keep; }
       }
     }
+  }
+  // 19/11: a temporary lock and a booking lock on the same unit for the same customer = one lock: the booking lock wins,
+  // the temporary one is not counted (ltSweep closes it as "converted")
+  for (const t of locks) {
+    if (!t.live || t.type !== 'temp') continue;
+    const fn = nameKey(String(t.prospect || '').split('/').pop() || '');
+    // also: a temporary request read from the sheet, when the same sales' booking now holds the car (the sheet text moved on)
+    const b = locks.find(x => x.id !== t.id && x.live && x.type === 'booking' && ((t.vin && x.vin === t.vin) || (!t.vin && t.ref && x.ref === t.ref))
+      && ((fn.n && x.booking && x.booking.cust && keyScore(nameKey(x.booking.cust), fn) >= 1) || (t.imported && t.owner && x.owner && t.owner === x.owner)));
+    if (b) { t.live = false; t.superseded = b.id; }
+  }
+  // 23/11: a lock request for a booking IDS has already given a car to (matched / delivered): nothing left to approve
+  for (const l of locks) {
+    if (l.status !== 'pending' || l.type !== 'booking' || !l.booking || !l.booking.vin || l.idsTook || l.superseded) continue;
+    const b = l.booking, dl = invByVin.get(b.vin);
+    l.bkDone = { vin: b.vin, no: b.no || null, cust: b.cust || null, delivered: !!(dl && dl.ddate), ddate: dl && dl.ddate || null }; l.live = false;
   }
   const pendByUnit = new Map();
   locks.filter(l => l.status === 'pending').sort((a, b) => (a.requested_at || '').localeCompare(b.requested_at || ''))
@@ -355,15 +460,21 @@ function deriveNow() {
     // two ages shown apart (บทวิเคราะห์ 19/10): days in stock, and days since production (none = รอระบุ)
     const inS = car.consign || car.stockin; car.stockAge = inS ? daysBetween(inS, today) : null; car.prodAge = car.prod ? daysBetween(car.prod, today) : null;
     car.spec = specKey(car.model, car.grade, car.color);
+    // a returned / Demo car marked for sale is free again, whatever IDS still says about the old sale (ตกลง 11/11)
+    if (car.special && car.special.sellable === true && car.special.reason !== 'adv' && ['sold', 'invoiced', 'company'].includes(car.st)) { car.stIds = car.st; car.st = 'free'; }
     const ls = lockStateOf(['V:' + car.vin, car.ref ? 'R:' + car.ref : null].filter(Boolean));
     car.lock = ls.hard; car.temps = ls.temps;
     car.status = ls.hard ? (ls.hard.status === 'pending' ? 'pending' : ls.hard.status === 'allocated' ? 'allocated' : 'locked')
       : (car.st === 'free' && ls.temps.length ? 'temp' : car.st);
     car.assignedTo = assignedBy.get(car.vin) || null;
     if (car.assignedTo && ['free', 'temp', 'noted', 'locked', 'pending'].includes(car.status)) car.status = 'assigned';
+    // the second label of a car (9/11): Advance (invoiced, no customer) · Demo (company car) · คืนรถ — kept whatever its status
+    const spR = car.special && car.special.reason;
+    car.kind = car.advFake || spR === 'adv' ? 'adv' : spR === 'demo' ? 'demo' : spR === 'returned' ? 'ret' : null;
   }
   // special cars (รถพิเศษ) are kept apart from stock: looping over the stock skips them, get/has still find them
-  cars.values = function* () { for (const c of Map.prototype.values.call(this)) if (!c.special) yield c; };
+  // except the ones marked sellable: those are free cars for sale like any other (ว่าง = everything ready to sell, 9/11)
+  cars.values = function* () { for (const c of Map.prototype.values.call(this)) if (!c.special || c.special.sellable === true) yield c; };
   // an IDS booking whose file row has no frame number yet, but the IDS stock already lists a car under its number (or its form
   // matched that car): IDS has allocated it, so it is not waiting for a car (ตกลง 30/10)
   const carByBk = new Map();
@@ -377,11 +488,43 @@ function deriveNow() {
   for (const b of bookings) {
     const l = locks.find(x => x.live && x.type === 'booking' && (x.bkref === b.key || (b.app && x.bkref === b.app.key)));
     b.lock = l || null;
+    // a temporary lock taken for this customer (same seller, spec and name) holds the queue too (9/11)
+    const tl = !l && b.match === 'waiting' && b.state !== 'cxform' ? locks.find(x => x.live && x.type === 'temp' && (x.bkref ? (x.bkref === b.key || (b.app && x.bkref === b.app.key))
+      : x.prospect && x.spec === b.spec && (x.sales || x.owner) === (b.owner || b.sales) && keyScore(nameKey(x.prospect), nameKey(b.cust)) >= 2)) : null;
+    if (tl) b.tempLock = tl;
     if (l) b.state = l.status === 'pending' ? 'pending' : l.status === 'allocated' ? 'allocated' : 'locked';
     else if (b.match === 'cancel') b.state = 'cancel';
+    else if (tl) b.state = 'locked';
+    else if (b.match === 'waiting' && b.app && b.app.rec.flow && b.app.rec.flow.assign && b.app.rec.flow.assign.vin) b.state = 'allocated';
+    else if (b.gone) b.state = 'gone';
+    // IDS booking marked "ไม่ต้องมีฟอร์ม · ลูกค้า Make รถ Advanced": no real customer, so it does not queue (12/11)
+    else if (!b.app && b.skip && /advance/i.test(b.skip.reason || '') && b.match === 'waiting') b.state = 'adv';
+    // a customer buying a demo car (form status "รถ Demon"): matched to IDS as usual, takes the demo car, does not queue for a new one (12/11)
+    else if (b.app && b.app.demoCar && b.match === 'waiting') b.state = 'democar';
+    // a web form not in the IDS booking file yet queues like the rest, by the booking date on the form (ตกลง 11/11); b.noIds marks it
     else if (b.match === 'car') b.state = 'idscar';
+
     else if (b.match === 'quota') b.state = 'idsquota';
     else b.state = 'waiting';
+  }
+  // an IDS number that is the old / other-branch number of a form's booking (IDS re-issued it, or the customer moved branch) is that
+  // booking, not a second one: it does not queue (13/11)
+  const altKeys = new Set(); at.forEach(a => { if (a.cancelled) return; ((a.match && a.match.alt) || []).forEach(x => altKeys.add(x.key)); ((a.rec && a.rec.ids_alt) || []).forEach(k => altKeys.add(k)); });
+  for (const b of bookings) if (!b.app && altKeys.has(b.key) && b.state === 'waiting') { b.state = 'alt'; b.mergedInto = true; }
+  // ไม่ต้องมีฟอร์ม · โอนลูกค้าให้สาขาอื่น / ใบจองซ้ำ (12/11): one booking, not two. The new IDS booking (keyed at the new branch, same customer
+  // and model) or the booking picked as the repeat takes this one's place in the queue (the earlier date) and this row folds into it.
+  // Until the new branch keys its IDS booking the transferred one keeps queueing ("รอใบจองใหม่ที่ <to>").
+  for (const b of bookings) {
+    if (b.app || !b.skip || !['waiting', 'idscar', 'idsquota'].includes(b.state)) continue;
+    const early = nb => { const d = b.qdate || b.date || ''; if (d && d < (nb.qdate || nb.date || '9')) nb.qdate = d; };
+    if (b.skip.to) {
+      const k = searchKey(b.cust || ''), m = String(b.spec || '').split('|')[0];
+      const nb = k ? bookings.find(x => x !== b && x.br === b.skip.to && x.no && searchKey(x.cust || '') === k && String(x.spec || '').split('|')[0] === m && !['cancel', 'cxform'].includes(x.state) && !x.mergedInto) : null;
+      if (nb) { early(nb); nb.xferFrom = { no: b.no, br: b.br }; b.mergedInto = nb.no; b.state = 'xfer'; } else b.xferWait = b.skip.to;
+    } else if (b.skip.dup) {
+      const nb = bookings.find(x => x !== b && ((x.app && x.app.key === b.skip.dup.key) || x.key === b.skip.dup.key) && !x.mergedInto);
+      if (nb) { early(nb); nb.dupOf = (nb.dupOf || []).concat(b.no); b.mergedInto = nb.no || nb.cust; b.state = 'dup'; }
+    }
   }
   // FIFO queue per spec
   const bySpec = {};
@@ -393,6 +536,9 @@ function deriveNow() {
   for (const c of cars.values()) if (c.ref) stockByRef.set(c.ref, c);
   const bkByRef = new Map();
   bookings.forEach(b => { if (b.ref) bkByRef.set(b.ref, b); if (b.ws) bkByRef.set(b.ws, b); });
+  // a quota whose car or booking number was taken by a web booking (allocated in the booking, or the web booking's number) is not free (9/11)
+  const atByVin = new Map(), atByNo = new Map();
+  at.forEach(a => { if (a.cancelled || a.demo) return; const v = (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin) || (a.match && a.match.vin) || a.logVin; if (v) atByVin.set(v, a); if (a.no) atByNo.set(String(a.no), a); });
   const quota = X.quota.map(q => {
     const car = (q.vin && cars.get(q.vin)) || stockByRef.get(q.ref) || null;
     const vin = q.vin || car?.vin || null;
@@ -400,10 +546,11 @@ function deriveNow() {
     // received into this system (or in the IDS stock) counts as arrived even if the quota file is older (13/10)
     const st = car && (st0 === 'waiting' || st0 === 'vin') ? (invByVin.get(car.vin) ? 'sold' : 'arrived') : st0;
     const b = (q.bk && bkByNo.get(q.bk)) || bkByRef.get(q.ref) || (vin ? bkByVin.get(vin) : null) || null;
+    const atb = (vin && atByVin.get(vin)) || (q.bk && atByNo.get(String(q.bk))) || (b && b.no && atByNo.get(String(b.no))) || null;
     const ls = lockStateOf(['R:' + q.ref, vin ? 'V:' + vin : null].filter(Boolean));
     const branchHold = q.vnote && BR[q.vnote.toUpperCase()] ? q.vnote.toUpperCase() : null;
-    return { ...q, vin, st, car, booking: b, bk: q.bk || b?.no || null, spec: specKey(q.model, q.grade, q.color), lock: ls.hard, temps: ls.temps, branchHold,
-      open: (st === 'waiting' || st === 'vin') && !(q.bk || b) && !ls.hard };
+    return { ...q, vin, st, car, booking: b, atb, bk: q.bk || b?.no || atb?.no || null, spec: specKey(q.model, q.grade, q.color), lock: ls.hard, temps: ls.temps, branchHold,
+      open: (st === 'waiting' || st === 'vin') && !(q.bk || b || atb) && !ls.hard && !ls.temps.some(t => t.live) && !(car && car.status && car.status !== 'free') };
   });
 
   // per spec summary
@@ -423,6 +570,7 @@ function deriveNow() {
     if ((car.age ?? -1) > (s.maxAge ?? -1)) s.maxAge = car.age;
   }
   bookings.filter(b => b.state === 'waiting').forEach(b => { const s = sp(b.spec); s.waiting++; s.waitingBy[b.br] = (s.waitingBy[b.br] || 0) + 1; });
+  quota.forEach(q => { if ((q.st === 'waiting' || q.st === 'vin') && (q.lock || (q.temps || []).some(t => t.live))) { const s = sp(q.spec); (s.qlocks = s.qlocks || []).push(q); } });
   quota.forEach(q => { if (q.open) { const s = sp(q.spec), n = q.qty || 1; s.incoming += n; s.incomingBy[q.br] = (s.incomingBy[q.br] || 0) + n; } });
   for (const s of Object.values(specs)) {
     s.short = s.waiting > s.free + s.incoming;
@@ -445,8 +593,9 @@ function deriveNow() {
   quota.forEach(q => { const s = sum[q.br]; if (!s) return; s.quota += q.qty || 1; if (q.open) s.quotaIn += q.qty || 1; });
 
   const receipts = [...S.receipts.entries()].filter(([, r]) => !r.hidden).map(([id, r]) => ({ id, ...r })).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-  const D = { today, X, cars, removed, deliveredOut, locks, idsB, at, bookings, bookingByKey, bySpec, quota, specs, sum, receipts, invByVin, idsOnly: M.idsOnly };
+  const D = { today, X, cars, removed, deliveredOut, locks, idsB, at, bookings, demoRows, bookingByKey, bySpec, quota, specs, sum, receipts, invByVin, idsOnly: M.idsOnly };
   D.spCars = [...Map.prototype.values.call(cars)].filter(c => c.special); S.spCount = D.spCars.length;
+  if (key) deriveCache = { key, D };   // alerts may read derive() (bookings gone from IDS, 18/11): no recursion
   D.alerts = buildAlerts(D);
   return D;
 }
@@ -466,9 +615,17 @@ function buildAlerts(D) {
     add('idsal:' + a.id, { br: c ? c.br : a.br, roles: ['admin'] }, 'warn', 'จัดสรรในเว็บแล้ว ต้องจัดสรรใน IDS', `${a.cust} · ${v}${c ? ' · ' + (c.model || '') + ' ' + (c.color || '') : ''} · ${a.sales || ''} · อัปโหลดไฟล์ IDS ที่มีเลขใบจองและชื่อลูกค้าเต็ม ระบบปิดรายการนี้เอง`, { act: 'at-open', id: a.id });
   }
   for (const a of D.at) {
-    if (!a.active || a.match) continue;
+    if (!a.active || a.match || a.demoCar) continue;   // 19/11: "รถ Demon" forms are not chased into IDS
     const ref = asof(a.br);
     const age = ref && a.date ? daysBetween(a.date, ref) : null;
+    // 18/11: the booking had an IDS booking number and a later Booking file no longer has it = it LEFT IDS (not "not in IDS yet")
+    const bo = typeof bkOutOf === 'function' ? bkOutOf(a) : null;
+    if (bo || a.logVin) {
+      if (a.logVin || !bkOutPending(bo.o, bo.u.br)) continue;   // handled already (car allocated and left stock / a reason chosen)
+      add('atids:' + a.id, { br: a.br, roles: ['admin', 'manager'] }, 'bad', 'ใบจองออกจาก IDS แล้ว · เลือกเหตุผล',
+        `${a.cust} · ${a.model} ${gradeShort(a.model, a.grade)} ${a.color || ''} · ใบจอง IDS ${bo.o.no || ''} หายจากไฟล์ Booking ที่อัปโหลด ${fmtD(bo.u.at)} · ไม่พบใน DL · เลือก: แก้ไขเป็นใบ IDS ใหม่ / ยกเลิก / แจ้งขายแล้ว รอ DL / ยังเก็บ`, { act: 'bkout-goto', id: bo.u.id, q: bo.o.no || '', label: 'ดูในรายการอัปโหลด', inline: { u: bo.u.id, i: bo.u.out.indexOf(bo.o) } });
+      continue;
+    }
     if (age === null || age < AT_TO_IDS_DAYS) continue;
     add('atids:' + a.id, { sales: a.sales, br: a.br, roles: ['sales', 'admin', 'manager'] }, 'bad', 'ใบจองยังไม่อยู่ใน IDS',
       `${a.cust} · ${a.model} ${gradeShort(a.model, a.grade)} ${a.color || ''} · จอง ${fmtD(a.date)} ผ่านมา ${age} วันแล้วยังไม่พบใน IDS (Booking / Stock / DL) ณ ${fmtD(ref)} เซลล์คีย์ลง IDS / แอดมินอัปเดตไฟล์ IDS${a.near && a.near.some(h => h.other) ? ' · พบชื่อลูกค้านี้ในใบจองอื่นที่ส่งมอบแล้ว ตรวจว่าซ้ำหรือไม่' : ''}`, { act: 'at-open', id: a.id });
@@ -526,31 +683,35 @@ function buildAlerts(D) {
     const unit = l.vin ? l.vin : `Quota ${l.ref}`;
     const cust = l.booking ? l.booking.cust || '' : l.type === 'temp' ? l.prospect || '' : l.dealer_name || '';
     if (l.idsAsk && ['pending', 'approved', 'allocated'].includes(l.status)) add('idsask:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'bad', 'IDS จัดสรรรถที่มีล็อกให้ลูกค้าชื่ออื่น',
-      `${unit} · ล็อกให้ ${cust || '–'} (${who || ''}) · IDS จัดสรรให้ ${l.idsInfo.cust || '–'}${l.idsInfo.no ? ' ใบจอง ' + l.idsInfo.no : ''} · ผู้จัดการเลือกใบจองที่ตรง`, { act: 'go', view: 'lock', sub: 'active' });
+      `${unit} · ล็อกให้ ${cust || '–'} (${who || ''}) · IDS จัดสรรให้ ${l.idsInfo.cust || '–'}${l.idsInfo.no ? ' ใบจอง ' + l.idsInfo.no : ''} · ผู้จัดการเลือกใบจองที่ตรง`, { act: 'lock-goto', id: l.id, q: 'list', label: 'เลือกใบจองที่ตรง' });
     // IDS allocated this car to another deal (or it is sold / invoiced): the request or lock here must be closed
     if (l.idsTook && !l.idsTook.same && ['pending', 'approved'].includes(l.status)) {
       const t = l.idsTook, why = t.st === 'booked' ? `IDS จัดสรรให้ใบจอง ${t.no || ''}${t.cust ? ' ' + t.cust : ''} แล้ว` : `ส่งมอบแล้ว${t.cust ? ' ให้ ' + t.cust : ''}`;
       add('idstook:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'bad', `${l.status === 'pending' ? 'คำขอล็อก' : 'ล็อก'}ใช้ไม่ได้แล้ว: ${why}`,
-        `${unit} · ${specLabelText(l.spec)} · ${cust} · เซลล์ ${who || l.sales_nick || ''} · ผู้จัดการกด${l.status === 'pending' ? 'ไม่อนุมัติ' : 'ปล่อยล็อก'}เพื่อปิดรายการ`, { act: 'go', view: 'lock', sub: l.status === 'pending' ? 'approve' : 'active' });
+        `${unit} · ${specLabelText(l.spec)} · ${cust} · เซลล์ ${who || l.sales_nick || ''} · ผู้จัดการกด${l.status === 'pending' ? 'ไม่อนุมัติ' : 'ปล่อยล็อก'}เพื่อปิดรายการ`, { act: 'lock-goto', id: l.id });
       continue;
     }
-    if (l.status === 'pending' && !l.idsTook) add('lockp:' + l.id, { br, roles: ['manager'] }, 'warn', l.type === 'temp' ? 'ขอล็อกชั่วคราว รออนุมัติ' : l.type === 'dealer' ? 'ขอล็อกแลก/ขายดีลเลอร์ รออนุมัติ' : 'ขอล็อกให้ใบจอง รออนุมัติ', `${unit} · ${specLabelText(l.spec)} · ${who || l.sales_nick || ''}${l.sheet_text || l.imported ? ' · จากชีต Stock' : ''}`, { act: 'go', view: 'lock', sub: 'approve' });
+    { const so = lockSpecOff(l, D); if (so) add('lkspec:' + l.id, { br: l.bk_br || (so.a && so.a.br) || l.car_br, roles: ['admin', 'manager'] }, 'warn', `ล็อกข้ามสเปก · แก้ไขใบจอง${so.ids ? 'ใน IDS' : ''}เป็นสเปกของรถ`,
+      `${(so.a && so.a.cust) || so.b.cust || ''} · ${l.vin || 'Quota ' + (l.ref || '')} · ${specOffText(so)}`, so.a ? { act: 'at-open', id: so.a.id, label: 'เปิดใบจอง' } : null); }
+    if (l.status === 'pending' && !l.idsTook && !l.superseded && !l.bkDone) add('lockp:' + l.id, { br, roles: ['manager'] }, 'warn', l.type === 'temp' ? 'ขอล็อกชั่วคราว รออนุมัติ' : l.type === 'dealer' ? 'ขอล็อกแลก/ขายดีลเลอร์ รออนุมัติ' : 'ขอล็อกให้ใบจอง รออนุมัติ', `${unit} · ${specLabelText(l.spec)} · ${who || l.sales_nick || ''}${l.sheet_text || l.imported ? ' · จากชีต Stock' : ''}`, { act: 'lock-goto', id: l.id });
     // the last day of a 15-day lock: the manager extends or releases; no update = the queue is released on releaseOn
+    if (l.over && l.live) add(`lkage:${l.id}:${Math.floor((l.over - 1) / 7)}`, { sales: who, br, roles: ['sales', 'manager'] }, 'warn', `ล็อกค้างมา ${l.heldDays} วัน · ตรวจว่ายังใช้คันนี้ไหม`,
+      `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · เซลล์ ${who || '–'} · เกินกำหนด ${l.days || ''} วันมา ${l.over} วัน · ยังใช้: ไม่ต้องทำอะไร · ไม่ใช้แล้ว: ปล่อยล็อก`, l.vin ? { act: 'xfer-open', id: l.vin, label: 'เปิดรถ' } : { act: 'go', view: 'lock', sub: 'active', label: 'ดูล็อก' });
     if (l.mgrDue) add('lockx:' + l.id, { br, roles: ['manager'] }, 'warn', `ครบ ${l.days} วันแล้ว${l.finWait ? ' ไฟแนนซ์ยังไม่ผ่าน' : ''} ต่อล็อกหรือปล่อย`,
       `${unit} · ${cust} · เซลล์ ${who || ''} · ถ้าไม่ต่อ ระบบปล่อยคิววันที่ ${fmtD(l.releaseOn)}`, { act: 'go', view: 'lock', sub: 'active' });
     // a manager locked a car of another branch (2/11): the owner branch is told and may release it (with a reason); the asking branch is told when it is released
     if (l.req_br && l.req_br !== l.car_br) {
       if (['approved', 'allocated'].includes(l.status)) add('lockc:' + l.id, { br: l.car_br, roles: ['admin', 'manager'] }, 'warn', `รถของสาขา ${l.car_br} ถูกผู้จัดการสาขา ${l.req_br} ล็อกแล้ว`,
-        `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · ${l.status === 'approved' ? `ล็อกถึง ${fmtD(l.end)} · ` : ''}ไม่ว่างแล้ว · ผู้จัดการสาขา ${l.car_br} ปลดล็อกได้ (ต้องใส่เหตุผล)`, { act: 'go', view: 'lock', sub: 'active', label: 'ดู / ปลดล็อก' });
+        `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · ${l.status === 'approved' ? `ล็อกถึง ${fmtD(l.end)} · ` : ''}ไม่ว่างแล้ว · ผู้จัดการสาขา ${l.car_br} ปลดล็อกได้ (ต้องใส่เหตุผล)`, { act: 'lock-goto', id: l.id, label: 'ดู / ปลดล็อก' });
       if (l.status === 'released' && l.rel && !l.rel.self && daysBetween(l.rel.at.slice(0, 10), today) <= 7) add('lockrel:' + l.id, { br: l.req_br, roles: ['admin', 'manager'] }, 'bad', `ล็อกรถสาขา ${l.car_br} ที่สาขาคุณขอไว้ ถูกปลดแล้ว`,
-        `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · เหตุผล: ${l.rel.reason || '–'}`, { act: 'go', view: 'lock', sub: 'active', label: 'ดู' });
+        `${unit} · ${specLabelText(l.spec)}${cust ? ' · ' + cust : ''} · เหตุผล: ${l.rel.reason || '–'}`, { act: 'lock-goto', id: l.id, label: 'ดู' });
     }
     if (l.finDue) add('lockf:' + l.id, { sales: who, br, roles: ['sales'] }, 'warn', 'ครบ 15 วัน อัปเดตสถานะไฟแนนซ์', `${unit} · ${cust} · ผู้จัดการต้องต่อล็อกภายใน ${fmtD(addDays(l.releaseOn, -1))} ไม่งั้นระบบปล่อยคิว`, l.booking && l.booking.app ? { act: 'at-open', id: l.booking.app.id } : null);
     else if (!l.mgrDue && l.status === 'approved' && !l.hold && l.live && l.daysLeft !== null && l.daysLeft <= 2 && l.daysLeft >= 0) add('locke:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'warn', `ล็อกจะหมดใน ${l.daysLeft} วัน`, `${unit} · ${l.type === 'temp' ? 'ลูกค้าที่จะมาจอง ' + (l.prospect || '') : cust}`, { act: 'go', view: 'lock', sub: 'active' });
     if (l.autoReleased && daysBetween(l.releaseOn, today) <= 3) add('lockr:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'muted', `ปล่อยคิวแล้ว: ครบ ${l.days} วัน ผู้จัดการไม่ได้ต่อ`, `${unit} · ${cust} · รถกลับเป็นว่าง ต้องการรถคันนี้ให้ขอล็อกใหม่`, { act: 'go', view: 'lock', sub: 'active' });
     if (l.type === 'temp' && l.status === 'bumped' && l.bumped_at && daysBetween(l.bumped_at.slice(0, 10), today) <= 3)
       add('lockb:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'bad', 'มีคนจองรถคันนี้ไปก่อนแล้ว',
-        `${unit} ที่${l.prospect ? ` ${l.owner || ''} ล็อกชั่วคราวไว้ให้ ${l.prospect}` : 'ล็อกชั่วคราวไว้'} ถูกล็อกให้ใบจองของ ${l.bumped_by || ''} ล็อกชั่วคราวถูกปล่อยแล้ว`, { act: 'go', view: 'lock', sub: 'history' });
+        `${unit} ที่${l.prospect ? ` ${l.owner || ''} ล็อกชั่วคราวไว้ให้ ${l.prospect}` : 'ล็อกชั่วคราวไว้'} ถูกล็อกให้ใบจองของ ${l.bumped_by || ''} ล็อกชั่วคราวถูกปล่อยแล้ว`, { act: 'lock-goto', id: l.id });
     if (l.type === 'temp' && (l.status === 'pending' || l.status === 'approved') && (l.bumped || l.challenged)) {
       const h = l.bumped || l.challenged;
       add('lockb:' + l.id, { sales: who, br, roles: ['sales', 'manager'] }, 'bad', l.bumped ? 'มีคนจองรถคันนี้ไปก่อนแล้ว' : 'มีคนแนบใบจองขอรถคันนี้ก่อน',
@@ -583,7 +744,7 @@ function buildAlerts(D) {
   for (const r of D.receipts) if (r.status === 'pending') add('recv:' + r.id, { br: r.br, roles: ['admin', 'manager'] }, 'warn', 'รับรถเข้า รอยืนยัน', `${r.doc_no || ''} · ${(r.cars || []).length} คัน`, { act: 'recv-open', id: r.id });
   for (const a of D.at) {
     if (a.cancelled || a.demo) continue;
-    if ((a.flow.done.delivered || a.flow.lateUpdate) && !a.flow.done.confirmed) add('conf:' + a.id, { br: a.br, roles: ['manager'] }, 'warn', 'ส่งมอบแล้ว รอผู้จัดการยืนยัน', `${a.cust} · ${a.model} · เซลล์ ${a.sales}`, { act: 'at-open', id: a.id });
+    if (false && (a.flow.done.delivered || a.flow.lateUpdate) && !a.flow.done.confirmed) add('conf:' + a.id, { br: a.br, roles: ['manager'] }, 'warn', 'ส่งมอบแล้ว รอผู้จัดการยืนยัน', `${a.cust} · ${a.model} · เซลล์ ${a.sales}`, { act: 'at-open', id: a.id });
   }
   // a car asked for / sent to another branch: the other branch's admin and manager are told (ตกลง 2/11)
   for (const [vin, o] of S.vehicles) {
@@ -597,6 +758,34 @@ function buildAlerts(D) {
     const d = m && m.stock ? daysBetween(m.stock.asof, today) : null;
     if (d !== null && d > 3) add('stale:' + br, { br, roles: ['admin'] }, 'muted', `ไฟล์ Stock IDS สาขา ${br} เก่า ${d} วัน`, 'อัปโหลดไฟล์ล่าสุดเพื่อให้การจับคู่และการแจ้งเตือนถูกต้อง', { act: 'go', view: 'upload' });
   }
+  if (typeof ltNotices === 'function') ltNotices(D, add);
+  if (typeof bkstatNotices === 'function') bkstatNotices(D, add);
+  // the same customer name locked / asked for on two cars or quota slots (11/11): the manager of the seller's branch looks
+  { const g = new Map();
+    for (const l of D.locks) {
+      if (!(l.live || l.status === 'pending') || l.type === 'dealer') continue;
+      const t = l.sheet_text && l.sheet_text.includes('/') ? sheetNorm(l.sheet_text) : l.prospect ? sheetNorm(`${l.sales || l.sales_nick || ''}/${l.prospect}`) : '';
+      if (!t || /\/$/.test(t)) continue;
+      (g.get(t) || g.set(t, []).get(t)).push(l);
+    }
+    for (const [t, ls] of g) {
+      const uid = l => l.vin || ((D.quota.find(q => q.ref === l.ref) || {}).vin) || 'Quota ' + l.ref;   // a quota slot with the car's frame number = the same car (11/11)
+      const units = [...new Set(ls.map(uid))]; if (units.length < 2) continue;
+      const l0 = ls[0], who = l0.sales || l0.owner || null, br = (who && salesBranch(who)) || l0.bk_br || l0.car_br;
+      add('lockdup:' + t, { br, roles: ['manager'] }, 'warn', `ล็อกชื่อซ้ำ ${units.length} คัน: "${l0.sheet_text || l0.prospect}"`,
+        `${ls.map(l => `${l.car_br} ${l.vin || 'Quota ' + l.ref} (${l.status === 'pending' ? 'รออนุมัติ' : 'ล็อกแล้ว'})`).join(' · ')}${who ? ' · เซลล์ ' + who : ''} · เลือกเก็บคันเดียว`, { act: 'go', view: 'lock', sub: 'active', label: 'ดู' });
+    } }
+  for (const br of BRS) {
+    const n = D.bookings.filter(b => b.br === br && b.state === 'gone');
+    if (n.length) add('bkgone:' + br, { br, roles: ['admin', 'manager'] }, 'bad', `ใบจอง IDS ${n.length} ใบ ไม่อยู่ในไฟล์ Booking ล่าสุด · รอตรวจ`,
+      `${n.slice(0, 3).map(b => `${b.no} ${b.cust || ''}`).join(', ')}${n.length > 3 ? ' …' : ''} · ยังไม่หาย แต่ไม่นับคิวจนกว่าผู้จัดการจะตอบ (ยังจองอยู่ / ยกเลิก)`, { act: 'go', view: 'upload', label: 'ตรวจ' });
+  }
+  // cars kept as "รอตรวจ" (not in the latest Stock IDS file, no invoice, nobody answered): the branch admin / manager say where each went
+  for (const br of BRS) {
+    const n = [...D.cars.values()].filter(c => c.br === br && c.status === 'review');
+    if (n.length) add('review:' + br, { br, roles: ['admin', 'manager'] }, 'bad', `รถ ${n.length} คัน ไม่อยู่ในไฟล์ Stock IDS ล่าสุด · รอตรวจ ตอบว่าไปไหน`,
+      `${n.slice(0, 4).map(c => c.vin).join(', ')}${n.length > 4 ? ' …' : ''} · ยังไม่หายจากเว็บ แต่ล็อก/ขายไม่ได้จนกว่าจะตอบ (ยังอยู่ = กลับเป็นรถว่าง)`, { act: 'go', view: 'upload', label: 'ตรวจ' });
+  }
   return out;
 }
 const specLabelText = k => { const [m, g, c] = String(k || '?|?|?').split('|'); return `${m} ${gradeShort(m, g)} ${c}`; };
@@ -604,6 +793,8 @@ function myAlerts(D) {
   const r = S.role.role, mine = [];
   for (const a of D.alerts) {
     const t = a.to;
+    // a notice already read (or made by this person) is gone (10/11)
+    if (a.act && a.act.ack && S.me && (a.act.by === S.me.id || ((a.act.acks || {})[S.me.id] || []).includes(String(a.act.id).split('|')[1]))) continue;
     if (r === 'sales') { if (t.roles.includes('sales') && t.sales && t.sales === S.role.sales) mine.push(a); }
     else if (r === 'admin') { if (t.roles.includes('admin') && t.br === S.role.branch) mine.push(a); }
     else if (r === 'aum' || r === 'nuch') { if (t.roles.includes('manager') && (!t.br || MGR_BR[r].includes(t.br))) mine.push(a); }
@@ -700,6 +891,7 @@ async function connect() {
     if (S.mode !== 'readonly') S.mode = 'shared';
     COLS.forEach(col => db.collection(col).onSnapshot(snap => {
       S[col] = new Map(snap.docs.map(d => [d.id, d.data()]));
+      (S.colsLoaded = S.colsLoaded || new Set()).add(col);   // 19/11: sweeps that write wait until every collection has arrived once
       if (col === 'ids') S.idsV++;
       S.dataV++;
       if (col === 'ids' && !S.seedTried && typeof carlogSeed === 'function') { S.seedTried = true; setTimeout(() => carlogSeed().catch(e => console.error('carlog seed', e)).then(() => perms().approve && perms().write && typeof lockIdsSync === 'function' ? lockIdsSync() : null).then(r => { if (r && (r.done || r.ask)) { toast(`ล็อกที่ IDS จัดสรรแล้ว: สำเร็จ ${r.done} · รอเลือกใบจอง ${r.ask}`); render(); } }).catch(e => console.error('lockids', e)), 6000); }
@@ -806,3 +998,6 @@ function vinSpecMap(X) {
   [...(X.cars || []), ...(X.inv || [])].forEach(c => { const n = c.bkno || c.no; if (n && c.model && c.grade && !m.has('no:' + n)) m.set('no:' + n, c); });
   _vsm = m; _vsmK = X; return m;
 }
+
+// the form's status column "รถ Demon" = a real customer buying a demo car (12/11); only a test drive (ทดลองขับ / เทสไดร์ in the model) is no booking
+function demoSaleRec(r) { return !!(r && (r.demo_car || (r.demo && !/ทดลองขับ|เทสไดร์/.test(String(r.model_text || ''))))); }

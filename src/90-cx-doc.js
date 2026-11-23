@@ -1,8 +1,8 @@
 // ------------------------------------------------------------------ one form for a cancelled booking (ตกลง 19/10)
 // "ใบอนุมัติยกเลิกการจอง และขอคืนเงินจอง" replaces the separate cancel form and refund form:
 //   1 the booking (with the customer's phone for CR) · 2 the cancel request · 3 the branch manager's approval (in the web)
-//   4 the refund account (refund only) · 5 CR's phone check, by hand (refund only) · 6 customer, sales, manager sign
-//   7 the executive signs (always on paper). No refund / deposit moved to a new booking: no 4 and no 5.
+//   4 the refund account (refund only) · 5 customer, sales, manager sign · 6 the executive signs (always on paper)
+//   No refund / deposit moved to a new booking: no 4, the rest numbered on. The CR phone check was taken off the form (9/11).
 // When the paper is complete the executive presses "อนุมัติจ่าย" / "อนุมัติ" in the web so the sales knows.
 // Each form gets a number CX-<branch>-<yymm>-<nnn> the first time it is printed (kept on the booking).
 // Only function declarations here: the first render runs before this part of the file.
@@ -48,15 +48,16 @@ async function printCancelDoc(a) {
       ...((c.fin_tried || []).length ? [['ยื่นไฟแนนซ์ไม่ผ่าน', c.fin_tried.join(', ')]] : []),
       ['รายละเอียด', [req ? c.req_note : c.note].filter(Boolean).join(' · ') || '–'],
       ['เอกสารแนบ', cxDocList(c).map(([k, t]) => `${(c.docs || {})[k] || (k === 'passbook' && rf.passbook_ok) ? '[✓]' : '[  ]'} ${t}`).join('\n')]] },
-    // one line, no box (ตกลง 23/10): ผู้จัดการอนุมัติยกเลิก วันที่ … · คืนมัดจำ / ไม่คืนมัดจำ in bold
-    { sec: 3, runs: [{ t: `ผู้จัดการอนุมัติยกเลิก วันที่ ${c.at ? fmtD(c.at.slice(0, 10)) : '–'}  ` }, { t: resMoney, b: true }, { t: `  · ${mgrName}${req && c.note ? ' · หมายเหตุ: ' + c.note : ''}` }], by: 'อนุมัติในระบบ' }
+    // the manager's approval (9/11): date and approver on one row, the deposit result and the note each on their own row, so nothing runs into anything
+    { sec: 3, h: 'ผู้จัดการอนุมัติยกเลิก', by: 'อนุมัติในระบบ' },
+    { kv: [['วันที่อนุมัติ', c.at ? fmtD(c.at.slice(0, 10)) : '–', 'ผู้อนุมัติ', mgrName || '–'], ['ผลเรื่องเงินจอง', resMoney],
+      ...(req && c.note ? [['หมายเหตุผู้จัดการ', c.note]] : [])] }
   ];
   let n = 4;
   if (refund) {
     blocks.push({ sec: n++, h: 'ขอคืนเงินจองเข้าบัญชีลูกค้า', by: rf.at ? `กรอกในระบบ ${cxWho(rf)} ${cxWhen(rf.at)}` : 'ยังไม่ได้กรอกบัญชี' },
       { kv: [['ยอดเงินคืน', `${money(c.amount)} บาท (${bahtText(c.amount)})`, 'ธนาคาร', rf.bank === 'อื่น ๆ' ? rf.bank_other || '' : rf.bank || ''],
-        ['เลขที่บัญชี', rf.account_no || '', 'ชื่อบัญชี', `${rf.account_name || ''}${rf.account_name && nameOk(rf.account_name, fresh.cust) ? ' ✓ ตรงชื่อผู้จอง' : ''}`]] },
-      { sec: n++, h: 'CR โทรตรวจสอบกับลูกค้า' }, { cr: true });
+        ['เลขที่บัญชี', rf.account_no || '', 'ชื่อบัญชี', `${rf.account_name || ''}${rf.account_name && nameOk(rf.account_name, fresh.cust) ? ' ✓ ตรงชื่อผู้จอง' : ''}`]] });
   }
   blocks.push({ sec: n++, h: 'ลายเซ็น' },
     { note: 'เงื่อนไขการถอนจอง: 1. บริษัทขอสงวนสิทธิ์ในการโอนเงิน ตามเลขที่บัญชีในนาม "ชื่อลูกค้า" ที่ระบุในใบจองเท่านั้น  2. เมื่อถอนจองแล้ว บริษัทจะยกเลิกการจองและเงื่อนไขทั้งหมดทันที\nข้าพเจ้าได้รับทราบเงื่อนไขของบริษัทฯ และยืนยันที่จะถอนจอง' },

@@ -187,7 +187,7 @@ function removeModal(m, D) {
   <div class="flex flex-col gap-4">
     <div class="field"><label for="x-reason" class="req">เหตุผล</label><select id="x-reason" data-modal="reason">
       ${S.role.role === 'admin' ? (car.br === myBranch() ? `<option value="dealer" ${m.reason === 'dealer' ? 'selected' : ''}>ขาย/แลกให้ดีลเลอร์อื่น (ตัดออกจาก Stock)</option>
-      <option value="push" ${m.reason === 'push' ? 'selected' : ''}>ขายออกจากสาขาตัวเองไปให้สาขาอื่น (ปลายทางกดรับรถเข้า)</option>`
+      <option value="push" ${m.reason === 'push' ? 'selected' : ''}>ขายออกจากสาขาตัวเองไปให้สาขาอื่น (ย้าย Stock ทันที)</option>`
         : `<option value="pull" selected>นำรถเข้าสาขาตัวเอง (ขอไปสาขาต้นทาง ต้นทางกดยืนยันย้าย)</option>`)
       : `<option value="dealer" ${m.reason === 'dealer' ? 'selected' : ''}>ขาย/แลกให้ดีลเลอร์อื่น</option>
       <option value="move" ${m.reason === 'move' ? 'selected' : ''}>ย้ายไปสาขาอื่นของเรา</option>
@@ -198,7 +198,7 @@ function removeModal(m, D) {
     ${m.reason === 'move' ? `<div class="field"><label for="x-to" class="req">ย้ายไปสาขา</label><select id="x-to" data-modal="to">${BRS.filter(b => b !== car.br).map(b => `<option value="${b}" ${m.to === b ? 'selected' : ''}>${b} ${BR[b].name}</option>`).join('')}</select></div>` : ''}
     <div class="field"><label for="x-note" class="${m.reason === 'other' ? 'req' : ''}">หมายเหตุ</label><input id="x-note" data-modal="note" value="${esc(m.note || '')}"></div>
     <p class="text-xs text-muted">ข้อมูลการขาย/แลกกับดีลเลอร์อื่นไม่มีในไฟล์ IDS การบันทึกที่นี่ครั้งเดียวจึงไม่ใช่การลงซ้ำ และทำให้รถคันนี้ไม่ถูกแจ้งว่า "ไม่พบข้อมูล" ตอนอัปโหลด Stock รอบถัดไป</p>
-    <div class="flex justify-end gap-2"><button class="btn btn-ghost" data-act="close">ยกเลิก</button><button class="btn btn-red" data-act="remove-submit">${m.reason === 'move' ? 'ย้ายสาขา' : m.reason === 'pull' ? 'ส่งคำขอ' : m.reason === 'push' ? 'แจ้งปลายทาง' : 'นำออก'}</button></div>
+    <div class="flex justify-end gap-2"><button class="btn btn-ghost" data-act="close">ยกเลิก</button><button class="btn btn-red" data-act="remove-submit">${m.reason === 'move' ? 'ย้ายสาขา' : m.reason === 'pull' ? 'ส่งคำขอ' : m.reason === 'push' ? 'ขายให้สาขานี้' : 'นำออก'}</button></div>
   </div>`;
 }
 function noteModal(m) {
@@ -305,12 +305,14 @@ async function saveUploads() {
     const parts = r.src === 'quota' ? r.months.map(m => ({ id: idsDocId('quota', r.br, m), m, rows: r.rows.filter(x => x.m === m) })) : [{ id: idsDocId(r.src, r.br), m: null, rows: r.rows }];
     for (const part of parts) {
       let rows = uplKeepRows(r, part.rows);
+      // "เฉพาะบางคัน" (10/11): the rows of this file go on top of what is stored; the others stay untouched
+      if (uplPartial(r)) { const key = x => r.src === 'stock' ? x.vin : r.src === 'booking' ? String(x.no) : x.ref, m = new Map(unpack(S.ids.get(part.id)).map(x => [key(x), x])); rows.forEach(x => m.set(key(x), { ...(m.get(key(x)) || {}), ...x })); rows = [...m.values()]; }
       const mk = () => ({ src: r.src, br: r.br, m: part.m, asof: r.asof, file: r.file, sheet: r.sheet, n: rows.length, ...pack(r.src, rows), warn: r.warn.slice(0, 20), ...actor() });
       let doc = mk();
       if (utf8len(doc) > 250000) { toast(`ตาราง ${SRC_LABEL[r.src]} ${r.br} ใหญ่เกินที่ต้นแบบเก็บได้`, 'bad'); continue; }
       if (!await write('ids', part.id, doc)) { U.busy = false; render(); return; }
       await write('uploads', newId('uploads'), { src: r.src, br: r.br, m: part.m, asof: r.asof, file: r.file, sheet: r.sheet, n: rows.length,
-        prevN: r.diff ? r.diff.prevN : null, out: r.src === 'stock' || r.src === 'booking' ? (r.diff?.out || []).slice(0, 300) : [], inN: r.diff?.inN || 0, ...actor() });
+        prevN: r.diff ? r.diff.prevN : null, out: !uplPartial(r) && (r.src === 'stock' || r.src === 'booking') ? (r.diff?.out || []).slice(0, 300) : [], inN: r.diff?.inN || 0, mode: uplPartial(r) ? 'partial' : 'full', ...actor() });
       ok++;
     }
   }
@@ -321,7 +323,7 @@ async function saveUploads() {
   // each car's history (in / out / IDS allocation) is kept beyond the stock table that each upload replaces
   try { await carlogUpdate(sel); } catch (e) { console.error('carlog', e); }
   const lk = sel.some(r => r.src !== 'invoice') ? await lockIdsSync().catch(e => { console.error('lockids', e); return { done: 0, ask: 0 }; }) : { done: 0, ask: 0 };
-  toast(`บันทึก ${ok} ตารางแล้ว${lk.done ? ` · ล็อกสำเร็จ (IDS จัดสรรให้ลูกค้าคนเดียวกัน) ${lk.done}` : ''}${lk.ask ? ` · IDS จัดสรรรถที่มีล็อกให้คนอื่น ${lk.ask} คัน รอผู้จัดการเลือก` : ''}${sh.made || sh.updated ? ` · คำขอล็อกจากชีตใหม่ ${sh.made}${sh.updated ? ` อัปเดต ${sh.updated}` : ''} รอผู้จัดการอนุมัติ` : ''}${dv ? ` · บันทึกส่งมอบจาก DL ${dv} ใบ` : ''}`);
+  toast(`บันทึก ${ok} ตารางแล้ว${lk.done ? ` · ล็อกสำเร็จ (IDS จัดสรรให้ลูกค้าคนเดียวกัน) ${lk.done}` : ''}${lk.ask ? ` · IDS จัดสรรรถที่มีล็อกให้คนอื่น ${lk.ask} คัน รอผู้จัดการเลือก` : ''}${sh.made || sh.updated ? ` · ล็อกจากชีต (ไม่ต้องอนุมัติ) ${sh.made}${sh.updated ? ` อัปเดต ${sh.updated}` : ''} รอผู้จัดการอนุมัติ` : ''}${dv ? ` · บันทึกส่งมอบจาก DL ${dv} ใบ` : ''}`);
   render();
 }
 
@@ -419,7 +421,7 @@ async function runBookingAi() {
 async function saveBooking() {
   const d = S.draft.booking, D = derive(), msg = $('#booking-msg');
   const missing = [];
-  if (!S.files.bk.length) missing.push('หน้าใบจอง (รูป)');
+  if (!S.files.bk.length && !noImgNeed()) missing.push('หน้าใบจอง (รูป)');
   if (!d.booking_date) missing.push('วันที่จอง');
   if (!d.sales) missing.push('ชื่อเซลล์');
   if (d.source === 'อื่น ๆ' && !String(d.source_other || '').trim()) missing.push('แหล่งที่มาอื่น (พิมพ์)');
@@ -488,7 +490,10 @@ function resetBooking() {
 function findLock(id) { const l = S.locks.get(id); return l ? { ...l, history: [...(l.history || [])] } : null; }
 async function saveLock(id, l, act, note) {
   l.history = [...(l.history || []), { ...actor(), act, note: note || '' }].slice(-40);
-  return write('locks', id, l);
+  const ok = await write('locks', id, l);
+  // 19/11: a lock made by allocating / approving (not typed in the lock box) goes into the sheet too, from the session that made it
+  if (ok && !l.typed && ['approved', 'allocated'].includes(l.status) && !l.sheet_sync && typeof ltAutoSheet === 'function') setTimeout(() => ltAutoSheet(id), 300);
+  return ok;
 }
 // a car and the quota slot it came from are the same unit
 function unitKeysOf(l, D) {
@@ -623,7 +628,7 @@ const ACTIONS = {
     if ((m.type === 'temp' || m.reason === 'อื่น ๆ') && !(m.note || '').trim()) { toast('ใส่เหตุผลก่อนส่ง (ยังไม่มีใบจอง)', 'bad'); $('#m-note')?.focus(); return; }
     const u = chk.u;
     const b = m.type === 'booking' && m.bkref ? D.bookingByKey.get(m.bkref) : null;
-    const direct = m.type === 'dealer' ? p.approveDealer : p.approve;
+    const direct = p.approve;   // managers / the executive lock at once, dealer trades too (10/11); the branch is told
     const days = LOCK_DAYS_BY[m.type] || 15;
     const owner = m.type === 'booking' ? (b ? b.owner : null) : m.type === 'temp' ? (isSales() ? S.role.sales : m.sales) : null;
     const id = newId('locks'), now = new Date().toISOString();
@@ -636,7 +641,7 @@ const ACTIONS = {
       req_br: (b ? b.br : null) || (owner ? salesBranch(owner) : null) || mgrBranches()[0] || null   // the branch that asked for the lock (a manager can lock a car of any branch)
     };
     const conv = m.convertFrom ? findLock(m.convertFrom) : null;
-    if (direct) { l.status = 'approved'; l.start = todayISO(); l.end = addDays(l.start, days); l.approved_at = now; }
+    if (direct) { l.status = 'approved'; l.start = todayISO(); l.end = addDays(l.start, days); l.approved_at = now; l.notices = [{ k: 'new', at: now, by: S.me.id || null, role: roleLabel() }]; }
     const act = direct ? (m.type === 'temp' ? 'ล็อกชั่วคราว (ผู้จัดการ)' : 'ล็อก (ผู้จัดการ)') : (m.type === 'temp' ? 'ขอล็อกชั่วคราว' : 'ขอล็อก');
     if (!await saveLock(id, l, act, direct ? `หมด ${fmtD(l.end)}` : (l.note || l.reason))) return;
     if (conv) { conv.status = 'converted'; conv.converted_to = id; await saveLock(m.convertFrom, conv, 'ลูกค้ามาจองแล้ว', `เปลี่ยนเป็นล็อกให้ใบจอง${direct ? '' : ' รอผู้จัดการอนุมัติ'}`); }
@@ -648,11 +653,11 @@ const ACTIONS = {
     const cur0 = S.locks.get(el.dataset.id);
     const L0 = derive().locks.find(x => x.id === el.dataset.id);
     if (L0 && L0.idsTook && !L0.idsTook.same) { toast(L0.idsTook.st === 'delivered' ? 'รถคันนี้ส่งมอบแล้ว อนุมัติไม่ได้ กดไม่อนุมัติเพื่อปิดคำขอ' : 'IDS จัดสรรรถคันนี้ให้ใบจองอื่นแล้ว อนุมัติไม่ได้ กดไม่อนุมัติเพื่อปิดคำขอ', 'bad'); return; }
-    if (cur0 && !(cur0.type === 'dealer' ? perms().approveDealer : canLockMgr(lkD(cur0)))) { toast(`อนุมัติได้เฉพาะ${cur0.type === 'dealer' ? 'พี่อั้ม' : MGR_NAME[cur0.car_br] || 'ผู้จัดการสาขานั้น'}`, 'bad'); return; }
+    if (cur0 && !(cur0.approver && S.me && cur0.approver === S.me.id) && !(cur0.type === 'dealer' ? perms().approveDealer : canLockMgr(lkD(cur0)))) { toast(`อนุมัติได้เฉพาะ${cur0.type === 'dealer' ? 'พี่อั้ม' : MGR_NAME[cur0.car_br] || 'ผู้จัดการสาขานั้น'}`, 'bad'); return; }
     const id = el.dataset.id, l = await claimFresh('locks', id, x => x.status === 'pending');
     if (!l) return;
     const D = derive();
-    const hard = D.locks.find(x => x.id !== id && x.live && x.type !== 'temp' && x.status !== 'pending' && sameUnit(x, l, D));
+    const hard = D.locks.find(x => x.id !== id && x.id !== l.replaces && x.live && x.type !== 'temp' && x.status !== 'pending' && sameUnit(x, l, D));
     if (hard) { toast(`หน่วยนี้ล็อกให้ ${hard.owner || hard.dealer_name || 'ใบจองอื่น'} แล้ว`, 'bad'); return; }
     const days = LOCK_DAYS_BY[l.type === 'customer' ? 'booking' : l.type] || 15;
     l.status = 'approved'; l.start = todayISO(); l.end = addDays(l.start, days); l.approved_at = new Date().toISOString();
@@ -663,6 +668,7 @@ const ACTIONS = {
       const side = await settleUnit(derive(), l, id); closed = side.length;
       if (side.length) { const cur = findLock(id); cur.undo = { ...cur.undo, side }; await write('locks', id, cur); }
     }
+    if (l.replaces && typeof ltApproveChange === 'function') await ltApproveChange(id);
     toast(`อนุมัติแล้ว ล็อกถึง ${fmtD(l.end)}${closed ? ` · ปิดคำขออื่นของรถคันนี้ ${closed} รายการให้อัตโนมัติ` : ''}`);
   },
   // put a lock back to where it was before the last action (pressed by mistake)
@@ -746,13 +752,18 @@ const ACTIONS = {
     if (v && a.date && v < a.date) { toast('วันนัดรับรถต้องไม่ก่อนวันจอง', 'bad'); return; }
     await saveFlow(a, { delivery_plan: v || null }, v ? `บันทึกวันนัดรับรถ ${fmtD(v)} แล้ว ล็อกจะถือไว้จนส่งมอบ` : 'ลบวันนัดรับรถแล้ว');
   },
+  // admin fix mode for invoiced / delivered bookings (10/11)
+  'flow-fix'(el) { const a = atById(el.dataset.id); if (!a || !fixOk(a) || !S.modal) return; S.modal.fix = S.modal.fix === a.id ? null : a.id; S.modal.se = null; render(); },
   async 'flow-booked'(el) {
     const a = atById(el.dataset.id); if (!a || !canEditBooking(a) || a.flow.done.booked) return;
-    const no = String(S.modal.receipt_no || '').trim();
+    const no = String(S.modal.receipt_no ?? a.rec.receipt_no ?? '').trim();
     if (!no) { toast('ใส่เลขที่ใบเสร็จมัดจำ', 'bad'); $('#fl-rc')?.focus(); return; }
+    // the deposit amount (11/11): from the booking form when it was keyed there, typed here otherwise; it goes to the collection-day costs
+    const dpIn = S.modal.deposit_in, dep = dpIn === undefined || dpIn === '' ? num(a.rec.deposit) : num(dpIn);
     const dup = derive().at.find(x => x.id !== a.id && !x.cancelled && String(x.rec.receipt_no || '').trim() === no && x.br === a.br);
     if (dup) { toast(`เลขที่ใบเสร็จนี้ใช้กับใบจองของ ${dup.cust} แล้ว`, 'bad'); return; }
-    if (await saveFlow(a, { receipt_no: no, receipt_by: actor() }, 'บันทึกเลขที่ใบเสร็จมัดจำแล้ว')) { delete S.modal.receipt_no; render(); }
+    const depPatch = dep > 0 && dep !== num(a.rec.deposit) ? { deposit: dep, ...(num(a.rec.deposit) ? { receipt_hist: [...(a.rec.receipt_hist || []), { old: { receipt_no: a.rec.receipt_no || null, deposit: a.rec.deposit || null }, why: 'แก้ยอดมัดจำตอนบันทึกใบเสร็จ', ...actor() }] } : {}) } : {};
+    if (await saveFlow(a, { receipt_no: no, receipt_by: actor(), ...depPatch }, 'บันทึกเลขที่ใบเสร็จมัดจำแล้ว' + (dep > 0 ? ` · มัดจำ ${money(dep)} บาท` : ''))) { delete S.modal.receipt_no; delete S.modal.deposit_in; render(); }
   },
   async 'flow-down'(el) {
     const a = atById(el.dataset.id);
@@ -785,15 +796,17 @@ const ACTIONS = {
     const vin = String(S.modal.assign_vin ?? assignDefault(a, D)).toUpperCase().trim();
     if (!VIN_RE.test(vin)) { toast('เลขตัวถังไม่ถูกต้อง', 'bad'); $('#fl-vin')?.focus(); return; }
     const car = D.cars.get(vin), own = car && car.lock && (car.lock.bkref === a.key || car.lock.bkref === a.row?.key);
-    if (!car && vin !== (a.match && a.match.vin)) { toast('ไม่พบ VIN นี้ในสต็อก', 'bad'); return; }
-    if (car && car.lock && !own) { toast(`รถคันนี้ล็อกให้ ${car.lock.owner || 'ใบจองอื่น'} อยู่`, 'bad'); return; }
-    if (car && !own && !['free', 'temp'].includes(car.status) && vin !== (a.match && a.match.vin)) { toast('รถคันนี้ไม่ว่าง', 'bad'); return; }
+    if (!car && vin !== (a.match && a.match.vin) && !fixOn(a)) { toast('ไม่พบ VIN นี้ในสต็อก', 'bad'); return; }
+    const fx = fixOn(a);
+    if (fx && !car && !carAny(vin, D) && vin !== (a.match && a.match.vin)) { toast('ไม่พบ VIN นี้ในระบบ', 'bad'); return; }
+    if (car && car.lock && !own && !fx) { toast(`รถคันนี้ล็อกให้ ${car.lock.owner || 'ใบจองอื่น'} อยู่`, 'bad'); return; }
+    if (car && !own && !fx && !['free', 'temp'].includes(car.status) && vin !== (a.match && a.match.vin)) { toast('รถคันนี้ไม่ว่าง', 'bad'); return; }
     const off = car && car.spec !== a.spec;
     if (await saveFlow(a, { flow: { assign: { ...actor(), vin, sales: a.sales, spec_differs: off || null } } }, off ? `จัดสรร ${vin} แล้ว (สเปกไม่ตรงใบจอง ตรวจอีกครั้ง)` : `จัดสรร ${vin} ให้ ${a.sales} แล้ว`)) {
       delete S.modal.assign_vin; render();
     }
   },
-  'po-open'(el) { const a = atById(el.dataset.id); if (!a) return; S.modal = { kind: 'at', id: a.id, po: poDraft(a), poq: '' }; render(); },
+  'po-open'(el) { const a = atById(el.dataset.id); if (!a) return; const fix = S.modal && S.modal.fix; S.modal = { kind: 'at', id: a.id, po: poDraft(a), poq: '', ...(fix === a.id ? { fix } : {}) }; render(); },
   'po-back'() { if (S.modal.ret) { S.modal = S.modal.ret; render(); return; } S.modal.po = null; render(); },
   'po-add'(el) {
     const m = S.modal, a = atById(m.id); if (!a || !m.po) return;
@@ -819,7 +832,8 @@ const ACTIONS = {
   },
   'po-del'(el) { const it = S.modal.po.items, x = it[Number(el.dataset.i)]; if (x && x.grp) S.modal.po.items = it.filter(i => i.grp !== x.grp); else it.splice(Number(el.dataset.i), 1); render(); },
   'po-quick'(el) {
-    const f = POFREQ[Number(el.dataset.i)]; if (!f || !S.modal.po) return;
+    const f = poFreq()[Number(el.dataset.i)]; if (!f || !S.modal.po) return;
+    if (poUlt({ name: f.l })) { const u = ucFor(atById(S.modal.id)), pr = u ? Number(u.price) || 0 : 0; S.modal.po.items.push({ name: u ? `Ultimate Care ${u.level} · ${u.engine}` : f.l, part: u ? u.code : '', vendor: 'Honda', cat: 'Ultimate Care', cost: pr || f.c || '', sale: pr || '', qty: 1, custom: true, ult: true }); if (!u) toast('ไม่พบราคา Ultimate Care ของรุ่นนี้ในหลังบ้าน ใส่มูลค่าเอง', 'bad'); render(); return; }
     if (f.q) { S.modal.poq = f.q; render(); return; }
     S.modal.po.items.push({ name: f.l, part: '', vendor: '', cat: 'ใช้บ่อย', cost: f.c || 0, sale: f.c || 0, qty: 1, custom: true }); render();
   },
@@ -827,20 +841,25 @@ const ACTIONS = {
   async 'po-save'(el) {
     const a = atById(el.dataset.id), po = S.modal.po;
     if (!a || !po) return;
-    if (!stepAllowed(a, 'po') || poLocked(a) || !(stepOpen(a, 'po') || a.flow.done.po || a.flow.poSkip || S.modal.ret)) { toast('ทำใบสั่งแต่งรถ ได้ก่อนส่งมอบ (ข้ามขั้นก่อนหน้าได้)', 'bad'); return; }
+    if (poRO(a)) { toast('ส่งมอบแล้ว แอดมินขึ้นไปแก้ใบแต่งรถได้', 'bad'); return; }
+    if (!stepAllowed(a, 'po') || !(stepOpen(a, 'po') || a.flow.done.po || a.flow.poSkip || poLocked(a) || S.modal.ret)) { toast('ทำใบสั่งแต่งรถ ได้ก่อนส่งมอบ (ข้ามขั้นก่อนหน้าได้)', 'bad'); return; }
     const items = po.items.map(x => ({ ...x, name: String(x.name || '').trim(), qty: Math.max(1, parseInt(x.qty, 10) || 1) })).filter(x => x.name);
+    const noUlt = items.find(x => poUlt(x) && !x.hon && !(Number(x.cost) > 0)); if (noUlt) { toast('Ultimate Care ที่ AT แถม ต้องใส่มูลค่า (ทุน) · ถ้า Honda แถม ให้ติ๊ก "Honda แถม" แทน', 'bad'); return; }
+    items.forEach(x => { if (x.hon) { x.cost = 0; x.sale = 0; if (!/Honda แถม/.test(x.name)) x.name += ' (Honda แถม)'; } });
     if (!items.length) { toast('ใส่รายการแต่งอย่างน้อย 1 รายการ (ถ้าไม่มีแต่ง ใส่ "ไม่มีรายการแต่ง")', 'bad'); return; }
     const prev = a.rec.flow && a.rec.flow.po;
+    const why = poWhyNeed(a) ? String(S.modal.poWhy || '').trim() : '';
+    if (poWhyNeed(a) && !why) { toast('ส่งมอบแล้ว ต้องใส่เหตุผลที่แก้ใบแต่งรถ', 'bad'); $('#po-why')?.focus(); return; }
     // an edit keeps the earlier version's summary (who, when, items) as history
-    const hist = prev && prev.at ? [...(prev.hist || []), { at: prev.at, by: prev.by, role: prev.role, items: (prev.items || []).map(x => `${x.name} ×${x.qty}`) }] : undefined;
-    const rec = { ...actor(), items, date: po.date || todayISO(), ddate: po.ddate || null, dtime: po.dtime || null, by_name: po.by || a.sales, note: (po.note || '').trim() || null, ac: po.ac && Object.keys(po.ac).some(k => po.ac[k]) ? po.ac : null, ucare: !!po.ucare, ...(hist ? { hist } : {}) };
-    if (await saveFlow(a, { flow: { po: rec } }, prev && prev.at ? 'แก้ใบแต่งรถแล้ว' : 'บันทึกใบสั่งแต่งรถ แล้ว')) { if (S.modal.ret) S.modal = S.modal.ret; else S.modal.po = null; render(); }
+    const hist = prev && prev.at ? [...(prev.hist || []), { at: prev.at, by: prev.by, role: prev.role, ...(prev.why ? { why: prev.why } : {}), items: (prev.items || []).map(x => `${x.name} ×${x.qty}`) }] : undefined;
+    const rec = { ...actor(), items, date: po.date || todayISO(), ddate: po.ddate || null, dtime: po.dtime || null, by_name: po.by || a.sales, note: (po.note || '').trim() || null, ac: po.ac && Object.keys(po.ac).some(k => po.ac[k]) ? po.ac : null, ucare: !!po.ucare, ...(hist ? { hist } : {}), ...(why ? { why } : {}) };
+    if (await saveFlow(a, { flow: { po: rec } }, why ? 'แก้ใบแต่งรถแล้ว (หลังส่งมอบ · ' + why + ')' : prev && prev.at ? 'แก้ใบแต่งรถแล้ว' : 'บันทึกใบสั่งแต่งรถ แล้ว')) { if (S.modal.ret) S.modal = S.modal.ret; else S.modal.po = null; render(); }
   },
   'po-print'(el) { const a = atById(el.dataset.id); if (a) printPO(a); },
   async 'flow-deliver'(el) {
     const D = derive(), a = D.at.find(x => x.id === el.dataset.id);
     const idsDv = a && a.rec.flow && a.rec.flow.delivered && a.rec.flow.delivered.src === 'IDS';
-    if (!a || !(a.flow.next === 'delivered' || a.flow.lateUpdate || idsDv) || !stepAllowed(a, 'delivered')) { toast('ส่งมอบได้หลังบันทึกการชำระดาวน์แล้ว', 'bad'); return; }
+    if (!a || !(a.flow.next === 'delivered' || a.flow.lateUpdate || idsDv || (fixOn(a) && !a.flow.done.delivered)) || !stepAllowed(a, 'delivered')) { toast('ส่งมอบได้หลังบันทึกการชำระดาวน์แล้ว', 'bad'); return; }
     const v = S.modal.deliv || {}, prev = (a.rec.flow && a.rec.flow.delivered) || {};
     const date = v.date ?? (a.flow.deliveredDate || '');
     if (!date) { toast('ใส่วันที่ส่งมอบรถ (วันที่ลูกค้ารับรถจริง)', 'bad'); $('#fl-dd')?.focus(); return; }
@@ -848,10 +867,11 @@ const ACTIONS = {
     if (!plate) { toast('ใส่เลขทะเบียนป้ายแดง', 'bad'); $('#fl-pl')?.focus(); return; }
     if (!validDate(date) || date > todayISO()) { toast('วันที่ส่งมอบต้องไม่เกินวันนี้', 'bad'); return; }
     if (a.date && date < a.date) { toast('วันที่ส่งมอบต้องไม่ก่อนวันจอง', 'bad'); return; }
-    if (!isCash(a.rec) && !finDocsN(a.rec)) { toast('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ (ที่ขั้น "ไฟแนนซ์ผ่าน")', 'bad'); return; }
+    const waive = !isCash(a.rec) && !finDocsN(a.rec) && noImgNeed();   // the executive may deliver without the finance approval attached (10/11)
+    if (!isCash(a.rec) && !finDocsN(a.rec) && !waive) { toast('แนบใบอนุมัติไฟแนนซ์ก่อนส่งมอบ (ที่ขั้น "ไฟแนนซ์ผ่าน")', 'bad'); return; }
     const tr = await tradeDelivOf(v, tradeCur(a.rec), 'fl', true); if (tr.err) { toast(tr.err, 'bad'); if (tr.id) $('#' + tr.id)?.focus(); return; }
     tradeFilesClear();
-    if (!await saveFlow(a, { trade: tr.rec, flow: { delivered: { ...actor(), date, plate } } }, 'บันทึกส่งมอบแล้ว กรอกข้อมูลค่าคอมแล้วรอผู้จัดการยืนยัน')) return;
+    if (!await saveFlow(a, { trade: tr.rec, flow: { delivered: { ...actor(), date, plate, ins: delivIns(a), ...(waive ? { no_fin_doc: true } : {}) } } }, waive ? 'บันทึกส่งมอบแล้ว (ผู้บริหารอนุโลม ยังไม่แนบใบอนุมัติไฟแนนซ์)' : 'บันทึกส่งมอบแล้ว กรอกข้อมูลค่าคอมแล้วรอผู้จัดการยืนยัน')) return;
     for (const l of derive().locks.filter(x => x.live && x.type === 'booking' && (x.bkref === a.key || x.bkref === a.row?.key))) {
       const cur = findLock(l.id); if (!cur) continue;
       cur.status = 'done'; await saveLock(l.id, cur, 'ส่งมอบแล้ว', fmtD(date));
@@ -886,6 +906,8 @@ const ACTIONS = {
       const mine = myBranch(), to = m.reason === 'pull' ? mine : (m.to || BRS.find(b => b !== car.br)), spec = (car.model || car.grade || car.color) ? [car.model || '?', car.grade || '?', car.color || '?'].join('|') : (cur.moved && cur.moved.spec) || null;
       if (car.xfer) { toast('มีคำขอย้ายรถคันนี้ค้างอยู่แล้ว', 'bad'); return; }
       if (m.reason === 'pull' ? car.br === mine : car.br !== mine) { toast('สาขาไม่ตรงกับประเภทที่เลือก', 'bad'); return; }
+      // 19/11: selling a car to another branch needs no confirmation from that branch: the Stock moves at once
+      if (m.reason === 'push') { if (await write('vehicles', m.vin, { ...cur, branch: to, moved: { ...(cur.moved || {}), ...actor(), from: car.br, to, spec, via: 'push', note: (m.note || '').trim() || null } })) { S.modal = null; toast(`ขายรถให้สาขา ${to} แล้ว · ย้าย Stock ไปสาขา ${to}`); render(); } return; }
       if (await write('vehicles', m.vin, { ...cur, xfer: { dir: m.reason, from: car.br, to, spec, note: (m.note || '').trim() || null, ...actor() } })) { S.modal = null; toast(m.reason === 'pull' ? `ส่งคำขอไปสาขา ${car.br} แล้ว` : `แจ้งสาขา ${to} แล้ว`); render(); }
       return;
     }
@@ -1026,7 +1048,7 @@ document.addEventListener('input', ev => {
     else if (RERENDER_ON_CHANGE.has(t.dataset.filter) && t.type === 'search') { clearTimeout(searchTimer); searchTimer = setTimeout(render, 300); }
   }
 });
-const RERENDER_ON_CHANGE = new Set(['lkq', 'q', 'bq', 'aq', 'rq', 'sFrom', 'sTo', 'bDFrom', 'bDTo', 'adq', 'alq', 'eFrom', 'eTo', 'chQ', 'chFrom', 'chTo', 'chAt']);
+const RERENDER_ON_CHANGE = new Set(['lkq', 'q', 'qq', 'bq', 'aq', 'rq', 'sFrom', 'sTo', 'bDFrom', 'bDTo', 'adq', 'alq', 'eFrom', 'eTo', 'chQ', 'chFrom', 'chTo', 'chAt']);
 // a field's change event fires on mousedown of the next click; redrawing then would swallow that click, so wait for the click to land
 let ptrDown = false, ptrRender = false;
 document.addEventListener('pointerdown', () => { ptrDown = true; }, true);
@@ -1083,6 +1105,7 @@ document.addEventListener('change', async ev => {
   }
   if (t.dataset.uplOn !== undefined) { const r = S.upl.results[Number(t.dataset.uplOn)]; if (r) r.on = t.checked; render(); return; }
   if (t.dataset.uplKind !== undefined) { const r = S.upl.results[Number(t.dataset.uplKind)]; if (r) { r.kind = t.value; r.nameChoice = null; r.diff = invDiff(r); } render(); return; }
+  if (t.dataset.uplMode !== undefined) { const r = S.upl.results[Number(t.dataset.uplMode)]; if (r) { r.mode = t.value; r.fullOk = false; } render(); return; }
   if (t.dataset.uplName !== undefined) { const r = S.upl.results[Number(t.dataset.uplName)]; if (r) r.nameChoice = t.value; render(); return; }
   if (t.dataset.uplDate !== undefined) { const r = S.upl.results[Number(t.dataset.uplDate)]; if (r && t.value) r.asof = t.value; return; }
   if (t.dataset.filter && RERENDER_ON_CHANGE.has(t.dataset.filter)) { S.filters[t.dataset.filter] = t.value; softRender(); return; }

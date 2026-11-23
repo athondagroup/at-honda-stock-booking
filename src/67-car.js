@@ -41,10 +41,13 @@ function carFull(vin, D) {
   if (c0) { const o = fill({ ...c0 }); o.status = kind === 'removed' ? 'removed' : (inv && inv.company ? 'company' : 'delivered'); o.out = kind; return o; }
   // not in stock, not in DL: look for any record that names the car
   const a = D.at.find(x => !x.cancelled && atVin(x) === vin), ib = D.idsB.find(b => b.vin === vin), o = S.vehicles.get(vin);
-  if (!a && !ib && !o) return null;
+  // the car log keeps the model / branch of a car that left the Stock file with no invoice (company / Demon cars, 10/11)
+  const lg = typeof carlogAll === 'function' ? carlogAll().get(vin) : null, e = (lg && lg.e) || {};
+  if (!a && !ib && !o && !lg) return null;
   const src = a || ib || {};
-  return fill({ vin, br: (o && (o.branch || (o.moved && o.moved.to))) || src.br || null, model: src.model || null, grade: src.grade || null, color: src.color || null,
-    status: 'unknown', out: 'unknown', src: 'ไม่อยู่ในไฟล์ Stock และ DL · ข้อมูลจากใบจอง', cust: src.cust || null, bkno: ib ? ib.no : null, fromInv: true });
+  return fill({ vin, br: (o && (o.branch || (o.moved && o.moved.to))) || src.br || e.br || null, model: src.model || e.m || null, grade: src.grade || e.g || null, color: src.color || e.c || null, prod: e.p || null,
+    status: 'unknown', out: 'unknown', src: a || ib ? 'ไม่อยู่ในไฟล์ Stock และ DL · ข้อมูลจากใบจอง' : 'ไม่อยู่ในไฟล์ Stock และ DL · ข้อมูลจากประวัติรถ', cust: src.cust || null, bkno: ib ? ib.no : null, fromInv: true,
+    ...(a && a.logVin === vin ? { status: 'assigned', src: `ออกจากไฟล์ Stock IDS แล้ว ${a.logOut && a.logOut.d ? fmtD(a.logOut.d) : ''} · IDS จัดให้ใบจอง ${a.no || ''} ${a.cust || ''} · รอไฟล์ DL ยืนยันใบกำกับ`, cust: a.cust, bkno: a.no || null } : {}) });
 }
 function carStChip(c) { return CAR_STATUS[c.status] ? statusChip(CAR_STATUS, c.status) : chip({ removed: 'นำออกจาก Stock', unknown: 'ไม่อยู่ใน Stock' }[c.status] || c.status || '–', 'muted'); }
 // where the car went / came from: taken out, moved between branches, handed over (data kept in vehicles/<vin> and the DL file)
@@ -68,11 +71,18 @@ function carModal(m, D) {
   const bk = D.at.find(a => !a.cancelled && ((a.match && a.match.vin === c.vin) || (a.rec.flow && a.rec.flow.assign && a.rec.flow.assign.vin === c.vin)));
   const row = (k, v) => v === null || v === undefined || v === '' ? '' : `<tr><td class="text-muted nowrap">${k}</td><td>${v}</td></tr>`;
   const ls = carLocks(c, D), hist = carHist(c.vin, D);
-  return `<div class="flex items-start justify-between gap-3 mb-2"><div><h2 class="font-head text-xl font-semibold"><span class="code">${esc(c.vin)}</span></h2>
-      <div class="mt-1 flex flex-wrap gap-2">${c.status === 'temp' ? chip('ล็อกชั่วคราว (แซงได้)', 'warn') : carStChip(c)} ${c.fromInv ? '' : tempChip(c)} ${chip(`${c.br} ${BR[c.br]?.name || ''}`, 'neutral')}</div>${c.fromInv ? '<p class="text-xs text-muted mt-1">รถคันนี้ไม่อยู่ในไฟล์ Stock IDS แล้ว (ออกใบกำกับแล้ว) แสดงข้อมูลจากไฟล์ DL</p>' : ''}</div>
-    ${m.back ? '<button class="btn btn-dark btn-sm" data-act="car-back">← กลับ</button>' : '<button class="btn btn-ghost btn-sm" data-act="close">ปิด</button>'}</div>
+  // top of the card (9/11): the three numbers a manager sends on to the sales, in one place, copied in one press
+  const idCell = (lab, v) => `<div class="min-w-0"><div class="text-xs text-muted">${lab}</div><div class="code font-semibold text-base break-all">${v ? esc(v) : '<span class="text-muted">–</span>'}</div></div>`;
+  return `<div class="rounded-lg p-3 mb-3 border border-line" style="background:var(--surface-2)">
+      ${c.invMoved ? `<div class="text-sm mb-2" style="color:var(--warn)">สาขา <b>${esc(c.br)}</b> · ย้ายจาก ${esc(c.invMoved.from)} อัตโนมัติ · ออกใบกำกับที่ ${esc(c.invMoved.to)}${c.invMoved.idate ? ' ' + fmtD(c.invMoved.idate) : ''}</div>` : ''}
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${idCell('เลขตัวถัง (VIN)', c.vin)}${idCell('เลขเครื่องยนต์', c.engine)}${idCell('Model code', c.mcode)}</div>
+      <div class="mt-3 flex flex-wrap gap-2"><button class="btn btn-red btn-sm" data-act="car-copy" data-vin="${esc(c.vin)}">คัดลอกข้อมูลรถ</button><button class="btn btn-ghost btn-sm" data-act="car-copy" data-vin="${esc(c.vin)}" data-only="vin">คัดลอก VIN</button>
+      ${m.back ? '<button class="btn btn-dark btn-sm" data-act="car-back">← กลับ</button>' : '<button class="btn btn-ghost btn-sm" data-act="close">ปิด</button>'}</div></div>
+    <div class="flex items-start justify-between gap-3 mb-2"><div><h2 class="font-head text-xl font-semibold">${specLabel(c.spec)}</h2>
+      <div class="mt-1 flex flex-wrap gap-2">${c.status === 'temp' ? chip('ล็อกชั่วคราว (แซงได้)', 'warn') : carStChip(c)}${c.kind ? ' ' + chip(FREE_KINDS[c.kind], c.kind === 'adv' ? 'ink' : 'warn') : ''} ${c.fromInv ? '' : tempChip(c)} ${chip(`${c.br} ${BR[c.br]?.name || ''}`, 'neutral')}</div>${c.fromInv ? '<p class="text-xs text-muted mt-1">รถคันนี้ไม่อยู่ในไฟล์ Stock IDS แล้ว (ออกใบกำกับแล้ว) แสดงข้อมูลจากไฟล์ DL</p>' : ''}</div>
+    </div>
   ${carWhyBox(c, D, inv, bk, hideCust)}
-  ${spBox(c, D)}${rptBox(c)}${carCampBox(c, bk)}
+  ${D.cars.has(c.vin) && !isSales() && perms().write ? `<div class="flex flex-wrap gap-2 mb-3" data-car-acts>${stockActions(D.cars.get(c.vin), perms(), D)}</div>` : ''}  ${c.status === 'unknown' && typeof carHistRows === 'function' && typeof carFixBox === 'function' ? (r => r ? carFixBox(r) : '')(carHistRows(D).find(x => x.vin === c.vin)) : ''}${spBox(c, D)}${rptBox(c)}${carCampBox(c, bk)}
   <div class="grid md:grid-cols-2 gap-5">
     <div><table class="tbl text-sm"><tbody>
       ${row('รุ่น เกรด สี', specLabel(c.spec))}
@@ -127,14 +137,14 @@ function qRowVals(b) {
 }
 function qTableBody(m, D) {
   const f = m.qf || {}, so = m.qs || { c: 'pos', d: 1 };
-  let rows = D.bookings.filter(b => b.spec === m.key && b.state === 'waiting').map(b => ({ b, v: qRowVals(b) }));
+  let rows = D.bookings.filter(b => b.spec === m.key && b.state === 'waiting' && inBr(b)).map(b => ({ b, v: qRowVals(b) }));
   rows = rows.filter(r => QCOLS.every(([k]) => !f[k] || String(k === 'date' ? fmtD(r.v.date) : r.v[k]).toLowerCase().includes(f[k].toLowerCase())));
   rows.sort((x, y) => { const a = x.v[so.c], c = y.v[so.c]; return (typeof a === 'number' ? a - c : String(a).localeCompare(String(c))) * so.d || x.v.pos - y.v.pos; });
   return `<tbody id="q-tb">${rows.map(({ b, v }) => `<tr><td>${chip('คิวที่ ' + v.pos, 'warn')}</td><td class="num">${fmtD(v.date)}</td><td>${custCell(b.cust, b.owner, { seed: b.seed })}</td><td>${esc(v.sales)}</td><td>${esc(v.br)}</td><td class="code">${esc(v.no) || '<span style="color:var(--warn)">ยังไม่มี</span>'}</td><td>${esc(v.dep)}${b.app && (!isSales() || isMine(b.owner)) ? ` <button class="underline text-xs" data-act="at-open" data-id="${esc(b.app.id)}">เปิดใบจอง</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="text-muted p-3">ไม่พบตามตัวกรอง</td></tr>'}</tbody>`;
 }
-function qCount(m, D) { const n = D.bookings.filter(b => b.spec === m.key && b.state === 'waiting').length; const t = (qTableBody(m, D).match(/<tr>/g) || []).length; return (m.qf && Object.values(m.qf).some(Boolean)) ? `แสดง ${t} จาก ${n} ใบ` : `${n} ใบ`; }
+function qCount(m, D) { const n = D.bookings.filter(b => b.spec === m.key && b.state === 'waiting' && inBr(b)).length; const t = (qTableBody(m, D).match(/<tr>/g) || []).length; return (m.qf && Object.values(m.qf).some(Boolean)) ? `แสดง ${t} จาก ${n} ใบ` : `${n} ใบ`; }
 function specQueueModal(m, D) {
-  const s = D.specs[m.key] || { waiting: 0, free: 0, incoming: 0 }, so = m.qs || { c: 'pos', d: 1 }, f = m.qf || {};
+  const s = D.specs[m.key] ? specView(D.specs[m.key], specPool(D)) : { waiting: 0, free: 0, incoming: 0 }, so = m.qs || { c: 'pos', d: 1 }, f = m.qf || {};
   return `<div class="flex items-start justify-between gap-3 mb-2"><div><h2 class="font-head text-xl font-semibold">คิวรอรถ · ${specLabel(m.key)}</h2>
     <p class="text-sm text-muted">รอรถ <b class="num" id="q-cnt">${qCount(m, D)}</b> · ว่าง <b class="num">${s.free}</b> คัน · Quota ว่าง <b class="num">${s.incoming}</b> · กดหัวคอลัมน์เพื่อเรียง พิมพ์ในช่องใต้หัวคอลัมน์เพื่อกรอง${isSales() ? ' · เซลล์เห็นชื่อลูกค้าเฉพาะของตัวเอง' : ''}</p></div>
     <button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
@@ -155,6 +165,16 @@ Object.assign(ACTIONS, {
   'specnet'(el) { S.modal = { kind: 'specnet', key: el.dataset.key }; render(); },
   'specq-open'(el) { S.modal = { kind: 'specq', key: el.dataset.key }; render(); },
   // opened from another window (e.g. checking a delivery note): keep that window to go back to
+  // the car's numbers as text for LINE: VIN, engine, model code, then model / grade / colour · branch (lines with no value are left out)
+  'car-copy'(el) {
+    const c = carFull(el.dataset.vin, derive()); if (!c) return;
+    const txt = el.dataset.only === 'vin' ? c.vin : [`VIN: ${c.vin}`, c.engine ? `เลขเครื่อง: ${c.engine}` : '', c.mcode ? `Model code: ${c.mcode}` : '',
+      `${[c.model, c.grade, c.color].filter(Boolean).join(' ')} · ${c.br || ''}`].filter(Boolean).join('\n');
+    const done = () => toast(el.dataset.only === 'vin' ? 'คัดลอก VIN แล้ว' : 'คัดลอกข้อมูลรถแล้ว');
+    const fallback = () => { const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+      let ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; } ta.remove(); ok ? done() : toast('คัดลอกไม่ได้ในเครื่องนี้: ' + txt.replace(/\n/g, ' · '), 'bad'); };
+    try { navigator.clipboard.writeText(txt).then(done, fallback); } catch (e) { fallback(); }
+  },
   'car-open'(el) { const back = S.modal && S.modal.kind !== 'car' ? S.modal : null; S.modal = { kind: 'car', vin: el.dataset.vin, back }; render(); },
   'car-back'() { S.modal = (S.modal && S.modal.back) || null; render(); }
 });

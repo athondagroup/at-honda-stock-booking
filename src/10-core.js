@@ -32,15 +32,17 @@ const INSURANCE = ['Honda แถม','AT แถม', 'ลูกค้าซื�
 const INSURERS = ['ซมโปะประกันภัย', 'ธนชาตประกันภัย','คุ้มภัยโตเกียวมารีนประกันภัย', 'กรุงเทพประกันภัย',  'ประกันภัยไทยวิวัฒน์', 'แอกซ่าประกันภัย', 'มิตซุย สุมิโตโม อินชัวรันซ์','วิริยะประกันภัย'];
 const SRC_LABEL = { stock: 'Stock', booking: 'Booking', quota: 'Quota', invoice: 'Invoice/DL' };
 const CAR_STATUS = {
-  free: ['ว่าง', 'good'], noted: ['มีชื่อจองไว้', 'warn'], booked: ['จัดสรรแล้ว (IDS)', 'neutral'],
-  sold: ['แจ้งขายแล้ว', 'muted'], invoiced: ['ออกใบกำกับแล้ว', 'neutral'], delivered: ['ส่งมอบแล้ว', 'muted'],
-  company: ['รถบริษัท', 'muted'], pending: ['รออนุมัติล็อก', 'warn'], locked: ['ล็อกชั่วคราว', 'red'],
-  allocated: ['จัดสรรแล้ว (เว็บ) รอไฟล์ IDS', 'ink'], assigned: ['จัดสรรแล้ว รอส่งมอบ', 'ink']
+  free: ['ว่าง', 'good'], noted: ['ล็อกชั่วคราว', 'warn'], booked: ['จัดสรร (IDS)', 'neutral'],
+  sold: ['แจ้งขาย', 'muted'], invoiced: ['ออกใบกำกับแล้ว', 'neutral'], delivered: ['ส่งมอบแล้ว', 'muted'],
+  company: ['รถบริษัท', 'muted'], pending: ['รออนุมัติ', 'warn'], locked: ['ล็อกชั่วคราว', 'red'],
+  review: ['รอตรวจ · ไม่อยู่ในไฟล์ IDS ล่าสุด', 'warn'],
+  allocated: ['จัดสรร (เว็บ)', 'ink'], assigned: ['จัดสรร (เว็บ)', 'ink']
 };
 const QUOTA_STATUS = { waiting: ['รอ VIN', 'neutral'], vin: ['ได้ VIN แล้ว รอรถ', 'warn'], arrived: ['ถึงสาขาแล้ว', 'good'], sold: ['ขายแล้ว', 'muted'] };
 const BOOK_STATE = {
   waiting: ['รอรถ', 'warn'], pending: ['รออนุมัติล็อก', 'warn'], locked: ['ล็อกแล้ว', 'red'], allocated: ['จัดสรรแล้ว', 'ink'],
-  idscar: ['IDS จัดสรรรถแล้ว', 'good'], idsquota: ['IDS จับคู่ Quota', 'neutral'], cancel: ['รอยกเลิก (IDS)', 'muted']
+  idscar: ['IDS จัดสรรรถแล้ว', 'good'], idsquota: ['IDS จับคู่ Quota', 'neutral'], cancel: ['รอยกเลิก (IDS)', 'muted'],
+  gone: ['ไม่อยู่ในไฟล์ IDS ล่าสุด · รอตรวจ', 'warn'], noids: ['ยังไม่มีใน IDS · ไม่นับคิว', 'muted'], adv: ['Make Advance · ไม่ต่อคิว', 'muted'], xfer: ['โอนลูกค้าแล้ว · รวมกับใบใหม่', 'muted'], dup: ['ใบจองซ้ำ · รวมกับใบเดิม', 'muted'], demo: ['รถทดลองขับ · ไม่ต่อคิว', 'neutral'], democar: ['ซื้อรถ Demo · ไม่ต่อคิว', 'neutral'], alt: ['เลขเดิม / อีกสาขา · รวมกับฟอร์ม', 'muted']
 };
 
 // ------------------------------------------------------------------ helpers
@@ -150,6 +152,8 @@ const canLockMgr = l => perms().approve && lockBrs(l).some(b => mgrBranches().in
 // delivered with another branch's car (e.g. a SPH car): the booking's branch, the sales' branch or the delivering branch is hers
 const adminOwns = a => !!(a && S.role.role === 'admin' && S.role.branch && [a.br, a.salesBr, a.delivBr].includes(S.role.branch));
 const canAllocBr = br => (S.role.role === 'admin' && br === S.role.branch) || canApproveBr(br);
+// the executive does not have to attach photos / documents anywhere (10/11)
+function noImgNeed() { return !!(S.role && S.role.role === 'exec'); }
 function custCell(name, sales, o = {}) {
   if (o.other) return chip('ขายให้สาขาอื่น', 'muted');
   if (o.company) return chip('รถบริษัท', 'muted');

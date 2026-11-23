@@ -13,10 +13,11 @@ function idsGsBox() {
     <p class="text-sm text-muted mb-3">ใช้แทนการอัปโหลดไฟล์ได้ ระบบอ่านทุกแท็บที่ชื่อมีรหัสสาขา (เช่น PSC, B PSC, 10.2026 PSC, DL PSC) รู้เองว่าเป็น Stock / Booking / Quota / Invoice จากหัวคอลัมน์ แล้วแสดงในรายการด้านบนให้ตรวจก่อนกดบันทึก${window.__WEB ? ' · ชีตต้องแชร์ให้อีเมล service account เดียวกับชีตคำตอบ Google Form (ผู้มีสิทธิ์อ่าน)' : ''}</p>
     <div class="flex flex-wrap gap-2 items-end">
       <div class="field grow" style="min-width:16rem"><label for="ids-gs">ลิงก์ Google Sheet</label><input id="ids-gs" data-idsgs="1" value="${esc(G.link ?? `https://docs.google.com/spreadsheets/d/${id}/edit`)}" ${can ? '' : 'disabled'}></div>
-      <button class="btn btn-dark" data-act="ids-gs-run" ${can && !G.busy && !S.upl.busy ? '' : 'disabled'}>${G.busy ? '<span class="spin"></span> กำลังอ่าน…' : 'ดึงจาก Google Sheet'}</button></div>
+      <button class="btn btn-dark" data-act="ids-gs-run" ${can && !G.busy && !S.upl.busy ? '' : 'disabled'}>${G.busy ? '<span class="spin"></span> กำลังอ่าน…' : 'ดึงจาก Google Sheet'}</button>
+      <button class="btn btn-ghost" data-act="gse-run" ${can && !G.busy && !S.upl.busy ? '' : 'disabled'} title="อ่านเฉพาะช่องที่คนแก้ในชีต: เลขที่ใบจอง / ข้อความล็อก / ชื่อลูกค้า / วันที่จัดสรร (Stock) และ VIN / ข้อความ (Quota)">ดึงเฉพาะที่แก้ในชีต (จัดสรร / ล็อกคิว)</button></div>
     ${G.busy ? `<p class="text-sm mt-2" role="status">${esc(G.busy)}</p>` : ''}
     ${G.err ? `<p class="text-sm mt-2" style="color:var(--bad)">${esc(G.err)}</p>` : ''}
-    ${G.done ? `<p class="text-sm mt-2" style="color:var(--good)">${esc(G.done)}</p>` : ''}</section>`;
+    ${G.done ? `<p class="text-sm mt-2" style="color:var(--good)">${esc(G.done)}</p>` : ''}${typeof gseBox === 'function' ? gseBox() : ''}</section>`;
 }
 function idsGsPayload(res) { let p = res && res.payload; if (typeof p === 'string') { try { p = JSON.parse(p); } catch (e) { p = null; } } return p; }
 async function idsGsRun() {

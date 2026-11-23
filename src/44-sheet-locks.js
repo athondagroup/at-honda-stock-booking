@@ -24,7 +24,15 @@ function parseSheetText(text) {
   const sales = salesOfNick(who);
   if (cust) return { kind: 'named', who, sales, cust, text: t };
   if (sales || i >= 0) return { kind: 'nick', who, sales, cust: '', text: t };
-  return { kind: 'dealer', who: '', sales: null, cust: '', dealer: t.replace(/^(ขายให้|ขาย|แลกให้|แลก)\s*/, '').trim() || t, text: t };
+  const d = t.replace(/^(ขายให้|ขาย|แลกให้|แลก)\s*/, '').trim() || t;
+  // 19/11: a booking number (51xxxxxxxx) is a booking, not a dealer's name
+  if (/^\d{8,12}$/.test(d.replace(/\D/g, '')) && /^[\d\s-]+$/.test(d)) return { kind: 'bkno', who: '', sales: null, cust: '', no: d.replace(/\D/g, ''), text: t };
+  return { kind: 'dealer', who: '', sales: null, cust: '', dealer: d, text: t };
+}
+// the open booking (web form or IDS) with this booking number
+function bookingByNo(no, D) {
+  no = String(no || '').replace(/\D/g, ''); if (!no) return null;
+  return D.bookings.find(b => String(b.no || '').replace(/\D/g, '') === no && b.state !== 'cancel') || null;
 }
 // the customer typed in the sheet is usually short (a first name or nickname): it is found inside the booking's name
 const sheetNameHit = (full, cust) => { const k = normName(String(cust || '').split(/\s+/)[0]); return k.length >= 2 && normName(full || '').includes(k); };
@@ -96,6 +104,7 @@ function lockBkModal(m, D) {
     ${pickBtn('temp', `<span class="font-medium">ยังไม่มีใบจอง: ล็อกชั่วคราว ${LOCK_DAYS_BY.temp} วัน</span><span class="block text-xs text-muted">ให้ ${esc(sales || p.who || 'เซลล์')}${p.cust ? ` · ลูกค้า ${esc(p.cust)}` : ''} · เมื่อลูกค้ามาจอง เซลล์กด "ลูกค้ามาจองแล้ว"</span>`, cur === 'temp')}
     ${pickBtn('dealer', `<span class="font-medium">แลก/ขายดีลเลอร์อื่น</span><span class="block text-xs text-muted">พี่อั้มอนุมัติ</span>`, cur === 'dealer')}
   </div>
+  ${(() => { const pc = cands.find(c => c.key === cur); const bs = pc ? ((pc.a && pc.a.spec) || pc.b.spec) : null; return bs && bs !== l.spec ? `<div class="mt-3 p-2 rounded" style="background:var(--warn-bg,#fef3c7)"><div class="text-sm" style="color:var(--warn)">⚠ สเปกไม่ตรง: ใบจองเป็น <b>${esc(specLabelText(bs))}</b> · รถเป็น <b>${esc(specLabelText(l.spec))}</b> · ล็อกได้แต่ต้องใส่เหตุผล แล้วแอดมินสาขาต้องแก้ไขใบจองเป็นสเปกของรถ</div><div class="field mt-1"><label for="lb-why" class="req">เหตุผลที่ล็อกข้ามสเปก</label><input id="lb-why" data-modal="why" value="${esc(m.why || '')}" placeholder="เช่น ลูกค้าเปลี่ยนเป็นรุ่นนี้"></div></div>` : ''; })()}
   ${cur === 'dealer' ? `<div class="field mt-3"><label for="lb-dealer" class="req">ชื่อดีลเลอร์</label><input id="lb-dealer" data-modal="dealer" value="${esc(m.dealer ?? l.dealer_name ?? p.dealer ?? '')}"></div>` : ''}
   <p class="text-xs text-muted mt-3">เลือกใบจองแล้ว อนุมัติได้ ${LOCK_DAYS_BY.booking} วัน · ไม่มีใบจอง ${LOCK_DAYS_BY.temp} วัน · นับจากวันอนุมัติ${cands.some(c => c.a === null) ? ' · ใบจองที่มีแต่ใน IDS เซลล์ต้องลงฟอร์ม AT ตามมา' : ''}</p>
   <div class="flex flex-wrap justify-end gap-2 mt-3"><button class="btn btn-ghost" data-act="close">ยกเลิก</button>
@@ -124,6 +133,7 @@ function sheetLockFields(u, D) {
   const base = { vin: u.vin, ref: u.ref, car_br: u.br, spec: u.spec, reason: 'นำเข้าจากชื่อที่พิมพ์ไว้ในชีต Stock', note: `ข้อความเดิม: "${u.text}"`, sheet_text: u.text, imported: true,
     dealer_name: null, prospect: null, sales: null, sales_nick: null, bkref: null, bk_br: null, warnings: [] };
   if (p.kind === 'dealer') return { ...base, type: 'dealer', dealer_name: p.dealer };
+  if (p.kind === 'bkno') { const b = bookingByNo(p.no, D); return b ? { ...base, type: 'booking', bkref: b.app ? b.app.key : b.key, bk_br: b.br || null, sales: b.owner || b.sales || null } : { ...base, type: 'temp', prospect: 'ใบจอง ' + p.no, warnings: [`ไม่พบใบจองเลข ${p.no}`] }; }
   const warn = p.sales ? [] : [`ยังไม่รู้ว่า "${p.who}" คือเซลล์คนไหน`];
   const a = p.kind === 'named' ? sheetAutoMatch(u.spec, p, D) : null;
   const common = { sales: p.sales || (a && a.sales) || null, sales_nick: p.sales ? null : p.who || null, prospect: p.cust || null, warnings: warn };
@@ -131,17 +141,17 @@ function sheetLockFields(u, D) {
   return { ...base, ...common, type: 'temp' };
 }
 function sheetSyncBox(D) {
-  const plan = sheetPlan(D), add = plan.filter(x => !x.update).length, upd = plan.length - add;
+  const plan = sheetPlan(D), add = plan.filter(x => !x.update).length, upd = plan.length - add, pend = D.locks.filter(l => l.status === 'pending' && l.imported && !l.replaces && !l.idsTook && branchOk(l.car_br)).length;
   return `<section class="mb-5"><h2 class="font-head text-lg font-semibold mb-1">ล็อกจากชีต Stock</h2>
     <div class="bg-surface border border-line rounded-lg p-4 text-sm">
-      <p>ทุกครั้งที่บันทึกไฟล์ Stock หรือ Quota ระบบดึงชื่อที่พิมพ์ไว้ในช่องเลขที่ใบจอง (เช่น "มด/เปิ้ล") มาเป็นคำขอล็อกให้ผู้จัดการอนุมัติ รถที่ IDS จัดสรรแล้ว (มีเลขที่ใบจอง) ใช้การจัดสรรจาก IDS</p>
-      <p class="mt-2">${plan.length ? `ข้อมูลตอนนี้มีข้อความที่ยังไม่มีคำขอ <b>${add}</b> รายการ${upd ? ` · ข้อความเปลี่ยน ต้องอัปเดตคำขอเดิม <b>${upd}</b> รายการ` : ''}` : '<span class="text-muted">ข้อความในชีตมีคำขอล็อกครบแล้ว</span>'}</p>
-      ${plan.length ? `<ul class="text-xs text-muted list-disc pl-5 mt-1">${plan.slice(0, 8).map(x => `<li><span class="code">${esc(x.u.vin || 'Quota ' + x.u.ref)}</span> ${esc(x.u.br)} · "${esc(x.u.text)}"${x.update ? ` (เดิม "${esc(sheetTextOf(x.update))}")` : ''}</li>`).join('')}</ul>
-        <button class="btn btn-dark btn-sm mt-3" data-act="sheet-sync" ${perms().write ? '' : 'disabled'}>สร้างคำขอล็อกจากชีต</button>` : ''}
+      <p>ทุกครั้งที่บันทึกไฟล์ Stock หรือ Quota ระบบดึงชื่อที่พิมพ์ไว้ในช่องเลขที่ใบจอง (เช่น "มด/เปิ้ล") มาล็อกให้เลย ไม่ต้องรออนุมัติ (ใบจอง ${LOCK_DAYS_BY.booking} วัน · ชั่วคราว ${LOCK_DAYS_BY.temp} วัน) รถที่ IDS จัดสรรแล้ว (มีเลขที่ใบจอง) ใช้การจัดสรรจาก IDS</p>
+      <p class="mt-2">${plan.length || pend ? `ข้อมูลตอนนี้มีข้อความที่ยังไม่ได้ล็อก <b>${add}</b> รายการ${upd ? ` · ข้อความเปลี่ยน <b>${upd}</b> รายการ` : ''}${pend ? ` · คำขอเดิมที่ค้างรออนุมัติ <b>${pend}</b> รายการ (กดแล้วอนุมัติให้เลย)` : ''}` : '<span class="text-muted">ข้อความในชีตล็อกครบแล้ว</span>'}</p>
+      ${plan.length || pend ? `<ul class="text-xs text-muted list-disc pl-5 mt-1">${plan.slice(0, 8).map(x => `<li><span class="code">${esc(x.u.vin || 'Quota ' + x.u.ref)}</span> ${esc(x.u.br)} · "${esc(x.u.text)}"${x.update ? ` (เดิม "${esc(sheetTextOf(x.update))}")` : ''}</li>`).join('')}</ul>
+        <button class="btn btn-dark btn-sm mt-3" data-act="sheet-sync" ${perms().write ? '' : 'disabled'}>ล็อกจากชีต</button>` : ''}
     </div></section>`;
 }
 // a request this person can decide: the manager of the car's branch (dealer trades: พี่อั้ม), the executive
-const canDecideLock = l => l.status === 'pending' && perms().write && !(l.idsTook && !l.idsTook.same) && (l.type === 'dealer' ? perms().approveDealer : canLockMgr(l));
+const canDecideLock = l => l.status === 'pending' && perms().write && !(l.idsTook && !l.idsTook.same) && ((l.approver && S.me && l.approver === S.me.id) || (!l.replaces && (l.type === 'dealer' ? perms().approveDealer : canLockMgr(l))));
 // ---------- the locks of one car, handled right from the stock page (approve, pick the booking, extend, release …)
 const carLocks = (c, D) => D.locks.filter(l => (l.vin === c.vin || (!l.vin && c.ref && l.ref === c.ref))
   && (l.live || l.status === 'pending' || (l.idsTook && !l.idsTook.same && l.status === 'approved'))).filter(lockVisible)
@@ -169,8 +179,24 @@ function carLockModal(m, D) {
     <button class="btn btn-ghost" data-act="close">ปิด</button></div>`;
 }
 // the status itself opens the car's locks, so a pending request is approved or changed where it is seen
-function carStatusCell(c, D) {
-  const chips = `${c.status === 'temp' ? chip('ล็อกชั่วคราว (แซงได้)', 'warn') : statusChip(CAR_STATUS, c.status)} ${tempChip(c)}${spChip(c)}`;
+// the status tags of a car (ตกลง 11/11): free = ว่าง; a returned car for sale: ว่าง + คืนรถ; an Advance with no customer: ว่าง + Advance +
+// ออกใบกำกับแล้ว (with a customer: ออกใบกำกับแล้ว only); a Demo for sale: ว่าง + รถบริษัท, not for sale: รถบริษัท. The table's status filter
+// lists every tag, a car shows under each of its own
+function carTags(c) {
+  const lab = k => ({ review: 'รอตรวจ (ไม่อยู่ใน IDS)', })[k] || (CAR_STATUS[k] || [k])[0];
+  if (c.status === 'free') return ['ว่าง', ...(c.kind === 'ret' ? ['คืนรถ'] : c.kind === 'adv' ? ['Advance', lab('invoiced')] : c.kind === 'demo' ? [lab('company')] : [])];
+  if (c.status === 'company') return [lab('company')];
+  const t = [c.status === 'temp' ? 'ล็อกชั่วคราว' : lab(c.status)];
+  if (c.kind === 'ret') t.push('คืนรถ'); else if (c.kind === 'demo') t.push(lab('company'));
+  return t;
+}
+const TAG_TONE = { 'ว่าง': 'good', 'คืนรถ': 'warn', 'Advance': 'ink', 'รถบริษัท': 'muted' };
+function carStatusCell(c, D, compact) {
+  // the table: one tag a line (11/11)
+  const tags = compact ? `<span class="xl-tags">${carTags(c).map(t => chip(t, TAG_TONE[t] || ((CAR_STATUS[c.status] || [])[1]) || 'neutral')).join('')}${tempChip(c)}</span>`
+    : `${c.status === 'temp' ? chip('ล็อกชั่วคราว (แซงได้)', 'warn') : statusChip(CAR_STATUS, c.status)}${c.kind ? ' ' + chip(FREE_KINDS[c.kind], c.kind === 'adv' ? 'ink' : 'warn') : ''}`;
+  // the table keeps it short: the special-car note only while it still needs a decision (sellable cars are just tagged)
+  const chips = `${tags} ${compact ? '' : tempChip(c)}${compact && c.special && c.special.sellable === true ? '' : spChip(c)}`;
   if (!D || !carLocks(c, D).length) return chips;
   const pend = carLocks(c, D).some(canDecideLock);
   return `<button class="text-left inline-flex flex-wrap items-center gap-1" data-act="carlock-open" data-vin="${esc(c.vin)}" title="กดเพื่ออนุมัติหรือแก้ไขล็อก">${chips}<span class="text-xs underline ${pend ? '' : 'text-muted'}" ${pend ? 'style="color:var(--red)"' : ''}>${pend ? 'อนุมัติ/แก้' : 'ดูล็อก'}</span></button>`;

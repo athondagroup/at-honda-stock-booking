@@ -46,7 +46,7 @@ page = f'''<!doctype html>
 </body></html>
 '''
 open(os.path.join(DIST, 'index.html'), 'w', encoding='utf8').write(page)
-for f in ['gate.js', 'sw.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'foc.json', 'fees.json']:
+for f in ['gate.js', 'sw.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'foc.json', 'fees.json', 'ucare.json']:
     shutil.copy(os.path.join(WEB, f), os.path.join(DIST, f))
 open(os.path.join(DIST, '.nojekyll'), 'w').write('')
 # ใบเสนอราคา (Sale Calculator): หน้าที่สร้างไว้แล้วใน quote/ ใช้ล็อกอินเดียวกัน (quote/src/README.md)

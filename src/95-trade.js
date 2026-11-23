@@ -11,24 +11,28 @@ function bookTradeFields(d) {
       <div class="field"><label for="b-tb">ยี่ห้อ</label><input id="b-tb" data-draft="booking.t_brand" value="${esc(d.t_brand || '')}" placeholder="เช่น Toyota" autocomplete="off"></div>
       <div class="field"><label for="b-tm">รุ่น</label><input id="b-tm" data-draft="booking.t_model" value="${esc(d.t_model || '')}" placeholder="เช่น Vios" autocomplete="off"></div>
       <div class="field"><label for="b-ty">ปี</label><input id="b-ty" type="number" min="1980" max="2030" inputmode="numeric" data-draft="booking.t_year" value="${esc(d.t_year || '')}"></div>
-      <div class="field"><label for="b-tp">ราคาประเมิน (ถ้ามี)</label><input id="b-tp" type="number" min="0" step="1000" inputmode="numeric" data-draft="booking.t_price" value="${esc(d.t_price || '')}"></div></div>` : ''}</div>`;
+      <div class="field"><label for="b-tp">ราคาประเมิน (ถ้ามี)</label><input id="b-tp" type="number" min="0" step="1000" inputmode="numeric" data-draft="booking.t_price" value="${esc(d.t_price || '')}"><span class="text-xs text-muted">ราคาที่เต็นท์ตีจริง</span></div></div>` : ''}</div>`;
 }
 function bookTradeRec(d) {
   if (d.trade === 'no') return { has: false };
   if (d.trade !== 'yes') return null;
   return { has: true, brand: String(d.t_brand || '').trim(), model: String(d.t_model || '').trim(), year: parseInt(d.t_year, 10) || null, price: num(d.t_price) || null };
 }
+// the old car is keyed in ONE place (10/11): complete = nothing more to key at delivery (the delivery step only shows it);
+// while the delivery step asks for it, the booking's own "รถเก่าเทิร์น" box steps aside
+function tradeComplete(t) { return !!t && (!t.has || !!(t.brand && t.model && num(t.sale_price) > 0 && t.tent && ((t.docs || []).length || noImgNeed()))); }
+function tradeDelivOpen(a) { const fl = a.flow || {}; return !!(perms().write && !a.cancelled && fl.done && !fl.done.delivered && stepAllowed(a, 'delivered') && stepOpen(a, 'delivered')); }
 function tradeCur(r) { return r.trade || (r.flow && r.flow.down && r.flow.down.tradein) || null; }
 function tradeLine(r) {
   const t = tradeCur(r);
   if (!t) return 'ยังไม่ระบุ';
   if (!t.has) return 'ไม่มี';
-  return ['มี', t.brand, t.model, t.year, t.price ? `ประเมิน ${money(t.price)}` : '', t.sale_price ? `· ขาย ${money(t.sale_price)}` : '', t.tent ? `ให้ ${t.tent}` : '', (t.docs || []).length ? `· สัญญา ${t.docs.length} รูป` : ''].filter(Boolean).join(' ');
+  return ['มี', t.brand, t.model, t.year, t.price ? `ประเมิน ${money(t.price)}` : '', t.sale_price ? `· ขาย ${money(t.sale_price)}${t.deduct === false ? ' (ไม่หักวันรับรถ)' : ''}` : '', t.tent ? `ให้ ${t.tent}` : '', (t.docs || []).length ? `· สัญญา ${t.docs.length} รูป` : ''].filter(Boolean).join(' ');
 }
 // the down-payment step starts from the booking's answer
 function tradePre(r) {
   const t = tradeCur(r); if (!t) return {};
-  return t.has ? { trade: 'yes', t_brand: t.brand || '', t_model: t.model || '', t_year: t.year || '', t_price: t.price || '', t_sale: t.sale_price || '', t_tent: t.tent || '' } : { trade: 'no' };
+  return t.has ? { trade: 'yes', t_brand: t.brand || '', t_model: t.model || '', t_year: t.year || '', t_price: t.price || '', t_sale: t.sale_price || '', t_tent: t.tent || '', t_deduct: t.deduct === false ? 'no' : 'yes' } : { trade: 'no' };
 }
 // edit in the booking (any time before the manager confirms)
 function tradeEditBox(m, a) {
@@ -49,8 +53,11 @@ function tradeDelivFields(pre, v, idp, cur, need) {
       <div class="field"><label for="${idp}-tb" class="${R}">ยี่ห้อ</label><input id="${idp}-tb" data-modal="${pre}.t_brand" value="${esc(v.t_brand ?? '')}" placeholder="เช่น Toyota" autocomplete="off"></div>
       <div class="field"><label for="${idp}-tm" class="${R}">รุ่น</label><input id="${idp}-tm" data-modal="${pre}.t_model" value="${esc(v.t_model ?? '')}" placeholder="เช่น Vios" autocomplete="off"></div>
       <div class="field"><label for="${idp}-ty">ปี</label><input id="${idp}-ty" type="number" min="1980" max="2030" inputmode="numeric" data-modal="${pre}.t_year" value="${esc(v.t_year ?? '')}"></div>
-      <div class="field"><label for="${idp}-tp">ราคาประเมิน</label><input id="${idp}-tp" type="number" min="0" step="1000" inputmode="numeric" data-modal="${pre}.t_price" value="${esc(v.t_price ?? '')}"></div>
-      <div class="field"><label for="${idp}-ts" class="${R}">ราคาขายรถเก่า (บาท)</label><input id="${idp}-ts" type="number" min="0" step="1000" inputmode="numeric" data-modal="${pre}.t_sale" value="${esc(v.t_sale ?? '')}"></div>
+      <div class="field"><label for="${idp}-tp">ราคาประเมิน</label><input id="${idp}-tp" type="number" min="0" step="1000" inputmode="numeric" data-modal="${pre}.t_price" value="${esc(v.t_price ?? '')}"><span class="text-xs text-muted">ราคาที่เต็นท์ตีจริง</span></div>
+      <div class="field"><label for="${idp}-ts" class="${R}">ราคาขายรถเก่า (บาท)</label><input id="${idp}-ts" type="number" min="0" step="1000" inputmode="numeric" data-modal="${pre}.t_sale" value="${esc(v.t_sale ?? '')}"><span class="text-xs text-muted">ราคาที่เต็นท์จ่ายให้ศูนย์ · ใส่แล้วนำไปหักในค่าใช้จ่ายวันรับรถ</span></div>
+      <div class="field col-span-2 sm:col-span-3"><span class="text-sm">ราคาขายรถเก่า</span><div class="flex flex-wrap gap-4 text-sm">
+        <label class="flex items-center gap-2"><input type="radio" class="w-4 h-4" name="${idp}-td" value="yes" data-modal="${pre}.t_deduct" ${v.t_deduct !== 'no' ? 'checked' : ''}> หักในค่าใช้จ่ายวันรับรถ</label>
+        <label class="flex items-center gap-2"><input type="radio" class="w-4 h-4" name="${idp}-td" value="no" data-modal="${pre}.t_deduct" ${v.t_deduct === 'no' ? 'checked' : ''}> ไม่หัก (เต็นท์จ่ายแยก / จ่ายลูกค้าเอง)</label></div></div>
       <div class="field"><label for="${idp}-tt" class="${R}">เต็นท์ที่รับซื้อ</label><input id="${idp}-tt" data-modal="${pre}.t_tent" value="${esc(v.t_tent ?? '')}" placeholder="ชื่อเต็นท์ / ผู้ซื้อ" autocomplete="off"></div>
       <div class="field col-span-2 sm:col-span-3"><span class="text-sm ${R}">ใบสัญญาซื้อขายรถเก่า</span><label class="btn btn-ghost btn-sm relative" style="width:fit-content">${nf ? `แนบใหม่ ${nf} รูป` : docs ? `แนบแล้ว ${docs} รูป · เพิ่มรูป` : 'แนบรูปสัญญา'}<input type="file" accept="image/*" multiple data-file="trade" class="absolute w-px h-px opacity-0"></label></div></div>` : ''}</div>`;
 }
@@ -65,11 +72,11 @@ async function tradeDelivOf(v, cur, idp, need) {
     if (!model) return { err: 'ใส่รุ่นรถเก่า', id: idp + '-tm' };
     if (!(sale > 0)) return { err: 'ใส่ราคาขายรถเก่า', id: idp + '-ts' };
     if (!tent) return { err: 'ใส่ชื่อเต็นท์ที่รับซื้อ', id: idp + '-tt' };
-    if (!have) return { err: 'แนบรูปใบสัญญาซื้อขายรถเก่า', id: null };
+    if (!have && !noImgNeed()) return { err: 'แนบรูปใบสัญญาซื้อขายรถเก่า', id: null };
   }
   const docs = [...((cur && cur.docs) || [])];
   for (const x of S.files.trade) { const id = await storeImage(x.blob); if (id) docs.push(id); }
-  return { rec: { has: true, brand, model, year: parseInt(v.t_year, 10) || null, price: num(v.t_price) || null, sale_price: sale || null, tent: tent || null, docs } };
+  return { rec: { has: true, brand, model, year: parseInt(v.t_year, 10) || null, price: num(v.t_price) || null, sale_price: sale || null, tent: tent || null, deduct: v.t_deduct !== 'no', docs } };
 }
 function tradeFilesClear() { S.files.trade.forEach(x => { try { URL.revokeObjectURL(x.url); } catch (e) { /* ignore */ } }); S.files.trade = []; }
 Object.assign(ACTIONS, {

@@ -1,5 +1,6 @@
 // ------------------------------------------------------------------ lock requests from the Stock / Quota sheet
 const hash36 = s => { let h = 5381; for (const ch of String(s)) h = ((h * 33) ^ ch.codePointAt(0)) >>> 0; return h.toString(36); };
+function sheetApproved(type) { const now = new Date().toISOString(), start = todayISO(); return { status: 'approved', start, end: addDays(start, LOCK_DAYS_BY[type] || LOCK_DAYS_BY.temp), approved_at: now, approved_by: S.me.id || null, notices: [{ k: 'new', at: now, by: S.me.id || null, role: 'จากชีต Stock' }] }; }
 async function syncSheetLocks(only) {
   const D = derive(), plan = sheetPlan(D).filter(x => !only || only(x.u));
   let made = 0, updated = 0;
@@ -8,15 +9,24 @@ async function syncSheetLocks(only) {
     if (update) {
       const cur = findLock(update.id); if (!cur || cur.status !== 'pending') continue;
       const old = sheetTextOf(cur);
-      Object.assign(cur, f);
+      Object.assign(cur, f, sheetApproved(f.type));
       if (await saveLock(update.id, cur, 'อัปเดตจากชีต Stock', `"${old || ''}" → "${u.text}"`)) updated++;
       continue;
     }
     // one id per unit and text, so two people saving the same file at once do not make two requests
     const id = 'H_' + (u.vin || u.ref) + '_' + hash36(sheetNorm(u.text));
     if (S.locks.has(id)) continue;
-    const l = { ...f, status: 'pending', requested_at: new Date().toISOString(), requested_by: S.me.id || null, requested_role: null, ext: 0, history: [], convert_from: null };
-    if (await saveLock(id, l, 'ขอล็อก (จากชีต Stock)', `"${u.text}"`)) made++;
+    const l = { ...f, ...sheetApproved(f.type), requested_at: new Date().toISOString(), requested_by: S.me.id || null, requested_role: null, ext: 0, history: [], convert_from: null };
+    if (await saveLock(id, l, 'ล็อกจากชีต Stock (ไม่ต้องอนุมัติ)', `"${u.text}"`)) made++;
+  }
+  // 17/11: names typed in the sheet need no approval → requests still waiting from before are approved too (unless the car already has a live lock)
+  for (const l of D.locks) {
+    if (l.status !== 'pending' || !l.imported || l.replaces || l.idsTook || !branchOk(l.car_br)) continue;
+    if (only && !only({ vin: l.vin, ref: l.ref })) continue;
+    if (D.locks.some(o => o.id !== l.id && o.live && o.status !== 'pending' && (l.vin ? o.vin === l.vin : !o.vin && o.ref === l.ref))) continue;
+    const cur = findLock(l.id); if (!cur || cur.status !== 'pending') continue;
+    Object.assign(cur, sheetApproved(cur.type));
+    if (await saveLock(l.id, cur, 'อนุมัติอัตโนมัติ (ล็อกจากชีต Stock)', '')) updated++;
   }
   return { made, updated };
 }
@@ -43,7 +53,11 @@ Object.assign(ACTIONS, {
       if (!b) { toast('ไม่พบใบจองนี้แล้ว', 'bad'); return; }
       if (c && c.hasCar) { toast('ใบจองนี้มีรถคันอื่นแล้ว เลือกใบอื่น', 'bad'); return; }
       const a = c ? c.a : b.app;
-      set = { type: 'booking', bkref: pick, bk_br: (a && a.br) || b.br || null, sales: (a && a.sales) || b.owner || L.sales || null, dealer_name: null };
+      set = { type: 'booking', bkref: pick, bk_br: (a && a.br) || b.br || null, sales: (a && a.sales) || b.owner || L.sales || null, dealer_name: null, spec_off: null };
+      // 19/11: another spec is allowed with a reason; the branch admin then edits the booking to the car's spec
+      const bs = (a && a.spec) || b.spec;
+      if (bs && bs !== L.spec) { const why = String(m.why || '').trim(); if (!why) { toast('สเปกไม่ตรง ใส่เหตุผลที่ล็อกข้ามสเปก', 'bad'); $('#lb-why')?.focus(); return; }
+        set.spec_off = { bk: bs, car: L.spec, why, at: new Date().toISOString(), by: roleLabel() }; }
       label = `ใบจอง ${b.no || ''} ${(a && a.cust) || b.cust || ''}`.trim();
     }
     const cur = await claimFresh('locks', m.id, x => x.status === 'pending');
@@ -62,7 +76,7 @@ Object.assign(ACTIONS, {
   },
   async 'sheet-sync'() {
     const r = await syncSheetLocks();
-    toast(r.made || r.updated ? `สร้างคำขอล็อกจากชีต ${r.made} รายการ${r.updated ? ` · อัปเดต ${r.updated}` : ''} รอผู้จัดการอนุมัติ` : 'ไม่มีข้อความใหม่ในชีต');
+    toast(r.made || r.updated ? `ล็อกจากชีต ${r.made} รายการ${r.updated ? ` · อนุมัติ/อัปเดต ${r.updated}` : ''} (ไม่ต้องรออนุมัติ)` : 'ไม่มีข้อความใหม่ในชีต');
     render();
   }
 });

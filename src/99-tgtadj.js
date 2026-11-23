@@ -6,6 +6,8 @@
 // Honda counts targets by "Ki": Ki 103 starts 2026-04 (April to March), a Ki is 12 months (Ki 104 starts 2027-04)
 // Only function declarations at the top level: the first render runs before this file.
 const KI0 = { n: 103, start: '2026-04' };
+// ticks that follow the reason (the user can still change them): quota cars late = cut is temporary; made up from another month = the add takes it off; Honda changes the target = a real cut
+const TGT_ADJ_DEF = { 'รถโควต้าไม่มาส่ง': [true, false], 'เกลี่ยเป้าจากเดือนอื่น': [false, true], 'ฮอนด้าปรับเป้า': [false, false] };
 const TGT_ADJ_REASONS = ['รถโควต้าไม่มาส่ง', 'ฮอนด้าปรับเป้า', 'สาขาปรับแผนการขาย', 'เกลี่ยเป้าจากเดือนอื่น', 'อื่น ๆ'];
 function mAdd(m, k) { const [y, mo] = m.split('-').map(Number), t = y * 12 + (mo - 1) + k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}`; }
 function mDiff(a, b) { const [ya, ma] = a.split('-').map(Number), [yb, mb] = b.split('-').map(Number); return (yb - ya) * 12 + (mb - ma); }
@@ -88,7 +90,7 @@ function tgtAdjModal(m) {
   <div class="flex flex-wrap gap-2 my-3">${chip2('ลดเป้า', P.cut ? '−' + P.cut : '–', P.cut ? 'bad' : '')}${chip2('เพิ่มเป้า', P.add ? '+' + P.add : '–', P.add ? 'good' : '')}${chip2('เป้าใหม่รวม', P.nw)}${chip2(`ค้างปรับของ ${esc(m.br)} ใน Ki นี้`, `${B.left} → ${after}`, after > 0 ? 'bad' : '')}</div>
   <div class="flex flex-col gap-2 mb-3">
     <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-5 h-5" data-modal="carry" ${carry ? 'checked' : ''}> ที่ลดไป จะเกลี่ยไปเดือนอื่น (ขึ้นเป็น "ค้างปรับ")</label>
-    <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-5 h-5" data-modal="link" ${link ? 'checked' : ''}> ที่เพิ่ม เกลี่ยมาจากค้างปรับ (หักค้างปรับออก)</label></div>
+    <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="w-5 h-5" data-modal="link" ${link ? 'checked' : ''}> ที่เพิ่ม เกลี่ยมาจากค้างปรับ (หักค้างปรับออก) · เพิ่มรุ่นอื่นได้ ไม่ต้องตรงกับรุ่นที่ลด นับรวมทั้งสาขา</label></div>
   <div class="grid sm:grid-cols-2 gap-3 mb-3"><div class="field"><label for="ta-r" class="req">เหตุผล</label><select id="ta-r" data-modal="reason">${TGT_ADJ_REASONS.map(r => `<option ${m.reason === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></div>
     <div class="field"><label for="ta-note">หมายเหตุ</label><input id="ta-note" data-modal="note" value="${esc(m.note || '')}" placeholder="เช่น ฮอนด้าส่งรถ Quota ช้า"></div></div>
   <div class="flex justify-end gap-2"><button class="btn btn-ghost" data-act="close">ยกเลิก</button><button class="btn btn-red" data-act="tgtadj-save">บันทึกการปรับเป้า ${monLabel(m.m)} ${esc(m.br)}</button></div>`;
@@ -96,10 +98,11 @@ function tgtAdjModal(m) {
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t || !S.modal || S.modal.kind !== 'tgtadj' || !t.dataset.modal) return;
   if (t.dataset.modal === 'm') S.modal.grid = {};
+  if (t.dataset.modal === 'reason') { const d = TGT_ADJ_DEF[t.value] || [true, true]; S.modal.carry = d[0]; S.modal.link = d[1]; render(); return; }
   if (['m', 'carry', 'link'].includes(t.dataset.modal) || t.dataset.tgtadjCell !== undefined) render();
 });
 Object.assign(ACTIONS, {
-  'tgtadj-open'() { if (!tgtCanEdit()) return; S.modal = { kind: 'tgtadj', m: todayISO().slice(0, 7), br: tgtEditBrs()[0], grid: {}, reason: TGT_ADJ_REASONS[0], carry: true, link: true, note: '' }; render(); },
+  'tgtadj-open'() { if (!tgtCanEdit()) return; S.modal = { kind: 'tgtadj', m: todayISO().slice(0, 7), br: tgtEditBrs()[0], grid: {}, reason: TGT_ADJ_REASONS[0], carry: TGT_ADJ_DEF[TGT_ADJ_REASONS[0]][0], link: TGT_ADJ_DEF[TGT_ADJ_REASONS[0]][1], note: '' }; render(); },
   'tgtadj-set'(el) { S.modal[el.dataset.k] = el.dataset.v; if (el.dataset.k === 'br') S.modal.grid = {}; render(); },
   'tgtadj-toggle'() { S.filters.tgtAdjOpen = !S.filters.tgtAdjOpen; render(); },
   'ki-sel'(el) { S.filters.kiSel = Number(el.dataset.k); render(); },

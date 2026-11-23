@@ -58,6 +58,10 @@ html, body { height: 100%; }
 /* nothing may make the page wider than the phone (iOS then zooms the whole page out) */
 html { overflow-x: hidden; }
 .field select { max-width: 100%; min-width: 0; text-overflow: ellipsis; }
+/* the sale terms grid (11/11): labels take two lines' height side by side so the boxes of one row line up; a small tick under a box */
+@media (min-width: 640px) { .tf-grid > .field > label:first-child { min-height: 2.7em; display: flex; align-items: flex-end; } }
+.field label.tf-chk { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; color: var(--fg); min-height: 0; }
+.field label.tf-chk input[type=checkbox] { width: 16px; height: 16px; min-height: 0; padding: 0; margin: 0; flex: none; box-shadow: none; }
 select { max-width: 100%; text-overflow: ellipsis; }
 body { background: var(--bg); color: var(--fg); font-family: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif; font-size: 14px; line-height: 1.55; }
 h1, h2, h3 { text-wrap: balance; }
@@ -127,6 +131,47 @@ tr.low td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 .modal.wide { max-width: 1120px; }
 .tbl td, .tbl th { padding: 7px 9px; }
 .tbl tbody tr:hover td { background: var(--surface-2); }
+.tbl-xl { font-size: 13px; border-collapse: collapse; }
+.tbl-xl td, .tbl-xl th { padding: 4px 7px; border: 1px solid var(--line); vertical-align: top; line-height: 1.35; }
+.tbl-xl th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+.tbl-xl .btn-sm { padding: 2px 8px; min-height: 26px; font-size: 12px; }
+.xf-btn { margin-left: 4px; padding: 0 4px; border: 1px solid var(--line); border-radius: 4px; font-size: 10.5px; line-height: 1.4; color: var(--muted); background: var(--surface); vertical-align: middle; }
+.xf-btn.on { color: var(--accent, #2563eb); border-color: var(--accent, #2563eb); font-weight: 700; }
+@media print { .xf-btn { display: none; } }
+.acx-btn { margin-left: 4px; padding: 0 5px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px; color: var(--muted); background: var(--surface); }
+.acx-btn.on { color: var(--accent, #2563eb); border-color: var(--accent, #2563eb); font-weight: 700; }
+.acx-pop { position: fixed; z-index: 40; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.18); padding: 8px; text-align: left; font-weight: 400; white-space: normal; color: var(--fg); }
+.acx-it { display: block; width: 100%; text-align: left; padding: 4px 6px; font-size: 12.5px; border-radius: 4px; }
+.acx-it:hover { background: var(--surface-2); }
+.acx-row { display: flex; gap: 6px; align-items: center; font-size: 12.5px; padding: 2px 4px; }
+.acx-list { max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 2px; }
+.lt-cell { position: relative; min-width: 105px; max-width: 160px; white-space: normal; }
+.lt-cell.on { min-width: 210px; max-width: none; }
+.lt-in { width: 200px; font: inherit; font-size: 12.5px; padding: 2px 6px; border: 2px solid var(--accent, #2563eb); border-radius: 5px; background: var(--surface); }
+.lt-in.idle { width: 100px; border: 1px solid var(--line); background: var(--surface-2); cursor: text; }
+@media (pointer: coarse) { input, select, textarea, .lt-in { font-size: 16px !important; } }
+.lt-txt { font-weight: 500; }
+.lt-drop { position: absolute; left: 0; top: 28px; z-index: 30; width: 360px; max-width: 80vw; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.18); overflow: hidden auto; max-height: min(60vh, 520px); white-space: normal; }
+.lt-it { display: flex; flex-direction: column; width: 100%; text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.lt-it:hover, .lt-it:focus, .lt-it.hl { background: var(--surface-2); }
+.lt-sub { font-size: 11px; color: var(--muted); }
+.lt-hint { font-size: 11px; color: var(--muted); padding: 5px 10px; background: var(--surface-2); }
+.tbl-xl .xl-pin { position: sticky; left: 0; z-index: 1; background: var(--surface); }
+.tbl-xl td.xl-st { white-space: normal; }
+/* filters on a phone: two boxes a row whatever loads the utility classes (11/11) */
+@media (max-width: 639px) { .flt2 { display: grid !important; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; } .flt2 > .col-span-2 { grid-column: span 2 / span 2; } .flt2 > .field { min-width: 0; } }
+.bk-tbl tr.bk-row { cursor: pointer; } .bk-tbl tr.bk-row:hover td { background: var(--surface-2); }
+.bk-tbl td[data-act="noop"] { cursor: default; }
+.bk-tbl .bk-acts .btn { white-space: nowrap; } .bk-tbl td { padding: 4px 6px; } .bk-tbl .chip { white-space: nowrap; }
+.tbl-xl td.xl-st > div { max-width: 11em; }
+.tbl-xl .xl-tags { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.tbl-xl .xl-tags .chip { white-space: nowrap; }
+.lt-drop .lt-x { position: sticky; top: 0; float: right; z-index: 2; margin: 4px 6px 0 0; font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--surface-2); color: var(--ink, inherit); }
+.lk-st { flex: none; } .lk-st .chip { white-space: normal; line-height: 1.35; padding-top: 2px; padding-bottom: 2px; border-radius: 10px; }
+.tbl-xl td.xl-pin .xl-sub { white-space: normal; max-width: 15em; }
+@media (max-width: 767px) { .tbl-xl td.xl-pin { font-size: 11.5px; } .tbl-xl td.xl-pin .xl-sub { font-size: 10.5px; max-width: 11em; } }
+.tbl-xl th.xl-pin { background: var(--surface-2); z-index: 2; }
+@media (max-width: 767px) { .tbl-xl .xl-desk { display: none; } }
 .nowrap { white-space: nowrap; }
 .opt-tip { display: inline-block; border-bottom: 1px dotted currentColor; cursor: help; font-weight: 600; white-space: nowrap; }
 .opt-pop { position: fixed; z-index: 9999; max-width: min(420px, calc(100vw - 16px)); padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.45; background: var(--ink, #222); color: var(--bg, #fff); box-shadow: 0 6px 24px rgba(0,0,0,.25); pointer-events: none; }
@@ -162,5 +207,6 @@ tr.low td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 /* date inputs on phones: stay inside the box, text on the left */
 .field input[type=date],.field input[type=month]{-webkit-appearance:none;appearance:none;display:block;width:100%;min-width:0;max-width:100%;min-height:2.75rem;text-align:left}
 .field input[type=date]::-webkit-date-and-time-value,.field input[type=month]::-webkit-date-and-time-value{text-align:left}
+.bko-hl { outline: 3px solid var(--warn); outline-offset: 2px; background: var(--warn-soft); border-radius: 6px; transition: background .3s; }
 </style>
 

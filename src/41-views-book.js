@@ -9,16 +9,17 @@ const atVisible = a => isSales() ? isMine(a.sales) : S.role.role === 'admin' ? a
 const monthStartISO = () => todayISO().slice(0, 8) + '01';
 function matchChip(a) {
   const m = a.match;
-  if (a.cancelled) return a.idsLeft ? chip(`ยกเลิกแล้ว · IDS ยังมีใบจอง ${a.idsLeft.no || ''} รอยกเลิกใน IDS`, 'warn') : chip('ยกเลิก', 'muted');
+  if (a.cancelled) return a.idsLeft ? chip(`ยกเลิกแล้ว · IDS ยังมีใบจอง ${a.idsLeft.no || ''} รอยกเลิกใน IDS`, 'warn') : a.idsGone ? chip(`ยกเลิก · IDS ${a.idsGone.no || ''} รอยกเลิกออกจากระบบแล้ว`, 'muted') : chip('ยกเลิก', 'muted');
   if (!m) {
     if (a.demo) return chip('รถทดลองขับ', 'muted');
     if (a.flow.history) return chip('ส่งมอบแล้ว (ฟอร์มเดิม)', 'muted');
     const nearTxt = a.near ? (a.near.some(h => h.other) ? ' · ชื่อซ้ำกับใบจองอื่น' : ' · มีชื่อคล้ายใน IDS') : '';
-    return a.ageDays >= AT_TO_IDS_DAYS ? chip(`ยังไม่อยู่ใน IDS ${a.ageDays} วัน${nearTxt}`, a.near ? 'warn' : 'bad') : chip(`รอคีย์ IDS (${a.ageDays ?? 0} วัน)${nearTxt}`, 'neutral');
+    // the tag, then the days in light text under it (11/11)
+    return (a.ageDays >= AT_TO_IDS_DAYS ? chip('ยังไม่อยู่ใน IDS', a.near ? 'warn' : 'bad') : chip('รอคีย์ IDS', 'neutral')) + `<div class="text-xs text-muted">${a.ageDays ?? 0} วัน${esc(nearTxt)}</div>`;
   }
   const pre = m.status === 'possible' ? 'อาจตรง · ' : '';
-  if (m.kind === 'dl') return chip(pre + (m.ddate ? `ส่งมอบแล้ว ${fmtD(m.ddate)}` : `ออกใบกำกับ ${fmtD(m.idate)}`), m.status === 'possible' ? 'warn' : 'good');
-  if (m.kind === 'stock') return chip(pre + 'จัดสรรรถแล้ว · รอส่งมอบ', m.status === 'possible' ? 'warn' : 'good');
+  if (m.kind === 'dl') return chip(pre + (m.ddate ? 'ส่งมอบแล้ว' : 'ออกใบกำกับ'), m.status === 'possible' ? 'warn' : 'good') + `<div class="text-xs text-muted">${fmtD(m.ddate || m.idate)}</div>`;
+  if (m.kind === 'stock') return chip(pre + 'รอส่งมอบ', m.status === 'possible' ? 'warn' : 'good');
   return chip(pre + 'พบใน IDS', m.status === 'possible' ? 'warn' : 'good');
 }
 
@@ -44,23 +45,26 @@ function bookRows(D) {
   if (D._bookRows) return D._bookRows;
   const rows = [], used = new Set();
   for (const a of D.at) {
-    if (a.demo) continue;
-    const ib = a.ids || a.idsLeft;   // a cancelled booking keeps its IDS booking that is still open (one row, not two)
+    if (a.demo) { const dr = D.bookingByKey.get(a.key); if (dr && dr.state === 'demo') rows.push({ key: a.key, a, b: null, row: dr, date: a.date, no: null, cust: 'รถ Demo', owner: a.sales, br: a.br, spec: a.spec, model: a.model, vin: null, demoRow: true }); continue; }
+    if (a.demoCar && !a.match && !a.ids) continue;   // 19/11: a "รถ Demon" form not matched to IDS is not listed
+    const ib = a.ids || a.idsLeft || a.idsGone;   // a cancelled booking keeps its IDS booking that is still open (one row, not two)
     if (ib) used.add(ib.key);
     ((a.match && a.match.alt) || []).forEach(x => used.add(x.key)); ((a.rec && a.rec.ids_alt) || []).forEach(k => used.add(k));   // the old number IDS replaced: same booking, no second row
     rows.push({ key: a.key, a, b: ib || null, row: a.row, date: a.date, no: a.no, cust: a.cust, owner: a.sales, idsSales: a.idsSales, br: a.br, spec: a.spec, model: a.model, vin: a.match && a.match.vin });
   }
   for (const b of D.idsB) {
-    if (used.has(b.key)) continue;
+    if (used.has(b.key) || b.mergedInto) continue;   // folded into the new / the repeated booking (12/11)
     rows.push({ key: b.key, a: null, b, row: D.bookingByKey.get(b.key), date: b.date, no: b.no, cust: b.cust, owner: b.owner || b.sales, idsSales: b.sales, br: b.br, spec: b.spec, model: b.model, vin: b.vin, noForm: D.idsOnly.includes(b), seed: b.seed });
   }
   return (D._bookRows = rows);
 }
 const BOOK_FILTERS = [['active', 'ยังไม่ส่งมอบ'], ['noids', 'ฟอร์ม AT ยังไม่อยู่ใน IDS'], ['noat', 'มีใน IDS แต่ไม่มีฟอร์ม AT'], ['waiting', 'รอรถ'], ['locked', 'ล็อก / รออนุมัติล็อก'], ['idscar', 'IDS จัดสรรรถแล้ว'],
-  ['assign', 'รอจัดสรรรถ'], ['confirm', 'รอยืนยันเจ้าของ / การจับคู่'], ['req', 'รออนุมัติแก้ไข / ยกเลิก'], ['refund', 'ยกเลิกแล้ว รอทำใบคืนเงิน'], ['dtoday', 'ส่งมอบวันนี้'], ['d7', 'นัดส่งมอบภายใน 7 วัน'], ['stuck', 'ต้องเร่งตาม'], ['done', 'ส่งมอบแล้ว'], ['cancel', 'ยกเลิก'], ['cxids', 'ยกเลิกแล้ว รอยกเลิกใน IDS'], ['all', 'ทั้งหมด']];
+  ['assign', 'รอจัดสรรรถ'], ['confirm', 'รอยืนยันเจ้าของ / การจับคู่'], ['req', 'รออนุมัติแก้ไข / ยกเลิก'], ['refund', 'ยกเลิกแล้ว รอทำใบคืนเงิน'], ['demo', 'รถ Demo (ซื้อรถ Demo / ทดลองขับ)'], ['dtoday', 'ส่งมอบวันนี้'], ['d7', 'นัดส่งมอบภายใน 7 วัน'], ['stuck', 'ต้องเร่งตาม'], ['done', 'ส่งมอบแล้ว'], ['cancel', 'ยกเลิก'], ['cxids', 'ยกเลิกแล้ว รอยกเลิกใน IDS'], ['all', 'ทั้งหมด']];
 function rowState(r, D, st) {
   const a = r.a, state = r.row ? r.row.state : null;
   if (st === 'all') return true;
+  if (r.demoRow) return st === 'active' || st === 'demo';   // a test-drive form (12/11)
+  if (st === 'demo') return !!(r.row && r.row.state === 'democar');
   if (st === 'active') return a ? a.active : r.b.match !== 'cancel';
   if (st === 'noids') return !!(a && a.active && !a.match);
   if (st === 'noat') return !!r.noForm;
@@ -110,10 +114,11 @@ function bookList(D) {
   if (q) list = list.filter(r => [r.no, r.cust, r.owner, r.idsSales, r.vin, r.b && r.b.cust, r.a && r.a.rec.customer].some(x => x && searchKey(x).includes(q)));
   if (dRange && f.bDType === 'sale') list.sort((x, y) => (saleDate(y, D) || '').localeCompare(saleDate(x, D) || '')); else list.sort((x, y) => (y.date || '').localeCompare(x.date || ''));
   // sort (บทวิเคราะห์ 19/10): open work first / waiting longest / entered last
-  if (f.bSort === 'work') list.sort((x, y) => bkWorkRank(y, D) - bkWorkRank(x, D) || (x.date || '').localeCompare(y.date || ''));
-  else if (f.bSort === 'wait') list.sort((x, y) => (x.date || '').localeCompare(y.date || ''));
-  else if (f.bSort === 'new') list.sort((x, y) => bkEntered(y).localeCompare(bkEntered(x)));
-  const filt = `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
+  const bsort = ''; // the เรียง box was taken out (11/11)
+  if (bsort === 'work') list.sort((x, y) => bkWorkRank(y, D) - bkWorkRank(x, D) || (x.date || '').localeCompare(y.date || ''));
+  else if (bsort === 'wait') list.sort((x, y) => (x.date || '').localeCompare(y.date || ''));
+  else if (bsort === 'new') list.sort((x, y) => bkEntered(y).localeCompare(bkEntered(x)));
+  const filt = `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3 flt2">
     <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-aq">ค้นหาเลขที่ใบจอง / ชื่อลูกค้า / เซลล์ / VIN</label><input id="f-aq" type="search" data-filter="aq" value="${esc(f.aq)}"></div>
     ${f.aq ? '<button class="btn btn-ghost btn-sm" data-act="aq-clear">ล้างคำค้น</button>' : ''}
     <div class="field"><label for="f-qm2">รุ่น</label><select id="f-qm2" data-filter="qModel"><option value="">ทุกรุ่น</option>${Object.keys(CATALOG).map(m => `<option ${f.qModel === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
@@ -125,7 +130,6 @@ function bookList(D) {
     <div class="field"><label for="f-bdto">ถึง</label><input id="f-bdto" type="date" data-filter="bDTo" value="${esc(f.bDTo || '')}"></div>
     ${dRange || f.qModel || f.bGrade || f.bColor || f.bSales || (f.aState && f.aState !== 'active') ? '<button class="btn btn-ghost btn-sm" data-act="bd-clear">ล้างตัวกรอง</button>' : ''}
     <div class="field"><label for="f-as">แสดง</label><select id="f-as" data-filter="aState">${BOOK_FILTERS.map(([k, t]) => `<option value="${k}" ${st === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
-    <div class="field"><label for="f-bsort">เรียง</label><select id="f-bsort" data-filter="bSort">${[['', 'วันที่จองใหม่ก่อน'], ['work', 'งานค้างก่อน'], ['wait', 'รอนานก่อน'], ['new', 'บันทึกล่าสุด']].map(([k, t]) => `<option value="${k}" ${(f.bSort || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
   </div>${bkFilterBar(f, st, q)}`;
   const all = bookRows(D).filter(r => inBrRow(r) && rowVisible(r) && (!dRange || bookDateOk(r, D)));
   const cnt = k => all.filter(r => rowState(r, D, k)).length;
@@ -133,39 +137,39 @@ function bookList(D) {
   if (!list.length) return `${filt}${quick && !q ? `<div class="flex flex-wrap gap-2 mb-3">${quick}</div>` : ''}<div class="bg-surface border border-line rounded-lg">${q ? emptyBox(`ไม่พบ "${esc(f.aq.trim())}"`, `ค้นหาแล้วทุกสถานะและทุกสาขา${isSales() ? ' (เซลล์ค้นหาได้เฉพาะใบจองของตัวเอง)' : S.role.role === 'admin' ? ' ของสาขาตัวเอง' : ''} ลองพิมพ์แค่ชื่อหรือนามสกุล`) : emptyBox('ไม่มีใบจองตามตัวกรองนี้', st === 'dtoday' || st === 'd7' ? 'ยังไม่มีใบจองที่ใส่วันนัดรับรถในช่วงนี้ (ใส่ได้ในขั้น "นัดรับรถ" ของใบจอง)' : p.book && st === 'active' ? 'กด "+ ใบจอง AT Honda" แล้วแนบรูปใบจองและสลิป' : 'ลองเปลี่ยนตัวกรองหรือสาขา')}</div>`;
   const PG = 50, pages = Math.max(1, Math.ceil(list.length / PG)), pg = Math.min(Math.max(1, Number(f.bPage) || 1), pages), from = (pg - 1) * PG;
   return `${filt}<div class="flex flex-wrap gap-2 items-center mb-2"><span class="text-sm">แสดง ${list.length ? from + 1 : 0}–${Math.min(from + PG, list.length)} จาก ${list.length} ใบ${q ? ` · ค้นหาทุกสาขา${st === 'active' ? ' ทุกสถานะ' : ` เฉพาะ "${BOOK_FILTERS.find(x => x[0] === st)[1]}"`}` : ` · ${S.br ? 'สาขา ' + S.br : 'ทุกสาขา'}`}</span>${q ? '' : quick}</div>
-  <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl">
-    <thead><tr><th>วันที่จอง / เลขที่</th><th>ชื่อลูกค้า</th><th>เซลล์ / สาขา</th><th>รุ่น / เกรด / สี</th><th>IDS</th><th>สถานะ / ขั้นถัดไป</th><th></th></tr></thead>
+  <div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl tbl-xl bk-tbl">
+    <thead><tr><th>วันที่ / เลขที่</th><th>ลูกค้า</th><th>เซลล์ / สาขา</th><th>รุ่น / เกรด / สี</th><th>ล็อก (เลขเฟรม / Quota)</th><th>IDS</th><th>สถานะ / ขั้นถัดไป</th></tr></thead>
     <tbody>${list.slice(from, from + PG).map(r => bookRow(r, D, p)).join('')}</tbody></table></div>${pager(pg, pages)}`;
 }
 function bookRow(r, D, p) {
   const a = r.a, b = r.b, row = r.row || {};
   const lk = row.lock || null;
   const acts = [];
-  if (a) acts.push(`<button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(a.id)}">เปิด</button>`);
+  // the row itself opens the booking (11/11): no "เปิด" / "จัดสรรรถ" buttons, only the actions that are not opening it
+  if (a) { /* row click */ }
   else if (r.noForm && p.book && p.write && (!isSales() || isMine(r.owner))) acts.push(`<button class="btn btn-dark btn-sm" data-act="ids-claim" data-id="${esc(b.no)}">ลงฟอร์ม AT</button>`);
   if (!a && b && r.noForm && p.write && idsFixCan(b)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="idspair-open" data-id="${esc(b.key)}">จับคู่กับฟอร์มที่มี</button>`);
   if (!a && b && p.write && idsFixCan(b)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="idsfix-open" data-id="${esc(b.no)}">แก้ไข</button>`);
-  if (p.write && p.request && row.state === 'waiting' && (!isSales() || isMine(r.owner)) && (a ? a.active : true)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="lock-open" data-bk="${esc(row.key || r.key)}">ขอล็อกรถ</button>`);
+  // ขอล็อกรถ / อนุมัติล็อก are gone from the list (11/11): managers type the lock in its column, anything odd is checked on the card
   // the booking's own locks are handled on this row: approve, allocate, extend, release, swap, undo (ตกลง 13/10)
-  if (p.write) D.locks.filter(l => (l.bkref === r.key || (row.key && l.bkref === row.key) || (a && l.bkref === a.key)) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased).forEach(l => acts.push(...rowLockActs(l, D)));
-  if (p.write && a && a.active && ((a.flow.next === 'assign' && (canAllocBr(a.br) || adminOwns(a))) || mgrAssign(a))) acts.push(`<button class="btn btn-dark btn-sm" data-act="at-open" data-id="${esc(a.id)}">จัดสรรรถ</button>`);
-  const idsCell = a ? `${matchChip(a)}${a.matchAsk ? `<div>${chip('รอยืนยันการจับคู่', 'warn')}</div>` : ''}${b && b.ids ? `<div class="text-xs text-muted">${esc(b.ids)}</div>` : ''}`
-    : `${r.noForm ? chip('ยังไม่มีฟอร์ม AT', 'bad') : b.webCancel ? '' : b.match === 'cancel' ? chip('รอยกเลิกใน IDS', 'muted') : chip('ใน IDS', 'neutral')}<div class="text-xs text-muted">${esc(b.ids || '')}</div>${idsFixChip(b)}`;
+
+  const idsCell = r.demoRow ? '<span class="text-xs text-muted">ไม่ต้องคีย์ IDS (รถทดลองขับ)</span>' : a ? `${matchChip(a)}${a.matchAsk ? `<div>${chip('รอยืนยันการจับคู่', 'warn')}</div>` : ''}${b && b.ids ? `<div class="text-xs text-muted">${esc(b.ids)}</div>` : ''}`
+    : `${r.noForm ? chip('ยังไม่มีฟอร์ม AT', 'bad') : b.webCancel ? '' : b.match === 'cancel' ? chip('รอยกเลิกใน IDS', 'muted') : chip('ใน IDS', 'neutral')}<div class="text-xs text-muted">${esc(b.ids || '')}</div>${idsFixChip(b)}${acts.length ? `<div class="flex flex-wrap gap-1 mt-1 bk-acts" data-act="noop">${acts.join('')}</div>` : ''}`;
   const stateCell = a && a.cancelled ? (a.rec.cancel && a.rec.cancel.refund === 'refund' ? chip(a.rec.refund && a.rec.refund.at ? 'ยกเลิก · ทำใบคืนเงินแล้ว' : 'ยกเลิก · รอทำใบคืนเงิน', a.rec.refund && a.rec.refund.at ? 'muted' : 'warn') : chip('ยกเลิก', 'muted'))
     : `${a && a.change ? `<div>${chip(a.change.type === 'cancel' ? 'รออนุมัติยกเลิก' : a.change.type === 'merge' ? 'รออนุมัติรวมใบ (ลงซ้ำ)' : 'รออนุมัติแก้ไข', 'warn')}</div>` : ''}${a && gformDue(a) && gformCfg() && (a.rec.created_at || '') >= (gformCfg().at || '') ? `<div>${chip('ยังไม่ส่ง Google Form', 'warn')}</div>` : ''}${a && a.flow.history ? chip('ส่งมอบแล้ว (ประวัติ)', 'muted') : statusChip(BOOK_STATE, row.state || 'waiting')}${row.state === 'waiting' && row.pos ? ` <span class="text-xs text-muted">คิวที่ ${row.pos}</span>` : ''}
-      ${a && a.flow.next ? `<div class="text-xs text-muted">ถัดไป: ${FLOW_LABEL[a.flow.next]}</div>` : ''}`;
-  return `<tr ${r.noForm ? 'class="low"' : ''}>
+      ${a && !r.demoRow && a.flow.next ? `<div class="text-xs text-muted">ถัดไป: ${a.flow.next === 'booked' ? 'ใบเสร็จมัดจำ' : FLOW_LABEL[a.flow.next]}</div>` : ''}`;
+  return `<tr class="${r.noForm ? 'low' : ''}${a ? ' bk-row' : ''}" ${a ? `data-act="at-open" data-id="${esc(a.id)}" title="กดเพื่อเปิดใบจอง"` : ''}>
     <td class="nowrap"><span class="num">${fmtD(r.date)}</span>${r.no ? `<div class="code text-xs text-muted">${esc(r.no)}</div>` : ''}</td>
-    <td style="min-width:150px">${custCell(r.cust, r.owner, { seed: r.seed })}${a && a.rec.doc_url ? `<div class="text-xs"><a class="underline" href="${esc(a.rec.doc_url)}" target="_blank" rel="noopener">ใบจองใน Drive</a></div>` : ''}</td>
-    <td class="nowrap">${salesCell(a ? a.sales : null, r.idsSales, a ? a.ownerCheck : null)}<div class="text-xs text-muted">${esc(r.br || '')} ${BR[r.br]?.name || ''}</div>${crossChip(a)}</td>
-    <td class="nowrap">${specLabel(r.spec)}${a && a.specFromIds ? ' <span class="text-xs text-muted">(ตาม IDS)</span>' : ''}${a && (a.multi || a.multiOf) ? `<div>${chip('จอง 2 คัน', 'warn')}</div>` : ''}${r.vin ? `<div class="code text-xs text-muted">${esc(r.vin)}</div>` : ''}</td>
-    <td style="min-width:130px">${idsCell}</td>
-    <td class="nowrap">${stateCell}</td>
-    <td class="text-right"><div class="flex flex-wrap gap-1 justify-end">${acts.join('')}</div></td></tr>`;
+    <td style="min-width:110px;max-width:170px">${custCell(r.cust, r.owner, { seed: r.seed })}${a && a.rec.doc_url ? `<div class="text-xs"><a class="underline" data-act="noop" href="${esc(a.rec.doc_url)}" target="_blank" rel="noopener">ใบจองใน Drive</a></div>` : ''}</td>
+    <td class="nowrap">${salesCell(a ? a.sales : null, r.idsSales, r.demoRow ? 'demo' : a ? a.ownerCheck : null)}<div class="text-xs text-muted">${esc(r.br || '')} ${BR[r.br]?.name || ''}</div>${crossChip(a)}</td>
+    <td class="nowrap">${(([m, g, c]) => `${esc(m)}<div class="text-xs text-muted">${esc(gradeShort(m, g) || g || '')} <span class="code">${esc(c || '')}</span></div>`)(String(r.spec || '?|?|?').split('|'))}${a && a.specFromIds ? '<span class="text-xs text-muted">(ตาม IDS)</span>' : ''}${a && (a.multi || a.multiOf) ? `<div>${chip('จอง 2 คัน', 'warn')}</div>` : ''}</td>
+    <td class="nowrap" data-act="noop">${bkLockCell(r, D)}</td>
+    <td style="min-width:90px;max-width:150px">${idsCell}</td>
+    <td style="min-width:90px;max-width:160px">${stateCell}</td></tr>`;
 }
 function bookingFilters(qKey, withState) {
   const f = S.filters;
-  return `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
+  return `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3 flt2">
     <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-${qKey}">ค้นหาเลขที่ใบจอง / ชื่อลูกค้า / เซลล์</label><input id="f-${qKey}" type="search" data-filter="${qKey}" value="${esc(f[qKey])}"></div>
     <div class="field"><label for="f-qm">รุ่น</label><select id="f-qm" data-filter="qModel"><option value="">ทุกรุ่น</option>${Object.keys(CATALOG).map(m => `<option ${f.qModel === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
     ${withState ? `<div class="field"><label for="f-bs">สถานะ</label><select id="f-bs" data-filter="bState"><option value="">ทั้งหมด</option>
@@ -211,7 +215,7 @@ function qtBody(D) {
   const { rows } = qtData(D), p = perms();
   return `<tbody id="qt-tb">${rows.slice(0, 1000).map(({ b, v }) => {
     const canReq = p.write && p.request && b.state === 'waiting' && (!isSales() || isMine(b.owner)) && branchOk(b.br);
-    return `<tr><td class="whitespace-nowrap">${b.state === 'waiting' ? chip(`รอรถ คิวที่ ${b.pos}`, 'warn') : statusChip(BOOK_STATE, b.state)}</td><td class="num whitespace-nowrap">${fmtD(b.date)}</td><td>${custCell(b.cust, b.owner, { seed: b.seed })}</td><td>${esc(v.model)}</td><td>${esc(v.grade)}</td><td>${esc(v.color)}</td><td>${esc(v.sales)}</td><td>${esc(v.br)}</td><td class="code">${esc(v.no) || '<span style="color:var(--warn)">ยังไม่มี</span>'}</td><td class="text-xs">${esc(v.dep)}</td>
+    return `<tr><td class="whitespace-nowrap">${b.state === 'waiting' ? chip(`รอรถ คิวที่ ${b.pos}`, 'warn') + (b.noIds ? ' <span class="text-xs" style="color:var(--warn)">ยังไม่มีใน IDS</span>' : '') : statusChip(BOOK_STATE, b.state)}</td><td class="num whitespace-nowrap">${fmtD(b.date)}</td><td>${custCell(b.cust, b.owner, { seed: b.seed })}</td><td>${esc(v.model)}</td><td>${esc(v.grade)}</td><td>${esc(v.color)}</td><td>${esc(v.sales)}</td><td>${esc(v.br)}</td><td class="code">${esc(v.no) || '<span style="color:var(--warn)">ยังไม่มี</span>'}</td><td class="text-xs">${esc(v.dep)}</td>
       <td class="whitespace-nowrap">${b.app && (!isSales() || isMine(b.owner)) ? `<button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(b.app.id)}">เปิดใบจอง</button>` : ''}${canReq ? ` <button class="btn btn-ghost btn-sm" data-act="lock-open" data-bk="${esc(b.key)}">ขอล็อกรถ</button>` : ''}</td></tr>`;
   }).join('') || `<tr><td colspan="11" class="p-3 text-muted">ไม่พบใบจองตามตัวกรองนี้</td></tr>`}</tbody>`;
 }
@@ -277,7 +281,7 @@ function summaryView(D) {
   const sales = salesNames(true);
   const brs = S.br ? [S.br] : BRS;
   return `
-  <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
+  <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3 flt2">
     <div class="field"><label for="s-from">ตั้งแต่วันที่</label><input id="s-from" type="date" data-filter="sFrom" value="${from}"></div>
     <div class="field"><label for="s-to">ถึงวันที่</label><input id="s-to" type="date" data-filter="sTo" value="${to}"></div>
     <div class="field"><label for="s-by">สรุปตาม</label><select id="s-by" data-filter="sBy">${[['model', 'รุ่น'], ['grade', 'รุ่น + เกรด'], ['spec', 'รุ่น + เกรด + สี'], ['sales', 'ชื่อเซลล์']].map(([k, t]) => `<option value="${k}" ${by === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
@@ -310,6 +314,9 @@ function viewQuota(D) {
   const months = [...new Set(list.map(q => q.m).filter(Boolean))].sort();
   if (f.qm) list = list.filter(q => q.m === f.qm);
   if (f.qModel) list = list.filter(q => q.model === f.qModel);
+  // search by VIN / Ref / booking number (9/11): looks in every status, the archive included
+  const qq = String(f.qq || '').trim().toUpperCase().replace(/\s+/g, '');
+  if (qq) list = list.filter(q => [q.vin, q.ref, q.bk, q.atb && q.atb.no].some(v => v && String(v).toUpperCase().includes(qq)) || (!isSales() && [q.booking && q.booking.cust, q.atb && q.atb.cust].some(v => v && String(v).replace(/\s+/g, '').includes(String(f.qq).replace(/\s+/g, '')))));
   const cnt = {}; list.forEach(q => { cnt[q.st] = (cnt[q.st] || 0) + (q.qty || 1); });
   const live = q => q.st === 'waiting' || q.st === 'vin';
   // arrived and sold quota are already in สต็อก / delivered: kept only in the archive view, so nothing shows twice (13/10)
@@ -319,14 +326,15 @@ function viewQuota(D) {
   else if (f.qs === 'matched') list = list.filter(q => q.bk && live(q));
   else if (f.qs === 'arch') list = list.filter(q => !live(q));
   else if (f.qs) list = list.filter(q => q.st === f.qs);
-  else list = list.filter(live);
+  else if (!qq) list = list.filter(live);
   list.sort((a, b) => (a.m || '').localeCompare(b.m || '') || (a.br || '').localeCompare(b.br || '') || a.spec.localeCompare(b.spec) || a.ref.localeCompare(b.ref));
   return `
   ${pageHead('Quota', isSales() ? 'Quota ที่ยังไม่มีใบจองจับคู่และยังไม่ถูกล็อก เซลล์ขอล็อกได้ ผู้จัดการเป็นคนอนุมัติ' : 'รถที่ Honda จัดสรรให้แต่ละสาขาตามเดือนส่ง พร้อมสถานะ VIN การมาถึงสาขา ใบจองที่จับคู่ และการล็อก')}
   ${brSeg()}
-  <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
+  <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3 flt2">
     <div class="field"><label for="f-qmon">เดือนส่ง</label><select id="f-qmon" data-filter="qm"><option value="">ทุกเดือน</option>${months.map(m => `<option value="${m}" ${f.qm === m ? 'selected' : ''}>${fmtM(m)}</option>`).join('')}</select></div>
     ${isSales() ? '' : `<div class="field"><label for="f-qst">สถานะ</label><select id="f-qst" data-filter="qs"><option value="">ทั้งหมด</option><option value="free" ${f.qs === 'free' ? 'selected' : ''}>ยังว่าง (ไม่มีใบจอง ไม่ถูกล็อก)</option><option value="matched" ${f.qs === 'matched' ? 'selected' : ''}>จับคู่ใบจองแล้ว</option>${Object.entries(QUOTA_STATUS).map(([k, v]) => `<option value="${k}" ${f.qs === k ? 'selected' : ''}>${v[0]}${k === 'arrived' || k === 'sold' ? ' (สำรองไว้ดู)' : ''}</option>`).join('')}<option value="arch" ${f.qs === 'arch' ? 'selected' : ''}>ถึงสาขา + ขายแล้ว (สำรองไว้ดู)</option></select></div>`}
+    <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-qq">ค้นหา VIN / Ref / เลขใบจอง${isSales() ? '' : ' / ชื่อลูกค้า'}</label><input id="f-qq" type="search" data-filter="qq" value="${esc(f.qq || '')}" placeholder="เช่น MRHRV5858TT105277 หรือ PSC2690002" autocomplete="off"></div>
     <div class="field"><label for="f-qmod">รุ่น</label><select id="f-qmod" data-filter="qModel"><option value="">ทุกรุ่น</option>${Object.keys(CATALOG).map(m => `<option ${f.qModel === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
   </div>
   ${isSales() ? (() => { const allQ = D.quota.filter(inBr).filter(q => (!f.qm || q.m === f.qm) && (!f.qModel || q.model === f.qModel)); const free = allQ.filter(q => q.open).length; return `<p class="text-sm mb-2">Quota ว่าง <b class="num" style="color:var(--good)">${free}</b> · ติดจองแล้ว <b class="num">${allQ.length - free}</b> (ไม่แสดงชื่อ)</p>`; })() : `<div class="flex flex-wrap gap-2 mb-3 text-sm">${Object.entries(QUOTA_STATUS).map(([k, v]) => qsChip(k, v[0], v[1], cnt[k] || 0, f.qs)).join('')}
@@ -335,10 +343,13 @@ function viewQuota(D) {
   ${list.length ? `<div class="bg-surface border border-line rounded-lg scroll-x"><table class="tbl">
     <thead><tr><th>Ref. Number</th><th>เดือนส่ง</th><th>สาขา</th><th>รุ่น / เกรด / สี</th><th>สถานะ</th><th>หมายเลขตัวถัง</th>${isSales() ? '' : '<th>ใบจองที่จับคู่ / ชื่อลูกค้า</th>'}<th>ล็อก</th><th></th></tr></thead>
     <tbody>${list.map(q => `<tr>
-      <td class="code nowrap">${esc(q.ref)}</td><td class="num nowrap">${fmtM(q.m)}${q.week ? ` <span class="text-xs text-muted">W${q.week}</span>` : ''}</td><td><b>${esc(q.br)}</b></td>
+      <td class="nowrap"><button class="code underline decoration-dotted" data-act="quota-open" data-ref="${esc(q.ref)}" title="ดูรายละเอียด Quota นี้">${esc(q.ref)}</button></td><td class="num nowrap">${fmtM(q.m)}${q.week ? ` <span class="text-xs text-muted">W${q.week}</span>` : ''}</td><td><b>${esc(q.br)}</b></td>
       <td class="nowrap">${specLabel(q.spec)}</td><td>${statusChip(QUOTA_STATUS, q.st)}</td><td class="code text-xs nowrap">${esc(q.vin || '–')}</td>
-      ${isSales() ? '' : `<td style="min-width:150px">${q.booking ? `<span class="code text-xs">${esc(q.bk)}</span> ${custCell(q.booking.cust, q.booking.owner, { seed: q.booking.seed })}<div class="text-xs text-muted">${esc(q.booking.owner || '')}</div>` : q.branchHold ? `<span class="text-muted">กันไว้ให้สาขา ${q.branchHold}</span>` : '<span class="text-muted">ยังว่าง</span>'}</td>`}
-      <td class="text-sm">${q.lock ? lockText(q.lock) : ''}${q.temps.length ? `<div>${chip(`ล็อกชั่วคราว ${q.temps.length} คน`, 'warn')}</div>` : ''}</td>
+      ${isSales() ? '' : `<td style="min-width:150px">${q.booking ? `<span class="code text-xs">${esc(q.bk)}</span> ${custCell(q.booking.cust, q.booking.owner, { seed: q.booking.seed })}<div class="text-xs text-muted">${esc(q.booking.owner || '')}</div>` : q.atb ? `<span class="code text-xs">${esc(q.atb.no || 'ใบจองเว็บ')}</span> ${custCell(q.atb.cust, q.atb.sales)}<div class="text-xs text-muted">${esc(q.atb.sales || '')} · ใบจองในเว็บ</div>`
+        : q.lock || (q.temps || []).length ? quotaHolders(q)
+        : q.car && q.car.status && q.car.status !== 'free' ? `<span class="text-sm">${esc((CAR_STATUS[q.car.status] || [q.car.status])[0])}${q.car.cust ? ' · ' + esc(q.car.cust) : ''}</span>`
+        : q.branchHold ? `<span class="text-muted">กันไว้ให้สาขา ${q.branchHold}</span>` : '<span class="text-muted">ยังว่าง</span>'}</td>`}
+      <td class="text-sm">${(!isSales() && ltCan() && ltQuotaCell(q, D, p)) || `${q.lock ? lockText(q.lock) : ''}${q.temps.length ? `<div>${chip(`ล็อกชั่วคราว ${q.temps.length} คน`, 'warn')}</div>` : ''}`}</td>
       <td class="text-right nowrap">${!p.write || !p.request ? '' : (q.open || quotaQueue(q)) ? `<button class="btn btn-ghost btn-sm" data-act="lock-open" data-ref="${esc(q.ref)}">${q.open ? 'ล็อก' : 'ขอคิวต่อ'}</button>`
         : q.car && !q.booking && carLockable(q.car) ? `<button class="btn btn-ghost btn-sm" data-act="lock-open" data-vin="${esc(q.car.vin)}">${q.car.status === 'pending' ? 'ขอคิวต่อ' : 'ล็อกรถคันนี้'}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`
     : `<div class="bg-surface border border-line rounded-lg">${emptyBox('ไม่มี Quota ตามตัวกรองนี้', 'อัปโหลดไฟล์ Quota จาก IDS ที่หน้าอัปเดตข้อมูล IDS')}</div>`}`;
@@ -351,12 +362,12 @@ function viewLock(D) {
   const hay = l => [l.vin, l.ref, l.owner, l.prospect, l.dealer_name, l.sales, l.sales_nick, sheetTextOf(l), bookingLabel(l.bkref, D), l.booking && l.booking.cust].filter(Boolean).join(' ');
   const vis = all.filter(l => (!f.lkType || l.type === f.lkType) && (!q || searchKey(hay(l)).includes(q)));
   const nT = t => all.filter(l => l.type === t && (l.live || l.status === 'pending')).length;
-  const bar = `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3">
+  const bar = `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3 flt2">
     <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-lkq">ค้นหา VIN / Ref / ลูกค้า / เซลล์ / ดีลเลอร์</label><input id="f-lkq" type="search" data-filter="lkq" value="${esc(f.lkq || '')}"></div>
     <div class="field col-span-2 sm:col-span-1"><label for="f-lkt">ประเภทล็อก</label><select id="f-lkt" data-filter="lkType"><option value="">ทุกประเภท</option>${Object.entries(LOCK_TYPE).map(([k, v]) => `<option value="${k}" ${f.lkType === k ? 'selected' : ''}>${v[0]} (${nT(k)})</option>`).join('')}</select></div>
     ${f.lkq || f.lkType ? '<button class="btn btn-ghost btn-sm" data-act="lk-clear">ล้างตัวกรอง</button>' : ''}</div>`;
   // a request IDS already answered (the car went to this booking / customer) is done, not waiting
-  const pend = vis.filter(l => l.status === 'pending' && !(l.idsTook && l.idsTook.same));
+  const pend = vis.filter(l => l.status === 'pending' && !l.bkDone && !(l.idsTook && l.idsTook.same));
   const sub = S.sub.lock;
   const body = sub === 'active' ? activeList(D, vis) : sub === 'history' ? historyList(D) : approveList(D, pend);
   return `${pageHead('ล็อกรถ', `ล็อกให้ใบจอง ${LOCK_DAYS_BY.booking} วัน (ถ้าระบุวันรับรถแล้วถือไว้จนส่งมอบ) · ล็อกชั่วคราวให้ลูกค้าที่จะมาจอง ${LOCK_DAYS_BY.temp} วัน ล็อกซ้อนกันได้ ใครแนบใบจองก่อนได้ก่อน · ทุกการล็อกต้องให้ผู้จัดการอนุมัติ`)}
@@ -369,8 +380,8 @@ function lockRow(l, D, o = {}) {
   const q = l.ref ? D.quota.find(x => x.ref === l.ref) : null;
   const br = l.car_br || car?.br || q?.br;
   const stTxt = l.status === 'pending' ? chip('รออนุมัติ', 'warn')
-    : l.status === 'approved' ? (l.mgrDue ? chip(`ครบกำหนด ผู้จัดการต่อหรือปล่อยภายใน ${fmtD(addDays(l.releaseOn, -1))}`, 'bad') : l.autoReleased ? chip(`ปล่อยคิวแล้ว ${fmtD(l.releaseOn)} (ผู้จัดการไม่ได้ต่อ)`, 'muted') : l.hold ? chip(`ถือไว้จนส่งมอบ ${fmtD(l.holdUntil)}`, 'red') : l.expired ? chip('หมดอายุ', 'bad') : chip(`ล็อก เหลือ ${l.daysLeft} วัน`, l.daysLeft <= 2 ? 'bad' : 'red'))
-    : l.status === 'allocated' ? chip('จัดสรรแล้ว (เว็บ) รอไฟล์ IDS', 'ink') : l.status === 'rejected' ? chip('ไม่อนุมัติ', 'muted') : l.status === 'converted' ? chip('เปลี่ยนเป็นล็อกให้ใบจอง', 'muted') : l.status === 'bumped' ? chip(`มีคนจองก่อน (${l.bumped_by || ''})`, 'muted') : l.status === 'done' ? chip(l.ids_done ? 'สำเร็จ: IDS จัดสรรให้แล้ว' : l.type === 'dealer' ? 'ขายให้ดีลเลอร์แล้ว' : 'ส่งมอบแล้ว', 'good') : l.status === 'withdrawn' ? chip('ถอนคำขอแล้ว', 'muted') : chip('ปล่อยแล้ว', 'muted');
+    : l.status === 'approved' ? (l.mgrDue ? chip(`ครบกำหนด ผู้จัดการต่อหรือปล่อยภายใน ${fmtD(addDays(l.releaseOn, -1))}`, 'bad') : l.autoReleased ? chip(`ปล่อยคิวแล้ว ${fmtD(l.releaseOn)} (ผู้จัดการไม่ได้ต่อ)`, 'muted') : l.hold ? chip(`ถือไว้จนส่งมอบ ${fmtD(l.holdUntil)}`, 'red') : l.expired ? chip('หมดอายุ', 'bad') : (l.over ? chip(`ล็อกมา ${l.heldDays} วัน · เกินกำหนด ${l.over} วัน ตรวจว่ายังใช้ไหม`, 'warn') : chip(`ล็อก เหลือ ${l.daysLeft} วัน`, 'red')))
+    : l.status === 'allocated' ? chip('จัดสรร (เว็บ)', 'ink') : l.status === 'rejected' ? chip('ไม่อนุมัติ', 'muted') : l.status === 'converted' ? chip('เปลี่ยนเป็นล็อกให้ใบจอง', 'muted') : l.status === 'bumped' ? chip(`มีคนจองก่อน (${l.bumped_by || ''})`, 'muted') : l.status === 'done' ? chip(l.ids_done ? 'สำเร็จ: IDS จัดสรรให้แล้ว' : l.type === 'dealer' ? 'ขายให้ดีลเลอร์แล้ว' : 'ส่งมอบแล้ว', 'good') : l.status === 'withdrawn' ? chip('ถอนคำขอแล้ว', 'muted') : chip('ปล่อยแล้ว', 'muted');
   const took = l.idsTook && !l.idsTook.same ? l.idsTook : null;
   const canDecide = p.write && l.status === 'pending' && (l.type === 'dealer' ? p.approveDealer : canLockMgr(l));
   const sheet = sheetTextOf(l);
@@ -398,7 +409,7 @@ function lockRow(l, D, o = {}) {
   if (l.type === 'booking' && p.write && !o.compact && ['approved', 'allocated'].includes(l.status) && bk && bk.app && (canAllocBr(br) || mine)) acts.push(`<button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(bk.app.id)}">ขายสำเร็จ · บันทึกส่งมอบ</button>`);
   if (l.status === 'approved' && p.write && !o.compact && l.live) {
     if (l.mgrDue && canLockMgr(l) && (l.finWait || (l.ext || 0) < MAX_EXT)) acts.push(`<button class="btn btn-red btn-sm" data-act="extend" data-id="${l.id}">ต่อ ${l.days} วัน${l.finWait ? ' (ไฟแนนซ์ยังไม่ผ่าน)' : ` (${l.ext || 0}/${MAX_EXT})`}</button>`);
-    else if (!l.mgrDue && canLockMgr(l) && (l.ext || 0) < MAX_EXT && !l.hold) acts.push(`<button class="btn btn-ghost btn-sm" data-act="extend" data-id="${l.id}">ต่ออายุ ${l.days} วัน (${l.ext || 0}/${MAX_EXT})</button>`);
+    else if (false && !l.mgrDue && canLockMgr(l) && (l.ext || 0) < MAX_EXT && !l.hold) acts.push(`<button class="btn btn-ghost btn-sm" data-act="extend" data-id="${l.id}">ต่ออายุ ${l.days} วัน (${l.ext || 0}/${MAX_EXT})</button>`);
     if (l.type === 'temp' && mine && !l.bumped) acts.push(`<button class="btn btn-dark btn-sm" data-act="lock-convert" data-id="${l.id}">ลูกค้ามาจองแล้ว</button>`);
     if (rec && mine && l.finDue) acts.push(`<button class="btn btn-ghost btn-sm" data-act="at-open" data-id="${esc(bk.app.id)}">อัปเดตไฟแนนซ์</button>`);
     // no "จัดสรรใน IDS แล้ว" button (ตกลง 2/11): a lock stays a lock until the uploaded IDS file shows the car under the booking
@@ -408,9 +419,9 @@ function lockRow(l, D, o = {}) {
   const unit = l.vin ? vinLink({ vin: l.vin }) : `<button class="code font-medium underline decoration-dotted text-left" data-act="quota-open" data-ref="${esc(l.ref)}" title="ดูรายละเอียด Quota">Quota ${esc(l.ref)}</button> <span class="text-xs text-muted">${q ? fmtM(q.m) : ''}</span>`;
   const reqH = (l.history || [])[0];
   return `<div class="p-3 md:px-4 flex flex-wrap gap-x-5 gap-y-2 items-center">
-    <div class="w-36">${stTxt}<div class="mt-1">${chip(LOCK_TYPE[l.type]?.[0] || l.type, LOCK_TYPE[l.type]?.[1] || 'neutral')}</div>${l.queueN > 1 ? `<div class="mt-1">${chip(`คำขอที่ ${l.queuePos}/${l.queueN} ของคันนี้`, l.queuePos === 1 ? 'ink' : 'warn')}</div>` : ''}</div>
+    <div class="w-36 lk-st">${stTxt}<div class="mt-1">${chip(LOCK_TYPE[l.type]?.[0] || l.type, LOCK_TYPE[l.type]?.[1] || 'neutral')}</div>${l.queueN > 1 ? `<div class="mt-1">${chip(`คำขอที่ ${l.queuePos}/${l.queueN} ของคันนี้`, l.queuePos === 1 ? 'ink' : 'warn')}</div>` : ''}</div>
     <div class="min-w-[170px] flex-1"><div>${unit} <span class="text-muted">${esc(br || '')}</span></div><div class="text-sm">${specLabel(l.spec || car?.spec || q?.spec || '')}</div>${car ? `<div class="text-xs text-muted">${prodPlain(car)} · อายุ ${car.age ?? '–'} วัน</div>` : ''}${l.moved_from ? `<div class="text-xs" style="color:var(--warn)">ย้ายล็อกจากคัน <span class="code">${esc(l.moved_from.vin || l.moved_from.ref || '')}</span></div>` : ''}${l.swap ? `<div class="text-xs" style="color:var(--warn)">เปลี่ยนคันจาก <span class="code">${esc(l.swap.from_vin)}</span> · ${esc(l.swap.reason)}</div>` : ''}</div>
-    <div class="min-w-[180px] text-sm">${l.type === 'dealer' ? `ดีลเลอร์: ${esc(l.dealer_name || '')}` : l.type === 'temp' ? `ลูกค้าที่จะมาจอง: ${isSales() && !mine ? 'ของเซลล์อื่น' : esc(l.prospect || '–')}` : `ใบจอง ${esc(bookingLabel(l.bkref, D))}${bk ? ` · ${custCell(bk.cust, bk.owner, { seed: bk.seed })}` : ''}`}
+    <div class="min-w-[180px] text-sm">${l.type === 'dealer' ? `ดีลเลอร์: ${esc(l.dealer_name || '')}` : l.type === 'temp' ? `ลูกค้าที่จะมาจอง: ${isSales() && !mine ? 'ของเซลล์อื่น' : esc(l.prospect || '–')}` : `ใบจอง ${esc(bookingLabel(l.bkref, D))}${bk ? ` · ${custCell(bk.cust, bk.owner, { seed: bk.seed })}` : ''}${bk && bk.app && (!isSales() || mine) ? ` <button class="underline text-xs" data-act="at-open" data-id="${esc(bk.app.id)}">เปิดใบจอง</button>` : ''}`}
       <div class="text-xs text-muted">เซลล์: ${esc(l.owner || l.sales_nick || '–')}${rec ? ` · ${esc(rec.purchase || '')}${rec.purchase === 'ไฟแนนซ์' ? ` ${esc(rec.fin_status || 'รอผล')}` : ''}` : ''}</div>
       ${sheet ? `<div class="text-xs text-muted">ข้อความในชีต: "${esc(sheet)}"${l.status === 'pending' && l.type === 'temp' && !took ? (() => { const n = sheetCands(l, D).length; return n ? ` · <span style="color:var(--warn)">มีใบจองที่อาจใช่ ${n} ใบ</span>` : ''; })() : ''}</div>` : ''}
       ${took ? `<div class="text-xs font-medium" style="color:var(--bad)">${took.st === 'booked' ? `IDS จัดสรรรถคันนี้ให้ใบจอง ${esc(took.no || '')}${took.cust ? ' ' + esc(took.cust) : ''} แล้ว · ใช้การจัดสรรจาก IDS` : `รถคันนี้ส่งมอบแล้ว${took.cust ? ' ให้ ' + esc(took.cust) : ''}`} · ${l.status === 'pending' ? 'กดไม่อนุมัติเพื่อปิดคำขอ' : 'กดปล่อยล็อกเพื่อปิดรายการ'}</div>` : l.idsTook ? `<div class="text-xs" style="color:var(--good)">${l.idsTook.st === 'delivered' ? 'ส่งมอบรถคันนี้ให้ใบจองนี้แล้ว' : 'IDS จัดสรรรถคันนี้ให้ใบจองนี้แล้ว'}</div>` : ''}
@@ -444,7 +455,7 @@ function activeList(D, vis) {
   const auto = vis.filter(l => l.autoReleased && !l.idsTook && daysBetween(l.releaseOn, D.today) <= 3);
   return `${lockIdsList(D, vis)}${close.length ? `<h2 class="font-head text-lg font-semibold mb-2" style="color:var(--bad)">IDS จัดสรรรถไปแล้ว ต้องปิดล็อกนี้ <span class="text-base">${close.length}</span></h2><div class="bg-surface border border-line rounded-lg divide-y divide-line mb-5">${close.map(l => lockRow(l, D)).join('')}</div>` : ''}
   <div class="bg-surface border border-line rounded-lg divide-y divide-line">${act.map(l => lockRow(l, D)).join('') || emptyBox('ยังไม่มีรถที่ล็อกอยู่', `เมื่อผู้จัดการอนุมัติ รถจะเปลี่ยนเป็นล็อกและนับถอยหลัง`)}</div>
-  <p class="text-xs text-muted mt-2">ล็อก ${LOCK_DAYS_BY.booking} วัน (ใบจอง / ดีลเลอร์): วันสุดท้ายแจ้งผู้จัดการให้ต่อหรือปล่อย ถ้าไม่ต่อภายใน ${MGR_GRACE} วันหลังครบกำหนด ระบบปล่อยคิวเอง · ล็อกชั่วคราว ${LOCK_DAYS_BY.temp} วัน หมดแล้วปล่อยเอง</p>
+  <p class="text-xs text-muted mt-2">ล็อกไม่หมดอายุเองและไม่ต้องต่ออายุ: ครบ ${LOCK_DAYS_BY.booking} วัน (ใบจอง / ดีลเลอร์) หรือ ${LOCK_DAYS_BY.temp} วัน (ชั่วคราว) แล้วระบบเตือนผู้จัดการและเซลล์สัปดาห์ละครั้งให้ตรวจว่ายังใช้คันนี้ไหม · ไม่ใช้แล้วกดปล่อยล็อก</p>
   ${auto.length ? `<h2 class="font-head text-lg font-semibold mt-6 mb-2">ปล่อยคิวอัตโนมัติ 3 วันล่าสุด <span class="text-muted text-base">${auto.length}</span></h2><div class="bg-surface border border-line rounded-lg divide-y divide-line">${auto.map(l => lockRow(l, D)).join('')}</div>` : ''}`;
 }
 function historyList(D) {
@@ -486,7 +497,7 @@ function flowTab(a) {
   const f = a.flow;
   if (f.history) return null;
   if (f.done.confirmed) return 'done';
-  if (f.done.delivered || f.lateUpdate) return 'confirmed';
+  if (f.done.delivered || f.lateUpdate) return 'done';   // 19/11: delivered = done, no manager confirmation to wait for
   if (f.done.assign) return 'delivered';
   return f.next;
 }

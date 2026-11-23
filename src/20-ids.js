@@ -239,7 +239,7 @@ const IDS = (() => {
           consign: r.consign_date, stockin: r.stockin_date, prod: r.production_date, age_ids: r.age_days,
           ref: r.ref_no ? findRef(r.ref_no) : null, bkno: BK_NO.test(bn) ? bn : null, bknote: bn && !BK_NO.test(bn) ? bn : null,
           cust: r.customer_name, sold: st.startsWith('แจ้งขาย') || date(st) !== null, company: isCompany(r.customer_name),
-          alloc: r.alloc_date, bkdate: r.booking_date, engine: r.engine_no
+          alloc: r.alloc_date, bkdate: r.booking_date, engine: r.engine_no, mcode: r.model_code ? String(r.model_code).trim().toUpperCase() : null
         });
       }
       res.asof = inferAsof(res.rows.map(x => [x.stockin, x.age_ids]));
@@ -513,7 +513,7 @@ function loadXLSX() {
 
 // ------------------------------------------------------------------ stored IDS tables: one db document per table, rows packed as arrays
 const PACK = {
-  stock: ['vin', 'model', 'grade', 'color', 'year', 'note', 'consign', 'stockin', 'prod', 'ref', 'bkno', 'bknote', 'cust', 'sold', 'company', 'alloc', 'bkdate', 'engine'],
+  stock: ['vin', 'model', 'grade', 'color', 'year', 'note', 'consign', 'stockin', 'prod', 'ref', 'bkno', 'bknote', 'cust', 'sold', 'company', 'alloc', 'bkdate', 'engine', 'mcode'],
   booking: ['no', 'date', 'model', 'grade', 'color', 'year', 'sales', 'ids', 'vin', 'ref', 'ws', 'cust', 'alloc', 'aging', 'est'],
   quota: ['ref', 'm', 'model', 'grade', 'color', 'vin', 'vnote', 'qty', 'week', 'cdate', 'ndc', 'dstock', 'ws', 'otype'],
   invoice: ['inv', 'idate', 'ddate', 'vin', 'no', 'cust', 'sales', 'fin', 'company', 'model', 'grade', 'color', 'other', 'to']
