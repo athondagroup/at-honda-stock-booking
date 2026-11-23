@@ -22,6 +22,7 @@ async function gseRun() {
     const qVin = new Map(); for (const d of S.ids.values()) if (d && d.src === 'quota') unpack(d).forEach(x => { if (x.ref && x.vin) qVin.set(x.ref, x.vin); });
     const seen = (t, br, unit, vin) => { const k = gseKey(t); if (!k || !t.includes('/')) return; const L = texts.get(k) || texts.set(k, []).get(k); const id = vin || unit; if (!L.some(u => u.id === id)) L.push({ br, unit, id }); };
     const sheetStock = new Map(), qNames = [];
+    const recvCars = new Map(); for (const c of derive().cars.values()) if (c.src !== 'IDS' && !c.gone && !c.quota && !c.special) recvCars.set(c.vin, c);
     for (const t of tabs) {
       const p = idsGsPayload(await mcp.callTool('Google Sheets', 'get_values', { spreadsheetId: id, range: `'${t.replace(/'/g, "''")}'!A1:BZ` }, { cache: false }));
       const r = p && p.values && p.values.length ? IDS.parseSheet(p.values, t, 'Google Sheet') : null;
@@ -31,7 +32,9 @@ async function gseRun() {
         const docId = idsDocId('stock', r.br), old = new Map(unpack(S.ids.get(docId)).map(x => [x.vin, x]));
         for (const x of r.rows) {
           sheetStock.set(x.vin, { br: r.br, x }); if (x.bknote) seen(x.bknote, r.br, x.vin, x.vin);
-          const o = old.get(x.vin); if (!o) { newCars++; continue; }
+          const o = old.get(x.vin);
+          // 23/11: a car received in this web (waiting for the IDS file) that the sheet's stock tab already lists: its row joins the stock copy
+          if (!o) { const rc = recvCars.get(x.vin); if (rc) edits.push({ src: 'stock', docId, br: r.br, key: x.vin, add: x, ch: [{ f: 'bknote', from: null, to: x.bknote || null }], recv: true }); else newCars++; continue; }
           // a blank in the sheet clears only the typed name: booking no. / customer / dates come from IDS and the sheet columns are often left empty (17/11)
           const ch = GSE_STOCK.filter(f => gseN(x[f]) !== gseN(o[f]) && (f === 'bknote' || gseN(x[f]))).map(f => ({ f, from: o[f] ?? null, to: x[f] ?? null }));
           // 19/11: the car is allocated in IDS (booking no. in the web): a name typed in the sheet is not a new queue —
@@ -61,9 +64,9 @@ async function gseRun() {
     const webName = new Map(); { const DD = derive(); for (const l of DD.locks) if (l.live && l.bkref && !l.typed) { const b = DD.bookingByKey.get(l.bkref), k = b && searchKey(String(b.cust || '').trim().split(/\s+/)[0] || ''); if (!k || k.length < 3) continue; if (l.vin) webName.set(l.vin, k); if (l.ref) webName.set('Q:' + l.ref, k); if (l.vin) for (const [ref, v] of qVin) if (v === l.vin) webName.set('Q:' + ref, k); } }
     const bkOfUnit = new Map(); for (const l of derive().locks) if (l.live && l.bkref) { if (l.vin) bkOfUnit.set(l.vin, l.bkref); if (l.ref) bkOfUnit.set('Quota ' + l.ref, l.bkref); }
     const webTxt = new Map(); for (const l of derive().locks) if (l.live && l.typed) { const t = gseKey(ltTextOf(l)); if (l.vin) webTxt.set(l.vin, t); if (l.ref) webTxt.set('Q:' + l.ref, t); if (l.vin) for (const [ref, v] of qVin) if (v === l.vin) webTxt.set('Q:' + ref, t); }
-    for (let i = edits.length - 1; i >= 0; i--) { const e = edits[i], k = e.src === 'quota' ? 'Q:' + e.key : e.key, vTo = e.src === 'quota' ? ((e.ch.find(c => c.f === 'vin') || {}).to || null) : null, w = webTxt.get(k) || (vTo && webTxt.get(vTo)); if (!w || e.src === 'warn') continue;
+    for (let i = edits.length - 1; i >= 0; i--) { const e = edits[i], k = e.src === 'quota' ? 'Q:' + e.key : e.key, vTo = e.src === 'quota' ? ((e.ch.find(c => c.f === 'vin') || {}).to || null) : null, w = webTxt.get(k) || (vTo && webTxt.get(vTo)); if (!w || e.src === 'warn' || e.recv) continue;
       e.ch = e.ch.filter(c => !((c.f === 'bknote' || c.f === 'vnote') && gseKey(c.to) === w)); if (!e.ch.length) edits.splice(i, 1); }
-    for (let i = edits.length - 1; i >= 0; i--) { const e = edits[i], k = e.src === 'quota' ? 'Q:' + e.key : e.key, vTo = e.src === 'quota' ? ((e.ch.find(c => c.f === 'vin') || {}).to || null) : null, nm = webName.get(k) || (vTo && webName.get(vTo)); if (!nm || e.src === 'warn') continue;
+    for (let i = edits.length - 1; i >= 0; i--) { const e = edits[i], k = e.src === 'quota' ? 'Q:' + e.key : e.key, vTo = e.src === 'quota' ? ((e.ch.find(c => c.f === 'vin') || {}).to || null) : null, nm = webName.get(k) || (vTo && webName.get(vTo)); if (!nm || e.src === 'warn' || e.recv) continue;
       e.ch = e.ch.filter(c => !((c.f === 'bknote' || c.f === 'vnote') && c.to && searchKey(c.to).includes(nm))); if (!e.ch.length) edits.splice(i, 1); }
     // a web lock on the car / slot (any kind): shown beside the empty sheet value, and its own sheet text is not an edit (17/11)
     { const DD = derive(); const lockOn = new Map(); for (const l of DD.locks) if (l.live) { if (l.vin) lockOn.set(l.vin, l); if (l.ref) lockOn.set('Q:' + l.ref, l); }
@@ -72,7 +75,8 @@ async function gseRun() {
         // 23/11: the same customer in the cell (nickname / spelling / one typo, or the name only added after the seller's nick) is the lock already in the web
         const cust = (b && b.cust) || l.prospect || String(said || '').split('/').slice(1).join(' ').trim(), ck = nameKey(cust);
         const sameCust = t => { const nm = String(t || '').split('/').slice(1).join(' ').trim() || String(t || ''); return !!(ck.n && nm && keyScore(nameKey(nm), ck) >= 1); };
-        e.ch = e.ch.filter(c => !((c.f === 'bknote' || c.f === 'vnote') && c.to && ((said && gseKey(c.to) === gseKey(said)) || sameCust(c.to))));
+        if (!e.recv) e.ch = e.ch.filter(c => !((c.f === 'bknote' || c.f === 'vnote') && c.to && ((said && gseKey(c.to) === gseKey(said)) || sameCust(c.to))));
+        else e.ch.forEach(c => { if (c.to && ((said && gseKey(c.to) === gseKey(said)) || sameCust(c.to))) c.same = true; });
         e.ch.forEach(c => { if ((c.f === 'bknote' || c.f === 'vnote') && !gseN(c.from)) { c.webTxt = said || (b ? b.cust : l.prospect) || 'มีล็อก'; c.web = `${l.type === 'temp' ? 'ล็อกชั่วคราว' : l.type === 'dealer' ? 'ล็อกดีลเลอร์' : 'ล็อกให้'}${b ? ' ' + (b.cust || '') : l.prospect ? ' ' + l.prospect : ''} ถึง ${fmtD(l.end)}`; } });
         if (!e.ch.length) edits.splice(i, 1); } }
     // the same name typed on two cars / quota slots: shown on the row, and the manager of the seller's branch is told after saving
@@ -97,7 +101,7 @@ function gseBox() {
   const v = x => x === null || x === '' ? '<span class="text-muted">(ว่าง)</span>' : esc(String(x));
   return `<div class="mt-3 p-3 rounded-lg" style="background:var(--surface-2)"><b>ช่องที่แก้ในชีต ${E.length} รายการ</b> <span class="text-sm text-muted">บันทึกแล้วเปลี่ยนเฉพาะช่องเหล่านี้ · ข้อความที่พิมพ์กลายเป็นล็อกตามกติกาเดิม · ช่องที่ถูกลบ ปล่อยล็อกที่มาจากข้อความนั้น</span>
     <div class="scroll-x mt-2 max-h-80 overflow-auto"><table class="tbl text-sm"><thead><tr><th><input type="checkbox" data-gseall="1" ${E.every(e => e.on) ? 'checked' : ''} aria-label="เลือกทั้งหมด"></th><th>สาขา</th><th>รถ / Quota</th><th>ช่อง</th><th>ในเว็บ</th><th>ในชีตตอนนี้</th></tr></thead><tbody>
-    ${E.flatMap((e, ei) => e.ch.map((c, ci) => `<tr${e.on ? '' : ' style="opacity:.5"'}><td>${ci || e.src === 'warn' ? '' : `<input type="checkbox" data-gse="${ei}" ${e.on ? 'checked' : ''} aria-label="นำเข้า">`}</td><td>${esc(e.br)}</td><td class="code nowrap">${esc(e.src === 'quota' ? 'Quota ' + e.key : e.key)}${e.src === 'match' ? `<div class="text-xs" style="color:var(--good);font-family:inherit">match จาก Quota ${esc(e.ref)} → Stock · ล็อกที่รถทันที</div>` : e.src === 'warn' ? `<div class="text-xs" style="color:var(--bad);font-family:inherit">${esc(e.note)}</div>` : ''}</td><td class="nowrap">${GSE_T[c.f] || c.f}</td><td>${c.ids && !gseN(c.from) ? '' : v(c.webTxt || c.from)}${c.web ? `<div class="text-xs" style="color:var(--accent,#2563eb)">เว็บ: ${esc(c.web)}</div>` : ''}${c.ids ? `<div class="text-xs" style="color:var(--warn)">${esc(c.ids)} · ชื่อในชีตไม่ตรง ตรวจก่อนนำเข้า</div>` : ''}</td><td><b>${v(c.to)}</b>${(c.f === 'bknote' || c.f === 'vnote') && e.dup && e.dup.length ? `<div class="text-xs" style="color:var(--bad)">ชื่อซ้ำกับ ${e.dup.map(u => esc(u.br + ' ' + u.unit)).join(', ')}</div>` : ''}</td></tr>`)).join('')}</tbody></table></div>
+    ${E.flatMap((e, ei) => e.ch.map((c, ci) => `<tr${e.on ? '' : ' style="opacity:.5"'}><td>${ci || e.src === 'warn' ? '' : `<input type="checkbox" data-gse="${ei}" ${e.on ? 'checked' : ''} aria-label="นำเข้า">`}</td><td>${esc(e.br)}</td><td class="code nowrap">${esc(e.src === 'quota' ? 'Quota ' + e.key : e.key)}${e.recv ? `<div class="text-xs" style="color:var(--good);font-family:inherit">รถที่รับเข้าในเว็บ · ชีตมีแถวนี้แล้ว นำเข้า = เพิ่มแถวรถคันนี้จากชีต</div>` : ''}${e.src === 'match' ? `<div class="text-xs" style="color:var(--good);font-family:inherit">match จาก Quota ${esc(e.ref)} → Stock · ล็อกที่รถทันที</div>` : e.src === 'warn' ? `<div class="text-xs" style="color:var(--bad);font-family:inherit">${esc(e.note)}</div>` : ''}</td><td class="nowrap">${GSE_T[c.f] || c.f}</td><td>${c.ids && !gseN(c.from) ? '' : v(c.webTxt || c.from)}${c.web ? `<div class="text-xs" style="color:var(--accent,#2563eb)">เว็บ: ${esc(c.web)}</div>` : ''}${c.ids ? `<div class="text-xs" style="color:var(--warn)">${esc(c.ids)} · ชื่อในชีตไม่ตรง ตรวจก่อนนำเข้า</div>` : ''}</td><td><b>${v(c.to)}</b>${(c.f === 'bknote' || c.f === 'vnote') && e.dup && e.dup.length ? `<div class="text-xs" style="color:var(--bad)">ชื่อซ้ำกับ ${e.dup.map(u => esc(u.br + ' ' + u.unit)).join(', ')}</div>` : ''}</td></tr>`)).join('')}</tbody></table></div>
     ${G.newCars ? `<p class="text-xs text-muted mt-1">มีรถในชีตที่ยังไม่อยู่ในเว็บ ${G.newCars} คัน ไม่ได้เพิ่ม (ใช้ "ดึงจาก Google Sheet" แบบเต็ม)</p>` : ''}
     <div class="flex gap-2 mt-2"><button class="btn btn-red btn-sm" data-act="gse-save" ${G.saving ? 'disabled' : ''}>${G.saving ? '<span class="spin"></span> กำลังบันทึก…' : `นำเข้า ${E.filter(e => e.on && e.src !== 'warn').length} รายการที่เลือก`}</button><button class="btn btn-ghost btn-sm" data-act="gse-cancel">ยกเลิก</button></div></div>`;
 }
@@ -109,7 +113,8 @@ async function gseSave() {
   for (const [docId, es] of byDoc) {
     const doc = S.ids.get(docId); if (!doc) continue;
     const src = es[0].src === 'match' ? 'stock' : es[0].src, key = src === 'stock' ? 'vin' : 'ref', rows = unpack(doc), m = new Map(es.map(e => [e.key, e]));
-    const out = rows.map(x => { const e = m.get(x[key]); if (!e) return x; const y = { ...x }; e.ch.forEach(c => { y[c.f] = c.to; if ((c.f === 'bknote' || c.f === 'vnote') && gseN(c.from)) cleared.push({ vin: src === 'stock' ? x.vin : null, ref: src === 'quota' ? x.ref : null, text: c.from }); }); return y; });
+    const out = rows.map(x => { const e = m.get(x[key]); if (!e || e.add) return x; const y = { ...x }; e.ch.forEach(c => { y[c.f] = c.to; if ((c.f === 'bknote' || c.f === 'vnote') && gseN(c.from)) cleared.push({ vin: src === 'stock' ? x.vin : null, ref: src === 'quota' ? x.ref : null, text: c.from }); }); return y; });
+    es.filter(e => e.add && !rows.some(x => x[key] === e.key)).forEach(e => out.push({ ...e.add }));
     if (!await write('ids', docId, { ...doc, ...pack(src, out), n: out.length, edited: { ...actor(), n: es.length, from: 'Google Sheet' } })) { S.idsGs = { ...S.idsGs, saving: false }; render(); return; }
   }
   await write('uploads', newId('uploads'), { src: 'sheetedit', br: null, m: null, asof: todayISO(), file: 'Google Sheet', sheet: 'เฉพาะที่แก้ในชีต', n: E.length, out: [], inN: 0, mode: 'edits', changes: E.slice(0, 200), ...actor() });
