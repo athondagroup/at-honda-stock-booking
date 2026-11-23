@@ -14,7 +14,16 @@ function carSheetSt(c, D) {
   const useQ = !!qrow && (!ids || (!String(c.bknote || '').trim() && (!!qrow.vnote || (sy0 && sy0.error === 'not_found'))));
   const qdoc = useQ ? S.ids.get(`quota_${qrow.br}_${qrow.m}`) : null, doc = useQ ? qdoc : S.ids.get('stock_' + c.br), readAt = doc && doc.at ? String(doc.at) : '';
   const sheet = String((useQ ? qrow.vnote : c.bknote) || '').trim(), where = useQ ? 'Quota ' + qrow.ref : '';
-  if (!ids && !useQ) return { k: 'na', why: 'รถยังไม่อยู่ในข้อมูลชีต Stock (รอไฟล์รอบหน้า)', readAt };
+  if (!ids && !useQ) {
+    // 23/11: no sheet copy for this car yet, but the lock itself came from the sheet (a name typed there, moved with the car),
+    // or the web wrote it / found it when writing: that is the sheet's side
+    const sy1 = l && l.sheet_sync;
+    if (l && sy1 && sy1.conflict && sy1.current != null) { const w = ltTextOf(l), cu = (l.booking && l.booking.cust) || l.prospect || '', f1 = shN(String(cu).split(/\s+/)[0] || '');
+      return shN(sy1.current) === shN(w) || (f1.length >= 3 && shN(sy1.current).includes(f1)) ? { k: 'ok', why: String(sy1.current), l, readAt } : { k: 'bad', web: w, sheet: String(sy1.current), l, readAt }; }
+    if (l && sy1 && sy1.at && !sy1.error) return { k: 'ok', why: `เขียนลงชีตแล้ว ${fmtDT(sy1.at)}`, l, readAt };
+    if (l && (l.imported || l.sheet_text) && !l.typed) return { k: 'ok', why: `ล็อกนี้มาจากชื่อในชีต "${l.sheet_text || ltTextOf(l)}"`, l, readAt };
+    return { k: 'na', why: 'รถยังไม่อยู่ในข้อมูลชีต Stock (รอไฟล์รอบหน้า)', readAt };
+  }
   if (c.bkno || c.bk) return { k: 'ok', why: 'IDS จัดสรร ' + (c.bkno || c.bk), readAt };
   if (!l) return sheet ? { k: 'bad', web: '', sheet, where, readAt } : { k: 'ok', why: where ? `ว่างทั้งสองฝั่ง (${where})` : 'ว่างทั้งสองฝั่ง', readAt };
   const web = ltTextOf(l), sy = l.sheet_sync || null, cust = (l.booking && l.booking.cust) || l.prospect || l.dealer_name || '';
