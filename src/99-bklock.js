@@ -34,7 +34,7 @@ function bltDrop(r, D) {
 }
 function bkLockList(r, D) {
   const row = r.row || {}, a = r.a, keys = [r.key, row.key, a && a.key].filter(Boolean);
-  const ls = D.locks.filter((l, i, all) => all.findIndex(x => x.id === l.id) === i && keys.includes(l.bkref) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased && (l.live || l.status === 'pending'));
+  const ls = D.locks.filter((l, i, all) => all.findIndex(x => x.id === l.id) === i && keys.includes(l.bkref) && ['pending', 'approved', 'allocated'].includes(l.status) && !l.autoReleased && !l.bkDone && (l.live || l.status === 'pending'));
   // a temporary lock a manager took for this customer by name (same seller and spec, no booking picked) holds this booking too:
   // the row says "ล็อกแล้ว", so the lock column shows that car (15/11)
   const t = row.tempLock; if (t && !ls.some(l => l.id === t.id)) ls.push(t);

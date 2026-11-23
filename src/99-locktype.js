@@ -150,6 +150,8 @@ function ltSweep(D) {
   ltRetry(D);
   ltReplacedSweep(D);
   for (const l of D.locks) if (l.bkFix && !(ltAutoTried = ltAutoTried || new Set()).has('bk:' + l.id)) { ltAutoTried.add('bk:' + l.id); ltSaveBkFix(l); }
+  // 23/11: a request for a booking IDS already gave a car to (matched / delivered) is closed as not needed
+  for (const t of D.locks) if (t.bkDone && t.status === 'pending' && !(ltAutoTried = ltAutoTried || new Set()).has('bkd:' + t.id)) { ltAutoTried.add('bkd:' + t.id); ltCloseBkDone(t.id, t.bkDone); }
   for (const t of D.locks) if (t.superseded && ['approved', 'pending'].includes(t.status) && !(ltAutoTried = ltAutoTried || new Set()).has('sup:' + t.id)) { ltAutoTried.add('sup:' + t.id); ltCloseSuperseded(t.id, t.superseded); }
   // a cell written before the booking was loaded ("นุดา /"): written again with the customer's name, if the sheet still has that text
   for (const l of D.locks) { const sy = l.sheet_sync; if (l.typed || !l.live || !sy || sy.error || sy.conflict || !sy.value || !/\/\s*$/.test(sy.value)) continue;
@@ -363,6 +365,11 @@ async function ltAutoSheet(id) {
 }
 
 // a temporary lock the same customer's booking lock now covers (19/11): closed as converted, the booking lock stays
+async function ltCloseBkDone(id, d) {
+  const x = findLock(id); if (!x || x.status !== 'pending') return;
+  x.status = 'rejected'; x.closed_why = 'bkdone';
+  await saveLock(id, x, 'ปิดคำขอล็อก (ไม่ต้องอนุมัติแล้ว)', `ใบจอง ${d.no || ''} IDS จัดสรรรถ ${d.vin}${d.delivered ? ` · ส่งมอบแล้ว ${fmtD(d.ddate)}` : ''}`);
+}
 async function ltCloseSuperseded(id, by) {
   const x = findLock(id); if (!x || !['approved', 'pending'].includes(x.status)) return;
   x.status = x.status === 'pending' ? 'rejected' : 'converted'; x.converted_to = by; x.sheet_cleared = x.sheet_cleared || new Date().toISOString();
