@@ -43,7 +43,7 @@ function ltCands(c, q, D) {
   const k = searchKey(q || '');
   const [model] = String(c.spec).split('|');
   const demo = ltDemoCar(c);
-  return [...D.bookings, ...(D.demoRows || []).filter(b => !D.locks.some(l => l.live && l.bkref === b.key))].filter(b => ['waiting', 'noids', 'demo', 'democar'].includes(b.state) && !(b.app && b.app.demo) && (!demo || ltDemoBk(b)) && (k ? [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k)) : b.spec === c.spec) && (k || !isSales() || isMine(b.owner)))
+  return [...D.bookings, ...(D.demoRows || []).filter(b => !D.locks.some(l => l.live && l.bkref === b.key))].filter(b => ['waiting', 'noids', 'demo', 'democar'].includes(b.state) && !(b.app && b.app.demo) && (demo ? ltDemoBk(b) : !ltDemoBk(b)) && (k ? [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k)) : b.spec === c.spec) && (k || !isSales() || isMine(b.owner)))
     .map(b => ({ b, rank: b.spec === c.spec ? 0 : String(b.spec || '').split('|')[0] === model ? 1 : 2 }))
     .sort((x, y) => x.rank - y.rank || String(x.b.qdate || x.b.date || '').localeCompare(String(y.b.qdate || y.b.date || ''))).slice(0, 200);
 }

@@ -494,6 +494,7 @@ function deriveNow(key) {
     if (tl) b.tempLock = tl;
     if (l) b.state = l.status === 'pending' ? 'pending' : l.status === 'allocated' ? 'allocated' : 'locked';
     else if (b.match === 'cancel') b.state = 'cancel';
+    else if (b.app && b.app.active && b.app.rec.cancel_wait) b.state = 'cxwait';   // รอยกเลิกใบจอง: out of the queue (23/11)
     else if (tl) b.state = 'locked';
     else if (b.match === 'waiting' && b.app && b.app.rec.flow && b.app.rec.flow.assign && b.app.rec.flow.assign.vin) b.state = 'allocated';
     else if (b.gone) b.state = 'gone';
@@ -642,6 +643,10 @@ function buildAlerts(D) {
       `${car} · IDS คีย์ด้วย ID ${a.idsSales} · ฟอร์ม AT เป็นของ ${a.sales} กด "เคสของฉัน" ครั้งเดียว แล้วจะไม่เตือนอีก`, go);
     if (a.ownerCheck === 'disputed') add('ownerd:' + a.id, { br: a.br, roles: ['manager'] }, 'bad', 'เซลล์แจ้งว่าไม่ใช่เคสของตัวเอง เลือกเจ้าของเคส',
       `${car} · ฟอร์ม AT: ${a.sales} · IDS: ${a.idsSales}${a.rec.owner_dispute.note ? ' · ' + a.rec.owner_dispute.note : ''}`, go);
+    // รอยกเลิกใบจอง: the documents still have to come in; the sales only hears about it when they did not ask to cancel themselves (23/11)
+    if (a.active && a.rec.cancel_wait) { const w = a.rec.cancel_wait, asked = a.change && a.change.type === 'cancel';
+      add('cxw:' + a.id, { sales: a.sales, br: a.br, roles: asked ? ['admin'] : ['sales', 'admin'] }, 'bad', 'รอยกเลิกใบจอง · นำส่งเอกสารขอถอนจอง',
+        `${car} · ${w.reason || ''}${w.note ? ' ' + w.note : ''} · ${asked ? 'เซลล์ส่งคำขอยกเลิกแล้ว แอดมินตรวจเอกสาร' : 'แนบเอกสาร แล้วกด "ขอยกเลิกใบจอง" ในใบนี้'}`, go); }
     if (a.change) add('chg:' + a.id, { br: a.br, roles: ['manager'] }, a.change.type === 'cancel' ? 'bad' : 'warn', a.change.type === 'cancel' ? 'ขอยกเลิกใบจอง รออนุมัติ' : 'ขอแก้ไขใบจอง รออนุมัติ',
       `${car} · เซลล์ ${a.sales} · ${a.change.type === 'cancel' ? a.change.reason : changeText(a.change)}`, go);
     const last = (a.rec.changes || []).slice(-1)[0];

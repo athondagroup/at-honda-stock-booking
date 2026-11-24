@@ -15,8 +15,8 @@ function bltCands(row, q, D) {
   const k = String(q || '').toUpperCase().replace(/\s+/g, ''), spec = row.spec || '', [model] = String(spec).split('|');
   const hit = (...xs) => !k || xs.some(x => x && String(x).toUpperCase().includes(k));
   const demo = ltDemoBk(row);
-  const cars = [...D.cars.values()].filter(c => (ltOpenCar(c) || (demo && ltDemoCar(c))) && !ltLockOf(c, D) && hit(c.vin, c.ref)).map(c => ({ u: c, kind: 'car' }));
-  const qs = D.quota.filter(x => !x.car).map(ltUnitQ).filter(u => ltOpenCar(u) && !ltLockOf(u, D) && hit(u.ref, u.vin)).map(u => ({ u, kind: 'quota' }));
+  const cars = [...D.cars.values()].filter(c => (demo ? ltDemoCar(c) : ltOpenCar(c)) && !ltLockOf(c, D) && hit(c.vin, c.ref)).map(c => ({ u: c, kind: 'car' }));
+  const qs = demo ? [] : D.quota.filter(x => !x.car).map(ltUnitQ).filter(u => ltOpenCar(u) && !ltLockOf(u, D) && hit(u.ref, u.vin)).map(u => ({ u, kind: 'quota' }));
   const rank = u => u.spec === spec ? 0 : String(u.spec || '').split('|')[0] === model ? 1 : 2;
   return [...cars, ...qs].map(x => ({ ...x, rank: rank(x.u) })).filter(x => k || x.rank === 0)
     .sort((x, y) => x.rank - y.rank || (x.kind === y.kind ? 0 : x.kind === 'car' ? -1 : 1) || (x.u.br === row.br ? 0 : 1) - (y.u.br === row.br ? 0 : 1) || String(x.u.br).localeCompare(String(y.u.br))).slice(0, 10);

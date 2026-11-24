@@ -59,7 +59,7 @@ function bookRows(D) {
   return (D._bookRows = rows);
 }
 const BOOK_FILTERS = [['active', 'ยังไม่ส่งมอบ'], ['noids', 'ฟอร์ม AT ยังไม่อยู่ใน IDS'], ['noat', 'มีใน IDS แต่ไม่มีฟอร์ม AT'], ['waiting', 'รอรถ'], ['locked', 'ล็อก / รออนุมัติล็อก'], ['idscar', 'IDS จัดสรรรถแล้ว'],
-  ['assign', 'รอจัดสรรรถ'], ['confirm', 'รอยืนยันเจ้าของ / การจับคู่'], ['req', 'รออนุมัติแก้ไข / ยกเลิก'], ['refund', 'ยกเลิกแล้ว รอทำใบคืนเงิน'], ['demo', 'รถ Demo (ซื้อรถ Demo / ทดลองขับ)'], ['dtoday', 'ส่งมอบวันนี้'], ['d7', 'นัดส่งมอบภายใน 7 วัน'], ['stuck', 'ต้องเร่งตาม'], ['done', 'ส่งมอบแล้ว'], ['cancel', 'ยกเลิก'], ['cxids', 'ยกเลิกแล้ว รอยกเลิกใน IDS'], ['all', 'ทั้งหมด']];
+  ['assign', 'รอจัดสรรรถ'], ['confirm', 'รอยืนยันเจ้าของ / การจับคู่'], ['req', 'รออนุมัติแก้ไข / รอยกเลิก'], ['refund', 'ยกเลิกแล้ว รอทำใบคืนเงิน'], ['demo', 'รถ Demo (ซื้อรถ Demo / ทดลองขับ)'], ['dtoday', 'ส่งมอบวันนี้'], ['d7', 'นัดส่งมอบภายใน 7 วัน'], ['stuck', 'ต้องเร่งตาม'], ['done', 'ส่งมอบแล้ว'], ['cancel', 'ยกเลิก'], ['cxids', 'ยกเลิกแล้ว รอยกเลิกใน IDS'], ['all', 'ทั้งหมด']];
 function rowState(r, D, st) {
   const a = r.a, state = r.row ? r.row.state : null;
   if (st === 'all') return true;
@@ -71,9 +71,9 @@ function rowState(r, D, st) {
   if (st === 'waiting') return state === 'waiting' && (a ? a.active : true);
   if (st === 'locked') return ['locked', 'pending', 'allocated'].includes(state);
   if (st === 'idscar') return state === 'idscar' && (a ? a.active : true);
-  if (st === 'assign') return !!(a && a.active && a.flow.next === 'assign');
+  if (st === 'assign') return !!(a && a.active && !a.rec.cancel_wait && a.flow.next === 'assign');
   if (st === 'confirm') return !!(a && (a.matchAsk || a.ownerCheck === 'pending' || a.ownerCheck === 'disputed'));
-  if (st === 'req') return !!(a && a.change);
+  if (st === 'req') return !!(a && (a.change || (a.active && a.rec.cancel_wait)));
   if (st === 'refund') return !!(a && a.cancelled && a.rec.cancel && a.rec.cancel.refund === 'refund' && !(a.rec.refund && a.rec.refund.at));
   if (st === 'dtoday') return !!(a && a.active && a.rec.delivery_plan === D.today);
   if (st === 'd7') return !!(a && a.active && a.rec.delivery_plan && a.rec.delivery_plan >= D.today && daysBetween(D.today, a.rec.delivery_plan) <= 7);
