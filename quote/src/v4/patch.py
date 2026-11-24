@@ -477,9 +477,12 @@ rep("            const carPrice = grade.price;", "            const carPrice = (
 
 # ---------- 7h. my profile (ข้อมูลของฉัน): header button on the website; sales fill their phone / LINE themselves
 PROF_BTN = """{window.__QWEB && (
+    <a href="../" title="ไปเว็บ AT stock" className="h-10 px-3 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 text-xs sm:text-sm font-bold flex items-center gap-1.5 shrink-0 whitespace-nowrap"><i className="fa-solid fa-warehouse"></i><span className="hidden sm:inline">ไปเว็บ AT stock</span><span className="sm:hidden">AT stock</span></a>
+)}
+{window.__QWEB && (
     <button type="button" onClick={() => setShowProfile(true)} title="ข้อมูลของฉัน (เบอร์โทร / LINE)" aria-label="ข้อมูลของฉัน" className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${atCfg.myProfile && atCfg.myProfile.phone ? 'bg-gray-100 text-gray-700' : 'bg-amber-100 text-amber-700 ring-2 ring-amber-300'}`}><i className="fa-solid fa-user"></i></button>
 )}
-{showProfile && <ProfileModal api={atCfg} onClose={() => setShowProfile(false)} />}
+{showProfile && ReactDOM.createPortal(<ProfileModal api={atCfg} onClose={() => setShowProfile(false)} />, document.body)}
 """
 _a = '<button onClick={() => setShowHistory(true)} className="h-10 min-w-10'
 assert s.count(_a) == 1
@@ -550,5 +553,6 @@ rep("""                            if (el) {
                                 el.classList.remove('card-shadow');""", """                            if (el && elementId === 'compare-a4-capture') { el.parentNode.style.left = '0'; el.style.width = '794px'; el.style.height = '1123px'; }
                             else if (el) {
                                 el.classList.remove('card-shadow');""")
+exec(rd('stockbk.py'))
 open(out, 'w', encoding='utf-8').write(s)
 print('patched', len(s))

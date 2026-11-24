@@ -91,8 +91,8 @@
   // ---- db: the page's collection names → rows of public.docs
   // atref = หลังบ้านของเว็บ AT stock (อ่านอย่างเดียว เฉพาะตารางที่ใบเสนอราคาใช้ ไม่โหลดประวัติการแก้)
   const COL = { config: 'qcfg', quotes: 'quotes', staffreq: 'qreq', atref: 'ref', profiles: 'qprof' };
-  const REF_IDS = ['campaigns', 'margins', 'privileges', 'fees', 'foc', 'catalog', 'gifts', 'sales'];
-  const REF_FIELDS = 'id,list:data->list,at:data->at,rows:data->rows,prices:data->prices,price_issue:data->price_issue,reg:data->reg,ins:data->ins,month:data->month,cols:data->cols,src:data->src';
+  const REF_IDS = ['campaigns', 'margins', 'privileges', 'fees', 'foc', 'catalog', 'gifts', 'sales', 'avail'];
+  const REF_FIELDS = 'id,list:data->list,at:data->at,rows:data->rows,prices:data->prices,price_issue:data->price_issue,specs:data->specs,reg:data->reg,ins:data->ins,month:data->month,cols:data->cols,src:data->src';
   const colOf = name => { const c = COL[name]; if (!c) throw Object.assign(new Error('collection ' + name), { code: 'invalid_argument' }); return c; };
   const hex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, '0')).join('');
   const err = (e, code) => Object.assign(new Error(e && e.message || code), { code: code || (e && /row-level security|permission|violates/i.test(e.message || '') ? 'not_granted' : /too large|payload/i.test(e && e.message || '') ? 'invalid_argument' : 'unavailable') });
@@ -195,26 +195,23 @@
     }
   };
 
-  function footer(email) {
-    const f = document.createElement('div');
-    f.id = 'q-web-foot';
-    f.style.cssText = 'text-align:center;font:500 12px Prompt,sans-serif;color:#6b7280;padding:18px 12px calc(110px + env(safe-area-inset-bottom,0px))';
-    f.innerHTML = `เข้าระบบเป็น ${esc(email)} · <a href="${esc(STOCK_URL)}" style="color:#dc2626;font-weight:700">ไปเว็บ AT stock</a> · <a href="#" id="q-out" style="color:#374151;font-weight:700">ออกจากระบบ</a>`;
-    document.body.appendChild(f);
-    document.getElementById('q-out').onclick = async ev => { ev.preventDefault(); await sb.auth.signOut(); location.reload(); };
-  }
-
   async function start(session, m) {
     gate.hidden = true; gate.innerHTML = '';
     const email = session.user.email.toLowerCase(), isExec = m.role === 'exec';
     const me = { id: session.user.id, name: m.name || email, email, isOwner: isExec, canEdit: isExec };
     window.__QWEB = { email, role: m.role, branch: m.branch || '', salesName: m.sales_name || '', name: m.name || '', logout: async () => { await sb.auth.signOut(); location.reload(); },
+      // ใบจอง → เว็บ AT stock: รูปใบจองเก็บใน Storage เดียวกัน · สถานะใบจองที่ลงจากใบเสนอราคา (เลขที่ / ยกเลิก)
+      uploadImage: async blob => { const id = hex(16); const { error } = await sb.storage.from('assets').upload(id, blob, { contentType: blob.type || 'image/png', upsert: false }); if (error) throw err(error); return id; },
+      bookingsFor: async ids => {
+        const { data, error } = await sb.from('docs').select('id,q:data->>quote_id,no:data->>booking_no,rc:data->>receipt_no,st:data->>status').eq('col', 'bookings').in('data->>quote_id', ids);
+        if (error) throw err(error);
+        const out = {}; (data || []).forEach(r => { if (r.q && (!out[r.q] || r.st !== 'cancelled')) out[r.q] = { id: r.id, no: r.no || '', receipt: r.rc || '', cancelled: r.st === 'cancelled' }; }); return out;
+      },
       members: async () => { const { data, error } = await sb.from('members').select('email,name,role,branch,sales_name,active'); if (error) throw err(error); return data || []; } };
     const user = { async me() { return me; }, async id() { return me.id; }, isOwner: () => isExec, canEdit: () => isExec };
     const caps = { db, user, downloads, mcp };
     window.claude = { use: async n => caps[n] || null };
     window.__startApp();
-    footer(email);
   }
 
   async function boot() {

@@ -608,7 +608,10 @@
                                 <input value={line} onChange={e => setLine(e.target.value)} placeholder="เช่น at.honda.beer" className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-base outline-none focus:border-red-500" />
                             </label>
                             {msg && <p className={`text-sm ${/ไม่สำเร็จ|ก่อน/.test(msg) ? 'text-red-600' : 'text-green-700'}`}>{msg}</p>}
-                            <button type="button" disabled={busy} onClick={save} className="w-full py-3 rounded-xl bg-red-600 text-white font-bold disabled:opacity-50">{busy ? 'กำลังบันทึก…' : 'บันทึกข้อมูลของฉัน'}</button>
+                            <div className="flex gap-2">
+                                <button type="button" disabled={busy} onClick={save} className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold disabled:opacity-50"><i className="fa-solid fa-floppy-disk mr-1.5"></i>{busy ? 'กำลังบันทึก…' : 'บันทึกข้อมูล'}</button>
+                                {window.__QWEB && window.__QWEB.logout && <button type="button" disabled={busy} onClick={() => window.__QWEB.logout()} className="flex-1 py-3 rounded-xl bg-white border-2 border-gray-300 text-gray-700 font-bold hover:bg-gray-50 disabled:opacity-50"><i className="fa-solid fa-right-from-bracket mr-1.5"></i>ออกจากระบบ</button>}
+                            </div>
                             {(me.log || []).length > 0 && (
                                 <details className="text-xs text-gray-500">
                                     <summary className="cursor-pointer">ประวัติการแก้ ({me.log.length} ครั้ง)</summary>

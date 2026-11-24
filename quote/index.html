@@ -333,11 +333,17 @@
   .inset-x-0 {
     inset-inline: 0px;
   }
+  .-top-2 {
+    top: calc(var(--spacing) * -2);
+  }
   .top-0 {
     top: 0px;
   }
   .top-1\/2 {
     top: calc(1 / 2 * 100%);
+  }
+  .-right-2 {
+    right: calc(var(--spacing) * -2);
   }
   .bottom-0 {
     bottom: 0px;
@@ -558,6 +564,9 @@
   .h-24 {
     height: calc(var(--spacing) * 24);
   }
+  .h-\[18px\] {
+    height: 18px;
+  }
   .h-auto {
     height: auto;
   }
@@ -719,6 +728,9 @@
   }
   .min-w-\[7rem\] {
     min-width: 7rem;
+  }
+  .min-w-\[18px\] {
+    min-width: 18px;
   }
   .min-w-\[180px\] {
     min-width: 180px;
@@ -915,6 +927,9 @@
   }
   .self-end {
     align-self: flex-end;
+  }
+  .self-start {
+    align-self: flex-start;
   }
   .truncate {
     overflow: hidden;
@@ -1531,6 +1546,10 @@
     --tw-leading: calc(var(--spacing) * 6);
     line-height: calc(var(--spacing) * 6);
   }
+  .leading-\[18px\] {
+    --tw-leading: 18px;
+    line-height: 18px;
+  }
   .leading-none {
     --tw-leading: 1;
     line-height: 1;
@@ -1675,6 +1694,9 @@
   .text-green-700 {
     color: var(--color-green-700);
   }
+  .text-green-800 {
+    color: var(--color-green-800);
+  }
   .text-indigo-700 {
     color: var(--color-indigo-700);
   }
@@ -1808,6 +1830,9 @@
   .opacity-75 {
     opacity: 75%;
   }
+  .opacity-80 {
+    opacity: 80%;
+  }
   .shadow {
     --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
@@ -1871,6 +1896,9 @@
   }
   .ring-violet-100 {
     --tw-ring-color: var(--color-violet-100);
+  }
+  .ring-white {
+    --tw-ring-color: var(--color-white);
   }
   .filter {
     filter: var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,);
@@ -1941,6 +1969,9 @@
     }
     .hover\:bg-amber-600:hover {
       background-color: var(--color-amber-600);
+    }
+    .hover\:bg-black:hover {
+      background-color: var(--color-black);
     }
     .hover\:bg-blue-50:hover {
       background-color: var(--color-blue-50);
@@ -2068,6 +2099,9 @@
   }
   .disabled\:opacity-50:disabled {
     opacity: 50%;
+  }
+  .disabled\:opacity-60:disabled {
+    opacity: 60%;
   }
   @media (width >= 40rem) {
     .sm\:col-span-2 {
@@ -4377,6 +4411,7 @@ const useQuoteLog = () => {
   const [mode, setMode] = useState("local");
   const [ready, setReady] = useState(false);
   const dbRef = useRef(null);
+  const lastId = useRef(null);
   useEffect(() => {
     let unsub = null, cancelled = false;
     const timer = setTimeout(() => setReady(true), 1e4);
@@ -4426,11 +4461,15 @@ const useQuoteLog = () => {
     const rec = JSON.parse(JSON.stringify({ ...entry, at: new Date().toISOString() }));
     if (dbRef.current) {
       try {
-        await dbRef.current.collection("quotes").doc().set(rec);
+        const r = dbRef.current.collection("quotes").doc();
+        await r.set(rec);
+        lastId.current = r.id;
         return "db";
       } catch (e) {}
     }
-    writeLocal((list) => [{ id: "L" + Date.now() + Math.floor(Math.random() * 1000), ...rec }, ...list]);
+    const lid = "L" + Date.now() + Math.floor(Math.random() * 1000);
+    lastId.current = lid;
+    writeLocal((list) => [{ id: lid, ...rec }, ...list]);
     return "local";
   };
   const update = async (id, patch) => {
@@ -4460,7 +4499,7 @@ const useQuoteLog = () => {
     writeLocal((list) => list.filter((x) => x.id !== id));
     return true;
   };
-  return { entries, mode, ready, add, update, remove };
+  return { entries, mode, ready, add, update, remove, lastId: () => lastId.current };
 };
 const AT_SHEET_ID_DEFAULT = "17pqWhpWAcj_rqg5jkzqCIVCGj3Awno__aqpIUZ_sSI8";
 const AT_SNAPSHOT = { at: "2026-11-04T01:50:00+07:00", src: "Google Sheet: AT Honda · ฐานข้อมูลของแถม และเงื่อนไขค่าคอม (ดึง 4 พ.ย. 2569)", camp: [["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "cityRec-1", "cityRec", "City (ราคาแนะนำ – แคมเปญเดิม ก.ย.)", "Sedan", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี", "1.69%", "0", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "cityRec-2", "cityRec", "City (ราคาแนะนำ – แคมเปญเดิม ก.ย.)", "Sedan", "2", "ทางเลือก 2: Service e-coupon มูลค่า 6,000 บาท + ฟรีประกันภัย 1 ปี", "", "0", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "cityRec-3", "cityRec", "City (ราคาแนะนำ – แคมเปญเดิม ก.ย.)", "Sedan", "3", "ทางเลือก 3: ค่าช่วยเหลือการขาย 12,000 บาท + ฟรีประกันภัย 1 ปี (ไม่ร่วม Gen to Gen / Test Drive / Local Native)", "", "12,000", "1", "Gen to Gen / Test Drive / Local Native", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "cityHbRec-1", "cityHbRec", "City Hatchback (ราคาแนะนำ – แคมเปญเดิม ก.ย.)", "Hatchback", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี", "1.69%", "0", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "cityHbRec-2", "cityHbRec", "City Hatchback (ราคาแนะนำ – แคมเปญเดิม ก.ย.)", "Hatchback", "2", "ทางเลือก 2: Service e-coupon มูลค่า 6,000 บาท + ฟรีประกันภัย 1 ปี", "", "0", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "cityHbRec-3", "cityHbRec", "City Hatchback (ราคาแนะนำ – แคมเปญเดิม ก.ย.)", "Hatchback", "3", "ทางเลือก 3: ค่าช่วยเหลือการขาย 12,000 บาท + ฟรีประกันภัย 1 ปี (ไม่ร่วม Gen to Gen / Test Drive / Local Native)", "", "12,000", "1", "Gen to Gen / Test Drive / Local Native", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "city-1", "city", "City (ราคาปกติ – แคมเปญ ต.ค.)", "Sedan", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี + ค่าช่วยเหลือการขาย 20,000 บาท", "1.69%", "20,000", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "city-2", "city", "City (ราคาปกติ – แคมเปญ ต.ค.)", "Sedan", "2", "ทางเลือก 2: ดอกเบี้ยพิเศษ 1.69% + Honda Exclusive Care 3 ปี", "1.69%", "0", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "city-3", "city", "City (ราคาปกติ – แคมเปญ ต.ค.)", "Sedan", "3", "ทางเลือก 3: ดอกเบี้ยพิเศษ 0.99% + ฟรีประกันภัย 1 ปี + ค่าช่วยเหลือการขาย 8,000 บาท", "0.99%", "8,000", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "city-4", "city", "City (ราคาปกติ – แคมเปญ ต.ค.)", "Sedan", "4", "ทางเลือก 4: ค่าช่วยเหลือการขาย 26,000 บาท + ฟรีประกันภัย 1 ปี (ใช้ได้ทั้ง ซื้อสด / Standard Rate / Double Smile Plus)", "", "26,000", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "cityHb-1", "cityHb", "City Hatchback (ราคาปกติ – แคมเปญ ต.ค.)", "Hatchback", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี + ค่าช่วยเหลือการขาย 20,000 บาท", "1.69%", "20,000", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "cityHb-2", "cityHb", "City Hatchback (ราคาปกติ – แคมเปญ ต.ค.)", "Hatchback", "2", "ทางเลือก 2: ดอกเบี้ยพิเศษ 1.69% + Honda Exclusive Care 3 ปี", "1.69%", "0", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "cityHb-3", "cityHb", "City Hatchback (ราคาปกติ – แคมเปญ ต.ค.)", "Hatchback", "3", "ทางเลือก 3: ดอกเบี้ยพิเศษ 0.99% + ฟรีประกันภัย 1 ปี + ค่าช่วยเหลือการขาย 8,000 บาท", "0.99%", "8,000", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "cityHb-4", "cityHb", "City Hatchback (ราคาปกติ – แคมเปญ ต.ค.)", "Hatchback", "4", "ทางเลือก 4: ค่าช่วยเหลือการขาย 26,000 บาท + ฟรีประกันภัย 1 ปี (ใช้ได้ทั้ง ซื้อสด / Standard Rate / Double Smile Plus)", "", "26,000", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "civic-1", "civic", "Civic e:HEV", "EL+ / RS", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี", "0.00%", "0", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "civic-2", "civic", "Civic e:HEV", "EL+ / RS", "2", "ทางเลือก 2: ดอกเบี้ยพิเศษ 0% + ฟรีประกันภัย 1 ปี + ค่าช่วยเหลือการขาย 35,000 บาท", "0.00%", "35,000", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "civic-3", "civic", "Civic e:HEV", "EL+ / RS", "3", "ทางเลือก 3: ค่าช่วยเหลือการขาย 90,000 บาท + ฟรีประกันภัย 1 ปี (ดอกเบี้ยมาตรฐาน)", "", "90,000", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "civicEL-1", "civicEL", "Civic e:HEV", "EL", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 1.89% + Honda Exclusive Care 3 ปี", "1.89%", "0", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "civicEL-2", "civicEL", "Civic e:HEV", "EL", "2", "ทางเลือก 2: ค่าช่วยเหลือการขาย 50,000 บาท (ดอกเบี้ยมาตรฐาน)", "", "50,000", "0", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "hrv-1", "hrv", "HR-V e:HEV", "ทุกเกรด", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี + ฟรีประกันภัยเพิ่ม 1 ปี (รวม 2 ปี)", "0.00%", "0", "2", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "hrv-2", "hrv", "HR-V e:HEV", "ทุกเกรด", "2", "ทางเลือก 2: ค่าช่วยเหลือการขาย 90,000 บาท + ฟรีประกันภัย 2 ปี (ดอกเบี้ยมาตรฐาน)", "", "90,000", "2", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "hrv-3", "hrv", "HR-V e:HEV", "ทุกเกรด", "3", "ทางเลือก 3: ค่าช่วยเหลือการขาย 140,000 บาท (ดอกเบี้ยมาตรฐาน)", "", "140,000", "0", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "accord-1", "accord", "Accord e:HEV", "ทุกเกรด", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี", "0.00%", "0", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "accord-2", "accord", "Accord e:HEV", "ทุกเกรด", "2", "ทางเลือก 2: ค่าช่วยเหลือการขาย 110,000 บาท + ฟรีประกันภัย 1 ปี (ดอกเบี้ยมาตรฐาน)", "", "110,000", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "crv-1", "crv", "CR-V e:HEV", "ทุกเกรด", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี", "0.00%", "0", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "crv-2", "crv", "CR-V e:HEV", "ทุกเกรด", "2", "ทางเลือก 2: ค่าช่วยเหลือการขาย 110,000 บาท + ฟรีประกันภัย 1 ปี (ดอกเบี้ยมาตรฐาน)", "", "110,000", "1", "", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "en2-1", "en2", "e:N2", "ทุกเกรด", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + ฟรีประกันภัย 1 ปี + โฮมชาร์จเจอร์พร้อมบริการติดตั้ง + Honda Ultimate Care + ค่าช่วยเหลือการขาย 200,000 บาท (ไม่ร่วม Gen to Gen / Local Native)", "0.00%", "200,000", "1", "Gen to Gen / Local Native", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "en2-2", "en2", "e:N2", "ทุกเกรด", "2", "ทางเลือก 2: ค่าช่วยเหลือการขาย 330,000 บาท + Honda Ultimate Care (ดอกเบี้ยมาตรฐาน) (ไม่ร่วม Gen to Gen / Local Native)", "", "330,000", "0", "Gen to Gen / Local Native", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "step-1", "step", "STEP WGN e:HEV", "ทุกเกรด", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี + Honda Ultimate Care (ไม่ร่วม Gen to Gen / Local Native)", "1.69%", "0", "1", "Gen to Gen / Local Native", "SP118/26", "Y"], ["2026-10", "2026-10-01", "2026-10-31", "2026-11-30", "step-2", "step", "STEP WGN e:HEV", "ทุกเกรด", "2", "ทางเลือก 2: ค่าช่วยเหลือการขาย 40,000 บาท + Honda Ultimate Care (ดอกเบี้ยมาตรฐาน) (ไม่ร่วม Gen to Gen / Local Native)", "", "40,000", "0", "Gen to Gen / Local Native", "SP118/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "cityRec-1", "cityRec", "City (ราคาช่วงแนะนำ – แคมเปญ พ.ย.–ธ.ค.)", "Sedan", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี", "1.69%", "0", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "cityRec-2", "cityRec", "City (ราคาช่วงแนะนำ – แคมเปญ พ.ย.–ธ.ค.)", "Sedan", "2", "ทางเลือก 2: Service e-coupon มูลค่า 6,000 บาท + ฟรีประกันภัย 1 ปี", "", "0", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "cityRec-3", "cityRec", "City (ราคาช่วงแนะนำ – แคมเปญ พ.ย.–ธ.ค.)", "Sedan", "3", "ทางเลือก 3: ค่าช่วยเหลือการขาย 12,000 บาท + ฟรีประกันภัย 1 ปี (ไม่ร่วม Gen to Gen / Test Drive / Local Native)", "", "12,000", "1", "Gen to Gen / Test Drive / Local Native", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "cityHbRec-1", "cityHbRec", "City Hatchback (ราคาช่วงแนะนำ – แคมเปญ พ.ย.–ธ.ค.)", "Hatchback", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี", "1.69%", "0", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "cityHbRec-2", "cityHbRec", "City Hatchback (ราคาช่วงแนะนำ – แคมเปญ พ.ย.–ธ.ค.)", "Hatchback", "2", "ทางเลือก 2: Service e-coupon มูลค่า 6,000 บาท + ฟรีประกันภัย 1 ปี", "", "0", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "cityHbRec-3", "cityHbRec", "City Hatchback (ราคาช่วงแนะนำ – แคมเปญ พ.ย.–ธ.ค.)", "Hatchback", "3", "ทางเลือก 3: ค่าช่วยเหลือการขาย 12,000 บาท + ฟรีประกันภัย 1 ปี (ไม่ร่วม Gen to Gen / Test Drive / Local Native)", "", "12,000", "1", "Gen to Gen / Test Drive / Local Native", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "city-1", "city", "City (ราคาปกติ – แคมเปญ พ.ย.–ธ.ค.)", "Sedan", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี + ค่าช่วยเหลือการขาย 20,000 บาท", "1.69%", "20,000", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "city-2", "city", "City (ราคาปกติ – แคมเปญ พ.ย.–ธ.ค.)", "Sedan", "2", "ทางเลือก 2: ดอกเบี้ยพิเศษ 1.69% + Honda Exclusive Care 3 ปี", "1.69%", "0", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "city-3", "city", "City (ราคาปกติ – แคมเปญ พ.ย.–ธ.ค.)", "Sedan", "3", "ทางเลือก 3: ดอกเบี้ยพิเศษ 0.99% + ฟรีประกันภัย 1 ปี + ค่าช่วยเหลือการขาย 8,000 บาท", "0.99%", "8,000", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "city-4", "city", "City (ราคาปกติ – แคมเปญ พ.ย.–ธ.ค.)", "Sedan", "4", "ทางเลือก 4: ค่าช่วยเหลือการขาย 26,000 บาท + ฟรีประกันภัย 1 ปี (ใช้ได้ทั้ง ซื้อสด / Standard Rate / Double Smile Plus)", "", "26,000", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "cityHb-1", "cityHb", "City Hatchback (ราคาปกติ – แคมเปญ พ.ย.–ธ.ค.)", "Hatchback", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี + ค่าช่วยเหลือการขาย 20,000 บาท", "1.69%", "20,000", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "cityHb-2", "cityHb", "City Hatchback (ราคาปกติ – แคมเปญ พ.ย.–ธ.ค.)", "Hatchback", "2", "ทางเลือก 2: ดอกเบี้ยพิเศษ 1.69% + Honda Exclusive Care 3 ปี", "1.69%", "0", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "cityHb-3", "cityHb", "City Hatchback (ราคาปกติ – แคมเปญ พ.ย.–ธ.ค.)", "Hatchback", "3", "ทางเลือก 3: ดอกเบี้ยพิเศษ 0.99% + ฟรีประกันภัย 1 ปี + ค่าช่วยเหลือการขาย 8,000 บาท", "0.99%", "8,000", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "cityHb-4", "cityHb", "City Hatchback (ราคาปกติ – แคมเปญ พ.ย.–ธ.ค.)", "Hatchback", "4", "ทางเลือก 4: ค่าช่วยเหลือการขาย 26,000 บาท + ฟรีประกันภัย 1 ปี (ใช้ได้ทั้ง ซื้อสด / Standard Rate / Double Smile Plus)", "", "26,000", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "civic-1", "civic", "Civic e:HEV", "EL+ / RS", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี", "0.00%", "0", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "civic-2", "civic", "Civic e:HEV", "EL+ / RS", "2", "ทางเลือก 2: ดอกเบี้ยพิเศษ 0% + ฟรีประกันภัย 1 ปี + ค่าช่วยเหลือการขาย 35,000 บาท", "0.00%", "35,000", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "civic-3", "civic", "Civic e:HEV", "EL+ / RS", "3", "ทางเลือก 3: ค่าช่วยเหลือการขาย 90,000 บาท + ฟรีประกันภัย 1 ปี (ดอกเบี้ยมาตรฐาน)", "", "90,000", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "civicEL-1", "civicEL", "Civic e:HEV", "EL", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 1.89% + Honda Exclusive Care 3 ปี", "1.89%", "0", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "civicEL-2", "civicEL", "Civic e:HEV", "EL", "2", "ทางเลือก 2: ค่าช่วยเหลือการขาย 50,000 บาท (ดอกเบี้ยมาตรฐาน)", "", "50,000", "0", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "hrv-1", "hrv", "HR-V e:HEV", "ทุกเกรด (ทางเลือก 3 เฉพาะ EL, RS สีทูโทน)", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี + ฟรีประกันภัยเพิ่ม 1 ปี (รวม 2 ปี)", "0.00%", "0", "2", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "hrv-2", "hrv", "HR-V e:HEV", "ทุกเกรด (ทางเลือก 3 เฉพาะ EL, RS สีทูโทน)", "2", "ทางเลือก 2: ค่าช่วยเหลือการขาย 90,000 บาท + ฟรีประกันภัย 2 ปี (ดอกเบี้ยมาตรฐาน)", "", "90,000", "2", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "hrv-3", "hrv", "HR-V e:HEV", "ทุกเกรด (ทางเลือก 3 เฉพาะ EL, RS สีทูโทน)", "3", "ทางเลือก 3: ค่าช่วยเหลือการขาย 140,000 บาท (ดอกเบี้ยมาตรฐาน · เฉพาะ EL, RS สีทูโทน)", "", "140,000", "0", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "accord-1", "accord", "Accord e:HEV", "ทุกเกรด", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี", "0.00%", "0", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "accord-2", "accord", "Accord e:HEV", "ทุกเกรด", "2", "ทางเลือก 2: ค่าช่วยเหลือการขาย 110,000 บาท + ฟรีประกันภัย 1 ปี (ดอกเบี้ยมาตรฐาน)", "", "110,000", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "crv-1", "crv", "CR-V e:HEV", "ทุกเกรด (ยกเว้น HuNT)", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี", "0.00%", "0", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "crv-2", "crv", "CR-V e:HEV", "ทุกเกรด (ยกเว้น HuNT)", "2", "ทางเลือก 2: ดอกเบี้ยพิเศษ 0.99% + Honda Exclusive Care 5 ปี + เพิ่มฟรีค่าแรงค่าอะไหล่เช็คระยะ 2 ปี หรือ 40,000 กม.", "0.99%", "0", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "crv-3", "crv", "CR-V e:HEV", "ทุกเกรด (ยกเว้น HuNT)", "3", "ทางเลือก 3: ค่าช่วยเหลือการขาย 110,000 บาท + ฟรีประกันภัย 1 ปี (ดอกเบี้ยมาตรฐาน)", "", "110,000", "1", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "crvHunt-1", "crvHunt", "CR-V e:HEV HuNT", "HuNT", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + Honda Exclusive Care 5 ปี + ฟรีประกันภัยเพิ่ม 1 ปี (รวม 2 ปี)", "0.00%", "0", "2", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "crvHunt-2", "crvHunt", "CR-V e:HEV HuNT", "HuNT", "2", "ทางเลือก 2: ดอกเบี้ยพิเศษ 0.99% + Honda Exclusive Care 5 ปี + เพิ่มฟรีค่าแรงค่าอะไหล่เช็คระยะ 2 ปี หรือ 40,000 กม. + ฟรีประกันภัยเพิ่ม 1 ปี (รวม 2 ปี)", "0.99%", "0", "2", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "crvHunt-3", "crvHunt", "CR-V e:HEV HuNT", "HuNT", "3", "ทางเลือก 3: ค่าช่วยเหลือการขาย 110,000 บาท + ฟรีประกันภัย 2 ปี (ดอกเบี้ยมาตรฐาน)", "", "110,000", "2", "", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "en2-1", "en2", "e:N2", "ทุกเกรด", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 0% + ฟรีประกันภัย 1 ปี + ฟรีโฮมชาร์จเจอร์พร้อมบริการติดตั้ง + Honda Ultimate Care + ค่าช่วยเหลือการขาย 200,000 บาท (ไม่ร่วม Gen to Gen / Local Native)", "0.00%", "200,000", "1", "Gen to Gen / Local Native", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "en2-2", "en2", "e:N2", "ทุกเกรด", "2", "ทางเลือก 2: ดอกเบี้ยพิเศษ 0% สูงสุด 84 เดือน + ฟรีประกันภัย 2 ปี + Honda Ultimate Care + ฟรีค่าแรงและค่าอะไหล่เช็คระยะ 7 ปี หรือ 140,000 กม. + ฟรีโฮมชาร์จเจอร์พร้อมบริการติดตั้ง (ไม่ร่วม Gen to Gen / Local Native)", "0.00%", "0", "2", "Gen to Gen / Local Native", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "en2-3", "en2", "e:N2", "ทุกเกรด", "3", "ทางเลือก 3: ค่าช่วยเหลือการขาย 330,000 บาท + Honda Ultimate Care (ดอกเบี้ยมาตรฐาน) (ไม่ร่วม Gen to Gen / Local Native)", "", "330,000", "0", "Gen to Gen / Local Native", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "step-1", "step", "STEP WGN e:HEV", "ทุกเกรด", "1", "ทางเลือก 1: ดอกเบี้ยพิเศษ 1.69% + ฟรีประกันภัย 1 ปี + Honda Ultimate Care (ไม่ร่วม Gen to Gen / Local Native)", "1.69%", "0", "1", "Gen to Gen / Local Native", "SP133/26", "Y"], ["2026-11", "2026-11-01", "2026-12-31", "2027-01-31", "step-2", "step", "STEP WGN e:HEV", "ทุกเกรด", "2", "ทางเลือก 2: ค่าช่วยเหลือการขาย 40,000 บาท + Honda Ultimate Care (ดอกเบี้ยมาตรฐาน) (ไม่ร่วม Gen to Gen / Local Native)", "", "40,000", "0", "Gen to Gen / Local Native", "SP133/26", "Y"]], margin: [["2026-10", "Accord e:HEV", "3%", "3%", "10,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-10", "CR-V e:HEV", "3%", "3%", "15,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-10", "City Turbo S", "3%", "3%", "15,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-10", "City e:HEV", "3%", "3%", "15,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-10", "City HB Turbo", "3%", "3%", "15,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-10", "City HB e:HEV", "3%", "3%", "15,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-10", "Civic e:HEV", "3%", "3%", "10,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-10", "HR-V e:HEV", "3%", "3%", "12,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-10", "e:N2", "3%", "3%", "15,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-10", "STEP WGN e:HEV", "2%", "3%", "0", "0", "ไม่มี Step บาทเพิ่ม", "Y"], ["2026-11", "Accord e:HEV", "3%", "3%", "10,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-11", "CR-V e:HEV", "3%", "3%", "15,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-11", "City Turbo S", "3%", "3%", "15,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-11", "City e:HEV", "3%", "3%", "15,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-11", "City HB Turbo", "3%", "3%", "15,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-11", "City HB e:HEV", "3%", "3%", "15,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-11", "Civic e:HEV", "3%", "3%", "10,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-11", "HR-V e:HEV", "3%", "3%", "12,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-11", "e:N2", "3%", "3%", "15,000", "20,000", "Step 1 + FN 20% · Step 2 + MG 20% สูงสุดคอม 2,000", "Y"], ["2026-11", "STEP WGN e:HEV", "2%", "3%", "0", "0", "ไม่มี Step บาทเพิ่ม", "Y"]], priv: [["2026-10", "gtg", "Gen to Gen", "city", "New City", "8000", "10000", "ใช่", "รถฮอนด้าเดิม 1 คัน / 2 คันขึ้นไป · ครอบครัวเดียวกัน ต้องมีเล่มทะเบียนและหลักฐานความสัมพันธ์", "TRUE"], ["2026-10", "gtg", "Gen to Gen", "cityHb", "City Hatchback", "8000", "10000", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-10", "gtg", "Gen to Gen", "civic", "New Civic", "10000", "15000", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-10", "gtg", "Gen to Gen", "hrv", "New HR-V", "10000", "15000", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-10", "gtg", "Gen to Gen", "accord", "New Accord", "25000", "30000", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-10", "gtg", "Gen to Gen", "crv", "New CR-V", "25000", "30000", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-10", "ln", "Local Native", "city", "New City", "10000", "", "ใช่", "เลือกเงิน 10,000 บาท หรือ Ultimate Care (ไม่เข้า Margin) · ชื่อตรงเจ้าของรถใหม่ และจังหวัดตามเขตการขาย", "TRUE"], ["2026-10", "ln", "Local Native", "cityHb", "City Hatchback", "10000", "", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-10", "ln", "Local Native", "civic", "New Civic", "10000", "", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-10", "ln", "Local Native", "hrv", "New HR-V", "10000", "", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-10", "ln", "Local Native", "accord", "New Accord", "10000", "", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-10", "ln", "Local Native", "crv", "New CR-V", "10000", "", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-10", "ln", "Local Native", "en2", "e:N2", "10000", "", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-10", "ln", "Local Native", "step", "STEP WGN", "10000", "", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-10", "hk", "ฮอนด้าเคียงข้างคุณ", "all", "ทุกรุ่นที่ร่วม", "25000", "70000", "ใช่", "ผู้ประสบอุทกภัย ใส่ยอดเองระหว่าง 25,000–70,000 บาท · ใช้ร่วม Gen to Gen / Local Native ไม่ได้", "TRUE"], ["2026-10", "loyalty", "Honda Loyalty (ลดดอกเบี้ย −0.15%)", "all", "ทุกรุ่นที่ร่วม", "", "", "ไม่ (บันทึกไว้)", "ผ่าน HLTC (New City: เจ้าของมอเตอร์ไซค์ฮอนด้า ใช้กับสถาบันการเงินที่ร่วมรายการ)", "TRUE"], ["2026-10", "fj", "First Jobber (ลดดอกเบี้ย −0.10%)", "city", "New City", "", "", "ไม่ (บันทึกไว้)", "อายุ 18–27 ปี / นักศึกษา · ผ่าน HLTC · เลือกได้ 1 จาก First Jobber / You're the One", "TRUE"], ["2026-10", "yto", "You're the One (ลดดอกเบี้ย −0.15%)", "city", "New City", "", "", "ไม่ (บันทึกไว้)", "ลูกค้าเก่า HLTC ประวัติดี", "TRUE"], ["2026-11", "gtg", "Gen to Gen", "city", "New City", "8000", "10000", "ใช่", "รถฮอนด้าเดิม 1 คัน / 2 คันขึ้นไป · ครอบครัวเดียวกัน ต้องมีเล่มทะเบียนและหลักฐานความสัมพันธ์ (SP133/26)", "TRUE"], ["2026-11", "gtg", "Gen to Gen", "cityHb", "City Hatchback", "8000", "10000", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-11", "gtg", "Gen to Gen", "civic", "New Civic", "10000", "15000", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-11", "gtg", "Gen to Gen", "hrv", "New HR-V", "10000", "15000", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-11", "gtg", "Gen to Gen", "accord", "New Accord", "25000", "30000", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-11", "gtg", "Gen to Gen", "crv", "New CR-V", "25000", "30000", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-11", "ln", "Local Native", "city", "New City", "10000", "", "ใช่", "เลือกเงิน 10,000 บาท หรือ Ultimate Care (ไม่เข้า Margin) · ชื่อตรงเจ้าของรถใหม่ และจังหวัดตามเขตการขาย", "TRUE"], ["2026-11", "ln", "Local Native", "cityHb", "City Hatchback", "10000", "", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-11", "ln", "Local Native", "civic", "New Civic", "10000", "", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-11", "ln", "Local Native", "hrv", "New HR-V", "10000", "", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-11", "ln", "Local Native", "accord", "New Accord", "10000", "", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-11", "ln", "Local Native", "crv", "New CR-V", "10000", "", "ใช่", "เหมือนด้านบน", "TRUE"], ["2026-11", "ln", "Local Native", "en2", "e:N2", "10000", "", "ใช่", "เหมือนด้านบน (แคมเปญ e:N2 ที่ไม่ร่วม Local Native ปิดสิทธิ์นี้เอง)", "TRUE"], ["2026-11", "loyalty", "Honda Loyalty (ลดดอกเบี้ย −0.15%)", "all", "ทุกรุ่นที่ร่วม", "", "", "ไม่ (บันทึกไว้)", "ทุกรุ่น (ยกเว้น New City) ลดดอกเบี้ย 0.15% เมื่อทำสัญญาเช่าซื้อผ่าน Honda Leasing / สถาบันการเงินที่ร่วม · New City: เจ้าของมอเตอร์ไซค์ฮอนด้า", "TRUE"], ["2026-11", "td", "e:N2 Test Drive (เงินสนับสนุน)", "en2", "e:N2", "20000", "", "ใช่", "ทดลองขับ e:N2 ที่ที่ปรึกษาบันทึกใน SPEAR + จอง 1–30 พ.ย. 69 + รับรถภายใน 31 ธ.ค. 69 · ชื่อผู้ทดลองขับตรงกับผู้ซื้อ · จอง/รับรถกับผู้จำหน่ายเดียวกับที่ทดลองขับ · ไม่รวม Fleet/Leasing (SP133/26 หน้า 11)", "TRUE"]], reg: [["ค่าจดทะเบียน · City", "city", "3,500", "5,500", "ลูกค้าชำระ", "Y", "City Turbo"], ["ค่าจดทะเบียน · City e:HEV", "city", "3,500", "5,500", "ลูกค้าชำระ", "Y", ""], ["ค่าจดทะเบียน · City Hatchback", "cityHb", "3,500", "5,500", "ลูกค้าชำระ", "Y", ""], ["ค่าจดทะเบียน · City Hatchback e:HEV", "cityHb", "3,500", "5,500", "ลูกค้าชำระ", "Y", ""], ["ค่าจดทะเบียน · WR-V", "wrv", "4,000", "5,500", "ลูกค้าชำระ", "Y", ""], ["ค่าจดทะเบียน · BR-V", "brv", "4,000", "5,500", "ลูกค้าชำระ", "Y", ""], ["ค่าจดทะเบียน · HR-V e:HEV", "hrv", "4,500", "7,000", "ลูกค้าชำระ", "Y", ""], ["ค่าจดทะเบียน · Civic 1.5", "civic15", "4,500", "7,000", "ลูกค้าชำระ", "Y", ""], ["ค่าจดทะเบียน · Civic e:HEV", "civic", "5,500", "9,500", "ลูกค้าชำระ", "Y", "EL / EL+ / RS"], ["ค่าจดทะเบียน · Accord 1.5", "accord15", "5,500", "9,500", "ลูกค้าชำระ", "Y", ""], ["ค่าจดทะเบียน · Accord e:HEV", "accord", "5,500", "9,500", "ลูกค้าชำระ", "Y", ""], ["ค่าจดทะเบียน · CR-V 1.5", "crv15", "6,500", "11,000", "ลูกค้าชำระ", "Y", ""], ["ค่าจดทะเบียน · CR-V e:HEV", "crv", "6,500", "11,000", "ลูกค้าชำระ", "Y", ""], ["ค่าจดทะเบียน · STEP WGN e:HEV", "step", "6,500", "11,000", "ลูกค้าชำระ", "Y", ""], ["ค่าจดทะเบียน · e:N2", "en2", "4,500", "7,000", "ลูกค้าชำระ", "Y", ""]], ins: [["2026-10", "City Turbo (S)", "cityTurbo", "City Turbo", "1", "23,000.72", "", "", "23,000.72", "Y", ""], ["2026-10", "City Turbo (S)", "cityTurbo", "City Turbo", "2", "19,900.93", "19,900.93", "", "39,801.86", "Y", ""], ["2026-10", "City Turbo (S)", "cityTurbo", "City Turbo", "3", "19,900.93", "19,900.93", "18,000.61", "57,802.47", "Y", ""], ["2026-10", "City e:HEV (Sedan)", "city", "New City / New City Regular", "1", "23,000.72", "", "", "23,000.72", "Y", ""], ["2026-10", "City e:HEV (Sedan)", "city", "New City / New City Regular", "2", "19,900.93", "19,900.93", "", "39,801.86", "Y", ""], ["2026-10", "City e:HEV (Sedan)", "city", "New City / New City Regular", "3", "19,900.93", "19,900.93", "18,000.61", "57,802.47", "Y", ""], ["2026-10", "City Hatchback", "cityHb", "New City Hatchback / Regular", "1", "23,000.72", "", "", "23,000.72", "Y", ""], ["2026-10", "City Hatchback", "cityHb", "New City Hatchback / Regular", "2", "19,900.93", "19,900.93", "", "39,801.86", "Y", ""], ["2026-10", "City Hatchback", "cityHb", "New City Hatchback / Regular", "3", "19,900.93", "19,900.93", "18,000.61", "57,802.47", "Y", ""], ["2026-10", "Civic e:HEV EL+ / RS", "civic", "Civic eHEV", "1", "27,700.16", "", "", "27,700.16", "Y", ""], ["2026-10", "Civic e:HEV EL+ / RS", "civic", "Civic eHEV", "2", "25,999.93", "22,660.46", "", "48,660.39", "Y", ""], ["2026-10", "Civic e:HEV EL+ / RS", "civic", "Civic eHEV", "3", "25,999.93", "22,660.46", "19,500.75", "68,161.14", "Y", ""], ["2026-10", "Civic e:HEV EL", "civicEL", "Civic eHEV EL", "1", "27,700.16", "", "", "27,700.16", "Y", ""], ["2026-10", "Civic e:HEV EL", "civicEL", "Civic eHEV EL", "2", "25,999.93", "22,660.46", "", "48,660.39", "Y", ""], ["2026-10", "Civic e:HEV EL", "civicEL", "Civic eHEV EL", "3", "25,999.93", "22,660.46", "19,500.75", "68,161.14", "Y", ""], ["2026-10", "HR-V e:HEV", "hrv", "HR-V eHEV", "1", "23,000.72", "", "", "23,000.72", "Y", ""], ["2026-10", "HR-V e:HEV", "hrv", "HR-V eHEV", "2", "22,300.94", "14,700.73", "", "37,001.67", "Y", ""], ["2026-10", "HR-V e:HEV", "hrv", "HR-V eHEV", "3", "22,300.94", "14,700.73", "14,700.73", "51,702.40", "Y", ""], ["2026-10", "Accord e:HEV", "accord", "Accord eHEV", "1", "30,700.44", "", "", "30,700.44", "Y", ""], ["2026-10", "Accord e:HEV", "accord", "Accord eHEV", "2", "29,000.21", "24,360.69", "", "53,360.90", "Y", ""], ["2026-10", "Accord e:HEV", "accord", "Accord eHEV", "3", "29,000.21", "24,360.69", "21,000.89", "74,361.79", "Y", ""], ["2026-10", "CR-V e:HEV", "crv", "CR-V eHEV", "1", "23,800.01", "", "", "23,800.01", "Y", ""], ["2026-10", "CR-V e:HEV", "crv", "CR-V eHEV", "2", "23,000.72", "17,300.83", "", "40,301.55", "Y", ""], ["2026-10", "CR-V e:HEV", "crv", "CR-V eHEV", "3", "23,000.72", "17,300.83", "16,000.78", "56,302.33", "Y", ""], ["2026-10", "e:N2", "en2", "eN2", "1", "30,500.35", "", "", "30,500.35", "Y", ""], ["2026-10", "e:N2", "en2", "eN2", "2", "28,500.52", "28,000.83", "", "56,501.35", "Y", ""], ["2026-10", "e:N2", "en2", "eN2", "3", "28,500.52", "28,000.83", "25,000.55", "81,501.90", "Y", ""], ["2026-10", "STEP WGN e:HEV", "step", "StepWgn eHEV", "1", "37,000.60", "", "", "37,000.60", "Y", ""], ["2026-10", "STEP WGN e:HEV", "step", "StepWgn eHEV", "2", "35,000.77", "30,000.66", "", "65,001.43", "Y", ""], ["2026-10", "STEP WGN e:HEV", "step", "StepWgn eHEV", "3", "35,000.77", "30,000.66", "27,000.38", "92,001.81", "Y", ""]], rates: [["CP-cityRec-1", "0", "3.75", "4.05", "4.35", "4.95"], ["CP-cityRec-1", "10", "3.35", "3.75", "4.05", "4.45"], ["CP-cityRec-1", "15", "2.85", "3.05", "3.45", "3.95"], ["CP-cityRec-1", "20", "2.25", "2.45", "2.85", "3.45"], ["CP-cityRec-1", "25", "1.69", "2.29", "2.69", "3.25"], ["CP-city-1", "0", "3.75", "4.05", "4.35", "4.95"], ["CP-city-1", "10", "3.35", "3.75", "4.05", "4.45"], ["CP-city-1", "15", "2.85", "3.05", "3.45", "3.95"], ["CP-city-1", "20", "2.25", "2.45", "2.85", "3.45"], ["CP-city-1", "25", "1.69", "2.29", "2.69", "3.25"], ["CP-city-3", "0", "3.45", "3.85", "4.25", "4.79"], ["CP-city-3", "10", "3.09", "3.59", "3.89", "4.19"], ["CP-city-3", "15", "2.49", "2.85", "3.29", "3.69"], ["CP-city-3", "20", "1.89", "2.29", "2.69", "3.19"], ["CP-city-3", "25", "0.99", "1.99", "2.45", "2.99"], ["CP-civic-1", "0", "2.19", "2.79", "3.39", "3.89"], ["CP-civic-1", "10", "1.69", "2.39", "3.19", "3.69"], ["CP-civic-1", "15", "1.29", "1.79", "2.39", "3.19"], ["CP-civic-1", "20", "0.59", "1.19", "1.89", "2.59"], ["CP-civic-1", "25", "0", "0.79", "1.49", "2.19"], ["CP-civicEL-1", "0", "3.89", "4.19", "4.49", "5.15"], ["CP-civicEL-1", "10", "3.19", "3.59", "3.69", "4.59"], ["CP-civicEL-1", "15", "2.59", "2.69", "3.09", "3.49"], ["CP-civicEL-1", "20", "2.19", "2.29", "2.59", "2.99"], ["CP-civicEL-1", "25", "1.89", "2.19", "2.49", "2.69"], ["CP-accord-1", "0", "2.95", "3.35", "3.75", "4.29"], ["CP-accord-1", "10", "2.59", "3.09", "3.39", "3.79"], ["CP-accord-1", "15", "2.29", "2.35", "2.79", "3.29"], ["CP-accord-1", "20", "1.69", "2.09", "2.39", "2.79"], ["CP-accord-1", "25", "0", "1.49", "1.95", "2.49"], ["CP-step-1", "0", "3.69", "3.99", "4.29", "4.95"], ["CP-step-1", "10", "2.99", "3.39", "3.49", "4.39"], ["CP-step-1", "15", "2.39", "2.49", "2.89", "3.29"], ["CP-step-1", "20", "1.99", "2.09", "2.39", "2.79"], ["CP-step-1", "25", "1.69", "1.99", "2.29", "2.49"], ["CP-crv-2", "0", "3.45", "3.85", "4.25", "4.79"], ["CP-crv-2", "10", "3.09", "3.59", "3.69", "4.19"], ["CP-crv-2", "15", "2.49", "2.69", "3.09", "3.49"], ["CP-crv-2", "20", "1.89", "2.29", "2.59", "2.99"], ["CP-crv-2", "25", "0.99", "1.99", "2.45", "2.69"], ["CP-en2-2", "25", "", "", "", "0"]], bind: [["แคมเปญ", "", "cityRec", "1", "CP-cityRec-1"], ["แคมเปญ", "", "cityHbRec", "1", "CP-cityRec-1"], ["แคมเปญ", "", "city", "1", "CP-city-1"], ["แคมเปญ", "", "city", "2", "CP-city-1"], ["แคมเปญ", "", "city", "3", "CP-city-3"], ["แคมเปญ", "", "cityHb", "1", "CP-city-1"], ["แคมเปญ", "", "cityHb", "2", "CP-city-1"], ["แคมเปญ", "", "cityHb", "3", "CP-city-3"], ["แคมเปญ", "", "civic", "1", "CP-civic-1"], ["แคมเปญ", "", "civic", "2", "CP-civic-1"], ["แคมเปญ", "", "civicEL", "1", "CP-civicEL-1"], ["แคมเปญ", "", "hrv", "1", "CP-civic-1"], ["แคมเปญ", "", "accord", "1", "CP-accord-1"], ["แคมเปญ", "", "crv", "1", "CP-accord-1"], ["แคมเปญ", "", "en2", "1", "CP-civic-1"], ["แคมเปญ", "", "step", "1", "CP-step-1"], ["แคมเปญ", "", "crv", "2", "CP-crv-2"], ["แคมเปญ", "", "crvHunt", "1", "CP-accord-1"], ["แคมเปญ", "", "crvHunt", "2", "CP-crv-2"], ["แคมเปญ", "", "en2", "2", "CP-en2-2"]] };
@@ -4799,6 +4838,19 @@ const atColorCode = (name) => {
   const hit = AT_COLOR_CODE.find(([re]) => re.test(String(name || "")));
   return hit ? hit[1] : "";
 };
+const AT_AVAIL = { specs: null, at: "" };
+const atSpecOf = (uiModel, gradeName, colorName) => {
+  const m = (AT_PRICE_MAP[MODEL_MAPPING[uiModel]] || {})[gradeName], code = atColorCode(colorName);
+  return m && code ? { model: m[0], grade: m[1], color: code } : null;
+};
+const atAvailOf = (uiModel, gradeName, colorName) => {
+  if (!AT_AVAIL.specs)
+    return null;
+  const sp = atSpecOf(uiModel, gradeName, colorName);
+  if (!sp)
+    return null;
+  return AT_AVAIL.specs[`${sp.model}|${sp.grade}|${sp.color}`] || { f: 0, i: 0, w: 0 };
+};
 const AT_GRADES_BASE = JSON.parse(JSON.stringify(GRADES_DATA));
 const AT_COLORS_BASE = JSON.parse(JSON.stringify(MODEL_COLORS));
 const AT_PRICE_STATUS = { on: false, matched: 0, missing: [], issue: null };
@@ -4910,6 +4962,8 @@ const cfgUseStock = (cfg, stock) => {
     cfg.roster = stock.sales.list.filter((x) => x && x.name).map((x) => ({ name: String(x.name), br: x.br || "", left: !!x.left })).sort((a, b) => a.left - b.left || String(a.br).localeCompare(String(b.br)) || a.name.localeCompare(b.name, "th"));
     cfg.staff = [];
   }
+  AT_AVAIL.specs = stock.avail && stock.avail.specs || null;
+  AT_AVAIL.at = stock.avail && stock.avail.at || "";
   cfg.catalog = stock.catalog || null;
   return cfg;
 };
@@ -6390,12 +6444,23 @@ const ProfileModal = ({ api, onClose }) => {
     className: "mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-base outline-none focus:border-red-500"
   })), msg && /* @__PURE__ */ React.createElement("p", {
     className: `text-sm ${/ไม่สำเร็จ|ก่อน/.test(msg) ? "text-red-600" : "text-green-700"}`
-  }, msg), /* @__PURE__ */ React.createElement("button", {
+  }, msg), /* @__PURE__ */ React.createElement("div", {
+    className: "flex gap-2"
+  }, /* @__PURE__ */ React.createElement("button", {
     type: "button",
     disabled: busy,
     onClick: save,
-    className: "w-full py-3 rounded-xl bg-red-600 text-white font-bold disabled:opacity-50"
-  }, busy ? "กำลังบันทึก…" : "บันทึกข้อมูลของฉัน"), (me.log || []).length > 0 && /* @__PURE__ */ React.createElement("details", {
+    className: "flex-1 py-3 rounded-xl bg-red-600 text-white font-bold disabled:opacity-50"
+  }, /* @__PURE__ */ React.createElement("i", {
+    className: "fa-solid fa-floppy-disk mr-1.5"
+  }), busy ? "กำลังบันทึก…" : "บันทึกข้อมูล"), window.__QWEB && window.__QWEB.logout && /* @__PURE__ */ React.createElement("button", {
+    type: "button",
+    disabled: busy,
+    onClick: () => window.__QWEB.logout(),
+    className: "flex-1 py-3 rounded-xl bg-white border-2 border-gray-300 text-gray-700 font-bold hover:bg-gray-50 disabled:opacity-50"
+  }, /* @__PURE__ */ React.createElement("i", {
+    className: "fa-solid fa-right-from-bracket mr-1.5"
+  }), "ออกจากระบบ")), (me.log || []).length > 0 && /* @__PURE__ */ React.createElement("details", {
     className: "text-xs text-gray-500"
   }, /* @__PURE__ */ React.createElement("summary", {
     className: "cursor-pointer"
@@ -6996,7 +7061,7 @@ const formatThaiDate = (date) => {
   const year = d.getFullYear() + 543;
   return `${day} ${month} ${year}`;
 };
-const ImagePreviewModal = ({ imageUrl, name, onClose, onCreateSalesSummary, canCreateSalesSummary, previewType }) => {
+const ImagePreviewModal = ({ imageUrl, name, onClose, onCreateSalesSummary, canCreateSalesSummary, previewType, onSendStock, sendState }) => {
   const handleManualDownload = async () => {
     try {
       const response = await fetch(imageUrl);
@@ -7069,7 +7134,15 @@ const ImagePreviewModal = ({ imageUrl, name, onClose, onCreateSalesSummary, canC
     className: `flex items-center justify-center py-3 rounded-xl font-bold transition ${canCreateSalesSummary ? "bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-100" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`
   }, /* @__PURE__ */ React.createElement("i", {
     className: "fa-solid fa-clipboard-list mr-2"
-  }), " สร้างใบสรุป")))));
+  }), " สร้างใบสรุป")), previewType === "booking-card" && window.__QWEB && onSendStock && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", {
+    onClick: () => onSendStock(imageUrl),
+    disabled: !!sendState,
+    className: "w-full flex items-center justify-center py-3 rounded-xl font-bold bg-gray-900 text-white hover:bg-black transition disabled:opacity-60"
+  }, /* @__PURE__ */ React.createElement("i", {
+    className: "fa-solid fa-paper-plane mr-2"
+  }), sendState || "ส่งเข้าเว็บ AT stock (ลงใบจองต่อ)"), /* @__PURE__ */ React.createElement("p", {
+    className: "text-[11px] text-gray-500 text-center leading-relaxed"
+  }, "รุ่น ราคา เงื่อนไขการขาย FOC ของแถม (ไปใบสั่งแต่งรถ) และรูปใบจองนี้ จะกรอกในฟอร์มใบจองของเว็บ AT stock ให้ · แนบสลิปมัดจำ ใส่เลขที่ใบจอง แล้วกดบันทึกที่นั่น")))));
 };
 const BookingFormModal = ({ initialData, onConfirm, onClose, isDSP, currentInstallments, extensionInterest }) => {
   const [form, setForm] = useState({
@@ -10741,6 +10814,17 @@ const ActionModal = ({ defaultName, onSaveData, onCreateBooking, onCreateSalesSu
   }, "พรีวิว / แชร์"))))));
 };
 const HistoryModal = ({ history, onLoad, onDelete, onClose, onToggleStar, onEditName, onViewBooking, loading }) => {
+  const [bkMap, setBkMap] = useState({});
+  const stockIds = history.filter((h) => h.stock).map((h) => h.id).join(",");
+  useEffect(() => {
+    if (!stockIds || !window.__QWEB || !window.__QWEB.bookingsFor)
+      return;
+    let on = true;
+    window.__QWEB.bookingsFor(stockIds.split(",")).then((m) => on && setBkMap(m || {}), () => {});
+    return () => {
+      on = false;
+    };
+  }, [stockIds]);
   const [filterDate, setFilterDate] = useState("");
   const [filterModel, setFilterModel] = useState("all");
   const [filterText, setFilterText] = useState("");
@@ -10857,7 +10941,16 @@ const HistoryModal = ({ history, onLoad, onDelete, onClose, onToggleStar, onEdit
     className: "flex items-center gap-1"
   }, /* @__PURE__ */ React.createElement("i", {
     className: "fa-solid fa-car text-red-500/70"
-  }), " ", uiModelShort(item.data.uiModel), " ", item.data.grade.name), /* @__PURE__ */ React.createElement("span", null, new Date(item.createdAt).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" }))))), /* @__PURE__ */ React.createElement("div", {
+  }), " ", uiModelShort(item.data.uiModel), " ", item.data.grade.name), /* @__PURE__ */ React.createElement("span", null, new Date(item.createdAt).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" })), item.stock && (() => {
+    const b = bkMap[item.id];
+    const t = !b ? ["ส่งเข้า AT stock แล้ว · รอแนบสลิปและบันทึก", "bg-amber-50 text-amber-700 border-amber-200"] : b.cancelled ? ["ใบจองถูกยกเลิก", "bg-gray-100 text-gray-500 border-gray-200"] : b.receipt ? [`จองแล้ว · เลขที่ ${b.no || b.receipt}`, "bg-green-50 text-green-700 border-green-200"] : ["บันทึกใบจองแล้ว · รอเลขที่ใบเสร็จมัดจำ", "bg-blue-50 text-blue-700 border-blue-200"];
+    return /* @__PURE__ */ React.createElement("a", {
+      href: b ? `../?bk=${encodeURIComponent(b.id)}` : `../?qbk=${encodeURIComponent(item.id)}#book/new`,
+      className: `mt-1 self-start px-2 py-0.5 rounded-full border text-[11px] font-bold ${t[1]}`
+    }, /* @__PURE__ */ React.createElement("i", {
+      className: "fa-solid fa-warehouse mr-1"
+    }), t[0]);
+  })()))), /* @__PURE__ */ React.createElement("div", {
     className: "flex gap-2 mt-3 pt-3 border-t border-gray-50 items-center h-10"
   }, /* @__PURE__ */ React.createElement("button", {
     onClick: () => onLoad(item),
@@ -12069,7 +12162,8 @@ const App = () => {
     name: e.name || e.customerName || `${uiModelShort(e.uiModel)} ${e.grade}`,
     isStarred: !!e.isStarred,
     data: e.data,
-    createdAt: new Date(e.at)
+    createdAt: new Date(e.at),
+    stock: e.stock ? { at: e.stock.at } : null
   })), [quoteLog.entries, atCfg.isAdmin, atCfg.viewer.id]);
   const historyLoading = !quoteLog.ready;
   const captureElement = async (elementId, name, scale = 2) => {
@@ -12196,6 +12290,92 @@ const App = () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
     await captureElement("sales-summary-card", `SaleSummary_${docName}`, 2);
   };
+  const [stockBkId, setStockBkId] = useState(null);
+  const [stockSending, setStockSending] = useState("");
+  const STOCK_FIN = { "ฮอนด้า ลีสซิ่ง": "HLTC", "กรุงศรี": "BAY", "ไทยพาณิชย์": "SCB", "ธนชาต": "TTB", "ทหารไทยธนชาต": "TTB", "เกียรตินาคิน": "KKP" };
+  const STOCK_WHO = { honda: "Honda แถม", dealer: "AT แถม", customer: "ลูกค้าซื้อ" };
+  const stockDraft = () => {
+    const b = bookingData || {}, cash = b.isCash || financeType === "cash", sp = atSpecOf(uiModel, grade?.name, color?.name) || {};
+    const finName = b.financeOption === "อื่นๆ" ? b.customFinance || "" : b.financeOption || "";
+    const term = parseInt(b.selectedTerm || terms[0] || 48), inst = calculatedInstallments?.[term] || {};
+    const disc = (priceAdjustment < 0 ? -priceAdjustment : 0) + getExpenseValue(expenses.cashDiscount);
+    const xp = [];
+    if (getExpenseValue(expenses.vatDiscount) > 0)
+      xp.push({ l: "VAT", v: getExpenseValue(expenses.vatDiscount) });
+    if (getExpenseValue(expenses.othersAdd) > 0)
+      xp.push({ l: expenses.othersAddLabel || "อื่น ๆ", v: getExpenseValue(expenses.othersAdd) });
+    const po = [
+      ...gifts.map((g, i) => ({ g: String(g || "").trim(), v: parseFloat(giftValues[i]) || 0 })).filter((x) => x.g && !giftAutoKind(x.g) && !atStdGifts().some((t) => t.l === x.g)).map((x) => ({ name: x.g, cost: x.v })),
+      ...(extraItems || []).filter((x) => x && String(x.name || "").trim()).map((x) => ({ name: x.name, part: x.part || "", cpay: true, cprice: Number(x.price) || 0, sale: Number(x.price) || 0, cost: 0 }))
+    ];
+    const remark = [b.remark, b.dspExtensionDetails, b.deliveryMonth && b.deliveryYear ? `รับรถ ${b.deliveryMonth}/${b.deliveryYear}` : ""].filter(Boolean).join(" · ");
+    return {
+      customer: (b.customerName || customerName || "").trim(),
+      sales: consultantName || "",
+      br: window.__QWEB && window.__QWEB.branch || "",
+      model: sp.model || "",
+      grade: sp.grade || "",
+      color: sp.color || "",
+      booking_date: b.bookingDate || "",
+      purchase: cash ? "ซื้อสด" : "ไฟแนนซ์",
+      finance: cash ? "" : STOCK_FIN[finName] || "อื่น ๆ",
+      deposit: getExpenseValue(expenses.deposit) || "",
+      discount: disc || "",
+      insurance: STOCK_WHO[insurancePayers[1] || "customer"],
+      foc_total: Math.round(totalGiftValue) || 0,
+      note: [STOCK_FIN[finName] || cash ? "" : `ไฟแนนซ์ ${finName}`, remark].filter(Boolean).join(" · "),
+      deal: {
+        ...cash ? {} : { down: Math.round(downAmount) || 0, rate: inst.rate !== undefined && inst.rate !== "-" ? Number(inst.rate) : "", term, adv_inst: paymentType === "beginning" },
+        ...priceAdjustment > 0 ? { price_add: priceAdjustment } : {},
+        campaign_id: campaign && campaign.code && campaign.month ? `${campaign.month}|${campaign.code}` : "",
+        at_step: cash ? "" : atStep === "step1" ? "1" : atStep === "step2" ? "2" : "",
+        priv_gtg: privGtg || "",
+        priv_ln: privLn ? "cash" : "",
+        priv_hk: privHk || "",
+        ins2_by: insuranceDuration >= 2 ? STOCK_WHO[insurancePayers[2] || "customer"] : "",
+        ins3_by: insuranceDuration >= 3 ? STOCK_WHO[insurancePayers[3] || "customer"] : "",
+        reg_by: registrationPayer === "dealer" ? "AT แถม" : "ลูกค้าซื้อ",
+        reg_type: registrationType === "corporate" ? "นิติบุคคล" : "บุคคลธรรมดา",
+        extra_pay: xp
+      },
+      po,
+      sum: { model: uiModelShort(uiModel), grade: grade?.name || "", color: color?.name || "", price: carPrice + colorPriceVal, tier: ((AT_PRICE_MAP[MODEL_MAPPING[uiModel]] || {})[grade?.name] || [])[3] || "", net: netPrice, cash, down: cash ? 0 : downAmount, term: cash ? "" : term, rate: inst.rate, monthly: inst.monthly, campaign: campaign?.name || "" }
+    };
+  };
+  const sendToStock = async (imageUrl) => {
+    const q = window.__QWEB;
+    if (!q || !q.uploadImage)
+      return;
+    if (!bookingData) {
+      alert("สร้างใบจองก่อน แล้วค่อยส่งเข้าเว็บ AT stock");
+      return;
+    }
+    setStockSending("กำลังส่งเข้าเว็บ AT stock…");
+    try {
+      const blob = await (await fetch(imageUrl)).blob();
+      const img = await q.uploadImage(blob);
+      const db = await window.claude.use("db");
+      const stock = { at: new Date().toISOString(), by: q.email, img, draft: JSON.parse(JSON.stringify(stockDraft())) };
+      let id = stockBkId;
+      if (id && !String(id).startsWith("L"))
+        await db.collection("quotes").doc(id).update({ stock });
+      else {
+        const r = db.collection("quotes").doc();
+        await r.set(JSON.parse(JSON.stringify({ uid: atCfg.viewer.id || "", kind: "booking", name: bookingData.customerName || quoteFileName, ...quoteSummary(), at: new Date().toISOString(), data: { ...collectState(), bookingData }, stock })));
+        id = r.id;
+        setStockBkId(id);
+      }
+      const go = "../?qbk=" + encodeURIComponent(id) + "#book/new";
+      if (typeof window.__QGO === "function") {
+        window.__QGO(go);
+        setStockSending("");
+      } else
+        location.href = go;
+    } catch (e) {
+      setStockSending("");
+      alert("ส่งเข้าเว็บ AT stock ไม่สำเร็จ: " + (e && e.message ? e.message : "ลองใหม่อีกครั้ง"));
+    }
+  };
   const generateBookingImage = async (formData) => {
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzYSJhxVFOg8UGFI9KFVzbJwj9xbXT3jkngiEztXJxexmJ_0hvI7mzEvWX-6KYTLmCc/exec";
     const finalPurchaseType = financeType === "cash" ? "cash" : formData.purchaseType;
@@ -12243,7 +12423,7 @@ const App = () => {
       financeCompany: formData.financeOption === "อื่นๆ" ? formData.customFinance : formData.financeOption,
       selectedTerm: formData.selectedTerm || "",
       data: { ...collectState(), customerName: formData.customerName || customerName, bookingData: nextBookingData }
-    });
+    }).then(() => setStockBkId(quoteLog.lastId()));
     setShowBookingForm(false);
     setTimeout(async () => {
       await captureElement("booking-card", `Booking_${formData.customerName}`, 2);
@@ -12317,6 +12497,7 @@ const App = () => {
   };
   const handleViewBooking = (item) => {
     handleLoad(item);
+    setStockBkId(item.id);
     const d = item.data;
     setTimeout(async () => {
       const docName = `Booking_${d.bookingData?.customerName || "Customer"}`;
@@ -12826,7 +13007,17 @@ const App = () => {
     onClick: () => atCfg.setViewAs(k),
     "aria-pressed": atCfg.viewAs === k,
     className: `px-2.5 sm:px-3 py-1.5 rounded-full transition ${atCfg.viewAs === k ? k === "admin" ? "bg-gray-900 text-white" : "bg-red-600 text-white" : "text-gray-600"}`
-  }, l))), window.__QWEB && /* @__PURE__ */ React.createElement("button", {
+  }, l))), window.__QWEB && /* @__PURE__ */ React.createElement("a", {
+    href: "../",
+    title: "ไปเว็บ AT stock",
+    className: "h-10 px-3 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 text-xs sm:text-sm font-bold flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+  }, /* @__PURE__ */ React.createElement("i", {
+    className: "fa-solid fa-warehouse"
+  }), /* @__PURE__ */ React.createElement("span", {
+    className: "hidden sm:inline"
+  }, "ไปเว็บ AT stock"), /* @__PURE__ */ React.createElement("span", {
+    className: "sm:hidden"
+  }, "AT stock")), window.__QWEB && /* @__PURE__ */ React.createElement("button", {
     type: "button",
     onClick: () => setShowProfile(true),
     title: "ข้อมูลของฉัน (เบอร์โทร / LINE)",
@@ -12834,10 +13025,10 @@ const App = () => {
     className: `h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${atCfg.myProfile && atCfg.myProfile.phone ? "bg-gray-100 text-gray-700" : "bg-amber-100 text-amber-700 ring-2 ring-amber-300"}`
   }, /* @__PURE__ */ React.createElement("i", {
     className: "fa-solid fa-user"
-  })), showProfile && /* @__PURE__ */ React.createElement(ProfileModal, {
+  })), showProfile && ReactDOM.createPortal(/* @__PURE__ */ React.createElement(ProfileModal, {
     api: atCfg,
     onClose: () => setShowProfile(false)
-  }), /* @__PURE__ */ React.createElement("button", {
+  }), document.body), /* @__PURE__ */ React.createElement("button", {
     onClick: () => setShowHistory(true),
     className: "h-10 min-w-10 px-3 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center justify-center gap-2 text-xs font-bold transition",
     title: "เปิดใบเสนอราคาที่บันทึกไว้"
@@ -12862,6 +13053,8 @@ const App = () => {
     name: previewName,
     previewType,
     canCreateSalesSummary: !!bookingData,
+    onSendStock: sendToStock,
+    sendState: stockSending,
     onCreateSalesSummary: async () => {
       const docName = pendingFileName || bookingData?.customerName || `${uiModelShort(uiModel)} ${grade?.name || ""}`.trim();
       setShowImagePreview(false);
@@ -13055,11 +13248,39 @@ const App = () => {
   }, currentAvailableColors.map((c) => /* @__PURE__ */ React.createElement("button", {
     key: c.name,
     type: "button",
-    title: c.name,
+    title: (() => {
+      const av = atAvailOf(uiModel, grade.name, c.name);
+      return av ? `${c.name} · ว่าง ${av.f} คัน` : c.name;
+    })(),
     onClick: () => setColor(c),
-    className: `w-8 h-8 rounded-full border-2 transition ${color?.name === c.name ? "border-red-600 scale-110" : "border-gray-200 hover:border-gray-400"}`,
+    className: `relative w-8 h-8 rounded-full border-2 transition ${color?.name === c.name ? "border-red-600 scale-110" : "border-gray-200 hover:border-gray-400"}`,
     style: { backgroundColor: c.code }
-  }))), /* @__PURE__ */ React.createElement("div", {
+  }, (() => {
+    const av = atAvailOf(uiModel, grade.name, c.name);
+    return av ? /* @__PURE__ */ React.createElement("span", {
+      className: `absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold leading-[18px] text-center text-white ring-2 ring-white ${av.f > 0 ? "bg-green-600" : av.i > 0 ? "bg-amber-500" : "bg-gray-400"}`
+    }, av.f) : null;
+  })()))), AT_AVAIL.specs && color && (() => {
+    const av = atAvailOf(uiModel, grade.name, color.name);
+    if (!av)
+      return /* @__PURE__ */ React.createElement("div", {
+        className: "hide-in-image no-print text-xs text-gray-500 bg-gray-50 rounded-lg px-2.5 py-1.5"
+      }, /* @__PURE__ */ React.createElement("i", {
+        className: "fa-solid fa-warehouse mr-1"
+      }), "ยังจับคู่สต็อกของรุ่น/สีนี้ไม่ได้");
+    const short = av.f + av.i <= av.w;
+    const br = av.b ? Object.entries(av.b).map(([k, n]) => `${k} ${n}`).join(" · ") : "";
+    const t = AT_AVAIL.at ? new Date(AT_AVAIL.at) : null;
+    return /* @__PURE__ */ React.createElement("div", {
+      className: `hide-in-image no-print text-xs rounded-lg px-2.5 py-1.5 border ${av.f > 0 && !short ? "bg-green-50 border-green-200 text-green-800" : short ? "bg-red-50 border-red-200 text-red-700" : "bg-amber-50 border-amber-200 text-amber-800"}`
+    }, /* @__PURE__ */ React.createElement("div", {
+      className: "font-bold"
+    }, /* @__PURE__ */ React.createElement("i", {
+      className: "fa-solid fa-warehouse mr-1"
+    }), "สต็อก AT: ว่าง ", av.f, " คัน", br ? ` (${br})` : "", " · Quota กำลังมา ", av.i, " · ใบจองรอรถ ", av.w), /* @__PURE__ */ React.createElement("div", {
+      className: "opacity-80"
+    }, short ? "รถไม่พอคิว ถ้าจองต้องรอ Honda จัดสรรเพิ่ม" : av.f > 0 ? "มีรถว่าง จองแล้วล็อกรถได้" : "ไม่มีรถว่างตอนนี้ รอ Quota ที่กำลังมา", t ? ` · อัปเดต ${t.toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""));
+  })(), /* @__PURE__ */ React.createElement("div", {
     className: "space-y-1.5 pt-2"
   }, /* @__PURE__ */ React.createElement("div", {
     className: "flex justify-between items-center"
