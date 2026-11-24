@@ -188,7 +188,10 @@ function ltSweep(D) {
 // 24/11: IDS gave the car to the lock's booking / customer (the lock is "done"): the cell that still holds the lock's text gets the
 // IDS booking number (stock row only, never the quota). Only while the car is still here; a cell someone changed is left alone.
 let ltIdsNoTried = new Set(), ltIdsQ = Promise.resolve();
+// 24/11 (evening): turned off at the user's request — the IDS booking number is not written over the lock's text any more
+const LT_IDS_NO_ON = false;
 function ltIdsNoSweep(D) {
+  if (!LT_IDS_NO_ON) return;
   let n = 0;
   for (const l of D.locks) {
     if (n >= 5) break;
