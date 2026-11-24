@@ -77,6 +77,7 @@ r"""            const [stockBkId, setStockBkId] = useState(null);
                 return {
                     customer: (b.customerName || customerName || '').trim(), sales: consultantName || '', br: (window.__QWEB && window.__QWEB.branch) || '',
                     model: sp.model || '', grade: sp.grade || '', color: sp.color || '', booking_date: b.bookingDate || '',
+                    ...(() => { const m = (AT_PRICE_MAP[MODEL_MAPPING[uiModel]] || {})[grade?.name]; return m ? { price_tier: m[3], price_year: m[2] } : {}; })(),
                     purchase: cash ? 'ซื้อสด' : 'ไฟแนนซ์', finance: cash ? '' : (STOCK_FIN[finName] || 'อื่น ๆ'),
                     deposit: getExpenseValue(expenses.deposit) || '', discount: disc || '', insurance: STOCK_WHO[insurancePayers[1] || 'customer'],
                     foc_total: Math.round(totalGiftValue) || 0,

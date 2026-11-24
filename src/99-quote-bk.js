@@ -36,6 +36,7 @@ async function qbkOpen(id) {
   if (S.role.role !== 'sales' && g.sales) set('sales', fitSales(g.sales) || g.sales);
   if (!myBranch() && g.br && BR[g.br]) set('br', g.br);
   d.deal = JSON.parse(JSON.stringify(g.deal || {}));
+  if (g.price_tier === 'old') { d.price_tier = 'old'; d.price_year = g.price_year || ''; }
   d.quote_id = id;
   d.quote = { id, at: st.at || null, by: st.by || null, sum: g.sum || null, po: Array.isArray(g.po) ? g.po : [] };
   d.aiFields = filled;
@@ -44,6 +45,10 @@ async function qbkOpen(id) {
   S.qbk = { id, state: blob ? 'ready' : 'noimg' };
   qbkDropParam(); render(); window.scrollTo(0, 0);
 }
+// the booking's price: the price list's current price, or ราคาเดิม when the quotation was made on an old-price model (ตกลง 24/11:
+// ใบจองใช้ราคาตามรุ่นราคาที่เลือกในใบเสนอราคา · คีย์ผิด แอดมินแก้ใน AT stock ได้) · picking another model / grade here goes back to the current price
+function bookPriceOf(d) { return priceOf(d.model, d.grade, d.color, (d.price_tier && d.price_year) || bookYear(d.model), d.price_tier === 'old'); }
+document.addEventListener('change', ev => { const k = ev.target && ev.target.dataset && ev.target.dataset.draft; if ((k === 'booking.model' || k === 'booking.grade') && S.draft.booking) { S.draft.booking.price_tier = ''; S.draft.booking.price_year = ''; } }, true);
 // the banner over the booking form, and what goes to the accessories order later
 function qbkHead(d) {
   if (!d || !d.quote_id) return S.qbk && S.qbk.state === 'loading' ? '<div class="p-3 rounded-lg text-sm" style="background:var(--surface-2)"><span class="spin"></span> กำลังดึงข้อมูลจากใบเสนอราคา…</div>' : '';
@@ -52,6 +57,7 @@ function qbkHead(d) {
     <div class="flex flex-wrap items-start gap-3"><div class="flex-1 min-w-[220px]"><div class="font-head font-semibold">ใบจองจากใบเสนอราคา</div>
       <div class="text-sm mt-1">${esc([s.model, s.grade, s.color].filter(Boolean).join(' · '))}${s.net ? ` · ราคาสุทธิ <b class="num">${money(s.net)}</b>` : ''}${s.cash ? ' · ซื้อสด' : s.term ? ` · ดาวน์ <b class="num">${money(s.down)}</b> · ผ่อน ${esc(s.term)} งวด ${s.rate !== undefined && s.rate !== '' ? `ดอกเบี้ย ${esc(s.rate)}%` : ''}${s.monthly ? ` · งวดละ <b class="num">${money(s.monthly)}</b>` : ''}` : ''}</div>
       ${(() => { const p = typeof bookTermsPrice === 'function' ? bookTermsPrice(d) : null; return p && s.price && Math.abs(p.price - s.price) >= 1 ? `<div class="text-sm mt-1" style="color:var(--warn)">ราคารถในใบเสนอราคา <b class="num">${money(s.price)}</b>${s.tier === 'old' ? ' (ราคาเดิม)' : ''} ไม่ตรงกับใบราคาในเว็บ <b class="num">${money(p.price)}</b> · ยอดจัดและค่างวดด้านล่างคิดจากราคาในเว็บ ตรวจก่อนบันทึก</div>` : ''; })()}
+      ${d.price_tier === 'old' ? '<div class="text-sm mt-1">ใช้<b>ราคาเดิม</b>ตามรุ่นราคาที่เลือกในใบเสนอราคา</div>' : ''}
       <div class="text-xs text-muted mt-1">ช่องที่มีแถบสีเขียวกรอกจากใบเสนอราคาแล้ว ตรวจอีกครั้ง · ${img ? 'รูปใบจองที่สร้างจากใบเสนอราคาแนบในข้อ 1 แล้ว' : '<span style="color:var(--warn)">ดึงรูปใบจองไม่ได้ แนบรูปเองในข้อ 1</span>'} · แนบสลิปมัดจำ ใส่เลขที่ใบจองแล้วกดบันทึก</div></div>
       <a class="btn btn-ghost btn-sm" href="quote/">กลับใบเสนอราคา</a></div></div>`;
 }

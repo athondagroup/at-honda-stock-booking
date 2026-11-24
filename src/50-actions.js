@@ -449,7 +449,7 @@ async function saveBooking() {
     insurance_kind: d.insurance_kind || null, ...bookPriceSnap(d), deal: bookTermsRec(d),
     trade: bookTradeRec(d),
     delivery_plan: validDate(d.delivery_plan), lead_id: d.lead_id || null, note: d.note || null, ids_claim: d.ids_claim || null,
-    quote_id: d.quote_id || null, quote: d.quote ? { id: d.quote.id, at: d.quote.at, by: d.quote.by, sum: d.quote.sum, po: d.quote.po } : null,
+    price_tier: d.price_tier === 'old' ? 'old' : null, quote_id: d.quote_id || null, quote: d.quote ? { id: d.quote.id, at: d.quote.at, by: d.quote.by, sum: d.quote.sum, po: d.quote.po } : null,
     doc_imgs, slip_imgs, img_missing: imgMissing, slip: S.files.slip.length > 0, flow: {},
     ai: d.ai, ai_ok: !!d.ai, ai_fields: d.aiFields, checks: checks.map(({ t, bad }) => ({ t, bad: !!bad })),
     status: 'active', created_at: new Date().toISOString(), created_by: S.me.id || null, created_role: roleLabel()

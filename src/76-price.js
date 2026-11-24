@@ -86,7 +86,7 @@ function bookYear(model) { return (typeof MODEL_YEAR === 'object' && MODEL_YEAR[
 // the booking form: the price of the picked car and, once a discount is typed, the price after it
 function bookFormPrice(d) {
   if (!d.model || !d.grade || !catPrices().length) return '<div id="bk-price" hidden></div>';
-  const p = priceOf(d.model, d.grade, d.color, bookYear(d.model)), box = body => `<div id="bk-price" class="sm:col-span-2 lg:col-span-3 text-sm p-2 px-3 rounded-lg" style="background:var(--surface-2)" aria-live="polite">${body}</div>`;
+  const p = bookPriceOf(d), box = body => `<div id="bk-price" class="sm:col-span-2 lg:col-span-3 text-sm p-2 px-3 rounded-lg" style="background:var(--surface-2)" aria-live="polite">${body}</div>`;
   if (!p) return box('<span class="text-muted">ยังไม่มีราคารุ่น/เกรดนี้ในใบราคา</span>');
   if (!d.color) return box(`ราคารถ${p.year ? ` MY'${String(p.year).slice(-2)}` : ''} เริ่มต้น <b class="num">${money(p.base)}</b> บาท · เลือกสีแล้วจะเห็นราคาตามสี`);
   const disc = d.discount === '' || d.discount === null || d.discount === undefined ? null : Number(d.discount);
@@ -98,7 +98,7 @@ document.addEventListener('input', ev => {
   const el = document.getElementById('bk-price'); if (el) el.outerHTML = bookFormPrice({ ...S.draft.booking, discount: t.value });
 });
 // kept on a new booking so a later price list does not change what it was booked at
-function bookPriceSnap(d) { const p = priceOf(d.model, d.grade, d.color, bookYear(d.model)); return p && p.exact ? { list_price: p.price, list_price_year: p.year, list_price_qd: p.qd } : {}; }
+function bookPriceSnap(d) { const p = bookPriceOf(d); return p && p.exact ? { list_price: p.price, list_price_year: p.year, list_price_qd: p.qd, ...(p.isOld ? { list_price_tier: 'old' } : {}) } : {}; }
 function bookPriceLine(a, D) {
   const p = bookPrice(a, D); if (!p) return null;
   const d = bookDiscount(a);

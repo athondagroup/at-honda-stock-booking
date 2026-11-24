@@ -12317,6 +12317,10 @@ const App = () => {
       grade: sp.grade || "",
       color: sp.color || "",
       booking_date: b.bookingDate || "",
+      ...(() => {
+        const m = (AT_PRICE_MAP[MODEL_MAPPING[uiModel]] || {})[grade?.name];
+        return m ? { price_tier: m[3], price_year: m[2] } : {};
+      })(),
       purchase: cash ? "ซื้อสด" : "ไฟแนนซ์",
       finance: cash ? "" : STOCK_FIN[finName] || "อื่น ๆ",
       deposit: getExpenseValue(expenses.deposit) || "",

@@ -254,7 +254,7 @@ function termsCtxAt(a, D) {
 }
 // ---- the booking form: the same fields, price from the price list and the discount from the booking's own field
 function bookTermsCtx(d) { return { model: d.model, grade: d.grade, color: d.color, cash: d.purchase === 'ซื้อสด', bookDate: d.booking_date || todayISO(), inv: null, adv: false }; }
-function bookTermsPrice(d) { const p = d.model && d.grade && d.color ? priceOf(d.model, d.grade, d.color, bookYear(d.model)) : null; return p && p.exact ? { price: p.price, paint: p.extra > 0 && p.extra < p.price ? p.extra : 0 } : null; }
+function bookTermsPrice(d) { const p = d.model && d.grade && d.color ? bookPriceOf(d) : null; return p && p.exact ? { price: p.price, paint: p.extra > 0 && p.extra < p.price ? p.extra : 0 } : null; }
 function bookTermsBox(d) {
   if (!d.model || !d.grade || !d.color) return `<fieldset class="p-4 rounded-lg border border-line"><legend class="font-head font-semibold px-1">เงื่อนไขการขาย</legend><p class="text-sm text-muted">เลือกรุ่น เกรด สี ก่อน แล้วจะเลือกดาวน์ ผ่อน แคมเปญ และ Margin ได้</p></fieldset>`;
   d.deal = d.deal || {};
