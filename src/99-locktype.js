@@ -177,7 +177,9 @@ function ltSweep(D) {
   if (typeof bltConvertSweep === 'function') bltConvertSweep(D);
   ltIdsNoSweep(D);
   for (const l of D.locks) {
-    if (l.status === 'done' && l.ids_done && l.ids_done.no) continue;   // its cell gets the IDS booking number instead (ltIdsNoSweep)
+    // IDS gave the car to this lock's own booking / customer (done, or about to be marked done): its cell gets the IDS booking number
+    // instead (ltIdsNoSweep) — never cleared (24/11: a received car's lock was cleared before the upload marked it done)
+    if ((l.status === 'done' && l.ids_done && l.ids_done.no) || l.idsTook) continue;
     if (!(l.typed || l.auto_sheet) || l.sheet_cleared || ltSwept.has(l.id) || l.live || !(l.vin || l.ref) || !(l.sheet_sync && l.sheet_sync.value && !l.sheet_sync.conflict)) continue;
     if (D.locks.some(x => x.id !== l.id && x.live && ltSameL(x, l) && x.typed)) { ltSwept.add(l.id); continue; }   // the cell now belongs to the next typed lock
     ltSwept.add(l.id); ltSheet(l.id, '', ltTextOf(l));
@@ -185,18 +187,20 @@ function ltSweep(D) {
 }
 // 24/11: IDS gave the car to the lock's booking / customer (the lock is "done"): the cell that still holds the lock's text gets the
 // IDS booking number (stock row only, never the quota). Only while the car is still here; a cell someone changed is left alone.
-let ltIdsNoTried = new Set();
+let ltIdsNoTried = new Set(), ltIdsQ = Promise.resolve();
 function ltIdsNoSweep(D) {
   let n = 0;
   for (const l of D.locks) {
     if (n >= 5) break;
-    if (l.status !== 'done' || !l.ids_done || !l.ids_done.no || !l.vin || l.ids_sheet || ltIdsNoTried.has(l.id)) continue;
+    const no = l.status === 'done' && l.ids_done ? l.ids_done.no : l.idsTook && l.idsTook.same && ['approved', 'allocated', 'pending'].includes(l.status) ? l.idsTook.no : null;
+    // tried before: kept unless the sheet could not be read then (try again)
+    if (!no || !l.vin || (l.ids_sheet && !['read_error', 'error', 'tool_error', 'nomcp'].includes(l.ids_sheet.code)) || ltIdsNoTried.has(l.id)) continue;
     if (l.done_at && daysBetween(String(l.done_at).slice(0, 10), todayISO()) > 30) continue;
     const c = D.cars.get(l.vin); if (!c || c.gone || ['delivered'].includes(c.st)) continue;
     const sy = l.sheet_sync, was = sy && !sy.error && !sy.conflict && sy.value ? sy.value : (l.sheet_text || (c.src === 'IDS' ? c.bknote : '') || '');
     if (!was || /^\d{8,}$/.test(String(was).trim()) || (c.src === 'IDS' && /^\d{8,}$/.test(String(c.bknote || '').trim()))) continue;
     ltIdsNoTried.add(l.id); n++;
-    ltIdsNoWrite(l.id, l.ids_done.no, was);
+    ltIdsQ = ltIdsQ.then(() => ltIdsNoWrite(l.id, no, was)).catch(() => {});   // one at a time (the sheet API limits bursts)
   }
 }
 async function ltIdsNoWrite(id, no, was) {
