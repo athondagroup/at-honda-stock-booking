@@ -287,7 +287,7 @@ const poStd = a => ['รับประกันคุณภาพรถ 3 ป�
 const UCARE = 'Ultimate Care รับประกันคุณภาพเพิ่ม 2 ปี หรือ 40,000 กม.';
 function poDraft(a) {
   const po = (a.rec.flow && a.rec.flow.po) || {};
-  const d = { items: (po.items || []).map(x => ({ ...x })), date: po.date || todayISO(), ddate: po.ddate || a.rec.delivery_plan || '', dtime: po.dtime || '', by: po.by_name || a.sales || '', note: po.note || '', ac: { ...(po.ac || {}) }, ucare: !!po.ucare };
+  const d = { items: (po.items || (typeof qbkPoItems === 'function' ? qbkPoItems(a) : [])).map(x => ({ ...x })), date: po.date || todayISO(), ddate: po.ddate || a.rec.delivery_plan || '', dtime: po.dtime || '', by: po.by_name || a.sales || '', note: po.note || '', ac: { ...(po.ac || {}) }, ucare: !!po.ucare };
   return po.at ? d : poDraftFees(a, d);
 }
 function poDraftFees(a, p) { poAuto(a, p).forEach(x => { if (x.fee && x.def && (p.ac[x.key] === undefined || p.ac[x.key] === '')) p.ac[x.key] = x.def; }); return p; }

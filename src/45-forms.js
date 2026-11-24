@@ -84,6 +84,7 @@ function bookingForm(D) {
   const running = ai && ai.state === 'running';
   return `
   <form id="booking-form" class="flex flex-col gap-5" novalidate>
+    ${typeof qbkHead === 'function' ? qbkHead(d) : ''}
     <section class="bg-surface border border-line rounded-lg p-4 md:p-6">
       <h2 class="font-head text-lg font-semibold mb-1">1. แนบใบจองและหลักฐานมัดจำ</h2>
       <p class="text-sm text-muted mb-4">ต้องมีรูปหน้าใบจองทุกใบ (เหมือนช่อง "หน้าใบจอง" ใน Google Form) · สลิปหรือใบเสร็จมัดจำแนบได้ถ้ามี · AI อ่านข้อมูลมากรอกให้ได้</p>
@@ -127,6 +128,7 @@ function bookingForm(D) {
         ${F('lead_id', 'Lead ID จาก BOT (ถ้ามี)', inp('lead_id', 'text', 'placeholder="ถ้ามี"'))}
       </fieldset>
       ${bookTermsBox(d)}
+      ${typeof qbkPoBox === 'function' ? qbkPoBox(d) : ''}
       <fieldset class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-lg" style="background:var(--surface-2)"><legend class="font-head font-semibold px-1">ข้อมูลเพิ่ม (ไม่อยู่ใน Google Form · ไม่บังคับ ใส่ทีหลังได้)</legend>
         ${F('booking_no', 'เลขที่ใบจอง IDS', inp('booking_no', 'text', 'inputmode="numeric" maxlength="12" placeholder="10 หลักจาก IDS"'), false, 'ยังไม่ได้ลง IDS เว้นไว้ก่อนได้ ระบบจะเตือนจนกว่าจะใส่')}
         ${d.purchase === 'ไฟแนนซ์' ? F('finance', 'บริษัทไฟแนนซ์ที่ยื่น', sel('finance', FINANCE)) : ''}
@@ -138,7 +140,7 @@ function bookingForm(D) {
       </fieldset>
       ${multiBlock(d, D)}
       ${checks.length ? `<div class="p-3 rounded-lg text-sm flex flex-col gap-1" style="background:var(--surface-2)"><b>ผลตรวจ</b>${checks.map(c => `<div style="color:var(--${c.bad ? 'warn' : 'good'})">${c.bad ? '⚠' : '✓'} ${esc(c.t)}</div>`).join('')}</div>` : ''}
-      <p class="text-xs text-muted">ของแถมรายชิ้นใส่ทีหลังในใบสั่งแต่งรถ</p>
+      ${d.quote_id ? '' : '<p class="text-xs text-muted">ของแถมรายชิ้นใส่ทีหลังในใบสั่งแต่งรถ</p>'}
       <div class="flex flex-wrap gap-3 items-center">
         <button type="submit" class="btn btn-red" ${p.write && !running && !S.saving ? '' : 'disabled'}>${S.saving ? '<span class="spin"></span> กำลังบันทึก…' : 'บันทึกใบจองเข้าคิว'}</button>
         <button type="button" class="btn btn-ghost" data-act="booking-reset">ล้างฟอร์ม</button>
