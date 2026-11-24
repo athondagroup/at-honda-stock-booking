@@ -60,15 +60,22 @@ function renderChrome(D) {
   const badges = badgeCounts(D);
   const badge = id => badges[id] ? `<span class="badge ml-auto">${badges[id]}</span>` : '';
   const gs = groupsFor(), gBadge = g => g.views.reduce((t, v) => t + (badges[v] || 0), 0);
-  $('#sidenav').innerHTML = gs.map(g => { const n = gBadge(g), on = g.views.includes(S.view); return `<a href="#${groupEntry(g)}" class="nav-item" data-act="nav" data-view="${groupEntry(g)}" data-group="${g.id}" ${on ? 'aria-current="page"' : ''}>${svg(g.icon || g.views[0])}${g.label}${n ? `<span class="badge ml-auto">${n}</span>` : ''}</a>`; }).join('');
+  // 24/11: no side menu any more; the bottom bar is the menu on every screen
   const ids = bottomIds(), bottom = [...ids.map(id => gs.find(g => g.id === id)).filter(Boolean), { id: 'more', label: 'เพิ่มเติม', views: [] }];
   const moreGs = gs.filter(g => !ids.includes(g.id)), moreViews = moreGs.flatMap(g => g.views);
+  // desktop (24/11): two tool pages get their own button before เพิ่มเติม — ข้อมูลผิด / ขาด / ต้องจับคู่ and อัปโหลด IDS
+  const canV = new Set(navFor().map(n => n.id));
+  const deskV = [['datafix', 'ข้อมูลผิด/ขาด/จับคู่', 'alerts'], ['upload', 'อัปโหลด IDS', 'upload']].filter(x => canV.has(x[0]));
+  const deskIds = deskV.map(x => x[0]);
+  const item = (href, act, view, label, icon, on, cnt, desk) => `<a href="#${href}" data-act="${act}" data-view="${view}" class="${desk ? 'hidden md:flex' : 'flex'} flex-col items-center gap-0.5 py-2 md:px-3 md:w-32 text-xs font-medium relative" style="color:${on ? 'var(--red)' : 'var(--muted)'}" ${on ? 'aria-current="page"' : ''}>
+      ${svg(icon, 22)}<span class="text-center leading-tight">${label}</span>${cnt ? `<span class="badge absolute top-1 left-1/2 ml-2">${cnt}</span>` : ''}</a>`;
   $('#bottomnav').innerHTML = bottom.map(g => {
-    const on = g.id === 'more' ? moreViews.includes(S.view) : g.views.includes(S.view);
-    const cnt = g.id === 'more' ? moreGs.reduce((t, x) => t + gBadge(x), 0) : gBadge(g);
-    const n = { id: g.id === 'more' ? 'more' : groupEntry(g), label: g.label, icon: g.id === 'more' ? 'more' : g.icon || g.views[0] };
-    return `<a href="#${n.id === 'more' ? S.view : n.id}" data-act="${n.id === 'more' ? 'menu' : 'nav'}" data-view="${n.id}" class="flex flex-col items-center gap-0.5 py-2 text-xs font-medium relative" style="color:${on ? 'var(--red)' : 'var(--muted)'}" ${on ? 'aria-current="page"' : ''}>
-      ${svg(n.icon, 22)}${n.label}${cnt ? `<span class="badge absolute top-1 left-1/2 ml-2">${cnt}</span>` : ''}</a>`;
+    if (g.id === 'more') {
+      const on = moreViews.includes(S.view), cnt = moreGs.reduce((t, x) => t + gBadge(x), 0);
+      const desk = deskV.map(([v, l, ic]) => item(v, 'nav', v, l, ic, S.view === v, v === 'datafix' && typeof datafixCount === 'function' ? datafixCount(D) : badges[v] || 0, true)).join('');
+      return desk + item(S.view, 'menu', 'more', 'เพิ่มเติม', 'more', on && !(deskIds.includes(S.view) && window.innerWidth >= 768), cnt, false);
+    }
+    return item(groupEntry(g), 'nav', groupEntry(g), g.label, g.icon || g.views[0], g.views.includes(S.view), gBadge(g), false);
   }).join('');
   $('#role-box').innerHTML = roleControls('side');
   $('#mobile-role-label').textContent = `ทดลองเป็น ${roleLabel()}`;
