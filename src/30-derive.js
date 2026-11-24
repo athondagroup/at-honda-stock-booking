@@ -158,7 +158,8 @@ function deriveNow(key) {
   const removed = [];
   for (const [vin, o] of S.vehicles) {
     const car0 = cars.get(vin);
-    if (o.added && !car0) cars.set(vin, { ...o.added, vin, st: 'free', src: 'รับเข้าในระบบนี้ รอไฟล์ IDS' });
+    // 24/11: a received car gets its IDS allocation / invoice like a stock row (IDS Booking can list the car before the Stock file does)
+    if (o.added && !car0) { const rc = { ...o.added, vin, src: 'รับเข้าในระบบนี้ รอไฟล์ IDS' }; rc.st = carStatus(rc, invByVin.get(vin), bkByVin) || 'free'; carEnrich(rc); cars.set(vin, rc); }
     // pulled back into stock as a special car (company Advance / Demon / returned by the customer): IDS no longer lists it
     else if (o.special && !car0 && !o.removed) { const i = invByVin.get(vin) || {}, sp = o.special, e = (!i.model && typeof carlogAll === 'function' && (carlogAll().get(vin) || {}).e) || {};
       cars.set(vin, { vin, br: sp.br || i.br || e.br, model: i.model || e.m, grade: i.grade || e.g, color: i.color || e.c, st: spStatus(sp), src: 'ดึงกลับเข้า Stock พิเศษ (ไม่อยู่ในไฟล์ Stock IDS)', special: sp, fromInv: false }); }
