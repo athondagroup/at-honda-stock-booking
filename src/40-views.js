@@ -232,7 +232,7 @@ function alertRow(a) {
 }
 // 19/11: งานวันนี้ = notifications: open to look, then clear (kept per person on this device). A request a manager must approve or
 // confirm (and the few confirmations asked of the sales / admin) stays until it is decided.
-const NTC_KEEP = ['chg:', 'lockp:', 'ownerd:', 'owner:', 'dealreq:', 'cxexec:', 'idsask:', 'xfer:', 'recv:', 'matchq:', 'cxw:'];
+const NTC_KEEP = ['chg:', 'lockp:', 'ownerd:', 'owner:', 'dealreq:', 'cxexec:', 'idsask:', 'xfer:', 'recv:', 'matchq:', 'cxw:', 'qtf:'];
 const ntcKeep = a => NTC_KEEP.some(k => a.id.startsWith(k));
 const ntcKey = () => 'atNtcDone:' + ((S.me && S.me.id) || S.role.role || 'x');
 let NTC_DONE = null;

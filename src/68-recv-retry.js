@@ -40,23 +40,12 @@ Object.assign(ACTIONS, {
 // first come first served — the lock approved first keeps the car and any other approved lock on it becomes the next in
 // the queue (pending), with a note. Temporary locks follow the usual rule: a booking lock wins and the temp owner is alerted.
 async function recvMoveLocks(vin, ref) {
-  if (!vin) return { moved: 0, queued: 0 };
-  let moved = 0, queued = 0;
-  if (ref) for (const [id, l0] of S.locks) {
-    if (l0.ref !== ref || l0.vin || !['pending', 'approved', 'allocated'].includes(l0.status)) continue;
-    const l = await claimFresh('locks', id, x => x.ref === ref && !x.vin); if (!l) continue;
-    l.vin = vin;
-    if (await saveLock(id, l, 'ย้ายล็อกจาก Quota มาที่ VIN', `Quota ${ref} → ${vin} (รับรถเข้า)`)) moved++;
-  }
-  const live = [...S.locks.entries()].map(([id, l]) => ({ id, ...l }))
-    .filter(l => (l.vin === vin || (ref && l.ref === ref)) && l.type !== 'temp' && ['approved', 'allocated'].includes(l.status))
-    .sort((a, b) => (a.approved_at || a.requested_at || '').localeCompare(b.approved_at || b.requested_at || ''));
-  for (const l of live.slice(1)) {
-    const cur = await claimFresh('locks', l.id, x => ['approved', 'allocated'].includes(x.status)); if (!cur) continue;
-    cur.status = 'pending'; delete cur.start; delete cur.end;
-    if (await saveLock(l.id, cur, 'ล็อกซ้ำ ต่อคิว', `รถ ${vin} มีล็อกที่อนุมัติก่อนแล้ว (${live[0].sales || live[0].dealer_name || ''}) คำขอนี้เป็นคิวถัดไป`)) queued++;
-  }
-  return { moved, queued };
+  // 24/11: the one rule (qtDecide, 99-qtfollow.js): a sure Ref → VIN moves the lock as it is; anything unsure waits for the manager
+  // ("ตรวจ: Quota → รถ" notice). No lock is put back in the queue automatically any more.
+  if (!vin || !ref) return { moved: 0, queued: 0 };
+  const D = derive(); let moved = 0, review = 0;
+  for (const l of D.locks.filter(x => !x.vin && x.ref === ref)) { const d = qtDecide(l, D); if (d && d.move === vin) { if (await qtMove(l.id, vin, 'รับรถเข้า')) moved++; } else if (d && d.review) review++; }
+  return { moved, queued: review };
 }
 
 // ---- removing a receive record entered by mistake (ตกลง 14/10): only one not confirmed yet (pending or ไม่ผ่าน).

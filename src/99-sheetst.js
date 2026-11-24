@@ -40,7 +40,7 @@ function carSheetSt(c, D) {
   if (sy && sy.at && !sy.error && String(sy.at) > readAt) return { k: 'ok', why: `เขียนลงชีตแล้ว ${fmtDT(sy.at)} (รออ่านชีตรอบหน้า)`, l, readAt };
   // 20/11: written OK (the cell was empty and now holds this text), but the sheet copy was pasted before / from an older file: still written
   if (!sheet && sy && sy.at && sy.value && !sy.error && !sy.conflict && shN(sy.value) === shN(web)) return { k: 'ok', why: `เขียนลงชีตแล้ว ${fmtDT(sy.at)}`, l, readAt };
-  if (!sheet || (sy && sy.error)) return { k: 'wait', web, why: sy && sy.error ? 'เขียนไม่สำเร็จ · ลองใหม่อัตโนมัติ' : 'ยังไม่ได้เขียนลงชีต', l, readAt };
+  if (!sheet || (sy && sy.error)) return { k: 'wait', web, why: sy && sy.error ? ltSheetWhy(sy) : 'ยังไม่ได้เขียนลงชีต', l, readAt };
   return { k: 'bad', web, sheet, where, l, readAt };
 }
 var SHEET_ST = { ok: ['✓ ตรงกับชีต', 'good'], wait: ['⏳ รอเขียนลงชีต', 'neutral'], bad: ['⚠ ไม่ตรง', 'bad'], na: ['ยังไม่มีในชีต', 'muted'] };

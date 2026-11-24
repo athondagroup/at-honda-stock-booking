@@ -43,7 +43,7 @@ function ltCands(c, q, D) {
   const k = searchKey(q || '');
   const [model] = String(c.spec).split('|');
   const demo = ltDemoCar(c);
-  return [...D.bookings, ...(D.demoRows || []).filter(b => !D.locks.some(l => l.live && l.bkref === b.key))].filter(b => ['waiting', 'noids', 'demo', 'democar'].includes(b.state) && !(b.app && b.app.demo) && (demo ? ltDemoBk(b) : !ltDemoBk(b)) && (k ? [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k)) : b.spec === c.spec) && (k || !isSales() || isMine(b.owner)))
+  return [...D.bookings, ...(D.demoRows || []).filter(b => !D.locks.some(l => l.live && l.bkref === b.key))].filter(b => ['waiting', 'noids', 'demo', 'democar'].includes(b.state) && !(b.app && b.app.demo) && (demo ? ltDemoBk(b) : !ltDemoBk(b)) && (k ? [b.cust, b.no, b.owner, b.sales].some(x => x && searchKey(String(x)).includes(k)) : b.spec === c.spec) && (!isSales() || isMine(b.owner)))
     .map(b => ({ b, rank: b.spec === c.spec ? 0 : String(b.spec || '').split('|')[0] === model ? 1 : 2 }))
     .sort((x, y) => x.rank - y.rank || String(x.b.qdate || x.b.date || '').localeCompare(String(y.b.qdate || y.b.date || ''))).slice(0, 200);
 }
@@ -82,7 +82,7 @@ function ltCell(c, D, p) {
   const ss = L && L.sheet_sync;
   const stOk = ss && ss.conflict && typeof carSheetSt === 'function' && (carSheetSt(c, D) || {}).k === 'ok';
   const warn = ss && ss.conflict && !stOk ? `<div class="text-xs" style="color:var(--bad)">ชีตมี "${esc(ss.current || '')}" ยังไม่ได้เขียน <button class="underline" data-act="lt-force" data-id="${esc(L.id)}">เขียนทับ</button></div>`
-    : ss && ss.error && ss.value ? `<div class="text-xs" style="color:var(--warn)">ยังไม่ได้ลงชีต (${ss.error === 'not_found' ? 'ไม่มีรถในชีต · เขียนให้เองเมื่อรถเข้าชีต' : 'เขียนไม่สำเร็จ'}) <button class="underline" data-act="lt-retry" data-id="${esc(L.id)}">ลองอีกครั้ง</button></div>` : '';
+    : ss && ss.error && ss.value ? `<div class="text-xs" style="color:var(--warn)">ยังไม่ได้ลงชีต (${ss.error === 'not_found' ? 'ไม่มีรถในชีต · เขียนให้เองเมื่อรถเข้าชีต' : esc(ltSheetWhy(ss))}) <button class="underline" data-act="lt-retry" data-id="${esc(L.id)}">ลองอีกครั้ง</button></div>` : '';
   if (t) return `<div class="lt-cell on"><input id="lt-in" class="lt-in" data-lt="${esc(ltKey(c))}" value="${esc(t.q || '')}" placeholder="ชื่อลูกค้า / เลขใบจอง / เซลล์" autocomplete="off">
     <button class="text-xs underline text-muted" data-act="lt-cancel">ยกเลิก</button>${ltDrop(c, D)}</div>`;
   const gone = !L ? ltGone(c, D) : null;
@@ -100,36 +100,51 @@ function ltCell(c, D, p) {
 function ltQuotaCell(q, D, p) { const u = q.car || ltUnitQ(q); return ltOpenCar(u) || ltLockOf(u, D) ? ltCell(u, D, p) : null; }
 const ltRoleShort = l => String(l.requested_role || '').replace(/\s*\(.*\)$/, '') || 'ผู้จัดการ';
 // ---- write / clear the sheet cell (only on the real web; the preview never touches the real sheet)
-async function ltSheet(id, value, expect, force, quiet) {
+async function ltSheet(id, value, expect, force, quiet, opt) {
   const l = findLock(id); if (!l) return null;
   const live = !!(window.__WEB), D = derive();
-  // the stock tab when the car is in stock; the quota tab's "Vin Number" cell when the unit has a quota slot (by frame number or Ref)
   const car = l.vin ? D.cars.get(l.vin) : null;
-  // 20/11: a car whose quota row in the sheet has no frame number yet (Vin Number holds a name): found by the car's Ref
-  let qs = D.quota.find(q => (l.vin && q.vin === l.vin) || (!l.vin && l.ref && q.ref === l.ref)) || null;
-  const call = async input => {
-    try { const mcp = await gsUse(); if (!mcp) throw { code: 'nomcp' }; const r = await mcp.callTool('Google Sheets', 'stock_cell', input, { cache: false }); let x = r && r.payload; if (typeof x === 'string') { try { x = JSON.parse(x); } catch (e) { x = null; } } return x || { code: 'error' }; }
-    catch (e) { return { code: (e && e.code) || 'error' }; }
-  };
-  let res = null, qres = null;
-  if (!live) res = { ok: true, preview: true };
-  else {
-    if (l.vin) res = await call({ br: l.car_br, vin: l.vin, value, expect: expect ?? '', force: !!force });
-    // a stock row was written, or there is none (a quota slot not in stock / a car missing from the stock tab): the quota slot follows
-    if (!qs && res && res.code === 'not_found' && car && typeof carQuotaRow === 'function') qs = carQuotaRow(car, D);
-    if (qs && (!res || res.ok || res.code === 'not_found')) qres = await call({ target: 'quota', vin: qs.vin || '', ref: qs.ref, br: qs.br, value, expect: expect ?? '', force: !!force });
-    if (!res || (res.code === 'not_found' && qres && (qres.ok || qres.code === 'conflict'))) { res = qres; qres = null; }
-  }
+  // 24/11: one rule (cellPlan, 65-cellplan.js): the stock tabs first (all four read, one row), the quota row as the fallback or the
+  // companion ("VIN text"); a read error / a duplicate never falls through to the quota. The real web asks the server to write;
+  // the preview reads the real sheet through the connector and only works out the plan (dry-run: the sheet is never written)
+  const input = { br: l.car_br, vin: l.vin || '', ref: l.ref || (car && car.ref) || '', value, expect: expect ?? '', force: !!force,
+    expect_quota: l.imported && l.sheet_text ? l.sheet_text : (l.sheet_quota && l.sheet_quota.value ? String(l.sheet_quota.value).replace(/^[A-HJ-NPR-Z0-9]{17}\s*/i, '') : undefined), stock_only: !!(opt && opt.stockOnly) };
+  let res;
+  try {
+    const mcp = await gsUse(); if (!mcp) throw { code: 'nomcp' };
+    if (live) { const r = await mcp.callTool('Google Sheets', 'lock_cell', input, { cache: false }); res = idsGsPayload(r) || { code: 'error' }; }
+    else res = await ltSheetDry(mcp, input);
+  } catch (e) { res = live ? { code: (e && e.code) || 'error' } : { ok: true, preview: true, plan: null }; }
+  const qres = res && res.ok ? (res.writes || []).find(w => w.kind === 'quota') || (res.quota ? { error: res.quota.code, current: res.quota.current, where: res.quota.where } : null) : null;
   const cur = findLock(id) || l, now = new Date().toISOString();
-  cur.sheet_sync = res && res.ok ? { at: now, value, range: res.range || null, preview: !!res.preview }
-    : { at: now, value, conflict: res && res.code === 'conflict', current: res && res.current, error: res && res.code !== 'conflict' ? (res && res.code) || 'error' : null };
-  if (qres) cur.sheet_quota = qres.ok ? { at: now, range: qres.range } : { at: now, error: qres.code || 'error', current: qres.current };
+  cur.sheet_sync = res && res.ok ? { at: now, value, range: res.range || null, kind: res.kind || null, preview: !!res.preview, dry: !!(res.preview && res.plan) }
+    : { at: now, value, conflict: res && res.code === 'conflict', current: res && res.current, error: res && res.code !== 'conflict' ? (res && res.code) || 'error' : null,
+        tabs: (res && res.tabs) || null, where: (res && res.where) || null, preview: !live };
+  if (qres) cur.sheet_quota = qres.range ? { at: now, range: qres.range, value: qres.value } : { at: now, error: qres.error || 'error', current: qres.current || null, where: qres.where || null };
   if (value === '' && res && res.ok) cur.sheet_cleared = now;
   await write('locks', id, cur);
   if (quiet) { if (res && res.ok) toast(`ลงชีตให้แล้ว "${value}" (${l.vin || 'Quota ' + l.ref})`); }
   else if (res && res.code === 'conflict') toast(`ยังไม่ได้เขียนลงชีต: ช่องในชีตตอนนี้เป็น "${res.current || ''}" ไม่ตรงกับที่เว็บรู้ · ล็อกในเว็บบันทึกแล้ว`, 'bad');
-  else if (!(res && res.ok)) toast(res && res.code === 'not_found' ? 'ไม่พบรถ / Quota นี้ในชีต Stock IDS (ล็อกในเว็บบันทึกแล้ว)' : 'เขียนชีตไม่สำเร็จ ล็อกในเว็บบันทึกแล้ว ลองใหม่ภายหลัง', 'bad');
+  else if (!(res && res.ok)) toast(ltSheetWhy(res) + ' (ล็อกในเว็บบันทึกแล้ว)', 'bad');
   return res;
+}
+// why a lock is not in the sheet yet, in words (24/11)
+function ltSheetWhy(r) {
+  const c = r && (r.error || r.code);
+  return c === 'not_found' ? 'ไม่พบรถ / Quota นี้ในชีต' : c === 'read_error' ? `อ่านชีตไม่สำเร็จ${r.tabs ? ' (' + r.tabs.join(', ') + ')' : ''} ยังไม่เขียน จะลองใหม่` : c === 'dup' ? `พบรถนี้ซ้ำในชีต ${(r.where || []).join(', ')} ยังไม่เขียน ตรวจชีตก่อน`
+    : c === 'conflict' ? `ช่องในชีตเป็น "${r.current || ''}"` : c === 'not_granted' ? 'ไม่มีสิทธิ์เขียนชีต' : 'เขียนชีตไม่สำเร็จ ลองใหม่ภายหลัง';
+}
+// the preview: read the real sheet (connector, read only) and work out where the lock would go — nothing is written (24/11)
+async function ltSheetDry(mcp, input) {
+  const id = idsGsId(), get = async range => { try { const p = idsGsPayload(await mcp.callTool('Google Sheets', 'get_values', { spreadsheetId: id, range }, { cache: false })); return p && Array.isArray(p.values) ? p.values : p ? [] : null; } catch (e) { return null; } };
+  const stock = {}; for (const t of ['PSC', 'ATE', 'SPH', 'KPA']) stock[t] = await get(`'${t}'!A1:AD800`);
+  let quota = {};
+  if (!input.stock_only) try { const meta = idsGsPayload(await mcp.callTool('Google Sheets', 'get_spreadsheet', { spreadsheetId: id, fields: ['sheets.properties.title'] }, { cache: false }));
+    const titles = cellQuotaTabs(((meta && meta.sheets) || []).map(x => x.properties.title));
+    for (const t of titles) quota[t] = await get(`'${t}'!A1:Z600`); } catch (e) { quota = null; }
+  const plan = cellPlan(input, { stock, quota });
+  S.lastDry = { at: new Date().toISOString(), input, plan };
+  return plan.code === 'ok' ? { ok: true, preview: true, range: plan.writes[0].range, kind: plan.writes[0].kind, writes: plan.writes, quota: plan.quota || null, plan } : { ...plan, preview: true };
 }
 // typed locks that ended (let go, expired, not approved, replaced): clear their sheet cell once (managers' sessions)
 let ltSwept = new Set();
@@ -146,6 +161,8 @@ function ltRetry(D) {
 }
 function ltAllLoaded() { return !!S.colsLoaded && COLS.every(c => S.colsLoaded.has(c)); }
 function ltSweep(D) {
+  // quota locks follow their car into stock (24/11) — in the preview too (its writes stay in the preview; the sheet is only planned)
+  if (ltCan() && ltAllLoaded() && typeof qtSweep === 'function') qtSweep(D);
   if (!ltCan() || !window.__WEB || !ltAllLoaded()) return;
   ltRetry(D);
   ltReplacedSweep(D);
@@ -158,11 +175,35 @@ function ltSweep(D) {
     const full = ltTextOf(l); if (/\/\s*$/.test(full) || full === sy.value || (ltAutoTried = ltAutoTried || new Set()).has('fx:' + l.id)) continue; ltAutoTried.add('fx:' + l.id); ltSheet(l.id, full, sy.value, false, true); }
   for (const l of D.locks) if (!l.typed && l.live && !l.sheet_sync && ['approved', 'allocated'].includes(l.status) && !(ltAutoTried = ltAutoTried || new Set()).has(l.id)) { ltAutoTried.add(l.id); ltAutoSheet(l.id); }
   if (typeof bltConvertSweep === 'function') bltConvertSweep(D);
+  ltIdsNoSweep(D);
   for (const l of D.locks) {
+    if (l.status === 'done' && l.ids_done && l.ids_done.no) continue;   // its cell gets the IDS booking number instead (ltIdsNoSweep)
     if (!(l.typed || l.auto_sheet) || l.sheet_cleared || ltSwept.has(l.id) || l.live || !(l.vin || l.ref) || !(l.sheet_sync && l.sheet_sync.value && !l.sheet_sync.conflict)) continue;
     if (D.locks.some(x => x.id !== l.id && x.live && ltSameL(x, l) && x.typed)) { ltSwept.add(l.id); continue; }   // the cell now belongs to the next typed lock
     ltSwept.add(l.id); ltSheet(l.id, '', ltTextOf(l));
   }
+}
+// 24/11: IDS gave the car to the lock's booking / customer (the lock is "done"): the cell that still holds the lock's text gets the
+// IDS booking number (stock row only, never the quota). Only while the car is still here; a cell someone changed is left alone.
+let ltIdsNoTried = new Set();
+function ltIdsNoSweep(D) {
+  let n = 0;
+  for (const l of D.locks) {
+    if (n >= 5) break;
+    if (l.status !== 'done' || !l.ids_done || !l.ids_done.no || !l.vin || l.ids_sheet || ltIdsNoTried.has(l.id)) continue;
+    if (l.done_at && daysBetween(String(l.done_at).slice(0, 10), todayISO()) > 30) continue;
+    const c = D.cars.get(l.vin); if (!c || c.gone || ['delivered'].includes(c.st)) continue;
+    const sy = l.sheet_sync, was = sy && !sy.error && !sy.conflict && sy.value ? sy.value : (l.sheet_text || (c.src === 'IDS' ? c.bknote : '') || '');
+    if (!was || /^\d{8,}$/.test(String(was).trim()) || (c.src === 'IDS' && /^\d{8,}$/.test(String(c.bknote || '').trim()))) continue;
+    ltIdsNoTried.add(l.id); n++;
+    ltIdsNoWrite(l.id, l.ids_done.no, was);
+  }
+}
+async function ltIdsNoWrite(id, no, was) {
+  const r = await ltSheet(id, no, was, false, true, { stockOnly: true });
+  const cur = findLock(id); if (!cur) return;
+  cur.ids_sheet = { at: new Date().toISOString(), no, ok: !!(r && r.ok), code: r && !r.ok ? r.code || 'error' : null, current: r && r.current || null };
+  await write('locks', id, cur);
 }
 // ---- the lock itself
 function ltNew(c, D, k, q, extra) {

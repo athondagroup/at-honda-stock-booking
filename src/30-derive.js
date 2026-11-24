@@ -781,6 +781,13 @@ function buildAlerts(D) {
       add('lockdup:' + t, { br, roles: ['manager'] }, 'warn', `ล็อกชื่อซ้ำ ${units.length} คัน: "${l0.sheet_text || l0.prospect}"`,
         `${ls.map(l => `${l.car_br} ${l.vin || 'Quota ' + l.ref} (${l.status === 'pending' ? 'รออนุมัติ' : 'ล็อกแล้ว'})`).join(' · ')}${who ? ' · เซลล์ ' + who : ''} · เลือกเก็บคันเดียว`, { act: 'go', view: 'lock', sub: 'active', label: 'ดู' });
     } }
+  // 24/11: a quota lock that could not follow its car on its own (two cars, the car already locked, a request the old rule queued)
+  if (typeof qtReviews === 'function') for (const r of qtReviews(D)) {
+    const ls = r.ids.map(id => D.locks.find(x => x.id === id)).filter(Boolean), l0 = ls[0] || {};
+    add('qtf:' + r.key, { br: l0.car_br, roles: ['manager'] }, 'bad', `ตรวจ: ${r.ref ? 'Quota ' + r.ref + ' → ' : ''}รถ ${r.vins.join(' / ')}`,
+      `${r.kind === 'multi' ? 'Quota นี้ชี้ไปที่รถหลายคัน เลือกคันที่ใช่' : 'มีล็อกมากกว่า 1 รายการบนคันเดียว เลือกรายการที่เก็บไว้'} · ${ls.map(l => `"${ltTextOf(l)}" (${l.status === 'pending' ? 'รออนุมัติ' : 'ล็อกแล้ว'})`).join(' · ')}`,
+      { act: 'qtf-open', id: r.key, label: 'เลือก' });
+  }
   for (const br of BRS) {
     const n = D.bookings.filter(b => b.br === br && b.state === 'gone');
     if (n.length) add('bkgone:' + br, { br, roles: ['admin', 'manager'] }, 'bad', `ใบจอง IDS ${n.length} ใบ ไม่อยู่ในไฟล์ Booking ล่าสุด · รอตรวจ`,
