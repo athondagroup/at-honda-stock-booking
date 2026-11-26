@@ -523,7 +523,7 @@ b = s.index('                    </div>\n\n                </div>\n            )
 s = s[:a] + rd('summary.jsx') + s[b:]
 
 # 7i (ต่อ): ใบสรุปการขายใช้ชื่อรุ่นแบบสั้น
-rep("<td style={{ width: '34%' }}>{uiModelLabel(uiModel)}</td>", "<td style={{ width: '34%' }}>{uiModelShort(uiModel)}</td>")
+pass  # (summary v2 uses uiModelShort) rep("<td style={{ width: '34%' }}>{uiModelLabel(uiModel)}</td>", "<td style={{ width: '34%' }}>{uiModelShort(uiModel)}</td>")
 # 7j: ชื่อรุ่นแบบสั้นทุกหน้าที่ออกให้ลูกค้า / ชื่อไฟล์ / ข้อความแจ้ง (ค่าที่เลือกและการคำนวณยังใช้ชื่อเต็ม)
 for _o, _n in [('${uiModel} ${grade', '${uiModelShort(uiModel)} ${grade'), ('${uiModel}_${grade', '${uiModelShort(uiModel)}_${grade'),
                ('{e.uiModel}', '{uiModelShort(e.uiModel)}'), ('{q.uiModel}', '{uiModelShort(q.uiModel)}'),

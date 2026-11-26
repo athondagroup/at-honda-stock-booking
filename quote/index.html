@@ -15345,226 +15345,408 @@ const App = () => {
     className: "text-base text-gray-500 mt-1"
   }, "(", consultantName || "...................................................", ")"), /* @__PURE__ */ React.createElement("p", {
     className: "text-base text-gray-400 mt-1"
-  }, consultantPhone, " ", consultantLine ? `Line: ${consultantLine}` : "")))), /* @__PURE__ */ React.createElement("div", {
-    id: "sales-summary-card",
-    className: "bg-white w-[1120px] h-auto relative text-black",
-    style: { padding: "36px 44px", fontFamily: "'Prompt', sans-serif" }
-  }, /* @__PURE__ */ React.createElement("style", null, `
-                                #sales-summary-card .doc-t { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
-                                #sales-summary-card .doc-t td { white-space: normal; overflow-wrap: anywhere; }
-                                #sales-summary-card .doc-t th, #sales-summary-card .doc-t td { border: 1px solid #000; padding: 5px 8px; vertical-align: top; }
-                                #sales-summary-card .doc-t th { background: #e5e5e5; font-weight: 700; text-align: left; }
-                                #sales-summary-card .doc-h { font-size: 14px; font-weight: 700; margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 2px solid #000; }
+  }, consultantPhone, " ", consultantLine ? `Line: ${consultantLine}` : "")))), (() => {
+    const mk = MODEL_MAPPING[uiModel];
+    const money = (v) => {
+      const n = Number(v) || 0;
+      return n < 0 ? `(${formatCurrency(-n)})` : formatCurrency(n);
+    };
+    const dash = (v) => Number(v) ? money(v) : "-";
+    const isCash = salesSummaryIsCash;
+    const listPrice = carPrice + colorPriceVal;
+    const cashDisc = customerTotalDiscount;
+    const invPrice = netPrice;
+    const rows = gifts.map((g, i) => ({ g: String(g || "").trim(), v: parseFloat(giftValues[i]) || 0 })).filter((x) => x.g && !giftAutoKind(x.g)).map((x) => {
+      const hit = findFocCost(x.g, mk);
+      const std = atStdGifts().some((t) => t.l === x.g);
+      const grp = hit && /honda/i.test(hit.vendor || "") ? "honda" : std && !x.v ? "std" : "sub";
+      return { ...x, code: hit ? hit.part || "" : "", vendor: hit ? hit.vendor || "" : "", grp };
+    });
+    const sumOf = (g) => rows.filter((r) => r.grp === g).reduce((s, r) => s + r.v, 0);
+    const focHonda = sumOf("honda"), focSub = sumOf("sub");
+    const premiums = INSURANCE_PREMIUMS[mk]?.[insuranceDuration] || [];
+    const others = [
+      ...cashDisc > 0 ? [{ code: "DISC", g: isCash ? "ส่วนลดเงินสด" : "ส่วนลดราคารถ / ส่วนลดเงินดาวน์", v: cashDisc }] : [],
+      ...premiums.map((p, i) => ({ year: i + 1, p, by: insurancePayers[i + 1] || "customer" })).filter((x) => x.by !== "customer").map((x) => ({ code: "INS-" + x.year, g: `ฟรีประกันภัยชั้น 1 ปีที่ ${x.year} (${x.by === "honda" ? "Honda แถม · ไม่หัก Margin" : "AT แถม"})`, v: x.by === "dealer" ? insuranceCosts.dealer > 0 && effectiveDealerInsuranceCost !== insuranceCosts.dealer ? Math.round(x.p * effectiveDealerInsuranceCost / insuranceCosts.dealer) : x.p : 0 })),
+      ...registrationPayer === "dealer" ? [{ code: "REG-F", g: "ฟรีค่าจดทะเบียน", v: effectiveDealerRegistrationCost }] : []
+    ];
+    const focOther = others.reduce((s, r) => s + r.v, 0);
+    const focUsed = focHonda + focSub + focOther;
+    const left = totalMarginSum - focUsed;
+    const accSold = extraTotal;
+    const branch = window.__QWEB && window.__QWEB.branch || "";
+    const docNo = `SS-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String((bookingData?.customerPhone || "").replace(/\D/g, "").slice(-4) || "0000")}`;
+    const KV = ({ k, v, b }) => /* @__PURE__ */ React.createElement("div", {
+      className: "ss-kv"
+    }, /* @__PURE__ */ React.createElement("span", null, k), /* @__PURE__ */ React.createElement("span", {
+      className: `num${b ? " b" : ""}`
+    }, v));
+    let no = 0;
+    const ItemRow = ({ r, sale, k }) => {
+      no += 1;
+      return /* @__PURE__ */ React.createElement("tr", {
+        key: k
+      }, /* @__PURE__ */ React.createElement("td", {
+        className: "c"
+      }, no), /* @__PURE__ */ React.createElement("td", {
+        className: "code"
+      }, r.code || "-"), /* @__PURE__ */ React.createElement("td", null, r.g, r.vendor && !/honda/i.test(r.vendor) ? /* @__PURE__ */ React.createElement("span", {
+        className: "muted"
+      }, " · ", r.vendor) : null), /* @__PURE__ */ React.createElement("td", {
+        className: "c"
+      }, "1"), /* @__PURE__ */ React.createElement("td", {
+        className: "num"
+      }, sale ? formatCurrency(r.price) : ""), /* @__PURE__ */ React.createElement("td", {
+        className: "num"
+      }, sale ? formatCurrency(r.price) : ""), /* @__PURE__ */ React.createElement("td", {
+        className: "num"
+      }, sale ? "" : r.v ? formatCurrency(r.v) : "-"), /* @__PURE__ */ React.createElement("td", {
+        className: "num"
+      }, sale ? "" : r.v ? formatCurrency(r.v) : "-"));
+    };
+    const SubTotal = ({ label, v, sale }) => /* @__PURE__ */ React.createElement("tr", {
+      className: "st"
+    }, /* @__PURE__ */ React.createElement("td", {
+      colSpan: sale ? 5 : 7,
+      className: "r"
+    }, label), /* @__PURE__ */ React.createElement("td", {
+      className: "num b"
+    }, formatCurrency(v)), sale ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("td", null), /* @__PURE__ */ React.createElement("td", null)) : null);
+    const Group = ({ title }) => /* @__PURE__ */ React.createElement("tr", {
+      className: "grp"
+    }, /* @__PURE__ */ React.createElement("td", null), /* @__PURE__ */ React.createElement("td", {
+      colSpan: 7
+    }, title));
+    return /* @__PURE__ */ React.createElement("div", {
+      id: "sales-summary-card",
+      className: "bg-white w-[1120px] h-auto relative text-black",
+      style: { padding: "34px 44px", fontFamily: "'Prompt', sans-serif" }
+    }, /* @__PURE__ */ React.createElement("style", null, `
+                                #sales-summary-card { font-size: 13px; line-height: 1.45; }
                                 #sales-summary-card .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+                                #sales-summary-card .b { font-weight: 700; }
+                                #sales-summary-card .muted { color: #555; }
+                                #sales-summary-card .box { border: 1px solid #000; }
+                                #sales-summary-card .sec { font-size: 13.5px; font-weight: 700; margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 2px solid #000; display: flex; justify-content: space-between; align-items: baseline; }
+                                #sales-summary-card .info { display: grid; grid-template-columns: 1.25fr 1fr 1fr; border: 1px solid #000; }
+                                #sales-summary-card .info > div { padding: 5px 10px; border-right: 1px solid #bbb; border-bottom: 1px solid #bbb; display: flex; gap: 8px; }
+                                #sales-summary-card .info > div:nth-child(3n) { border-right: 0; }
+                                #sales-summary-card .info > div:nth-last-child(-n+3) { border-bottom: 0; }
+                                #sales-summary-card .info .k { color: #444; white-space: nowrap; min-width: 92px; }
+                                #sales-summary-card .info .v { font-weight: 600; overflow-wrap: anywhere; }
+                                #sales-summary-card .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; border: 1px solid #000; }
+                                #sales-summary-card .cols > div { padding: 8px 12px; border-right: 1px solid #000; }
+                                #sales-summary-card .cols > div:last-child { border-right: 0; }
+                                #sales-summary-card .cols h4 { font-size: 12px; font-weight: 700; margin: 0 0 4px; padding: 2px 6px; background: #e5e5e5; }
+                                #sales-summary-card .ss-kv { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+                                #sales-summary-card .ss-kv.line { border-top: 1px solid #000; margin-top: 3px; padding-top: 4px; }
+                                #sales-summary-card .it { width: 100%; border-collapse: collapse; table-layout: fixed; }
+                                #sales-summary-card .it th { background: #e5e5e5; font-weight: 700; padding: 5px 6px; border-top: 1px solid #000; border-bottom: 1px solid #000; text-align: left; font-size: 12px; }
+                                #sales-summary-card .it td { padding: 3px 6px; vertical-align: top; overflow-wrap: anywhere; }
+                                #sales-summary-card .it .c { text-align: center; }
+                                #sales-summary-card .it .r { text-align: right; }
+                                #sales-summary-card .it .code { font-size: 11.5px; }
+                                #sales-summary-card .it .grp td { font-weight: 700; text-decoration: underline; padding-top: 8px; }
+                                #sales-summary-card .it .st td { font-weight: 600; }
+                                #sales-summary-card .it .st td.num { border-top: 1px solid #000; }
+                                #sales-summary-card .it .tot td { font-weight: 800; border-top: 2px solid #000; padding-top: 5px; }
+                                #sales-summary-card .stamp { border: 3px double #000; padding: 4px 12px; text-align: center; font-weight: 800; }
                             `), /* @__PURE__ */ React.createElement("div", {
-    className: "flex justify-between items-start pb-3",
-    style: { borderBottom: "3px double #000" }
-  }, /* @__PURE__ */ React.createElement("div", {
-    className: "flex items-center gap-4"
-  }, /* @__PURE__ */ React.createElement("div", {
-    style: { width: 54, height: 54, border: "2px solid #000", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }
-  }, /* @__PURE__ */ React.createElement(HondaNextLogo, {
-    color: "#000000",
-    size: 36,
-    showWord: false
-  })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", {
-    style: { fontSize: 20, fontWeight: 800, letterSpacing: "0.02em" }
-  }, "AT HONDA GROUP"), /* @__PURE__ */ React.createElement("div", {
-    style: { fontSize: 13 }
-  }, "ผู้จำหน่ายรถยนต์ฮอนด้าอย่างเป็นทางการ"))), /* @__PURE__ */ React.createElement("div", {
-    className: "text-right"
-  }, /* @__PURE__ */ React.createElement("div", {
-    style: { fontSize: 22, fontWeight: 800 }
-  }, "ใบสรุปการขาย"), /* @__PURE__ */ React.createElement("div", {
-    style: { fontSize: 12 }
-  }, "SALES SUMMARY"), /* @__PURE__ */ React.createElement("div", {
-    style: { fontSize: 11, marginTop: 4, border: "1px solid #000", display: "inline-block", padding: "1px 8px" }
-  }, "เอกสารภายใน · INTERNAL USE ONLY"))), /* @__PURE__ */ React.createElement("table", {
-    className: "doc-t",
-    style: { marginTop: 12 }
-  }, /* @__PURE__ */ React.createElement("tbody", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", {
-    style: { width: "16%" }
-  }, "เลขที่เอกสาร"), /* @__PURE__ */ React.createElement("td", {
-    style: { width: "34%" }
-  }, "SS-", new Date().toISOString().slice(0, 10).replace(/-/g, ""), "-", String((bookingData?.customerPhone || "").replace(/\D/g, "").slice(-4) || "0000")), /* @__PURE__ */ React.createElement("th", {
-    style: { width: "16%" }
-  }, "วันที่"), /* @__PURE__ */ React.createElement("td", null, formatThaiDate(new Date))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "ชื่อลูกค้า"), /* @__PURE__ */ React.createElement("td", null, bookingData?.customerName || customerName || pendingFileName || "-"), /* @__PURE__ */ React.createElement("th", null, "เบอร์โทรลูกค้า"), /* @__PURE__ */ React.createElement("td", null, bookingData?.customerPhone || "-")), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "ที่ปรึกษาการขาย"), /* @__PURE__ */ React.createElement("td", null, consultantName || "-"), /* @__PURE__ */ React.createElement("th", null, "ติดต่อ"), /* @__PURE__ */ React.createElement("td", null, [consultantPhone, consultantLine ? `LINE ${consultantLine}` : ""].filter(Boolean).join(" · ") || "-")), bookingData?.bookingDate && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "วันที่จอง"), /* @__PURE__ */ React.createElement("td", null, formatThaiDate(bookingData.bookingDate)), /* @__PURE__ */ React.createElement("th", null, "แคมเปญเดือน"), /* @__PURE__ */ React.createElement("td", null, cfgMonthText(campaign?.month || AT_ACTIVE.month))))), /* @__PURE__ */ React.createElement("div", {
-    className: "doc-h"
-  }, "1. รายละเอียดรถยนต์และราคา"), /* @__PURE__ */ React.createElement("table", {
-    className: "doc-t"
-  }, /* @__PURE__ */ React.createElement("tbody", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", {
-    style: { width: "16%" }
-  }, "รุ่น"), /* @__PURE__ */ React.createElement("td", {
-    style: { width: "34%" }
-  }, uiModelShort(uiModel)), /* @__PURE__ */ React.createElement("th", {
-    style: { width: "16%" }
-  }, "เกรด"), /* @__PURE__ */ React.createElement("td", null, grade?.name || "-")), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "สี"), /* @__PURE__ */ React.createElement("td", null, color?.name || "-"), /* @__PURE__ */ React.createElement("th", null, "แคมเปญ"), /* @__PURE__ */ React.createElement("td", {
-    style: { fontSize: 12 }
-  }, campaign?.name || "-")))), /* @__PURE__ */ React.createElement("table", {
-    className: "doc-t",
-    style: { marginTop: 6 }
-  }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "รายการ"), /* @__PURE__ */ React.createElement("th", {
-    className: "num",
-    style: { width: "22%" }
-  }, "จำนวนเงิน (บาท)"))), /* @__PURE__ */ React.createElement("tbody", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "ราคารถ"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(carPrice))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "ค่าสี"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(colorPriceVal))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, priceAdjustment < 0 ? "ส่วนลดราคารถ" : "ปรับราคา / ซับดาวน์"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, priceAdjustment < 0 ? "-" : "", formatCurrency(Math.abs(priceAdjustment)))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    style: { fontWeight: 700 }
-  }, "ราคาสุทธิ"), /* @__PURE__ */ React.createElement("td", {
-    className: "num",
-    style: { fontWeight: 700 }
-  }, formatCurrency(netPrice))))), /* @__PURE__ */ React.createElement("div", {
-    className: "doc-h"
-  }, "2. เงื่อนไขการชำระเงิน"), /* @__PURE__ */ React.createElement("table", {
-    className: "doc-t"
-  }, /* @__PURE__ */ React.createElement("tbody", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", {
-    style: { width: "16%" }
-  }, "ประเภทการซื้อ"), /* @__PURE__ */ React.createElement("td", {
-    style: { width: "34%" }
-  }, salesSummaryPurchaseText), /* @__PURE__ */ React.createElement("th", {
-    style: { width: "16%" }
-  }, "สถาบันการเงิน"), /* @__PURE__ */ React.createElement("td", null, salesSummaryFinanceCompany)), !salesSummaryIsCash && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "เงินดาวน์"), /* @__PURE__ */ React.createElement("td", null, formatCurrency(downAmount), " บาท (", parseFloat(Number(downPct).toFixed(2)), "%)"), /* @__PURE__ */ React.createElement("th", null, "ยอดจัดไฟแนนซ์"), /* @__PURE__ */ React.createElement("td", null, formatCurrency(financeAmount), " บาท")), !salesSummaryIsCash && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "จำนวนงวด"), /* @__PURE__ */ React.createElement("td", null, salesSummaryTerm, " งวด (", paymentType === "beginning" ? "ผ่อนต้นงวด" : "ผ่อนปลายงวด", ")"), /* @__PURE__ */ React.createElement("th", null, "ดอกเบี้ย / ค่างวด"), /* @__PURE__ */ React.createElement("td", null, salesSummaryRateText, " · ", salesSummaryMonthlyText)), !salesSummaryIsCash && salesSummaryInstallment?.balloon > 0 && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "ชำระก้อนสุดท้าย"), /* @__PURE__ */ React.createElement("td", null, formatCurrency(salesSummaryInstallment.balloon), " บาท"), /* @__PURE__ */ React.createElement("th", null, "กลุ่มลูกค้า"), /* @__PURE__ */ React.createElement("td", null, customerType === "general" ? "ทั่วไป" : customerType === "loyal_15" ? "First Jobber" : customerType === "loyal_30" ? "You're the One" : customerType)))), /* @__PURE__ */ React.createElement("div", {
-    className: "grid grid-cols-2 gap-5"
-  }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", {
-    className: "doc-h"
-  }, "3. ค่าใช้จ่ายวันรับรถ"), /* @__PURE__ */ React.createElement("table", {
-    className: "doc-t"
-  }, /* @__PURE__ */ React.createElement("tbody", null, salesSummaryIsCash && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "ราคารถยนต์ (ซื้อสด)"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(netPrice))), !salesSummaryIsCash && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "เงินดาวน์"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(downAmount))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "ค่าเบี้ยประกันภัย"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, insuranceCosts.customer > 0 ? formatCurrency(insuranceCosts.customer) : expenses.insurance || "-")), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "ค่าจดทะเบียน"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, registrationPayer === "dealer" ? "เอทีแถม" : formatCurrency(registrationCosts.customer))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "ค่ามัดจำป้ายแดง"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(expenses.redPlate))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "ค่าอุปกรณ์ตกแต่ง (ลูกค้าซื้อเพิ่ม)"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(expenses.accessories))), getExpenseValue(expenses.vatDiscount) > 0 && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "VAT"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(expenses.vatDiscount))), getExpenseValue(expenses.othersAdd) > 0 && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, expenses.othersAddLabel || "อื่นๆ"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(expenses.othersAdd))), paymentType === "beginning" && !salesSummaryIsCash && !isDSP && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "ค่างวดงวดแรก"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(expenses.firstInstallment))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "หัก ส่วนลดเงินสด"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, docNeg(expenses.cashDiscount))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "หัก มัดจำ"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, docNeg(expenses.deposit))), getExpenseValue(expenses.othersDeduct) > 0 && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "หัก อื่นๆ"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, docNeg(expenses.othersDeduct))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    style: { fontWeight: 800 }
-  }, "รวมชำระวันรับรถ"), /* @__PURE__ */ React.createElement("td", {
-    className: "num",
-    style: { fontWeight: 800 }
-  }, formatCurrency(salesSummaryTotalOnDelivery)))))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", {
-    className: "doc-h"
-  }, "4. Margin และ FOC (ภายใน)"), /* @__PURE__ */ React.createElement("table", {
-    className: "doc-t"
-  }, /* @__PURE__ */ React.createElement("tbody", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "Margin รถ ", Math.round(atMarginPct * 1000) / 10, "%"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(marginCar3Pct))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "AT แคมเปญ (Step)"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(atStepAmount))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "Honda แคมเปญ"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(marginCampaign))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "สิทธิพิเศษ Honda"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(privAmount))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "ซับดาวน์ / อัพราคา"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(extraSubDownMargin))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "Margin เพิ่มเติม"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(atHondaMargin))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    style: { fontWeight: 700 }
-  }, "รวม Margin"), /* @__PURE__ */ React.createElement("td", {
-    className: "num",
-    style: { fontWeight: 700 }
-  }, formatCurrency(totalMarginSum))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "หัก ส่วนลดให้ลูกค้า"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, docNeg(customerTotalDiscount))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", null, "หัก FOC รวม (ของแถม ", formatCurrency(totalGiftValue), " · ประกัน ", formatCurrency(effectiveDealerInsuranceCost), " · จดทะเบียน ", formatCurrency(effectiveDealerRegistrationCost), ")"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, docNeg(totalFocExpense))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    style: { fontWeight: 800 }
-  }, "กำไรคงเหลือสุทธิ"), /* @__PURE__ */ React.createElement("td", {
-    className: "num",
-    style: { fontWeight: 800 }
-  }, remainingMarginProfit < 0 ? "(" + formatCurrency(Math.abs(remainingMarginProfit)) + ")" : formatCurrency(remainingMarginProfit))))), /* @__PURE__ */ React.createElement("table", {
-    className: "doc-t",
-    style: { marginTop: 6 }
-  }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "ประกันภัยชั้น 1"), /* @__PURE__ */ React.createElement("th", null, "ผู้รับผิดชอบ"), /* @__PURE__ */ React.createElement("th", {
-    className: "num"
-  }, "เบี้ย (บาท)"))), /* @__PURE__ */ React.createElement("tbody", null, Array.from({ length: insuranceDuration }).map((_, i) => {
-    const year = i + 1;
-    const payer = insurancePayers[year] || "customer";
-    const premium = (INSURANCE_PREMIUMS[MODEL_MAPPING[uiModel]]?.[insuranceDuration] || [])[i] || 0;
-    return /* @__PURE__ */ React.createElement("tr", {
-      key: year
-    }, /* @__PURE__ */ React.createElement("td", null, "ปีที่ ", year), /* @__PURE__ */ React.createElement("td", null, payer === "honda" ? "ฮอนด้าแถม" : payer === "dealer" ? "เอทีแถม" : "ลูกค้าชำระ"), /* @__PURE__ */ React.createElement("td", {
+      className: "flex justify-between items-start pb-3",
+      style: { borderBottom: "3px double #000" }
+    }, /* @__PURE__ */ React.createElement("div", {
+      className: "flex items-center gap-3"
+    }, /* @__PURE__ */ React.createElement(HondaNextLogo, {
+      color: "#000000",
+      size: 46,
+      showWord: false
+    }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", {
+      style: { fontSize: 20, fontWeight: 800, letterSpacing: "0.02em" }
+    }, "AT HONDA GROUP", branch ? /* @__PURE__ */ React.createElement("span", {
+      style: { fontSize: 14, fontWeight: 600 }
+    }, " · สาขา ", branch) : null), /* @__PURE__ */ React.createElement("div", {
+      style: { fontSize: 15, fontWeight: 700 }
+    }, "ใบสรุปการขาย (ฝ่ายขาย) ", /* @__PURE__ */ React.createElement("span", {
+      style: { fontSize: 12, fontWeight: 400 }
+    }, "· SALES SUMMARY · เอกสารภายใน ห้ามส่งให้ลูกค้า")))), /* @__PURE__ */ React.createElement("div", {
+      className: "stamp"
+    }, /* @__PURE__ */ React.createElement("div", {
+      style: { fontSize: 17 }
+    }, "ใบสรุปชั่วคราว"), /* @__PURE__ */ React.createElement("div", {
+      style: { fontSize: 12, fontWeight: 600 }
+    }, "รอผู้จัดการอนุมัติ · ยังใช้เบิกค่าคอมไม่ได้"))), /* @__PURE__ */ React.createElement("div", {
+      className: "info",
+      style: { marginTop: 12 }
+    }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "เลขที่"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, docNo)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "วันที่"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, formatThaiDate(new Date))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "วันที่จอง"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, bookingData?.bookingDate ? formatThaiDate(bookingData.bookingDate) : "-")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "ชื่อลูกค้า"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, bookingData?.customerName || customerName || "-")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "โทรศัพท์"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, bookingData?.customerPhone || "-")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "กำหนดรับรถ"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, bookingData?.deliveryMonth && bookingData?.deliveryYear ? `${bookingData.deliveryMonth}/${bookingData.deliveryYear}` : "-")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "ที่ปรึกษาการขาย"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, consultantName || "-")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "ติดต่อ"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, [consultantPhone, consultantLine ? `LINE ${consultantLine}` : ""].filter(Boolean).join(" · ") || "-")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "เลขที่จอง (IDS)"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, "-"))), /* @__PURE__ */ React.createElement("div", {
+      className: "sec"
+    }, /* @__PURE__ */ React.createElement("span", null, "รายละเอียดรถยนต์"), /* @__PURE__ */ React.createElement("span", {
+      style: { fontWeight: 400, fontSize: 12 }
+    }, "แคมเปญเดือน ", cfgMonthText(campaign?.month || AT_ACTIVE.month))), /* @__PURE__ */ React.createElement("div", {
+      className: "info",
+      style: { gridTemplateColumns: "1.25fr 1fr 1fr" }
+    }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "แบบ (รุ่น)"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, uiModelShort(uiModel), " ", grade?.name || "")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "สี"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, color?.name || "-")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "เงินจอง"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, getExpenseValue(expenses.deposit) ? `${formatCurrency(expenses.deposit)} บาท` : "-"))), /* @__PURE__ */ React.createElement("div", {
+      className: "sec"
+    }, /* @__PURE__ */ React.createElement("span", null, "ราคา · Margin · FOC"), /* @__PURE__ */ React.createElement("span", {
+      style: { fontWeight: 400, fontSize: 12 }
+    }, "หน่วย: บาท")), /* @__PURE__ */ React.createElement("div", {
+      className: "cols"
+    }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h4", null, "ราคารถ"), /* @__PURE__ */ React.createElement(KV, {
+      k: "ราคา (ตามใบราคา)",
+      v: formatCurrency(carPrice)
+    }), /* @__PURE__ */ React.createElement(KV, {
+      k: "ค่าสี",
+      v: dash(colorPriceVal)
+    }), /* @__PURE__ */ React.createElement(KV, {
+      k: "อัพราคา / ซับดาวน์",
+      v: dash(extraSubDownMargin)
+    }), /* @__PURE__ */ React.createElement(KV, {
+      k: isCash ? "ส่วนลดเงินสด" : "ส่วนลดราคารถ / ดาวน์",
+      v: cashDisc ? `-${formatCurrency(cashDisc)}` : "-"
+    }), /* @__PURE__ */ React.createElement("div", {
+      className: "ss-kv line"
+    }, /* @__PURE__ */ React.createElement("span", {
+      className: "b"
+    }, "ราคารถขาย (Inv.)"), /* @__PURE__ */ React.createElement("span", {
+      className: "num b"
+    }, formatCurrency(invPrice - getExpenseValue(expenses.cashDiscount)))), /* @__PURE__ */ React.createElement(KV, {
+      k: "ขายอุปกรณ์ (ลูกค้าซื้อ)",
+      v: dash(accSold)
+    })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h4", null, "Margin"), /* @__PURE__ */ React.createElement(KV, {
+      k: `Margin รถ ${Math.round(atMarginPct * 1000) / 10}%`,
+      v: dash(marginCar3Pct)
+    }), /* @__PURE__ */ React.createElement(KV, {
+      k: "AT แคมเปญ (Step)",
+      v: dash(atStepAmount)
+    }), /* @__PURE__ */ React.createElement(KV, {
+      k: "Honda แคมเปญ (RS Honda)",
+      v: dash(marginCampaign)
+    }), /* @__PURE__ */ React.createElement(KV, {
+      k: "สิทธิพิเศษ Honda",
+      v: dash(privAmount)
+    }), /* @__PURE__ */ React.createElement(KV, {
+      k: "อัพราคา / ซับดาวน์",
+      v: dash(extraSubDownMargin)
+    }), /* @__PURE__ */ React.createElement(KV, {
+      k: "Margin เพิ่มเติม",
+      v: dash(atHondaMargin)
+    }), /* @__PURE__ */ React.createElement("div", {
+      className: "ss-kv line"
+    }, /* @__PURE__ */ React.createElement("span", {
+      className: "b"
+    }, "รวม Margin"), /* @__PURE__ */ React.createElement("span", {
+      className: "num b"
+    }, formatCurrency(totalMarginSum)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h4", null, "FOC"), /* @__PURE__ */ React.createElement(KV, {
+      k: "รวม Margin",
+      v: formatCurrency(totalMarginSum)
+    }), /* @__PURE__ */ React.createElement(KV, {
+      k: "FOC (Honda)",
+      v: dash(focHonda)
+    }), /* @__PURE__ */ React.createElement(KV, {
+      k: "FOC (Sub)",
+      v: dash(focSub)
+    }), /* @__PURE__ */ React.createElement(KV, {
+      k: "FOC อื่น ๆ",
+      v: dash(focOther)
+    }), /* @__PURE__ */ React.createElement(KV, {
+      k: "FOC ใช้ไป",
+      v: formatCurrency(focUsed),
+      b: true
+    }), /* @__PURE__ */ React.createElement("div", {
+      className: "ss-kv line",
+      style: { fontSize: 14 }
+    }, /* @__PURE__ */ React.createElement("span", {
+      className: "b"
+    }, "Margin คงเหลือ"), /* @__PURE__ */ React.createElement("span", {
+      className: "num b"
+    }, money(left))))), /* @__PURE__ */ React.createElement("div", {
+      className: "sec"
+    }, /* @__PURE__ */ React.createElement("span", null, "เงื่อนไขการซื้อ")), /* @__PURE__ */ React.createElement("div", {
+      className: "info"
+    }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "เงื่อนไข"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, isCash ? "ซื้อสด" : `จัดไฟแนนซ์ · ${salesSummaryPurchaseText}`)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "สถาบันการเงิน"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, salesSummaryFinanceCompany)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "ดาวน์"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, isCash ? "-" : `${parseFloat(Number(downPct).toFixed(2))}% · ${formatCurrency(downAmount)} บาท`)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "ยอดจัด"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, isCash ? "-" : `${formatCurrency(financeAmount)} บาท`)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "ดอกเบี้ย / งวด"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, isCash ? "-" : `${salesSummaryRateText} · ${salesSummaryTerm} งวด`)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "ค่างวด"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, isCash ? "-" : `${salesSummaryMonthlyText} (${paymentType === "beginning" ? "ผ่อนต้นงวด" : "ผ่อนปลายงวด"})`))), /* @__PURE__ */ React.createElement("div", {
+      className: "box",
+      style: { borderTop: 0, padding: "5px 10px" }
+    }, /* @__PURE__ */ React.createElement("span", {
+      style: { color: "#444" }
+    }, "รายละเอียดแคมเปญ"), "  ", /* @__PURE__ */ React.createElement("b", null, campaign?.name || "ไม่ใช้แคมเปญ Honda"), !isCash && salesSummaryInstallment?.balloon > 0 ? ` · ชำระก้อนสุดท้าย ${formatCurrency(salesSummaryInstallment.balloon)} บาท` : ""), /* @__PURE__ */ React.createElement("div", {
+      className: "sec"
+    }, /* @__PURE__ */ React.createElement("span", null, "รายการอุปกรณ์และของแถม")), /* @__PURE__ */ React.createElement("table", {
+      className: "it"
+    }, /* @__PURE__ */ React.createElement("colgroup", null, /* @__PURE__ */ React.createElement("col", {
+      style: { width: 44 }
+    }), /* @__PURE__ */ React.createElement("col", {
+      style: { width: 150 }
+    }), /* @__PURE__ */ React.createElement("col", null), /* @__PURE__ */ React.createElement("col", {
+      style: { width: 44 }
+    }), /* @__PURE__ */ React.createElement("col", {
+      style: { width: 92 }
+    }), /* @__PURE__ */ React.createElement("col", {
+      style: { width: 92 }
+    }), /* @__PURE__ */ React.createElement("col", {
+      style: { width: 92 }
+    }), /* @__PURE__ */ React.createElement("col", {
+      style: { width: 100 }
+    })), /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", {
+      className: "c"
+    }, "ลำดับ"), /* @__PURE__ */ React.createElement("th", null, "รหัส"), /* @__PURE__ */ React.createElement("th", null, "คำอธิบาย"), /* @__PURE__ */ React.createElement("th", {
+      className: "c"
+    }, "Qty"), /* @__PURE__ */ React.createElement("th", {
+      className: "r"
+    }, "ราคา/หน่วย"), /* @__PURE__ */ React.createElement("th", {
+      className: "r"
+    }, "จำนวนเงิน"), /* @__PURE__ */ React.createElement("th", {
+      className: "r"
+    }, "FOC/หน่วย"), /* @__PURE__ */ React.createElement("th", {
+      className: "r"
+    }, "มูลค่า FOC"))), /* @__PURE__ */ React.createElement("tbody", null, extraItems.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Group, {
+      title: "ขายอุปกรณ์ (ลูกค้าซื้อเพิ่ม)"
+    }), extraItems.map((x, i) => ItemRow({ k: "x" + i, sale: true, r: { g: x.name, code: x.part, price: Number(x.price) || 0 } })), /* @__PURE__ */ React.createElement(SubTotal, {
+      sale: true,
+      label: "รวมขายอุปกรณ์",
+      v: accSold
+    })), rows.some((r) => r.grp === "honda") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Group, {
+      title: "แถมอุปกรณ์ Honda"
+    }), rows.filter((r) => r.grp === "honda").map((r, i) => ItemRow({ k: "h" + i, r })), /* @__PURE__ */ React.createElement(SubTotal, {
+      label: "รวมมูลค่าแถมอุปกรณ์ Honda",
+      v: focHonda
+    })), rows.some((r) => r.grp === "sub") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Group, {
+      title: "แถมอุปกรณ์ Sub"
+    }), rows.filter((r) => r.grp === "sub").map((r, i) => ItemRow({ k: "s" + i, r })), /* @__PURE__ */ React.createElement(SubTotal, {
+      label: "รวมมูลค่าแถมอุปกรณ์ Sub",
+      v: focSub
+    })), others.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Group, {
+      title: "แถมอื่น ๆ"
+    }), others.map((r, i) => ItemRow({ k: "o" + i, r })), /* @__PURE__ */ React.createElement(SubTotal, {
+      label: "รวมมูลค่าแถมอื่น ๆ",
+      v: focOther
+    })), rows.some((r) => r.grp === "std") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Group, {
+      title: "บริการมาตรฐาน (ไม่มีทุน)"
+    }), rows.filter((r) => r.grp === "std").map((r, i) => ItemRow({ k: "d" + i, r }))), !rows.length && !others.length && !extraItems.length && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
+      colSpan: 8,
+      className: "c muted",
+      style: { padding: 10 }
+    }, "— ไม่มีรายการ —")), /* @__PURE__ */ React.createElement("tr", {
+      className: "tot"
+    }, /* @__PURE__ */ React.createElement("td", {
+      colSpan: 7,
+      className: "r"
+    }, "รวมมูลค่า FOC ทั้งหมด"), /* @__PURE__ */ React.createElement("td", {
       className: "num"
-    }, formatCurrency(premium)));
-  }))))), /* @__PURE__ */ React.createElement("div", {
-    className: "doc-h"
-  }, "5. รายการของแถม (", totalGiftCount, " รายการ)"), /* @__PURE__ */ React.createElement("table", {
-    className: "doc-t"
-  }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", {
-    style: { width: 44 }
-  }, "ลำดับ"), /* @__PURE__ */ React.createElement("th", null, "รายการ"), /* @__PURE__ */ React.createElement("th", {
-    className: "num",
-    style: { width: "18%" }
-  }, "ทุน FOC (บาท)"))), /* @__PURE__ */ React.createElement("tbody", null, gifts.filter((g) => String(g || "").trim()).length === 0 && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    colSpan: 3,
-    style: { textAlign: "center" }
-  }, "— ไม่มีรายการของแถม —")), gifts.map((g, i) => ({ g, v: giftValues[i] })).filter((x) => String(x.g || "").trim()).map((x, n) => /* @__PURE__ */ React.createElement("tr", {
-    key: n
-  }, /* @__PURE__ */ React.createElement("td", {
-    style: { textAlign: "center" }
-  }, n + 1), /* @__PURE__ */ React.createElement("td", null, x.g), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, giftAutoKind(x.g) ? "คิดในประกัน/จดทะเบียน" : formatCurrency(x.v)))))), extraItems.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", {
-    className: "doc-h"
-  }, "6. อุปกรณ์ที่ลูกค้าซื้อเพิ่ม (", extraItems.length, " รายการ)"), /* @__PURE__ */ React.createElement("table", {
-    className: "doc-t"
-  }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", {
-    style: { width: 44 }
-  }, "ลำดับ"), /* @__PURE__ */ React.createElement("th", null, "รายการ"), /* @__PURE__ */ React.createElement("th", {
-    style: { width: "18%" }
-  }, "Part No."), /* @__PURE__ */ React.createElement("th", {
-    className: "num",
-    style: { width: "18%" }
-  }, "ราคา (บาท)"))), /* @__PURE__ */ React.createElement("tbody", null, extraItems.map((x, n) => /* @__PURE__ */ React.createElement("tr", {
-    key: n
-  }, /* @__PURE__ */ React.createElement("td", {
-    style: { textAlign: "center" }
-  }, n + 1), /* @__PURE__ */ React.createElement("td", null, x.name), /* @__PURE__ */ React.createElement("td", null, x.part || "-"), /* @__PURE__ */ React.createElement("td", {
-    className: "num"
-  }, formatCurrency(x.price)))), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
-    colSpan: 3,
-    style: { fontWeight: 700 }
-  }, "รวม"), /* @__PURE__ */ React.createElement("td", {
-    className: "num",
-    style: { fontWeight: 700 }
-  }, formatCurrency(extraTotal)))))), /* @__PURE__ */ React.createElement("div", {
-    className: "grid grid-cols-3 gap-8",
-    style: { marginTop: 44 }
-  }, ["ที่ปรึกษาการขาย", "ผู้จัดการฝ่ายขาย", "ผู้อนุมัติ"].map((t, i) => /* @__PURE__ */ React.createElement("div", {
-    key: t,
-    className: "text-center",
-    style: { fontSize: 13 }
-  }, /* @__PURE__ */ React.createElement("div", {
-    style: { borderBottom: "1px dotted #000", height: 36 }
-  }), /* @__PURE__ */ React.createElement("div", {
-    style: { marginTop: 6 }
-  }, "( ", i === 0 && consultantName ? consultantName : " ".repeat(36), " )"), /* @__PURE__ */ React.createElement("div", {
-    style: { fontWeight: 700, marginTop: 2 }
-  }, t), /* @__PURE__ */ React.createElement("div", {
-    style: { marginTop: 2 }
-  }, "วันที่ ......../......../........")))), /* @__PURE__ */ React.createElement("div", {
-    style: { fontSize: 11, marginTop: 22, borderTop: "1px solid #000", paddingTop: 6 }
-  }, "เอกสารนี้สรุปจากใบเสนอราคา ณ วันที่ ", formatThaiDate(new Date), " ใช้ตรวจสอบรายการขาย ค่าใช้จ่ายลูกค้า Margin และ FOC ภายในบริษัท ห้ามส่งให้ลูกค้า"))));
+    }, formatCurrency(focUsed))))), /* @__PURE__ */ React.createElement("div", {
+      className: "sec"
+    }, /* @__PURE__ */ React.createElement("span", null, "ค่าใช้จ่ายลูกค้าวันรับรถ"), /* @__PURE__ */ React.createElement("span", {
+      style: { fontWeight: 400, fontSize: 12 }
+    }, "รวมชำระ ", /* @__PURE__ */ React.createElement("b", {
+      style: { fontSize: 14 }
+    }, formatCurrency(salesSummaryTotalOnDelivery)), " บาท")), /* @__PURE__ */ React.createElement("div", {
+      className: "box",
+      style: { padding: "6px 12px", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", columnGap: 22 }
+    }, [
+      [isCash ? "ราคารถ (ซื้อสด)" : "เงินดาวน์", isCash ? netPrice : downAmount],
+      ["ค่าเบี้ยประกันภัย", insuranceCosts.customer > 0 ? insuranceCosts.customer : null, insuranceCosts.customer > 0 ? null : insuranceCosts.freeYears ? `แถม ${insuranceCosts.freeYears} ปี` : expenses.insurance || "-"],
+      ["ค่าจดทะเบียน", registrationPayer === "dealer" ? null : registrationCosts.customer, registrationPayer === "dealer" ? "AT แถม" : null],
+      ["มัดจำป้ายแดง", getExpenseValue(expenses.redPlate)],
+      ["อุปกรณ์ (ลูกค้าซื้อ)", getExpenseValue(expenses.accessories)],
+      ...getExpenseValue(expenses.vatDiscount) > 0 ? [["VAT", getExpenseValue(expenses.vatDiscount)]] : [],
+      ...getExpenseValue(expenses.othersAdd) > 0 ? [[expenses.othersAddLabel || "อื่น ๆ", getExpenseValue(expenses.othersAdd)]] : [],
+      ...paymentType === "beginning" && !isCash && !isDSP ? [["ค่างวดงวดแรก", getExpenseValue(expenses.firstInstallment)]] : [],
+      ["หัก ส่วนลดเงินสด", -getExpenseValue(expenses.cashDiscount)],
+      ["หัก เงินจอง", -getExpenseValue(expenses.deposit)],
+      ...getExpenseValue(expenses.othersDeduct) > 0 ? [["หัก อื่น ๆ", -getExpenseValue(expenses.othersDeduct)]] : []
+    ].map(([k, v, t]) => /* @__PURE__ */ React.createElement("div", {
+      key: k,
+      className: "ss-kv"
+    }, /* @__PURE__ */ React.createElement("span", null, k), /* @__PURE__ */ React.createElement("span", {
+      className: "num"
+    }, t || (v ? v < 0 ? `-${formatCurrency(-v)}` : formatCurrency(v) : "-"))))), /* @__PURE__ */ React.createElement("div", {
+      className: "grid grid-cols-3 gap-8",
+      style: { marginTop: 40 }
+    }, [["ที่ปรึกษาการขาย", consultantName], ["ผู้จัดการฝ่ายขาย (อนุมัติ)", ""], ["ผู้บริหาร (อนุมัติ)", ""]].map(([t, n]) => /* @__PURE__ */ React.createElement("div", {
+      key: t,
+      className: "text-center"
+    }, /* @__PURE__ */ React.createElement("div", {
+      style: { borderBottom: "1px dotted #000", height: 36 }
+    }), /* @__PURE__ */ React.createElement("div", {
+      style: { marginTop: 6 }
+    }, "( ", n || " ".repeat(36), " )"), /* @__PURE__ */ React.createElement("div", {
+      style: { fontWeight: 700, marginTop: 2 }
+    }, t), /* @__PURE__ */ React.createElement("div", {
+      style: { marginTop: 2 }
+    }, "วันที่ ......../......../........")))), /* @__PURE__ */ React.createElement("div", {
+      style: { fontSize: 11, marginTop: 20, borderTop: "1px solid #000", paddingTop: 6 }
+    }, "ใบสรุปชั่วคราวจากหน้าใบเสนอราคา ณ ", formatThaiDate(new Date), " · ตัวเลขอาจเปลี่ยนได้จนกว่าผู้จัดการยืนยันในเว็บ AT stock · ใบอนุมัติเบิกค่าคอมออกจากเว็บ AT stock หลังผู้จัดการยืนยันแล้ว · เอกสารภายใน ห้ามส่งให้ลูกค้า"));
+  })()));
 };
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(/* @__PURE__ */ React.createElement(App, null));
