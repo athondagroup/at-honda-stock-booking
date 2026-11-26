@@ -39,33 +39,32 @@
                             const SubTotal = ({ label, v, sale }) => <tr className="st"><td colSpan={sale ? 5 : 7} className="r">{label}</td><td className="num b">{formatCurrency(v)}</td>{sale ? <><td></td><td></td></> : null}</tr>;
                             const Group = ({ title }) => <tr className="grp"><td></td><td colSpan={7}>{title}</td></tr>;
                             return (
-                        <div id="sales-summary-card" className="bg-white w-[1120px] h-auto relative text-black" style={{ padding: '34px 44px', fontFamily: "'Prompt', sans-serif" }}>
+                        <div id="sales-summary-card" className="bg-white w-[1120px] h-auto relative text-black" style={{ padding: '28px 40px', fontFamily: "'Prompt', sans-serif" }}>
                             <style>{`
-                                #sales-summary-card { font-size: 13px; line-height: 1.45; }
+                                #sales-summary-card { font-size: 12.5px; line-height: 1.38; }
                                 #sales-summary-card .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
                                 #sales-summary-card .b { font-weight: 700; }
                                 #sales-summary-card .muted { color: #555; }
                                 #sales-summary-card .box { border: 1px solid #000; }
-                                #sales-summary-card .sec { font-size: 13.5px; font-weight: 700; margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 2px solid #000; display: flex; justify-content: space-between; align-items: baseline; }
-                                #sales-summary-card .info { display: grid; grid-template-columns: 1.25fr 1fr 1fr; border: 1px solid #000; }
-                                #sales-summary-card .info > div { padding: 5px 10px; border-right: 1px solid #bbb; border-bottom: 1px solid #bbb; display: flex; gap: 8px; }
-                                #sales-summary-card .info > div:nth-child(3n) { border-right: 0; }
-                                #sales-summary-card .info > div:nth-last-child(-n+3) { border-bottom: 0; }
-                                #sales-summary-card .info .k { color: #444; white-space: nowrap; min-width: 92px; }
+                                #sales-summary-card .sec { font-size: 13.5px; font-weight: 700; margin: 10px 0 4px; padding-bottom: 2px; border-bottom: 1.5px solid #000; display: flex; justify-content: space-between; align-items: baseline; }
+                                #sales-summary-card .info { display: grid; grid-template-columns: 1.25fr 1fr 1fr; column-gap: 18px; }
+                                #sales-summary-card .info > div { padding: 1.5px 0; display: flex; gap: 8px; }
+                                                                                                #sales-summary-card .info .k { color: #444; white-space: nowrap; min-width: 92px; }
                                 #sales-summary-card .info .v { font-weight: 600; overflow-wrap: anywhere; }
-                                #sales-summary-card .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; border: 1px solid #000; }
-                                #sales-summary-card .cols > div { padding: 8px 12px; border-right: 1px solid #000; }
-                                #sales-summary-card .cols > div:last-child { border-right: 0; }
-                                #sales-summary-card .cols h4 { font-size: 12px; font-weight: 700; margin: 0 0 4px; padding: 2px 6px; background: #e5e5e5; }
-                                #sales-summary-card .ss-kv { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+                                #sales-summary-card .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+                                #sales-summary-card .cols > div { padding: 0 14px; border-right: 1px solid #999; }
+                                #sales-summary-card .cols > div:first-child { padding-left: 0; }
+                                #sales-summary-card .cols > div:last-child { border-right: 0; padding-right: 0; }
+                                #sales-summary-card .cols h4 { font-size: 12px; font-weight: 700; margin: 0 0 2px; text-decoration: underline; }
+                                #sales-summary-card .ss-kv { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; }
                                 #sales-summary-card .ss-kv.line { border-top: 1px solid #000; margin-top: 3px; padding-top: 4px; }
                                 #sales-summary-card .it { width: 100%; border-collapse: collapse; table-layout: fixed; }
-                                #sales-summary-card .it th { background: #e5e5e5; font-weight: 700; padding: 5px 6px; border-top: 1px solid #000; border-bottom: 1px solid #000; text-align: left; font-size: 12px; }
-                                #sales-summary-card .it td { padding: 3px 6px; vertical-align: top; overflow-wrap: anywhere; }
+                                #sales-summary-card .it th { background: #e5e5e5; font-weight: 700; padding: 3px 6px; border-top: 1px solid #000; border-bottom: 1px solid #000; text-align: left; font-size: 11.5px; }
+                                #sales-summary-card .it td { padding: 1px 6px; vertical-align: top; overflow-wrap: anywhere; }
                                 #sales-summary-card .it .c { text-align: center; }
                                 #sales-summary-card .it .r { text-align: right; }
                                 #sales-summary-card .it .code { font-size: 11.5px; }
-                                #sales-summary-card .it .grp td { font-weight: 700; text-decoration: underline; padding-top: 8px; }
+                                #sales-summary-card .it .grp td { font-weight: 700; text-decoration: underline; padding-top: 4px; }
                                 #sales-summary-card .it .st td { font-weight: 600; }
                                 #sales-summary-card .it .st td.num { border-top: 1px solid #000; }
                                 #sales-summary-card .it .tot td { font-weight: 800; border-top: 2px solid #000; padding-top: 5px; }
@@ -73,13 +72,10 @@
                             `}</style>
 
                             {/* หัวเอกสาร */}
-                            <div className="flex justify-between items-start pb-3" style={{ borderBottom: '3px double #000' }}>
-                                <div className="flex items-center gap-3">
-                                    <HondaNextLogo color="#000000" size={46} showWord={false} />
-                                    <div>
-                                        <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '0.02em' }}>AT HONDA GROUP{branch ? <span style={{ fontSize: 14, fontWeight: 600 }}> · สาขา {branch}</span> : null}</div>
-                                        <div style={{ fontSize: 15, fontWeight: 700 }}>ใบสรุปการขาย (ฝ่ายขาย) <span style={{ fontSize: 12, fontWeight: 400 }}>· SALES SUMMARY · เอกสารภายใน ห้ามส่งให้ลูกค้า</span></div>
-                                    </div>
+                            <div className="flex justify-between items-start pb-2" style={{ borderBottom: '2px solid #000' }}>
+                                <div>
+                                    <div style={{ fontSize: 17, fontWeight: 800 }}>{AT_COMPANY[branch] || 'บริษัท เอที ฮอนด้า ออโตโมบิล จำกัด'}</div>
+                                    <div style={{ fontSize: 15, fontWeight: 700 }}>ใบสรุปการขาย (ฝ่ายขาย) <span style={{ fontSize: 12, fontWeight: 400 }}>· SALES SUMMARY · เอกสารภายใน ห้ามส่งให้ลูกค้า</span></div>
                                 </div>
                                 <div className="stamp">
                                     <div style={{ fontSize: 17 }}>ใบสรุปชั่วคราว</div>
@@ -88,7 +84,7 @@
                             </div>
 
                             {/* ข้อมูลเอกสาร / ลูกค้า */}
-                            <div className="info" style={{ marginTop: 12 }}>
+                            <div className="info" style={{ marginTop: 8 }}>
                                 <div><span className="k">เลขที่</span><span className="v">{docNo}</span></div>
                                 <div><span className="k">วันที่</span><span className="v">{formatThaiDate(new Date())}</span></div>
                                 <div><span className="k">วันที่จอง</span><span className="v">{bookingData?.bookingDate ? formatThaiDate(bookingData.bookingDate) : '-'}</span></div>
@@ -144,14 +140,14 @@
                             {/* เงื่อนไขการซื้อ */}
                             <div className="sec"><span>เงื่อนไขการซื้อ</span></div>
                             <div className="info">
-                                <div><span className="k">เงื่อนไข</span><span className="v">{isCash ? 'ซื้อสด' : `จัดไฟแนนซ์ · ${salesSummaryPurchaseText}`}</span></div>
+                                <div style={{ gridColumn: 'span 3' }}><span className="k">เงื่อนไข</span><span className="v">{isCash ? 'ซื้อสด' : `จัดไฟแนนซ์ · ${salesSummaryPurchaseText} ${salesSummaryRateText} · ยอดสินเชื่อ ${formatCurrency(financeAmount)} บาท`}</span></div>
                                 <div><span className="k">สถาบันการเงิน</span><span className="v">{salesSummaryFinanceCompany}</span></div>
                                 <div><span className="k">ดาวน์</span><span className="v">{isCash ? '-' : `${parseFloat(Number(downPct).toFixed(2))}% · ${formatCurrency(downAmount)} บาท`}</span></div>
-                                <div><span className="k">ยอดจัด</span><span className="v">{isCash ? '-' : `${formatCurrency(financeAmount)} บาท`}</span></div>
                                 <div><span className="k">ดอกเบี้ย / งวด</span><span className="v">{isCash ? '-' : `${salesSummaryRateText} · ${salesSummaryTerm} งวด`}</span></div>
                                 <div><span className="k">ค่างวด</span><span className="v">{isCash ? '-' : `${salesSummaryMonthlyText} (${paymentType === 'beginning' ? 'ผ่อนต้นงวด' : 'ผ่อนปลายงวด'})`}</span></div>
+                                <div><span className="k">คอมไฟแนนซ์</span><span className="v">{isCash ? '-' : <span style={{ fontWeight: 400 }}>รอยืนยันสูตร</span>}</span></div>
                             </div>
-                            <div className="box" style={{ borderTop: 0, padding: '5px 10px' }}><span style={{ color: '#444' }}>รายละเอียดแคมเปญ</span>&nbsp;&nbsp;<b>{campaign?.name || 'ไม่ใช้แคมเปญ Honda'}</b>{!isCash && salesSummaryInstallment?.balloon > 0 ? ` · ชำระก้อนสุดท้าย ${formatCurrency(salesSummaryInstallment.balloon)} บาท` : ''}</div>
+                            <div style={{ padding: '1.5px 0' }}><span style={{ color: '#444' }}>รายละเอียดแคมเปญ</span>&nbsp;&nbsp;<b>{campaign?.name || 'ไม่ใช้แคมเปญ Honda'}</b>{!isCash && salesSummaryInstallment?.balloon > 0 ? ` · ชำระก้อนสุดท้าย ${formatCurrency(salesSummaryInstallment.balloon)} บาท` : ''}</div>
 
                             {/* รายการ */}
                             <div className="sec"><span>รายการอุปกรณ์และของแถม</span></div>
@@ -179,10 +175,7 @@
                                         {others.map((r, i) => ItemRow({ k: 'o' + i, r: r }))}
                                         <SubTotal label="รวมมูลค่าแถมอื่น ๆ" v={focOther} />
                                     </>}
-                                    {rows.some(r => r.grp === 'std') && <>
-                                        <Group title="บริการมาตรฐาน (ไม่มีทุน)" />
-                                        {rows.filter(r => r.grp === 'std').map((r, i) => ItemRow({ k: 'd' + i, r: r }))}
-                                    </>}
+                                    {rows.some(r => r.grp === 'std') && <tr className="grp"><td></td><td colSpan={7} style={{ textDecoration: 'none' }}><u>บริการมาตรฐาน (ไม่มีทุน)</u> <span style={{ fontWeight: 400 }}>{rows.filter(r => r.grp === 'std').map(r => r.g).join(' · ')}</span></td></tr>}
                                     {!rows.length && !others.length && !extraItems.length && <tr><td colSpan={8} className="c muted" style={{ padding: 10 }}>— ไม่มีรายการ —</td></tr>}
                                     <tr className="tot"><td colSpan={7} className="r">รวมมูลค่า FOC ทั้งหมด</td><td className="num">{formatCurrency(focUsed)}</td></tr>
                                 </tbody>
@@ -190,7 +183,7 @@
 
                             {/* ค่าใช้จ่ายวันรับรถ */}
                             <div className="sec"><span>ค่าใช้จ่ายลูกค้าวันรับรถ</span><span style={{ fontWeight: 400, fontSize: 12 }}>รวมชำระ <b style={{ fontSize: 14 }}>{formatCurrency(salesSummaryTotalOnDelivery)}</b> บาท</span></div>
-                            <div className="box" style={{ padding: '6px 12px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', columnGap: 22 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', columnGap: 22 }}>
                                 {[
                                     [isCash ? 'ราคารถ (ซื้อสด)' : 'เงินดาวน์', isCash ? netPrice : downAmount],
                                     ['ค่าเบี้ยประกันภัย', insuranceCosts.customer > 0 ? insuranceCosts.customer : null, insuranceCosts.customer > 0 ? null : (insuranceCosts.freeYears ? `แถม ${insuranceCosts.freeYears} ปี` : (expenses.insurance || '-'))],
@@ -207,7 +200,7 @@
                             </div>
 
                             {/* ลายเซ็น */}
-                            <div className="grid grid-cols-3 gap-8" style={{ marginTop: 40 }}>
+                            <div className="grid grid-cols-3 gap-8" style={{ marginTop: 30 }}>
                                 {[['ที่ปรึกษาการขาย', consultantName], ['ผู้จัดการฝ่ายขาย (อนุมัติ)', ''], ['ผู้บริหาร (อนุมัติ)', '']].map(([t, n]) => (
                                     <div key={t} className="text-center">
                                         <div style={{ borderBottom: '1px dotted #000', height: 36 }}></div>
@@ -217,7 +210,7 @@
                                     </div>
                                 ))}
                             </div>
-                            <div style={{ fontSize: 11, marginTop: 20, borderTop: '1px solid #000', paddingTop: 6 }}>
+                            <div style={{ fontSize: 10.5, marginTop: 14, borderTop: '1px solid #000', paddingTop: 4 }}>
                                 ใบสรุปชั่วคราวจากหน้าใบเสนอราคา ณ {formatThaiDate(new Date())} · ตัวเลขอาจเปลี่ยนได้จนกว่าผู้จัดการยืนยันในเว็บ AT stock · ใบอนุมัติเบิกค่าคอมออกจากเว็บ AT stock หลังผู้จัดการยืนยันแล้ว · เอกสารภายใน ห้ามส่งให้ลูกค้า
                             </div>
                         </div>

@@ -4839,6 +4839,7 @@ const atColorCode = (name) => {
   return hit ? hit[1] : "";
 };
 const AT_AVAIL = { specs: null, at: "" };
+const AT_COMPANY = { PSC: "บริษัท เอที ฮอนด้า ออโตโมบิล (ภาษีเจริญ) จำกัด", ATE: "บริษัท เอที ฮอนด้า ออโตโมบิล (เอกชัย-บางบอน) จำกัด", SPH: "บริษัท เอที ฮอนด้า ออโตโมบิล (สามพราน) จำกัด", KPA: "บริษัท เอที ฮอนด้า ออโตโมบิล (กำแพงแสน) จำกัด" };
 const atSpecOf = (uiModel, gradeName, colorName) => {
   const m = (AT_PRICE_MAP[MODEL_MAPPING[uiModel]] || {})[gradeName], code = atColorCode(colorName);
   return m && code ? { model: m[0], grade: m[1], color: code } : null;
@@ -11742,7 +11743,7 @@ const App = () => {
   const salesSummaryTerm = parseInt(bookingData?.selectedTerm || terms[0] || 48);
   const salesSummaryInstallment = !salesSummaryIsCash ? calculatedInstallments?.[salesSummaryTerm] || calcInstallment(salesSummaryTerm) : null;
   const salesSummaryFinanceCompany = salesSummaryIsCash ? "-" : bookingData?.financeCompany || "-";
-  const salesSummaryPurchaseText = salesSummaryIsCash ? "ซื้อสด" : isDSP || financeType === "dsp" ? "ผ่อน Double Smile Plus" : "ผ่อนปกติ";
+  const salesSummaryPurchaseText = salesSummaryIsCash ? "ซื้อสด" : isDSP || financeType === "dsp" ? "ผ่อน Double Smile Plus" : isUsingStandardRate ? `ดอกเบี้ยปกติ ${BANK_LABELS[selectedBank] || selectedBank || ""}`.trim() : "ดอกเบี้ยแคมเปญ";
   const salesSummaryRateText = salesSummaryInstallment?.rate && salesSummaryInstallment.rate !== "-" ? `${salesSummaryInstallment.rate}%` : "-";
   const salesSummaryMonthlyText = salesSummaryInstallment?.monthly ? `${formatCurrency(salesSummaryInstallment.monthly)} บาท/เดือน` : "-";
   const totalAdditions = getExpenseValue(expenses.insurance) + registrationCosts.customer + getExpenseValue(expenses.redPlate) + getExpenseValue(expenses.accessories) + getExpenseValue(expenses.vatDiscount) + getExpenseValue(expenses.othersAdd) + (paymentType === "beginning" && financeType !== "cash" ? getExpenseValue(expenses.firstInstallment) || 0 : 0);
@@ -15420,55 +15421,46 @@ const App = () => {
     return /* @__PURE__ */ React.createElement("div", {
       id: "sales-summary-card",
       className: "bg-white w-[1120px] h-auto relative text-black",
-      style: { padding: "34px 44px", fontFamily: "'Prompt', sans-serif" }
+      style: { padding: "28px 40px", fontFamily: "'Prompt', sans-serif" }
     }, /* @__PURE__ */ React.createElement("style", null, `
-                                #sales-summary-card { font-size: 13px; line-height: 1.45; }
+                                #sales-summary-card { font-size: 12.5px; line-height: 1.38; }
                                 #sales-summary-card .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
                                 #sales-summary-card .b { font-weight: 700; }
                                 #sales-summary-card .muted { color: #555; }
                                 #sales-summary-card .box { border: 1px solid #000; }
-                                #sales-summary-card .sec { font-size: 13.5px; font-weight: 700; margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 2px solid #000; display: flex; justify-content: space-between; align-items: baseline; }
-                                #sales-summary-card .info { display: grid; grid-template-columns: 1.25fr 1fr 1fr; border: 1px solid #000; }
-                                #sales-summary-card .info > div { padding: 5px 10px; border-right: 1px solid #bbb; border-bottom: 1px solid #bbb; display: flex; gap: 8px; }
-                                #sales-summary-card .info > div:nth-child(3n) { border-right: 0; }
-                                #sales-summary-card .info > div:nth-last-child(-n+3) { border-bottom: 0; }
-                                #sales-summary-card .info .k { color: #444; white-space: nowrap; min-width: 92px; }
+                                #sales-summary-card .sec { font-size: 13.5px; font-weight: 700; margin: 10px 0 4px; padding-bottom: 2px; border-bottom: 1.5px solid #000; display: flex; justify-content: space-between; align-items: baseline; }
+                                #sales-summary-card .info { display: grid; grid-template-columns: 1.25fr 1fr 1fr; column-gap: 18px; }
+                                #sales-summary-card .info > div { padding: 1.5px 0; display: flex; gap: 8px; }
+                                                                                                #sales-summary-card .info .k { color: #444; white-space: nowrap; min-width: 92px; }
                                 #sales-summary-card .info .v { font-weight: 600; overflow-wrap: anywhere; }
-                                #sales-summary-card .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; border: 1px solid #000; }
-                                #sales-summary-card .cols > div { padding: 8px 12px; border-right: 1px solid #000; }
-                                #sales-summary-card .cols > div:last-child { border-right: 0; }
-                                #sales-summary-card .cols h4 { font-size: 12px; font-weight: 700; margin: 0 0 4px; padding: 2px 6px; background: #e5e5e5; }
-                                #sales-summary-card .ss-kv { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+                                #sales-summary-card .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+                                #sales-summary-card .cols > div { padding: 0 14px; border-right: 1px solid #999; }
+                                #sales-summary-card .cols > div:first-child { padding-left: 0; }
+                                #sales-summary-card .cols > div:last-child { border-right: 0; padding-right: 0; }
+                                #sales-summary-card .cols h4 { font-size: 12px; font-weight: 700; margin: 0 0 2px; text-decoration: underline; }
+                                #sales-summary-card .ss-kv { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; }
                                 #sales-summary-card .ss-kv.line { border-top: 1px solid #000; margin-top: 3px; padding-top: 4px; }
                                 #sales-summary-card .it { width: 100%; border-collapse: collapse; table-layout: fixed; }
-                                #sales-summary-card .it th { background: #e5e5e5; font-weight: 700; padding: 5px 6px; border-top: 1px solid #000; border-bottom: 1px solid #000; text-align: left; font-size: 12px; }
-                                #sales-summary-card .it td { padding: 3px 6px; vertical-align: top; overflow-wrap: anywhere; }
+                                #sales-summary-card .it th { background: #e5e5e5; font-weight: 700; padding: 3px 6px; border-top: 1px solid #000; border-bottom: 1px solid #000; text-align: left; font-size: 11.5px; }
+                                #sales-summary-card .it td { padding: 1px 6px; vertical-align: top; overflow-wrap: anywhere; }
                                 #sales-summary-card .it .c { text-align: center; }
                                 #sales-summary-card .it .r { text-align: right; }
                                 #sales-summary-card .it .code { font-size: 11.5px; }
-                                #sales-summary-card .it .grp td { font-weight: 700; text-decoration: underline; padding-top: 8px; }
+                                #sales-summary-card .it .grp td { font-weight: 700; text-decoration: underline; padding-top: 4px; }
                                 #sales-summary-card .it .st td { font-weight: 600; }
                                 #sales-summary-card .it .st td.num { border-top: 1px solid #000; }
                                 #sales-summary-card .it .tot td { font-weight: 800; border-top: 2px solid #000; padding-top: 5px; }
                                 #sales-summary-card .stamp { border: 3px double #000; padding: 4px 12px; text-align: center; font-weight: 800; }
                             `), /* @__PURE__ */ React.createElement("div", {
-      className: "flex justify-between items-start pb-3",
-      style: { borderBottom: "3px double #000" }
-    }, /* @__PURE__ */ React.createElement("div", {
-      className: "flex items-center gap-3"
-    }, /* @__PURE__ */ React.createElement(HondaNextLogo, {
-      color: "#000000",
-      size: 46,
-      showWord: false
-    }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", {
-      style: { fontSize: 20, fontWeight: 800, letterSpacing: "0.02em" }
-    }, "AT HONDA GROUP", branch ? /* @__PURE__ */ React.createElement("span", {
-      style: { fontSize: 14, fontWeight: 600 }
-    }, " · สาขา ", branch) : null), /* @__PURE__ */ React.createElement("div", {
+      className: "flex justify-between items-start pb-2",
+      style: { borderBottom: "2px solid #000" }
+    }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", {
+      style: { fontSize: 17, fontWeight: 800 }
+    }, AT_COMPANY[branch] || "บริษัท เอที ฮอนด้า ออโตโมบิล จำกัด"), /* @__PURE__ */ React.createElement("div", {
       style: { fontSize: 15, fontWeight: 700 }
     }, "ใบสรุปการขาย (ฝ่ายขาย) ", /* @__PURE__ */ React.createElement("span", {
       style: { fontSize: 12, fontWeight: 400 }
-    }, "· SALES SUMMARY · เอกสารภายใน ห้ามส่งให้ลูกค้า")))), /* @__PURE__ */ React.createElement("div", {
+    }, "· SALES SUMMARY · เอกสารภายใน ห้ามส่งให้ลูกค้า"))), /* @__PURE__ */ React.createElement("div", {
       className: "stamp"
     }, /* @__PURE__ */ React.createElement("div", {
       style: { fontSize: 17 }
@@ -15476,7 +15468,7 @@ const App = () => {
       style: { fontSize: 12, fontWeight: 600 }
     }, "รอผู้จัดการอนุมัติ · ยังใช้เบิกค่าคอมไม่ได้"))), /* @__PURE__ */ React.createElement("div", {
       className: "info",
-      style: { marginTop: 12 }
+      style: { marginTop: 8 }
     }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
       className: "k"
     }, "เลขที่"), /* @__PURE__ */ React.createElement("span", {
@@ -15610,11 +15602,13 @@ const App = () => {
       className: "sec"
     }, /* @__PURE__ */ React.createElement("span", null, "เงื่อนไขการซื้อ")), /* @__PURE__ */ React.createElement("div", {
       className: "info"
-    }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+    }, /* @__PURE__ */ React.createElement("div", {
+      style: { gridColumn: "span 3" }
+    }, /* @__PURE__ */ React.createElement("span", {
       className: "k"
     }, "เงื่อนไข"), /* @__PURE__ */ React.createElement("span", {
       className: "v"
-    }, isCash ? "ซื้อสด" : `จัดไฟแนนซ์ · ${salesSummaryPurchaseText}`)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+    }, isCash ? "ซื้อสด" : `จัดไฟแนนซ์ · ${salesSummaryPurchaseText} ${salesSummaryRateText} · ยอดสินเชื่อ ${formatCurrency(financeAmount)} บาท`)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
       className: "k"
     }, "สถาบันการเงิน"), /* @__PURE__ */ React.createElement("span", {
       className: "v"
@@ -15624,19 +15618,20 @@ const App = () => {
       className: "v"
     }, isCash ? "-" : `${parseFloat(Number(downPct).toFixed(2))}% · ${formatCurrency(downAmount)} บาท`)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
       className: "k"
-    }, "ยอดจัด"), /* @__PURE__ */ React.createElement("span", {
-      className: "v"
-    }, isCash ? "-" : `${formatCurrency(financeAmount)} บาท`)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
-      className: "k"
     }, "ดอกเบี้ย / งวด"), /* @__PURE__ */ React.createElement("span", {
       className: "v"
     }, isCash ? "-" : `${salesSummaryRateText} · ${salesSummaryTerm} งวด`)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
       className: "k"
     }, "ค่างวด"), /* @__PURE__ */ React.createElement("span", {
       className: "v"
-    }, isCash ? "-" : `${salesSummaryMonthlyText} (${paymentType === "beginning" ? "ผ่อนต้นงวด" : "ผ่อนปลายงวด"})`))), /* @__PURE__ */ React.createElement("div", {
-      className: "box",
-      style: { borderTop: 0, padding: "5px 10px" }
+    }, isCash ? "-" : `${salesSummaryMonthlyText} (${paymentType === "beginning" ? "ผ่อนต้นงวด" : "ผ่อนปลายงวด"})`)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+      className: "k"
+    }, "คอมไฟแนนซ์"), /* @__PURE__ */ React.createElement("span", {
+      className: "v"
+    }, isCash ? "-" : /* @__PURE__ */ React.createElement("span", {
+      style: { fontWeight: 400 }
+    }, "รอยืนยันสูตร")))), /* @__PURE__ */ React.createElement("div", {
+      style: { padding: "1.5px 0" }
     }, /* @__PURE__ */ React.createElement("span", {
       style: { color: "#444" }
     }, "รายละเอียดแคมเปญ"), "  ", /* @__PURE__ */ React.createElement("b", null, campaign?.name || "ไม่ใช้แคมเปญ Honda"), !isCash && salesSummaryInstallment?.balloon > 0 ? ` · ชำระก้อนสุดท้าย ${formatCurrency(salesSummaryInstallment.balloon)} บาท` : ""), /* @__PURE__ */ React.createElement("div", {
@@ -15690,9 +15685,14 @@ const App = () => {
     }), others.map((r, i) => ItemRow({ k: "o" + i, r })), /* @__PURE__ */ React.createElement(SubTotal, {
       label: "รวมมูลค่าแถมอื่น ๆ",
       v: focOther
-    })), rows.some((r) => r.grp === "std") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Group, {
-      title: "บริการมาตรฐาน (ไม่มีทุน)"
-    }), rows.filter((r) => r.grp === "std").map((r, i) => ItemRow({ k: "d" + i, r }))), !rows.length && !others.length && !extraItems.length && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
+    })), rows.some((r) => r.grp === "std") && /* @__PURE__ */ React.createElement("tr", {
+      className: "grp"
+    }, /* @__PURE__ */ React.createElement("td", null), /* @__PURE__ */ React.createElement("td", {
+      colSpan: 7,
+      style: { textDecoration: "none" }
+    }, /* @__PURE__ */ React.createElement("u", null, "บริการมาตรฐาน (ไม่มีทุน)"), " ", /* @__PURE__ */ React.createElement("span", {
+      style: { fontWeight: 400 }
+    }, rows.filter((r) => r.grp === "std").map((r) => r.g).join(" · ")))), !rows.length && !others.length && !extraItems.length && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", {
       colSpan: 8,
       className: "c muted",
       style: { padding: 10 }
@@ -15710,8 +15710,7 @@ const App = () => {
     }, "รวมชำระ ", /* @__PURE__ */ React.createElement("b", {
       style: { fontSize: 14 }
     }, formatCurrency(salesSummaryTotalOnDelivery)), " บาท")), /* @__PURE__ */ React.createElement("div", {
-      className: "box",
-      style: { padding: "6px 12px", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", columnGap: 22 }
+      style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", columnGap: 22 }
     }, [
       [isCash ? "ราคารถ (ซื้อสด)" : "เงินดาวน์", isCash ? netPrice : downAmount],
       ["ค่าเบี้ยประกันภัย", insuranceCosts.customer > 0 ? insuranceCosts.customer : null, insuranceCosts.customer > 0 ? null : insuranceCosts.freeYears ? `แถม ${insuranceCosts.freeYears} ปี` : expenses.insurance || "-"],
@@ -15731,7 +15730,7 @@ const App = () => {
       className: "num"
     }, t || (v ? v < 0 ? `-${formatCurrency(-v)}` : formatCurrency(v) : "-"))))), /* @__PURE__ */ React.createElement("div", {
       className: "grid grid-cols-3 gap-8",
-      style: { marginTop: 40 }
+      style: { marginTop: 30 }
     }, [["ที่ปรึกษาการขาย", consultantName], ["ผู้จัดการฝ่ายขาย (อนุมัติ)", ""], ["ผู้บริหาร (อนุมัติ)", ""]].map(([t, n]) => /* @__PURE__ */ React.createElement("div", {
       key: t,
       className: "text-center"
@@ -15744,7 +15743,7 @@ const App = () => {
     }, t), /* @__PURE__ */ React.createElement("div", {
       style: { marginTop: 2 }
     }, "วันที่ ......../......../........")))), /* @__PURE__ */ React.createElement("div", {
-      style: { fontSize: 11, marginTop: 20, borderTop: "1px solid #000", paddingTop: 6 }
+      style: { fontSize: 10.5, marginTop: 14, borderTop: "1px solid #000", paddingTop: 4 }
     }, "ใบสรุปชั่วคราวจากหน้าใบเสนอราคา ณ ", formatThaiDate(new Date), " · ตัวเลขอาจเปลี่ยนได้จนกว่าผู้จัดการยืนยันในเว็บ AT stock · ใบอนุมัติเบิกค่าคอมออกจากเว็บ AT stock หลังผู้จัดการยืนยันแล้ว · เอกสารภายใน ห้ามส่งให้ลูกค้า"));
   })()));
 };

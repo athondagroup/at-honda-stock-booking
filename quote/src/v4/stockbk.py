@@ -162,3 +162,9 @@ rep("""                                                        <span>{new Date(i
                                                             return <a href={b ? `../?bk=${encodeURIComponent(b.id)}` : `../?qbk=${encodeURIComponent(item.id)}#book/new`} className={`mt-1 self-start px-2 py-0.5 rounded-full border text-[11px] font-bold ${t[1]}`}><i className="fa-solid fa-warehouse mr-1"></i>{t[0]}</a>;
                                                         })()}
                                                     </div>""")
+
+# 6. sales summary (26/11): company name by the sales' branch (same names as the AT stock web's documents); interest wording
+rep("        const AT_AVAIL = { specs: null, at: '' };",
+    "        const AT_AVAIL = { specs: null, at: '' };\n        const AT_COMPANY = { PSC: 'บริษัท เอที ฮอนด้า ออโตโมบิล (ภาษีเจริญ) จำกัด', ATE: 'บริษัท เอที ฮอนด้า ออโตโมบิล (เอกชัย-บางบอน) จำกัด', SPH: 'บริษัท เอที ฮอนด้า ออโตโมบิล (สามพราน) จำกัด', KPA: 'บริษัท เอที ฮอนด้า ออโตโมบิล (กำแพงแสน) จำกัด' };")
+rep("const salesSummaryPurchaseText = salesSummaryIsCash ? 'ซื้อสด' : (isDSP || financeType === 'dsp' ? 'ผ่อน Double Smile Plus' : 'ผ่อนปกติ');",
+    "const salesSummaryPurchaseText = salesSummaryIsCash ? 'ซื้อสด' : (isDSP || financeType === 'dsp' ? 'ผ่อน Double Smile Plus' : isUsingStandardRate ? `ดอกเบี้ยปกติ ${BANK_LABELS[selectedBank] || selectedBank || ''}`.trim() : 'ดอกเบี้ยแคมเปญ');")
