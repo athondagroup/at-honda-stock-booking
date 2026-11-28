@@ -8,10 +8,10 @@ function commGaps(a, D) {
   const d = a.rec.deal || {}, fl = a.rec.flow || {}, g = [];
   if (!d.at) g.push('เงื่อนไขการขาย');
   else { if (!d.at_step) g.push('ช่อง STEP'); if (!d.reg_by) g.push('ผู้จ่ายค่าจดทะเบียน'); }
-  if (!(fl.po && fl.po.at)) g.push(fl.po_skip ? 'ใบสั่งแต่ง (ข้ามไว้)' : 'ใบสั่งแต่ง');
+  if (!(fl.po && fl.po.at)) g.push(fl.po_skip ? 'ใบสั่งแต่ง (ข้ามไว้) · ยังคิดเหลือ/เกินไม่ได้' : 'ใบสั่งแต่ง · ยังคิดเหลือ/เกินไม่ได้');
   if (!fl.delivered) g.push('บันทึกส่งมอบ');
   if (!String(a.rec.receipt_no || '').trim()) g.push('เลขใบเสร็จ');
-  if (d.at) { const foc = saleFoc(a).v, m = num(d.margin); if (foc && m > 0 && foc > 3 * m) g.push(`FOC ${money(foc)} สูงผิดปกติ`); }
+  if (d.at && fl.po && fl.po.at) { const foc = saleFoc(a).v, m = num(d.margin); if (foc && m > 0 && foc > 3 * m) g.push(`FOC ${money(foc)} สูงผิดปกติ`); }
   return g;
 }
 function commGapCell(a, D) {
@@ -88,7 +88,7 @@ function cmxSheet(X, D, who, st) {
     const r = [setName[set], fmtM(month), a.delivBr || a.br || '', a.cust || '', a.model || '', a.grade || '', a.color || '', atVin(a) || '', dt(a.date), v(inv.inv), dt(inv.idate), dt(s.ddate), ev ? fmtM(ev[2] || ev[1].slice(0, 7)) : null];
     if (G.terms) r.push(v(a.rec.purchase), v(d.fin_co || a.rec.finance), n(d.rate), n(d.term), n(d.price), n(d.paint), n(d.price_add), n(s.disc), n(d.down), n(d.fin_amount));
     if (G.camp) r.push(v(d.campaign), d.camp_month ? fmtM(d.camp_month) : null, d.at_step ? 'ช่อง ' + d.at_step : has ? 'ไม่ระบุ' : null);
-    if (G.margin) r.push(n(d.margin_car), n(d.margin_at), n(d.margin_honda), n(d.margin_priv), n(d.margin_extra), has ? n(d.margin) : null, n(s.foc.v), v(s.foc.src), s.bal === null ? null : s.bal);
+    if (G.margin) r.push(n(d.margin_car), n(d.margin_at), n(d.margin_honda), n(d.margin_priv), n(d.margin_extra), has ? n(d.margin) : null, n(s.foc.v), s.needPo ? (s.foc.src ? s.foc.src + ' (ยังไม่ใช้คิด)' : null) : v(s.foc.src), s.needPo && has ? 'ต้องทำใบสั่งแต่งก่อน' : s.bal === null ? null : s.bal);
     if (G.other) r.push(v(d.ins1_by || a.rec.insurance), v(d.reg_by), v(a.rec.source), n(a.rec.deposit), v(a.rec.receipt_no));
     r.push(gaps.length ? gaps.join(' · ') : 'ครบ');
     return r;

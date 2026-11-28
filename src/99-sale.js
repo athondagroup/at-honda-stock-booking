@@ -7,23 +7,26 @@ function saleDates(a, D) {
 function saleFoc(a) {
   const po = (a.rec.flow && a.rec.flow.po) || {}, items = po.items || [];
   const cost = poAutoCost(a, po) + items.reduce((n, x) => n + poFocCost(x), 0);
-  if (po.at && cost) return { v: cost, src: 'ตามใบสั่งแต่งรถ' };
+  if (po.at) return { v: cost, src: 'ตามใบสั่งแต่งรถ' };
   const f = a.rec.foc_total;
   return f === null || f === undefined || f === '' ? { v: null, src: '' } : { v: Number(f) || 0, src: 'ตามใบจอง' };
 }
 function saleSum(a, D) {
   const d = a.rec.deal || {}, has = !!d.at;
   const disc = has ? num(d.disc) + num(d.down_disc) : bookDiscount(a);
+  // เหลือ / เกิน only from the accessories order: the booking's FOC field is sometimes discount + gifts (as in the sheet),
+  // sometimes gifts only, so without the order nothing is worked out ("ต้องทำใบสั่งแต่งก่อน", 28/11)
+  const po = (a.rec.flow && a.rec.flow.po) || {}, needPo = !po.at;
   const foc = saleFoc(a), margin = has ? num(d.margin) : null;
-  const bal = margin !== null ? margin - num(disc) - num(foc.v) : null;
-  return { d, has, margin, disc, foc, bal, ...saleDates(a, D) };
+  const bal = margin !== null && !needPo ? margin - num(disc) - num(foc.v) : null;
+  return { d, has, margin, disc, foc, bal, needPo, ...saleDates(a, D) };
 }
 function saleSumBox(a, D) {
   if (a.cancelled || a.demo) return '';
   const s = saleSum(a, D), mine = !isSales() || isMine(a.sales);
   if (!mine) return '';
   const cell = (k, v, sub, tone) => `<div class="min-w-0"><div class="text-xs text-muted">${k}</div><div class="num font-semibold" ${tone ? `style="color:var(--${tone})"` : ''}>${v}</div>${sub ? `<div class="text-xs text-muted">${sub}</div>` : ''}</div>`;
-  const balTxt = s.bal === null ? '–' : `${s.bal < 0 ? 'เกิน' : 'เหลือ'} ${money(Math.abs(s.bal))}`;
+  const balTxt = s.needPo && s.has ? 'ต้องทำใบสั่งแต่งก่อน' : s.bal === null ? '–' : `${s.bal < 0 ? 'เกิน' : 'เหลือ'} ${money(Math.abs(s.bal))}`;
   const sold = !!(s.idate || s.ddate || a.done);
   const canDate = a.done && !s.ddate && perms().write && canEditBooking(a);
   const dateIn = canDate ? `<div class="flex flex-wrap gap-2 items-end"><div class="field"><label for="sl-dd">วันส่งมอบ (ไม่มีในไฟล์ IDS)</label><input id="sl-dd" type="date" data-modal="sale_ddate" value="${esc((S.modal && S.modal.sale_ddate) || '')}"></div>
@@ -33,7 +36,7 @@ function saleSumBox(a, D) {
       ${cell('Margin รวม', s.margin === null ? '–' : money(s.margin), s.has ? '' : 'ยังไม่ใส่เงื่อนไข')}
       ${cell('ส่วนลด', s.disc === null ? '–' : money(s.disc), s.has && num(s.d.down_disc) ? `รวมส่วนลดดาวน์ ${money(s.d.down_disc)}` : '')}
       ${cell('FOC รวม', s.foc.v === null ? '–' : money(s.foc.v), s.foc.src)}
-      ${cell('เหลือ / เกิน', balTxt, 'Margin − ส่วนลด − FOC', s.bal === null ? '' : s.bal < 0 ? 'bad' : 'good')}
+      ${cell('เหลือ / เกิน', balTxt, s.needPo && s.has ? 'FOC ในใบจองอาจรวมส่วนลดแล้ว จึงยังไม่คิด' : 'Margin − ส่วนลด − FOC', s.needPo && s.has ? 'warn' : s.bal === null ? '' : s.bal < 0 ? 'bad' : 'good')}
     </div>
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
       <div><div class="text-muted">ออกใบกำกับ</div><div class="num">${fmtD(s.idate)}${s.adv ? ' (Advance)' : ''}</div></div>
@@ -60,7 +63,7 @@ function printSaleApp(a, D) {
   const terms = [['ราคารถ (ราคาเต็ม)', M(d.price)], ['ส่วนลดราคารถ', M(d.disc)]];
   if (!cash) terms.push(['เงินดาวน์', M(d.down)], ['ส่วนลดดาวน์', M(d.down_disc)], ['ยอดจัด', M(d.fin_amount)], ['ดอกเบี้ย / งวด', `${d.rate ?? '–'} % · ${d.term || '–'} งวด`]);
   const mg = [['1. Margin รถ', M(d.margin_car)], ['2. AT แคมเปญ', M(d.margin_at)], ['3. Honda แคมเปญ', M(d.margin_honda)], [`4. สิทธิพิเศษ Honda${d.privileges ? ` (${d.privileges})` : ''}`, M(d.margin_priv)], ...xpArr(d.extra_pay).map(y => [`5. ลูกค้าชำระเพิ่ม · ${y.l || ''}`, M(y.v)]), ['Margin รวม', M(s.margin)],
-    ['หัก ส่วนลดรวม', M(s.disc)], [`หัก FOC รวม (${s.foc.src || '–'})`, M(s.foc.v)], [s.bal !== null && s.bal < 0 ? 'เกิน Margin' : 'เหลือ', s.bal === null ? '–' : money(Math.abs(s.bal))]];
+    ['หัก ส่วนลดรวม', M(s.disc)], [`หัก FOC รวม (${s.foc.src || '–'})`, M(s.foc.v)], [s.bal !== null && s.bal < 0 ? 'เกิน Margin' : 'เหลือ', s.needPo ? 'ต้องทำใบสั่งแต่งก่อน' : s.bal === null ? '–' : money(Math.abs(s.bal))]];
   // gifts (accessories PO): each item with its sale value and its FOC cost, then the totals (26/10)
   const po = (r.flow && r.flow.po) || {}, pit = po.items || [];
   const qn = x => Number(x.qty) || 1, gv = pit.reduce((n, x) => n + (Number(x.sale) || 0) * qn(x), 0), gc = poAutoCost(a, po) + pit.reduce((n, x) => n + poFocCost(x), 0);
