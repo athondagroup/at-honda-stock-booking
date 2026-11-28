@@ -9,7 +9,8 @@ function gsCan() { return perms().write && (perms().upload || perms().approve); 
 let gsMcp;
 function gsUse() { if (gsMcp === undefined) gsMcp = (window.claude && typeof window.claude.use === 'function') ? window.claude.use('mcp').catch(() => null) : Promise.resolve(null); return gsMcp; }
 // dd/mm/yyyy (Buddhist or Christian year) → yyyy-mm-dd ; "dd/mm/yyyy hh:mm:ss" (Bangkok) → ISO
-function gsDate(s) { const m = String(s || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (!m) return null; let y = Number(m[3]); if (y > 2400) y -= 543; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; }
+// a year typed short ("27/11/26" → the sheet keeps 0026; "69" = 2569) is read as this century, Buddhist when 60 or more (28/11)
+function gsDate(s) { const m = String(s || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/); if (!m) return null; let y = Number(m[3]); if (y < 100) y = y >= 60 ? 2500 + y - 543 : 2000 + y; else if (y < 1900) return null; if (y > 2400) y -= 543; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; }
 function gsTs(s) { const m = String(s || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}) (\d{1,2}):(\d{2}):(\d{2})/); if (!m) return null; let y = Number(m[3]); if (y > 2400) y -= 543; return new Date(Date.UTC(y, m[2] - 1, m[1], m[4] - 7, m[5], m[6])).toISOString(); }
 function gsNum(s) { const t = String(s || '').replace(/[^\d.]/g, ''); return t ? Number(t) : null; }
 function gsSales(raw) {

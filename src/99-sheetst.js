@@ -78,16 +78,17 @@ async function shLiveRead(force) {
   const mcp = await gsUse().catch(() => null);
   if (!mcp) { SH_LIVE = { busy: false, err: 'nomcp', t: Date.now() }; render(); return; }
   const id = idsGsId(), vins = new Map(), bad = [];
-  for (const t of BRS) {
+  // the four tabs at the same time (about one call's wait); the page is already drawn, it redraws once when they are in
+  await Promise.all(BRS.map(async t => {
     try {
       const p = idsGsPayload(await mcp.callTool('Google Sheets', 'get_values', { spreadsheetId: id, range: `'${t}'!A1:AD800` }, { cache: false }));
-      const rows = p && Array.isArray(p.values) ? p.values : null; if (!rows) { bad.push(t); continue; }
-      const h = rows.findIndex(x => (x || []).some(v => String(v).includes('หมายเลขตัวถัง')) && (x || []).some(v => String(v).includes('เลขที่ใบสั่งจอง'))); if (h < 0) { bad.push(t); continue; }
+      const rows = p && Array.isArray(p.values) ? p.values : null; if (!rows) { bad.push(t); return; }
+      const h = rows.findIndex(x => (x || []).some(v => String(v).includes('หมายเลขตัวถัง')) && (x || []).some(v => String(v).includes('เลขที่ใบสั่งจอง'))); if (h < 0) { bad.push(t); return; }
       const vi = rows[h].findIndex(v => String(v).includes('หมายเลขตัวถัง')), bi = rows[h].findIndex(v => String(v).includes('เลขที่ใบสั่งจอง'));
       rows.forEach((x, i) => { if (i <= h) return; const v = String((x || [])[vi] || '').toUpperCase().trim(); if (!/^[A-Z0-9]{17}$/.test(v)) return;
         const o = vins.get(v); if (o) o.dup = true; else vins.set(v, { tab: t, row: i + 1, k: String((x || [])[bi] == null ? '' : x[bi]).trim() }); });
     } catch (e) { bad.push(t); }
-  }
+  }));
   SH_LIVE = { busy: false, at: new Date().toISOString(), t: Date.now(), vins, bad }; render();
 }
 function sheetStBar(cars, D) {
