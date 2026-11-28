@@ -120,7 +120,8 @@ function sheetPlan(D) {
   for (const q of D.quota) if (q.vnote && q.vnote.includes('/') && !q.vin && !q.bk && !q.booking && branchOk(q.br)) units.push({ vin: null, ref: q.ref, br: q.br, spec: q.spec, text: q.vnote });
   const plan = [];
   for (const u of units) {
-    const on = D.locks.filter(l => (u.vin ? l.vin === u.vin : !l.vin && l.ref === u.ref));
+    // 24/11: a quota lock that moved to its car keeps its Ref: still the same unit (no second lock from the quota row's text)
+    const on = D.locks.filter(l => (u.vin ? l.vin === u.vin || (!l.vin && !!u.ref && l.ref === u.ref) : l.ref === u.ref));
     if (on.some(l => sheetNorm(sheetTextOf(l)) === sheetNorm(u.text))) continue;
     const wait = on.find(l => l.status === 'pending' && sheetTextOf(l));
     if (!wait && on.some(l => l.live)) continue;

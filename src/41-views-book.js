@@ -59,7 +59,7 @@ function bookRows(D) {
   return (D._bookRows = rows);
 }
 const BOOK_FILTERS = [['active', 'ยังไม่ส่งมอบ'], ['noids', 'ฟอร์ม AT ยังไม่อยู่ใน IDS'], ['noat', 'มีใน IDS แต่ไม่มีฟอร์ม AT'], ['waiting', 'รอรถ'], ['locked', 'ล็อก / รออนุมัติล็อก'], ['idscar', 'IDS จัดสรรรถแล้ว'],
-  ['assign', 'รอจัดสรรรถ'], ['confirm', 'รอยืนยันเจ้าของ / การจับคู่'], ['req', 'รออนุมัติแก้ไข / ยกเลิก'], ['refund', 'ยกเลิกแล้ว รอทำใบคืนเงิน'], ['demo', 'รถ Demo (ซื้อรถ Demo / ทดลองขับ)'], ['dtoday', 'ส่งมอบวันนี้'], ['d7', 'นัดส่งมอบภายใน 7 วัน'], ['stuck', 'ต้องเร่งตาม'], ['done', 'ส่งมอบแล้ว'], ['cancel', 'ยกเลิก'], ['cxids', 'ยกเลิกแล้ว รอยกเลิกใน IDS'], ['all', 'ทั้งหมด']];
+  ['assign', 'รอจัดสรรรถ'], ['confirm', 'รอยืนยันเจ้าของ / การจับคู่'], ['req', 'รออนุมัติแก้ไข / รอยกเลิก'], ['refund', 'ยกเลิกแล้ว รอทำใบคืนเงิน'], ['demo', 'รถ Demo (ซื้อรถ Demo / ทดลองขับ)'], ['dtoday', 'ส่งมอบวันนี้'], ['d7', 'นัดส่งมอบภายใน 7 วัน'], ['stuck', 'ต้องเร่งตาม'], ['done', 'ส่งมอบแล้ว'], ['cancel', 'ยกเลิก'], ['cxids', 'ยกเลิกแล้ว รอยกเลิกใน IDS'], ['all', 'ทั้งหมด']];
 function rowState(r, D, st) {
   const a = r.a, state = r.row ? r.row.state : null;
   if (st === 'all') return true;
@@ -71,9 +71,9 @@ function rowState(r, D, st) {
   if (st === 'waiting') return state === 'waiting' && (a ? a.active : true);
   if (st === 'locked') return ['locked', 'pending', 'allocated'].includes(state);
   if (st === 'idscar') return state === 'idscar' && (a ? a.active : true);
-  if (st === 'assign') return !!(a && a.active && a.flow.next === 'assign');
+  if (st === 'assign') return !!(a && a.active && !a.rec.cancel_wait && a.flow.next === 'assign');
   if (st === 'confirm') return !!(a && (a.matchAsk || a.ownerCheck === 'pending' || a.ownerCheck === 'disputed'));
-  if (st === 'req') return !!(a && a.change);
+  if (st === 'req') return !!(a && (a.change || (a.active && a.rec.cancel_wait)));
   if (st === 'refund') return !!(a && a.cancelled && a.rec.cancel && a.rec.cancel.refund === 'refund' && !(a.rec.refund && a.rec.refund.at));
   if (st === 'dtoday') return !!(a && a.active && a.rec.delivery_plan === D.today);
   if (st === 'd7') return !!(a && a.active && a.rec.delivery_plan && a.rec.delivery_plan >= D.today && daysBetween(D.today, a.rec.delivery_plan) <= 7);
@@ -118,18 +118,18 @@ function bookList(D) {
   if (bsort === 'work') list.sort((x, y) => bkWorkRank(y, D) - bkWorkRank(x, D) || (x.date || '').localeCompare(y.date || ''));
   else if (bsort === 'wait') list.sort((x, y) => (x.date || '').localeCompare(y.date || ''));
   else if (bsort === 'new') list.sort((x, y) => bkEntered(y).localeCompare(bkEntered(x)));
-  const filt = `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3 flt2">
+  const filt = `<div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end mb-3 flt2 flt-bk">
     <div class="field col-span-2 sm:grow sm:max-w-xs"><label for="f-aq">ค้นหาเลขที่ใบจอง / ชื่อลูกค้า / เซลล์ / VIN</label><input id="f-aq" type="search" data-filter="aq" value="${esc(f.aq)}"></div>
     ${f.aq ? '<button class="btn btn-ghost btn-sm" data-act="aq-clear">ล้างคำค้น</button>' : ''}
     <div class="field"><label for="f-qm2">รุ่น</label><select id="f-qm2" data-filter="qModel"><option value="">ทุกรุ่น</option>${Object.keys(CATALOG).map(m => `<option ${f.qModel === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
     <div class="field"><label for="f-bg">เกรด</label><select id="f-bg" data-filter="bGrade"><option value="">ทุกเกรด</option>${(f.qModel ? Object.keys(CATALOG[f.qModel] || {}) : [...new Set(Object.values(CATALOG).flatMap(g => Object.keys(g)))].sort()).map(g => `<option ${f.bGrade === g ? 'selected' : ''}>${esc(g)}</option>`).join('')}</select></div>
     <div class="field"><label for="f-bc">สี</label><select id="f-bc" data-filter="bColor"><option value="">ทุกสี</option>${[...new Set(f.qModel && f.bGrade ? (CATALOG[f.qModel] || {})[f.bGrade] || [] : Object.values(CATALOG).flatMap(g => Object.values(g).flat()))].sort().map(c => `<option ${f.bColor === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
     ${isSales() ? '' : `<div class="field"><label for="f-bs2">เซลล์</label><select id="f-bs2" data-filter="bSales"><option value="">ทุกคน</option>${salesNames(true).map(n => `<option ${f.bSales === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>`}
-    <div class="field"><label for="f-bdt">ช่วงวันที่</label><select id="f-bdt" data-filter="bDType"><option value="" ${f.bDType !== 'sale' ? 'selected' : ''}>วันที่จอง</option><option value="sale" ${f.bDType === 'sale' ? 'selected' : ''}>วันที่ขาย (ส่งมอบ)</option></select></div>
+    <div class="field f-row2"><label for="f-bdt">ช่วงวันที่</label><select id="f-bdt" data-filter="bDType"><option value="" ${f.bDType !== 'sale' ? 'selected' : ''}>วันที่จอง</option><option value="sale" ${f.bDType === 'sale' ? 'selected' : ''}>วันที่ขาย (ส่งมอบ)</option></select></div>
     <div class="field"><label for="f-bdf">ตั้งแต่</label><input id="f-bdf" type="date" data-filter="bDFrom" value="${esc(f.bDFrom || '')}"></div>
     <div class="field"><label for="f-bdto">ถึง</label><input id="f-bdto" type="date" data-filter="bDTo" value="${esc(f.bDTo || '')}"></div>
-    ${dRange || f.qModel || f.bGrade || f.bColor || f.bSales || (f.aState && f.aState !== 'active') ? '<button class="btn btn-ghost btn-sm" data-act="bd-clear">ล้างตัวกรอง</button>' : ''}
     <div class="field"><label for="f-as">แสดง</label><select id="f-as" data-filter="aState">${BOOK_FILTERS.map(([k, t]) => `<option value="${k}" ${st === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+    ${dRange || f.qModel || f.bGrade || f.bColor || f.bSales || (f.aState && f.aState !== 'active') ? '<button class="btn btn-ghost btn-sm" data-act="bd-clear">ล้างตัวกรอง</button>' : ''}
   </div>${bkFilterBar(f, st, q)}`;
   const all = bookRows(D).filter(r => inBrRow(r) && rowVisible(r) && (!dRange || bookDateOk(r, D)));
   const cnt = k => all.filter(r => rowState(r, D, k)).length;

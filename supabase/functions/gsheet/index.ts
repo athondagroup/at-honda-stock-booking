@@ -7,6 +7,7 @@
 // with that account's e-mail as Viewer. Returns { range, values } like the Sheets API.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { cellPlan, cellQuotaTabs } from "./cellplan.js";
 
 const SA = Deno.env.get("GOOGLE_SERVICE_ACCOUNT") || "";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
@@ -47,6 +48,34 @@ Deno.serve(async (req) => {
     // the lock typed on the stock page (10/11): write ONE cell, the booking-no column of the VIN's row in a branch tab of the IDS
     // stock sheet. Managers / the executive only. The page sends what it believes the cell holds (expect); a cell changed in the sheet
     // meanwhile is not overwritten (conflict + what it holds now) unless force.
+    // 24/11 "lock_cell": the stock tab first (all four read, one row), the quota row as the fallback or the companion ("VIN text"),
+    // read errors / duplicates never fall through to the quota. dry: the plan only, nothing written. Rule: cellplan.js
+    if (body.tool === "lock_cell") {
+      if (!CELL_ROLES.includes(String(m.role || ""))) return out({ code: "not_granted" }, 403);
+      const vin = String(body.vin || "").toUpperCase().trim(), ref = String(body.ref || "").toUpperCase().trim();
+      if (vin && !/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) return out({ code: "bad_request" }, 400);
+      if (!vin && !/^[A-Z0-9]{6,20}$/.test(ref)) return out({ code: "bad_request" }, 400);
+      const tw = await token(JSON.parse(SA), !body.dry);
+      const base = `https://sheets.googleapis.com/v4/spreadsheets/${CELL_SHEET}`;
+      const get = async (range: string) => { try { const r = await fetch(`${base}/values/${encodeURIComponent(range)}`, { headers: { Authorization: `Bearer ${tw}` } }); return r.ok ? ((await r.json()).values || []) : null; } catch { return null; } };
+      const stock: Record<string, any> = {};
+      for (const tab of CELL_TABS) stock[tab] = await get(`'${tab}'!A1:AD800`);
+      let quota: Record<string, any> | null = {};
+      if (!body.stock_only) try {
+        const meta = await fetch(`${base}?fields=sheets.properties.title`, { headers: { Authorization: `Bearer ${tw}` } });
+        if (!meta.ok) quota = null;
+        else for (const t of cellQuotaTabs(((await meta.json()).sheets || []).map((x: any) => x.properties.title))) quota![t] = await get(`'${t}'!A1:Z600`);
+      } catch { quota = null; }
+      const plan: any = cellPlan({ vin, ref, value: body.value, expect: body.expect, expect_quota: body.expect_quota, force: body.force, stock_only: !!body.stock_only }, { stock, quota });
+      if (body.dry || plan.code !== "ok") return out({ ...plan, dry: !!body.dry });
+      const done: any[] = [];
+      for (const w of plan.writes) {
+        const r = await fetch(`${base}/values/${encodeURIComponent(w.range)}?valueInputOption=RAW`, { method: "PUT", headers: { Authorization: `Bearer ${tw}`, "Content-Type": "application/json" }, body: JSON.stringify({ range: w.range, majorDimension: "ROWS", values: [[w.value]] }) });
+        if (!r.ok) { const g = await r.json().catch(() => ({})); console.error("lock_cell", r.status, g && g.error && g.error.message); return out({ code: done.length ? "partial" : "tool_error", status: r.status, done, failed: w.range }, done.length ? 200 : 502); }
+        done.push(w);
+      }
+      return out({ ok: true, range: done[0].range, tab: done[0].tab, kind: done[0].kind, prev: done[0].prev, writes: done, quota: plan.quota || null });
+    }
     if (body.tool === "stock_cell") {
       if (!CELL_ROLES.includes(String(m.role || ""))) return out({ code: "not_granted" }, 403);
       const vin = String(body.vin || "").toUpperCase().trim(), value = String(body.value ?? "").slice(0, 120);

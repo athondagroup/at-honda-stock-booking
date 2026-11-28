@@ -17,6 +17,7 @@ function renderModal(D) {
   else if (m.kind === 'swap') body = swapModal(m, D);
   else if (m.kind === 'lockbk') { body = lockBkModal(m, D); wide = true; }
   else if (m.kind === 'carlock') { body = carLockModal(m, D); wide = true; }
+  else if (m.kind === 'qtf') body = qtModal(m, D);
   else if (m.kind === 'doc') { body = docModal(m); wide = true; }
   else if (m.kind === 'export') body = exportModal(m, D);
   else if (m.kind === 'recvdup') body = recvDupModal(m);
@@ -124,6 +125,8 @@ function lockModal(m, D) {
   const cand = spec ? candidates(spec, D) : { cars: [], qs: [] };
   const rec = b && spec ? recommend(spec, b.br, D) : {};
   const wSpec = u ? u.spec : b ? b.spec : null;
+  // 24/11: a request opened on a car / quota slot picks its booking from the same list as the typed lock cell (ltCands)
+  const bu = m.fixedUnit && u && !m.convertFrom ? (u.kind === 'car' ? D.cars.get(u.key) : (() => { const q = D.quota.find(x => x.ref === u.key); return q ? ltUnitQ(q) : null; })()) : null;
   const myWaiting = wSpec ? D.bookings.filter(x => x.state === 'waiting' && (x.spec === wSpec || (b && x.key === b.key)) && (!isSales() || isMine(x.owner)) && branchOk(x.br)) : [];
   // "every car": all cars of the model, any grade or colour, with the ones that cannot be locked shown but not pickable
   const model = spec ? String(spec).split('|')[0] : null;
@@ -149,6 +152,7 @@ function lockModal(m, D) {
     </div>`}
     ${m.type === 'booking' ? (b && (!m.fixedUnit || m.convertFrom) && m.bkFixed ? `<div class="text-sm p-3 rounded-lg" style="background:var(--surface-2)"><div class="font-medium">ใบจอง ${esc(b.no || '(ยังไม่อยู่ใน IDS)')} · ${b.br} · ${esc(b.owner || '')}${esc(custTxt(b))}</div>
         <div>${specLabel(b.spec)} · จอง ${fmtD(b.date)} ${b.pos ? `· คิวที่ ${b.pos}` : ''}</div>${m.convertFrom ? '' : '<button class="btn btn-ghost btn-sm mt-2" data-act="lock-edit" data-what="bk">เปลี่ยนใบจอง</button>'}</div>`
+      : bu ? lockBkPicker(m, bu, D)
       : `<div class="field"><label for="m-bk" class="req">ใบจองที่จะได้รถคันนี้ (ต้องมีใบจองแนบในฟอร์ม AT Honda)</label><select id="m-bk" data-modal="bkref"><option value="">เลือกใบจอง</option>
         ${myWaiting.map(x => `<option value="${esc(x.key)}" ${m.bkref === x.key ? 'selected' : ''}>คิว ${x.pos} · ${esc(x.no || 'ยังไม่อยู่ใน IDS')} · ${x.br} · ${esc(x.owner || '')}${esc(custTxt(x))} · ${fmtD(x.date)}${x.app ? '' : ' · ยังไม่มีฟอร์ม'}</option>`).join('')}</select>
         ${myWaiting.length ? '' : m.convertFrom ? `<span class="text-xs">ยังไม่มีใบจองสเปกนี้ในระบบ ลงใบจอง AT Honda พร้อมแนบรูปใบจองก่อน แล้วกลับมากด "ลูกค้ามาจองแล้ว" อีกครั้ง</span>
@@ -178,6 +182,21 @@ function lockModal(m, D) {
     <div class="flex justify-end gap-2"><button class="btn btn-ghost" data-act="close">ยกเลิก</button>
       <button class="btn btn-red" data-act="lock-submit" ${p.write ? '' : 'disabled'}>${direct ? 'ล็อกเลย (ผู้จัดการ)' : 'ส่งขออนุมัติ'}</button></div>
   </div>`;
+}
+// the booking list of a lock (24/11): one list for the "ขอล็อก" dialog and the typed lock cell — search by customer, booking number or
+// seller; the same spec first, then the ones this person can lock now, then the queue. The sheet's text is shown, not taken as a booking.
+function lockBkOk(b) { return !!(b && b.app && (b.app.rec.imported || (b.app.deposit > 0 && b.app.slip)) && (!isSales() || isMine(b.owner))); }
+function lockBkPicker(m, c, D) {
+  const q = String(m.bkq || '').trim();
+  const list = ltCands(c, q, D).map((x, i) => ({ ...x, i, ok: lockBkOk(x.b) })).sort((x, y) => x.rank - y.rank || (y.ok - x.ok) || x.i - y.i);
+  const sheetTxt = c.quota ? c.quota.vnote : c.bknote;
+  const row = ({ b, rank, ok }) => { const k = b.key, on = m.bkref === k;
+    return `<button class="pick text-left ${on ? 'on' : ''} ${ok ? '' : 'opacity-70'}" data-act="lock-bk" data-k="${esc(k)}" aria-pressed="${on}"><span class="flex-1 min-w-0"><b>${esc(b.cust || '–')}</b>${b.no ? ' · ' + esc(b.no) : ' · <span class="text-muted">ยังไม่มีเลข IDS</span>'} <span class="text-xs text-muted">${esc(b.br || '')}</span>
+      <span class="block text-xs text-muted">เซลล์ ${esc(b.owner || b.sales || '–')} · จอง ${fmtD(b.qdate || b.date)}${b.pos ? ' · คิวที่ ' + b.pos : ''} · ${esc(specLabelText(b.spec))} · ${rank === 0 ? '<span style="color:var(--good)">สเปกตรง</span>' : '<span style="color:var(--warn)">สเปกไม่ตรง</span>'}${ok ? '' : ' · <span style="color:var(--warn)">ยังล็อกไม่ได้ (ไม่มีฟอร์ม / มัดจำ)</span>'}</span></span></button>`; };
+  return `<div class="field"><label for="m-bkq" class="req">ใบจองที่จะได้รถคันนี้</label>
+    ${sheetTxt ? `<div class="text-xs mb-1" style="color:var(--warn)">ข้อความในชีต: "${esc(sheetTxt)}" (ยังไม่ได้ผูกใบจอง ค้นหาชื่อนี้แล้วเลือกใบจองที่ใช่)</div>` : ''}
+    <input id="m-bkq" type="search" data-modal="bkq" value="${esc(q)}" placeholder="ค้นหาชื่อลูกค้า / เลขใบจอง / เซลล์ (ไม่ค้น = ใบจองสเปกนี้)" autocomplete="off">
+    <div class="flex flex-col gap-2 max-h-64 overflow-auto pr-1 mt-2">${list.map(row).join('') || `<div class="text-sm text-muted">${q ? 'ไม่พบใบจองที่ยังไม่มีรถ' : 'ยังไม่มีใบจองสเปกนี้ที่รอรถ ค้นหาด้วยชื่อ หรือใช้ "ลูกค้ากำลังจะมาจอง"'}</div>`}</div></div>`;
 }
 function removeModal(m, D) {
   const car = D.cars.get(m.vin);
@@ -600,6 +619,7 @@ const ACTIONS = {
     S.modal = m; render();
   },
   'lock-type'(el) { S.modal.type = el.dataset.type; render(); },
+  'lock-bk'(el) { S.modal.bkref = el.dataset.k; render(); },
   // the request stays editable: another booking, another car, or every car of the model
   'lock-edit'(el) {
     const m = S.modal, w = el.dataset.what; if (!m) return;
@@ -626,6 +646,8 @@ const ACTIONS = {
     const chk = lockChecks(m, D);
     if (chk.block.length) { toast(chk.block[0], 'bad'); return; }
     // a reason is needed only when there is no booking yet (temporary lock), or "other" was picked
+    const bx = m.type === 'booking' && m.bkref ? D.bookingByKey.get(m.bkref) : null, specOff = bx && chk.u && bx.spec !== chk.u.spec;
+    if (specOff && !(m.note || '').trim()) { toast('สเปกไม่ตรง: ใส่เหตุผลในหมายเหตุ แล้วแอดมินสาขาต้องแก้ใบจองเป็นสเปกของรถคันนี้', 'bad'); $('#m-note')?.focus(); return; }
     if ((m.type === 'temp' || m.reason === 'อื่น ๆ') && !(m.note || '').trim()) { toast('ใส่เหตุผลก่อนส่ง (ยังไม่มีใบจอง)', 'bad'); $('#m-note')?.focus(); return; }
     const u = chk.u;
     const b = m.type === 'booking' && m.bkref ? D.bookingByKey.get(m.bkref) : null;
@@ -641,6 +663,7 @@ const ACTIONS = {
       ext: 0, history: [], convert_from: m.convertFrom || null, requested_role: roleLabel(),
       req_br: (b ? b.br : null) || (owner ? salesBranch(owner) : null) || mgrBranches()[0] || null   // the branch that asked for the lock (a manager can lock a car of any branch)
     };
+    if (specOff) l.spec_off = { bk: bx.spec, car: u.spec, why: (m.note || '').trim(), at: now, by: roleLabel() };   // the same as a typed cross-spec lock (24/11)
     const conv = m.convertFrom ? findLock(m.convertFrom) : null;
     if (direct) { l.status = 'approved'; l.start = todayISO(); l.end = addDays(l.start, days); l.approved_at = now; l.notices = [{ k: 'new', at: now, by: S.me.id || null, role: roleLabel() }]; }
     const act = direct ? (m.type === 'temp' ? 'ล็อกชั่วคราว (ผู้จัดการ)' : 'ล็อก (ผู้จัดการ)') : (m.type === 'temp' ? 'ขอล็อกชั่วคราว' : 'ขอล็อก');
@@ -973,7 +996,7 @@ const ACTIONS = {
     }
     const orig = S.receipts.get(m.id) || {};
     if (await write('receipts', m.id, { ...orig, ...r, status: 'confirmed', review: { ...actor(), note: (m.note || '').trim() || null } })) {
-      S.modal = null; S.ai.receive = null; toast(`รับรถเข้าสต็อกแล้ว ${r.cars.length} คัน${moved ? ` · ย้ายล็อกจาก Quota ${moved} รายการ` : ''}${queued ? ` · ล็อกซ้ำเป็นคิวต่อ ${queued}` : ''}`, queued ? 'bad' : 'good'); render();
+      S.modal = null; S.ai.receive = null; toast(`รับรถเข้าสต็อกแล้ว ${r.cars.length} คัน${moved ? ` · ย้ายล็อกจาก Quota ${moved} รายการ` : ''}${queued ? ` · ล็อกซ้อน ${queued} รายการ รอผู้จัดการเลือก (แจ้งเตือน "ตรวจ: Quota → รถ")` : ''}`, queued ? 'bad' : 'good'); render();
     }
   },
   // the same delivery note sent twice: close this one without adding any car (ขอ 13/10)

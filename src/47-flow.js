@@ -111,6 +111,7 @@ function atModal(m, D) {
       ${tradeDelivOpen(a) && !tradeComplete(tradeCur(a.rec)) ? '' : tradeEditBox(m, a)}
       ${mergedBox(a, D)}
       ${m.cancel ? cancelPanel(m, a) : ''}
+      ${typeof cxWaitBox === 'function' ? cxWaitBox(m, a) : ''}
       ${ownerBox(m, a)}
       ${bkxBox(m, a)}
       ${matchInfo}${dupAskBox(a)}
@@ -119,6 +120,7 @@ function atModal(m, D) {
       ${bookingHistory(a)}
       <div class="flex flex-wrap gap-2 justify-end">
         ${canChange ? `<button class="btn btn-ghost" data-act="edit-open" data-id="${esc(a.id)}">${canApproveBr(a.br) ? 'แก้ไขใบจอง' : 'แก้ไข / ขอแก้ไขใบจอง'}</button><button class="btn btn-ghost" data-act="cancel-open" data-id="${esc(a.id)}">${canApproveBr(a.br) ? 'ยกเลิกใบจอง' : 'ขอยกเลิกใบจอง'}</button>` : ''}
+        ${canCxWait(a) && !a.rec.cancel_wait && !(S.modal.cxw && S.modal.cxw.id === a.id) ? `<button class="btn btn-ghost" style="color:var(--bad)" data-act="cxw-open" data-id="${esc(a.id)}">รอยกเลิกใบจอง</button>` : ''}
         ${canSwap(swapCtx(D, { atId: a.id })) ? `<button class="btn btn-ghost" data-act="swap-open" data-id="${esc(a.id)}">เปลี่ยนคัน</button>` : ''}
         ${p.write && p.request && (canEditBooking(a) || p.mgr) && a.row?.state === 'waiting' ? `<button class="btn btn-red" data-act="lock-open" data-bk="${esc(a.row.key)}">ขอล็อกรถ</button>` : ''}
       </div>

@@ -158,7 +158,8 @@ function deriveNow(key) {
   const removed = [];
   for (const [vin, o] of S.vehicles) {
     const car0 = cars.get(vin);
-    if (o.added && !car0) cars.set(vin, { ...o.added, vin, st: 'free', src: 'รับเข้าในระบบนี้ รอไฟล์ IDS' });
+    // 24/11: a received car gets its IDS allocation / invoice like a stock row (IDS Booking can list the car before the Stock file does)
+    if (o.added && !car0) { const rc = { ...o.added, vin, src: 'รับเข้าในระบบนี้ รอไฟล์ IDS' }; rc.st = carStatus(rc, invByVin.get(vin), bkByVin) || 'free'; carEnrich(rc); cars.set(vin, rc); }
     // pulled back into stock as a special car (company Advance / Demon / returned by the customer): IDS no longer lists it
     else if (o.special && !car0 && !o.removed) { const i = invByVin.get(vin) || {}, sp = o.special, e = (!i.model && typeof carlogAll === 'function' && (carlogAll().get(vin) || {}).e) || {};
       cars.set(vin, { vin, br: sp.br || i.br || e.br, model: i.model || e.m, grade: i.grade || e.g, color: i.color || e.c, st: spStatus(sp), src: 'ดึงกลับเข้า Stock พิเศษ (ไม่อยู่ในไฟล์ Stock IDS)', special: sp, fromInv: false }); }
@@ -494,6 +495,7 @@ function deriveNow(key) {
     if (tl) b.tempLock = tl;
     if (l) b.state = l.status === 'pending' ? 'pending' : l.status === 'allocated' ? 'allocated' : 'locked';
     else if (b.match === 'cancel') b.state = 'cancel';
+    else if (b.app && b.app.active && b.app.rec.cancel_wait) b.state = 'cxwait';   // รอยกเลิกใบจอง: out of the queue (23/11)
     else if (tl) b.state = 'locked';
     else if (b.match === 'waiting' && b.app && b.app.rec.flow && b.app.rec.flow.assign && b.app.rec.flow.assign.vin) b.state = 'allocated';
     else if (b.gone) b.state = 'gone';
@@ -642,6 +644,10 @@ function buildAlerts(D) {
       `${car} · IDS คีย์ด้วย ID ${a.idsSales} · ฟอร์ม AT เป็นของ ${a.sales} กด "เคสของฉัน" ครั้งเดียว แล้วจะไม่เตือนอีก`, go);
     if (a.ownerCheck === 'disputed') add('ownerd:' + a.id, { br: a.br, roles: ['manager'] }, 'bad', 'เซลล์แจ้งว่าไม่ใช่เคสของตัวเอง เลือกเจ้าของเคส',
       `${car} · ฟอร์ม AT: ${a.sales} · IDS: ${a.idsSales}${a.rec.owner_dispute.note ? ' · ' + a.rec.owner_dispute.note : ''}`, go);
+    // รอยกเลิกใบจอง: the documents still have to come in; the sales only hears about it when they did not ask to cancel themselves (23/11)
+    if (a.active && a.rec.cancel_wait) { const w = a.rec.cancel_wait, asked = a.change && a.change.type === 'cancel';
+      add('cxw:' + a.id, { sales: a.sales, br: a.br, roles: asked ? ['admin'] : ['sales', 'admin'] }, 'bad', 'รอยกเลิกใบจอง · นำส่งเอกสารขอถอนจอง',
+        `${car} · ${w.reason || ''}${w.note ? ' ' + w.note : ''} · ${asked ? 'เซลล์ส่งคำขอยกเลิกแล้ว แอดมินตรวจเอกสาร' : 'แนบเอกสาร แล้วกด "ขอยกเลิกใบจอง" ในใบนี้'}`, go); }
     if (a.change) add('chg:' + a.id, { br: a.br, roles: ['manager'] }, a.change.type === 'cancel' ? 'bad' : 'warn', a.change.type === 'cancel' ? 'ขอยกเลิกใบจอง รออนุมัติ' : 'ขอแก้ไขใบจอง รออนุมัติ',
       `${car} · เซลล์ ${a.sales} · ${a.change.type === 'cancel' ? a.change.reason : changeText(a.change)}`, go);
     const last = (a.rec.changes || []).slice(-1)[0];
@@ -775,6 +781,13 @@ function buildAlerts(D) {
       add('lockdup:' + t, { br, roles: ['manager'] }, 'warn', `ล็อกชื่อซ้ำ ${units.length} คัน: "${l0.sheet_text || l0.prospect}"`,
         `${ls.map(l => `${l.car_br} ${l.vin || 'Quota ' + l.ref} (${l.status === 'pending' ? 'รออนุมัติ' : 'ล็อกแล้ว'})`).join(' · ')}${who ? ' · เซลล์ ' + who : ''} · เลือกเก็บคันเดียว`, { act: 'go', view: 'lock', sub: 'active', label: 'ดู' });
     } }
+  // 24/11: a quota lock that could not follow its car on its own (two cars, the car already locked, a request the old rule queued)
+  if (typeof qtReviews === 'function') for (const r of qtReviews(D)) {
+    const ls = r.ids.map(id => D.locks.find(x => x.id === id)).filter(Boolean), l0 = ls[0] || {};
+    add('qtf:' + r.key, { br: l0.car_br, roles: ['manager'] }, 'bad', `ตรวจ: ${r.ref ? 'Quota ' + r.ref + ' → ' : ''}รถ ${r.vins.join(' / ')}`,
+      `${r.kind === 'multi' ? 'Quota นี้ชี้ไปที่รถหลายคัน เลือกคันที่ใช่' : 'มีล็อกมากกว่า 1 รายการบนคันเดียว เลือกรายการที่เก็บไว้'} · ${ls.map(l => `"${ltTextOf(l)}" (${l.status === 'pending' ? 'รออนุมัติ' : 'ล็อกแล้ว'})`).join(' · ')}`,
+      { act: 'qtf-open', id: r.key, label: 'เลือก' });
+  }
   for (const br of BRS) {
     const n = D.bookings.filter(b => b.br === br && b.state === 'gone');
     if (n.length) add('bkgone:' + br, { br, roles: ['admin', 'manager'] }, 'bad', `ใบจอง IDS ${n.length} ใบ ไม่อยู่ในไฟล์ Booking ล่าสุด · รอตรวจ`,

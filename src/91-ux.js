@@ -179,13 +179,34 @@ function gsearchResults(m, D) {
   const btn = (attrs, html) => `<button class="text-left p-2 rounded-lg border border-line bg-surface text-sm" ${attrs}>${html}</button>`;
   const carSub = c => { const i = c.inv || (c.handed ? null : D.invByVin.get(c.vin)); const st = c.handed ? 'ส่งมอบแล้ว' : c.removed ? 'นำออกแล้ว' : c.lgOut ? 'ออกจากไฟล์ Stock' : esc((CAR_STATUS[c.status] || [c.status])[0] || '');
     return `${specLabelText(c.spec || specKey(c.model, c.grade, c.color))} · ${esc(c.br || '')} · ${st}${!isSales() && i && (c.dlOnly || c.status === 'delivered' || c.status === 'invoiced') ? ` · ใบกำกับ ${esc(i.inv || '')} ${fmtD(i.idate)}${i.ddate ? ` ส่งมอบ ${fmtD(i.ddate)}` : ''}${i.cust ? ' · ' + esc(i.cust) : ''}` : ''}`; };
-  return q.length < 2 ? '<p class="text-sm text-muted">พิมพ์อย่างน้อย 2 ตัว</p>' : !(cars.length + bks.length + qs.length) ? `<p class="text-sm text-muted">ไม่พบ "${esc(q)}" ใน${scope === 'all' ? 'ทุกสาขา' : ' ' + S.br}</p>`
+  return q.length < 2 ? gsHistBox() : !(cars.length + bks.length + qs.length) ? `<p class="text-sm text-muted">ไม่พบ "${esc(q)}" ใน${scope === 'all' ? 'ทุกสาขา' : ' ' + S.br}</p>`
     : `<p class="text-xs text-muted mb-2">ค้นใน${scope === 'all' ? 'ทุกสาขา' : ' ' + S.br} ตามสิทธิ์ที่เห็นได้${isSales() ? ' (เซลล์เห็นชื่อลูกค้าเฉพาะของตัวเอง)' : ''}</p>
     ${sec('รถ', cars.length, cars.map(c => btn(`data-act="car-open" data-vin="${esc(c.vin)}"`, `<span class="code">${vinShow(c.vin)}</span><span class="block text-xs text-muted">${carSub(c)}</span>${!isSales() && (c.lgOut || c.removed || c.dlOnly) ? stockOutWhere(c.vin, D) : ''}`)).join(''))}
     ${sec('ใบจอง', bks.length, bks.map(r => btn(r.a ? `data-act="at-open" data-id="${esc(r.a.id)}"` : `data-act="go" data-view="book" data-q="${esc(r.no || '')}"`, `<b>${(!isSales() || isMine(r.owner)) ? esc(r.cust || '') : 'ลูกค้าของเซลล์อื่น'}</b><span class="block text-xs text-muted">${esc(r.no || 'ยังไม่อยู่ใน IDS')} · ${esc(r.br || '')} · ${esc(r.owner || '')} · ${specLabelText(r.spec)}${r.vin ? ` · VIN …${esc(String(r.vin).slice(-6))}` : ''}</span>`)).join(''))}
     ${sec('Quota', qs.length, qs.map(x => btn(`data-act="quota-open" data-ref="${esc(x.ref || '')}"`, `<b>Ref ${esc(x.ref || '')}</b><span class="block text-xs text-muted">${specLabelText(x.spec)} · ${esc(x.br || '')}${x.vin ? ` · VIN …${esc(String(x.vin).slice(-6))}` : ''}</span>`)).join(''))}`;
 }
+// 24/11: the last 10 searches of this person (this browser), newest first; kept when a result is opened or Enter is pressed
+function gsHistKey() { return 'atSearchHist:' + ((S.me && S.me.id) || 'local'); }
+function gsHist() { try { const a = JSON.parse(localStorage.getItem(gsHistKey()) || '[]'); return Array.isArray(a) ? a.filter(x => typeof x === 'string').slice(0, 10) : []; } catch (e) { return []; } }
+function gsHistAdd(q) {
+  q = String(q || '').trim(); if (q.length < 2) return;
+  const a = [q, ...gsHist().filter(x => x.toLowerCase() !== q.toLowerCase())].slice(0, 10);
+  try { localStorage.setItem(gsHistKey(), JSON.stringify(a)); } catch (e) { /* storage off: no history */ }
+}
+function gsHistBox() {
+  const h = gsHist();
+  if (!h.length) return '<p class="text-sm text-muted">พิมพ์อย่างน้อย 2 ตัว</p>';
+  return `<div class="flex items-center justify-between mb-1"><h3 class="font-semibold text-sm">ค้นหาล่าสุด</h3><button class="text-xs underline text-muted" data-act="gsearch-hist-clear">ล้างประวัติ</button></div>
+    <div class="flex flex-col gap-1">${h.map(x => `<button class="text-left p-2 rounded-lg border border-line bg-surface text-sm flex items-center gap-2" data-act="gsearch-hist" data-q="${esc(x)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color:var(--muted)"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="flex-1">${esc(x)}</span></button>`).join('')}</div>`;
+}
+// a result opened from the search, or Enter in the box: the words go into the history
+document.addEventListener('click', e => { const t = e.target && e.target.closest && e.target.closest('#gs-res [data-act]'); if (t && S.modal && S.modal.kind === 'gsearch' && !/^gsearch-hist/.test(t.dataset.act)) gsHistAdd(S.modal.q); }, true);
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && e.target.id === 'gs-q') gsHistAdd(e.target.value); });
+// desktop: "/" opens the search (not while typing in a field)
+document.addEventListener('keydown', e => { if (e.key === '/' && !e.metaKey && !e.ctrlKey && !(e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) && !(S.modal)) { e.preventDefault(); ACTIONS['gsearch-open'](); } });
 Object.assign(ACTIONS, {
+  'gsearch-hist'(el) { if (!S.modal || S.modal.kind !== 'gsearch') return; S.modal.q = el.dataset.q || ''; render(); setTimeout(() => { const i = document.getElementById('gs-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 30); },
+  'gsearch-hist-clear'() { try { localStorage.removeItem(gsHistKey()); } catch (e) { /* nothing to clear */ } render(); },
   'gsearch-open'() { S.modal = { kind: 'gsearch', q: '', all: true }; render(); setTimeout(() => { const i = document.getElementById('gs-q'); if (i) i.focus(); }, 30); },
   'gsearch-scope'(el) { if (S.modal) { S.modal.all = el.dataset.v !== 'br'; render(); } }
 });
