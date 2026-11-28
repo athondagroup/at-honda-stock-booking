@@ -189,3 +189,12 @@ s = s.replace(_a, """                                    {form.purchaseType !== 
                                         </div>
                                     )}
                                     {isDSP && dspOptions && (""")
+
+# 8. คอม FN % (28/11): ค่ามาตรฐาน 8% · Double Smile Plus ตามตาราง HLTC: 8% ยกเว้น CR-V ใหม่ / Accord e:HEV ใหม่ / STEP WGN e:HEV = 6% · เซลล์แก้ได้
+rep("            const [stockBkId, setStockBkId] = useState(null);",
+    "            const fnDefaultPct = isDSP && /CR-V|Accord|STEP WGN/i.test(String(uiModel || '')) ? 6 : 8;\n            const [stockBkId, setStockBkId] = useState(null);")
+rep("<BookingFormModal initialData={{ customerName: customerName || '', customerPhone: '' }}",
+    "<BookingFormModal initialData={{ customerName: customerName || '', customerPhone: '', fnPct: String(fnDefaultPct) }}")
+rep("                fnPct: '',\n                selectedTerm: '48',", "                fnPct: initialData.fnPct || '',\n                selectedTerm: '48',")
+rep("""placeholder="เช่น 8" />""", """placeholder="8" />
+                                                <p className="text-[11px] text-gray-400 mt-1 leading-snug">มาตรฐาน 8% · Double Smile 8% (CR-V / Accord / STEP WGN 6%) · บวกดอกเบี้ยเพิ่ม % สูงขึ้นตามตาราง HLTC</p>""")

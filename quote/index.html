@@ -7157,7 +7157,7 @@ const BookingFormModal = ({ initialData, onConfirm, onClose, isDSP, currentInsta
     customFinance: "",
     creditIns: "",
     creditInsBy: "down",
-    fnPct: "",
+    fnPct: initialData.fnPct || "",
     selectedTerm: "48",
     remark: "",
     dspSelection: "balloon"
@@ -7353,8 +7353,10 @@ const BookingFormModal = ({ initialData, onConfirm, onClose, isDSP, currentInsta
     value: form.fnPct,
     onChange: (e) => setForm({ ...form, fnPct: e.target.value }),
     className: "input-modern w-full p-2 rounded-lg text-sm",
-    placeholder: "เช่น 8"
-  }))), isDSP && dspOptions && /* @__PURE__ */ React.createElement("div", {
+    placeholder: "8"
+  }), /* @__PURE__ */ React.createElement("p", {
+    className: "text-[11px] text-gray-400 mt-1 leading-snug"
+  }, "มาตรฐาน 8% · Double Smile 8% (CR-V / Accord / STEP WGN 6%) · บวกดอกเบี้ยเพิ่ม % สูงขึ้นตามตาราง HLTC"))), isDSP && dspOptions && /* @__PURE__ */ React.createElement("div", {
     className: "bg-blue-50 p-3 rounded-xl border border-blue-100 animate-pop-in"
   }, /* @__PURE__ */ React.createElement("label", {
     className: "block text-sm font-bold text-blue-900 mb-2"
@@ -12329,6 +12331,7 @@ const App = () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
     await captureElement("sales-summary-card", `SaleSummary_${docName}`, 2);
   };
+  const fnDefaultPct = isDSP && /CR-V|Accord|STEP WGN/i.test(String(uiModel || "")) ? 6 : 8;
   const [stockBkId, setStockBkId] = useState(null);
   const [stockSending, setStockSending] = useState("");
   const STOCK_FIN = { "ฮอนด้า ลีสซิ่ง": "HLTC", "กรุงศรี": "BAY", "ไทยพาณิชย์": "SCB", "ธนชาต": "TTB", "ทหารไทยธนชาต": "TTB", "เกียรตินาคิน": "KKP" };
@@ -13126,7 +13129,7 @@ const App = () => {
     onCreate: handleGenerateSticker,
     onClose: () => setShowStickerModal(false)
   }), showBookingForm && /* @__PURE__ */ React.createElement(BookingFormModal, {
-    initialData: { customerName: customerName || "", customerPhone: "" },
+    initialData: { customerName: customerName || "", customerPhone: "", fnPct: String(fnDefaultPct) },
     onConfirm: generateBookingImage,
     onClose: () => setShowBookingForm(false),
     isDSP,
@@ -15418,7 +15421,7 @@ const App = () => {
     const creditIns = isCash ? 0 : getExpenseValue(bookingData?.creditIns);
     const creditInDown = creditIns > 0 && bookingData?.creditInsBy !== "pay";
     const finAmt = financeAmount + (creditInDown ? creditIns : 0);
-    const fnPct = parseFloat(bookingData?.fnPct) || 0;
+    const fnPct = parseFloat(bookingData?.fnPct) || fnDefaultPct;
     const fnRate = Number(salesSummaryInstallment?.rate) || 0;
     const fnYears = Math.min(6, (salesSummaryTerm || 0) / 12);
     const fnTotal = isCash ? 0 : Math.round(finAmt * fnRate / 100 * fnYears * fnPct / 100);

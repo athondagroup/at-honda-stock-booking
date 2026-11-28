@@ -33,7 +33,7 @@
                             const creditIns = isCash ? 0 : getExpenseValue(bookingData?.creditIns);
                             const creditInDown = creditIns > 0 && bookingData?.creditInsBy !== 'pay';
                             const finAmt = financeAmount + (creditInDown ? creditIns : 0);
-                            const fnPct = parseFloat(bookingData?.fnPct) || 0;
+                            const fnPct = parseFloat(bookingData?.fnPct) || fnDefaultPct; // ไม่ได้กรอก = ค่ามาตรฐาน (8% · DSP ตามตาราง HLTC)
                             const fnRate = Number(salesSummaryInstallment?.rate) || 0;
                             const fnYears = Math.min(6, (salesSummaryTerm || 0) / 12);
                             const fnTotal = isCash ? 0 : Math.round(finAmt * fnRate / 100 * fnYears * fnPct / 100);
