@@ -35,7 +35,7 @@ function pmStats(D, keep, y) {
   D.at.forEach(a => { if (a.demo || !keep(a)) return; pmEvents(a, D).forEach(([c, d, mk]) => { const k = mk || d.slice(0, 7); if (out[k]) out[k][c].push(a); }); });
   return out;
 }
-function pmCols(showInv) { return [['bk', 'จอง'], ['cx', 'ยกเลิก'], ['dv', 'ส่งมอบ'], ...(showInv ? [['inv', 'ใบกำกับ'], ['cm', 'เบิกค่าคอม']] : []), ['tr', 'รถเก่า (เทิร์น)']]; }
+function pmCols(showInv) { return [['bk', 'จอง'], ['cx', 'ยกเลิก'], ['dv', 'ส่งมอบ'], ...(showInv === 'cm' ? [['cm', 'เบิกค่าคอม']] : showInv ? [['inv', 'ใบกำกับ'], ['cm', 'เบิกค่าคอม']] : []), ['tr', 'รถเก่า (เทิร์น)']]; }
 function pmBtn(n, data) { return n ? `<button class="num underline decoration-dotted" data-act="pm-cell" ${Object.entries(data).map(([k, v]) => `data-${k}="${esc(String(v))}"`).join(' ')} title="กดเพื่อดูรายการ">${n}</button>` : '<span class="text-muted">–</span>'; }
 // one person's months (who = sales name), or everyone in scope when who is '*'
 function pmMonthTable(D, who, y, showInv) {
@@ -43,7 +43,7 @@ function pmMonthTable(D, who, y, showInv) {
   const nowM = D.today.slice(0, 7), months = Object.keys(st).filter(m => m <= nowM || Object.values(st[m]).some(l => l.length));
   const tot = {}; cols.forEach(([c]) => { tot[c] = months.reduce((n, m) => n + st[m][c].length, 0); });
   return `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>เดือน</th>${cols.map(([, t]) => `<th class="text-right">${t}</th>`).join('')}</tr></thead><tbody>
-    ${months.map(m => `<tr><td class="nowrap">${fmtM(m)}</td>${cols.map(([c]) => `<td class="num text-right ${c === 'dv' ? 'font-semibold' : ''}">${pmBtn(st[m][c].length, { who, y, m, c })}</td>`).join('')}</tr>`).join('')}
+    ${months.map(m => `<tr><td class="nowrap">${fmtM(m)}</td>${cols.map(([c]) => `<td class="num text-right nowrap ${c === 'dv' ? 'font-semibold' : ''}">${pmBtn(st[m][c].length, { who, y, m, c })}${c === 'cm' ? commGapBadge(st[m][c], D) : ''}</td>`).join('')}</tr>`).join('')}
     <tr style="font-weight:600"><td>รวม ${y}</td>${cols.map(([c]) => `<td class="num text-right">${pmBtn(tot[c], { who, y, m: '', c })}</td>`).join('')}</tr></tbody></table></div>`;
 }
 function pmYearSel(D) { return `<div class="field"><label for="pm-y">ปี</label><select id="pm-y" data-filter="pmYear">${pmYears(D).map(y => `<option value="${y}" ${pmYear(D) === y ? 'selected' : ''}>${y}</option>`).join('')}</select></div>`; }
@@ -51,19 +51,19 @@ function pmYearSel(D) { return `<div class="field"><label for="pm-y">ปี</lab
 function salesMonthly(D) {
   const me = S.role.sales; if (!me) return '';
   return `<section class="bg-surface border border-line rounded-lg p-4 mb-6"><div class="flex flex-wrap items-end justify-between gap-3 mb-2"><h2 class="font-head text-lg font-semibold">ยอดของฉันรายเดือน</h2>${pmYearSel(D)}</div>
-    ${pmMonthTable(D, me, pmYear(D), false)}
+    ${pmMonthTable(D, me, pmYear(D), 'cm')}<div class="mt-2">${cmxBtn(me, D.today.slice(0, 7))}</div>
     <p class="text-xs text-muted mt-2">จอง / ยกเลิก นับตามวันที่จอง · ส่งมอบ นับตามวันที่ส่งมอบ · รถเก่า นับใบจองที่ลูกค้ามีรถเก่าเทิร์น (ตามเดือนที่ส่งมอบ) · กดตัวเลขเพื่อดูรายคัน</p></section>`;
 }
 // managers / executive: everyone (in their branches), then one person
 function dashPerson(D) {
   const y = pmYear(D), mo = S.filters.pmMonth || '', who = S.filters.pmSales || '';
   const head = `${pageHead('รายบุคคล', 'ยอดจอง ส่งมอบ ใบกำกับ และรถเก่าเทิร์น ของเซลล์แต่ละคน ดูย้อนหลังได้ทุกปีที่มีข้อมูล')}${dashTabs()}${brSeg()}`;
-  if (who) return `${head}<div class="flex flex-wrap items-end gap-3 mb-3"><button class="btn btn-ghost btn-sm" data-act="pm-who" data-n="">← ทุกคน</button><h2 class="font-head text-lg font-semibold">${salesName(who)}</h2>${pmYearSel(D)}</div>
+  if (who) return `${head}<div class="flex flex-wrap items-end gap-3 mb-3"><button class="btn btn-ghost btn-sm" data-act="pm-who" data-n="">← ทุกคน</button><h2 class="font-head text-lg font-semibold">${salesName(who)}</h2>${pmYearSel(D)}${cmxBtn(who)}</div>
     ${dCard('รายเดือน', pmMonthTable(D, who, y, true), 'กดตัวเลขเพื่อดูรายคัน · ใบกำกับนับจากไฟล์ DL ของรถที่ผูกกับใบจองของเซลล์คนนี้')}`;
   const keep = a => inBr(a), st = pmStats(D, keep, y), cols = pmCols(true);
   const months = mo ? [mo] : Object.keys(st);
   const ppl = {};
-  months.forEach(m => cols.forEach(([c]) => st[m][c].forEach(a => { const p = (ppl[a.sales || 'ไม่ระบุ'] ||= { n: a.sales || 'ไม่ระบุ', bk: 0, cx: 0, dv: 0, inv: 0, cm: 0, tr: 0 }); p[c]++; })));
+  months.forEach(m => cols.forEach(([c]) => st[m][c].forEach(a => { const p = (ppl[a.sales || 'ไม่ระบุ'] ||= { n: a.sales || 'ไม่ระบุ', bk: 0, cx: 0, dv: 0, inv: 0, cm: 0, tr: 0, cmL: [] }); p[c]++; if (c === 'cm') p.cmL.push(a); })));
   const rows = Object.values(ppl).sort((a, b) => b.dv - a.dv || b.bk - a.bk), bkMax = Math.max(1, ...rows.map(p => p.bk));
   // bookings in the comparison period: the month before (or the same month last year), or last year for a whole year
   const pv = (() => {
@@ -75,9 +75,9 @@ function dashPerson(D) {
     return { of: n => by[n] || 0, label: pm ? fmtM(pm) : 'ปี ' + py, long: pm ? (yoy ? 'เดือนเดียวกันปีที่แล้ว' : 'เดือนก่อนหน้า') : 'ปีก่อนหน้า' };
   })();
   const mSel = `<div class="field"><label for="pm-m">เดือน</label><select id="pm-m" data-filter="pmMonth"><option value="">ทั้งปี</option>${Object.keys(st).map(m => `<option value="${m}" ${mo === m ? 'selected' : ''}>${fmtM(m)}</option>`).join('')}</select></div>`;
-  return `${head}<div class="flex flex-wrap items-end gap-3 mb-3">${pmYearSel(D)}${mSel}</div>
+  return `${head}<div class="flex flex-wrap items-end gap-3 mb-3">${pmYearSel(D)}${mSel}${cmxBtn('', mo)}</div>
     ${dCard(`ยอดแยกเซลล์ ${mo ? fmtM(mo) : 'ปี ' + y}`, `<div class="scroll-x"><table class="tbl text-sm"><thead><tr><th>เซลล์</th>${cols.map(([c, t]) => `<th class="text-right">${t}</th>${c === 'bk' ? '<th></th>' : ''}`).join('')}<th class="text-right nowrap">จอง ${esc(pv.label)}</th></tr></thead><tbody>
-      ${rows.map(p => `<tr><td class="nowrap"><button class="underline decoration-dotted text-left" data-act="pm-who" data-n="${esc(p.n)}">${salesName(p.n)}</button></td>${cols.map(([c]) => `<td class="num text-right ${c === 'bk' || c === 'dv' ? 'font-semibold' : ''}">${pmBtn(p[c], { who: p.n, y, m: mo, c })}</td>${c === 'bk' ? `<td style="min-width:80px"><span class="viz-mark block h-3 rounded-r" style="width:${Math.max(2, p.bk / bkMax * 100)}%;background:var(--viz-1)" title="จอง ${p.bk} คัน"></span></td>` : ''}`).join('')}<td class="num text-right text-muted">${pv.of(p.n)} ${p.bk - pv.of(p.n) ? `<span class="text-xs" style="color:var(--${p.bk > pv.of(p.n) ? 'good' : 'bad'})">${p.bk > pv.of(p.n) ? '▲' : '▼'}${Math.abs(p.bk - pv.of(p.n))}</span>` : ''}</td></tr>`).join('') || `<tr><td colspan="${cols.length + 3}" class="text-muted">ไม่มีข้อมูล</td></tr>`}
+      ${rows.map(p => `<tr><td class="nowrap"><button class="underline decoration-dotted text-left" data-act="pm-who" data-n="${esc(p.n)}">${salesName(p.n)}</button></td>${cols.map(([c]) => `<td class="num text-right ${c === 'bk' || c === 'dv' ? 'font-semibold' : ''}">${pmBtn(p[c], { who: p.n, y, m: mo, c })}${c === 'cm' ? commGapBadge(p.cmL, D) : ''}</td>${c === 'bk' ? `<td style="min-width:80px"><span class="viz-mark block h-3 rounded-r" style="width:${Math.max(2, p.bk / bkMax * 100)}%;background:var(--viz-1)" title="จอง ${p.bk} คัน"></span></td>` : ''}`).join('')}<td class="num text-right text-muted">${pv.of(p.n)} ${p.bk - pv.of(p.n) ? `<span class="text-xs" style="color:var(--${p.bk > pv.of(p.n) ? 'good' : 'bad'})">${p.bk > pv.of(p.n) ? '▲' : '▼'}${Math.abs(p.bk - pv.of(p.n))}</span>` : ''}</td></tr>`).join('') || `<tr><td colspan="${cols.length + 3}" class="text-muted">ไม่มีข้อมูล</td></tr>`}
       </tbody></table></div>`, `เรียงตามยอดส่งมอบ · แถบ = ยอดจองเทียบคนที่มากที่สุด · ${esc(pv.label)} = ${esc(pv.long)} (เลือก "เทียบกับ" ได้ที่แท็บ ยอดจอง) · กดชื่อเพื่อดูรายเดือน · กดตัวเลขเพื่อดูรายคัน`)}
     ${personModelCard(D)}
     ${dCard(`ทุกคนรายเดือน ${y}`, pmMonthTable(D, '*', y, true))}`;
@@ -92,9 +92,9 @@ function pmModalBody(m, D) {
   const col = Object.fromEntries(pmCols(true))[m.c] || m.c, mineAll = !isSales();
   const dOf = a => { const e = pmEvents(a, D).find(([c]) => c === m.c); return e ? e[1] : a.date; };
   // a list by month for invoices follows the claim month: say so when a car was moved
-  return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">${col} · ${m.who === '*' ? 'ทุกคน' : esc(m.who)}</h2><p class="text-sm text-muted">${m.m ? fmtM(m.m) : 'ทั้งปี ' + y} · ${fmtN(list.length)} คัน · กดแถวเพื่อเปิดใบจอง</p></div><button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></div>
-  <div class="scroll-x max-h-[70vh] overflow-auto"><table class="tbl text-sm"><thead><tr><th>วันที่${m.c === 'cm' ? 'ใบกำกับ' : col}</th><th>วันที่จอง</th><th>สาขา</th>${m.who === '*' ? '<th>เซลล์</th>' : ''}<th>ลูกค้า</th><th>รุ่น เกรด สี</th><th>VIN</th>${['inv', 'cm', 'dv', 'tr'].includes(m.c) ? '<th>รถเก่า</th>' : ''}${['inv', 'cm', 'dv'].includes(m.c) ? '<th class="nowrap">เดือนเบิกค่าคอม</th>' : ''}</tr></thead><tbody>
-  ${list.map(a => { const t = tradeOf(a); return `<tr class="cursor-pointer" data-act="at-open" data-id="${esc(a.id)}"><td class="nowrap">${fmtD(dOf(a))}</td><td class="nowrap">${fmtD(a.date)}</td><td>${esc(a.delivBr || a.br || '')}</td>${m.who === '*' ? `<td class="nowrap">${salesName(a.sales)}</td>` : ''}<td>${mineAll || isMine(a.sales) ? esc(a.cust || '') : '<span class="text-muted">ลูกค้าเซลล์อื่น</span>'}</td><td class="nowrap">${esc(a.model || '')} ${esc(gradeShort(a.model, a.grade) || a.grade || '')} ${esc(a.color || '')}</td><td class="code text-xs">${esc(atVin(a) || '')}</td>${['inv', 'cm', 'dv', 'tr'].includes(m.c) ? `<td class="text-xs" onclick="event.stopPropagation()">${t ? `<span style="color:var(--good)">✓ มีรถเก่า</span> ${esc(tradeTxt(t))}` : canEditBooking(a) ? `<button class="underline" style="color:var(--accent, #2563eb)" data-act="pm-trade" data-id="${esc(a.id)}">＋ เพิ่มรถเก่า</button>` : '<span class="text-muted">–</span>'}</td>` : ''}${['inv', 'cm', 'dv'].includes(m.c) ? `<td class="nowrap" onclick="event.stopPropagation()">${commCell(a, D)}</td>` : ''}</tr>`; }).join('') || '<tr><td colspan="8" class="text-muted">ไม่มี</td></tr>'}</tbody></table></div>`;
+  return `<div class="flex items-start justify-between gap-3 mb-3"><div><h2 class="font-head text-xl font-semibold">${col} · ${m.who === '*' ? 'ทุกคน' : esc(m.who)}</h2><p class="text-sm text-muted">${m.m ? fmtM(m.m) : 'ทั้งปี ' + y} · ${fmtN(list.length)} คัน · กดแถวเพื่อเปิดใบจอง</p></div><span class="flex flex-wrap gap-2 justify-end">${['cm', 'inv', 'dv'].includes(m.c) ? cmxBtn(m.who === '*' ? '' : m.who, m.m) : ''}<button class="btn btn-ghost btn-sm" data-act="close">ปิด</button></span></div>
+  <div class="scroll-x max-h-[70vh] overflow-auto"><table class="tbl text-sm"><thead><tr><th>วันที่${m.c === 'cm' ? 'ใบกำกับ' : col}</th><th>วันที่จอง</th><th>สาขา</th>${m.who === '*' ? '<th>เซลล์</th>' : ''}<th>ลูกค้า</th><th>รุ่น เกรด สี</th><th>VIN</th>${['inv', 'cm', 'dv', 'tr'].includes(m.c) ? '<th>รถเก่า</th>' : ''}${['inv', 'cm', 'dv'].includes(m.c) ? '<th class="nowrap">เดือนเบิกค่าคอม</th><th class="nowrap">ข้อมูลเบิกค่าคอม</th>' : ''}</tr></thead><tbody>
+  ${list.map(a => { const t = tradeOf(a); return `<tr class="cursor-pointer" data-act="at-open" data-id="${esc(a.id)}"><td class="nowrap">${fmtD(dOf(a))}</td><td class="nowrap">${fmtD(a.date)}</td><td>${esc(a.delivBr || a.br || '')}</td>${m.who === '*' ? `<td class="nowrap">${salesName(a.sales)}</td>` : ''}<td>${mineAll || isMine(a.sales) ? esc(a.cust || '') : '<span class="text-muted">ลูกค้าเซลล์อื่น</span>'}</td><td class="nowrap">${esc(a.model || '')} ${esc(gradeShort(a.model, a.grade) || a.grade || '')} ${esc(a.color || '')}</td><td class="code text-xs">${esc(atVin(a) || '')}</td>${['inv', 'cm', 'dv', 'tr'].includes(m.c) ? `<td class="text-xs" onclick="event.stopPropagation()">${t ? `<span style="color:var(--good)">✓ มีรถเก่า</span> ${esc(tradeTxt(t))}` : canEditBooking(a) ? `<button class="underline" style="color:var(--accent, #2563eb)" data-act="pm-trade" data-id="${esc(a.id)}">＋ เพิ่มรถเก่า</button>` : '<span class="text-muted">–</span>'}</td>` : ''}${['inv', 'cm', 'dv'].includes(m.c) ? `<td class="nowrap" onclick="event.stopPropagation()">${commCell(a, D)}</td><td style="min-width:10rem">${commGapCell(a, D)}</td>` : ''}</tr>`; }).join('') || '<tr><td colspan="8" class="text-muted">ไม่มี</td></tr>'}</tbody></table></div>`;
 }
 
 // ---- per-car list for ยอดขายและเป้า: invoices (by invoice date) or deliveries (by delivery date) in the period

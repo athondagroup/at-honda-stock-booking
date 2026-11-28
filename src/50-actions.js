@@ -35,6 +35,7 @@ function renderModal(D) {
   else if (m.kind === 'specq') { body = specQueueModal(m, D); wide = true; }
   else if (m.kind === 'sumcell') { body = sumCellModal(m, D); wide = true; }
   else if (m.kind === 'pm') { body = pmModal(m, D); wide = true; }
+  else if (m.kind === 'cmx') { body = cmxModal(m, D); wide = true; }
   else if (m.kind === 'catedit') { body = catEditModal(m); wide = true; }
   else if (m.kind === 'stassign') { body = stAssignModal(m, D); wide = true; }
   else if (m.kind === 'dio') { body = dioModal(m); wide = true; }
