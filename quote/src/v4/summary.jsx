@@ -28,6 +28,14 @@
                             const left = totalMarginSum - focUsed;
                             const accSold = extraTotal;
                             const branch = (window.__QWEB && window.__QWEB.branch) || '';
+                            // คอม FN (ตกลง 28/11): ยอดจัด × ดอกเบี้ยลูกค้า (สุทธิ) × ปี (สูงสุด 6) × คอม FN % ที่เซลล์กรอก · AT ได้ 20% เฉพาะ STEP ช่อง 1 · ดอกเบี้ย 0% = 0
+                            const creditIns = getExpenseValue(bookingData?.creditIns);
+                            const fnPct = parseFloat(bookingData?.fnPct) || 0;
+                            const fnRate = Number(salesSummaryInstallment?.rate) || 0;
+                            const fnYears = Math.min(6, (salesSummaryTerm || 0) / 12);
+                            const fnTotal = isCash ? 0 : Math.round(financeAmount * fnRate / 100 * fnYears * fnPct / 100);
+                            const fnStep1 = atStep === 'step1';
+                            const fnAt = fnStep1 ? Math.round(fnTotal * 0.2) : 0;
                             const docNo = `SS-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String((bookingData?.customerPhone || '').replace(/\D/g, '').slice(-4) || '0000')}`;
                             const KV = ({ k, v, b }) => <div className="ss-kv"><span>{k}</span><span className={`num${b ? ' b' : ''}`}>{v}</span></div>;
                             let no = 0;
@@ -140,12 +148,12 @@
                             {/* เงื่อนไขการซื้อ */}
                             <div className="sec"><span>เงื่อนไขการซื้อ</span></div>
                             <div className="info">
-                                <div style={{ gridColumn: 'span 3' }}><span className="k">เงื่อนไข</span><span className="v">{isCash ? 'ซื้อสด' : `จัดไฟแนนซ์ · ${salesSummaryPurchaseText} ${salesSummaryRateText} · ยอดสินเชื่อ ${formatCurrency(financeAmount)} บาท`}</span></div>
+                                <div style={{ gridColumn: 'span 3' }}><span className="k">เงื่อนไข</span><span className="v">{isCash ? 'ซื้อสด' : `จัดไฟแนนซ์ · ${salesSummaryPurchaseText} ${salesSummaryRateText} · ยอดจัด ${formatCurrency(financeAmount)} บาท${creditIns ? ` · ประกันคุ้มครองสินเชื่อ ${formatCurrency(creditIns)} บาท` : ''}`}</span></div>
                                 <div><span className="k">สถาบันการเงิน</span><span className="v">{salesSummaryFinanceCompany}</span></div>
                                 <div><span className="k">ดาวน์</span><span className="v">{isCash ? '-' : `${parseFloat(Number(downPct).toFixed(2))}% · ${formatCurrency(downAmount)} บาท`}</span></div>
                                 <div><span className="k">ดอกเบี้ย / งวด</span><span className="v">{isCash ? '-' : `${salesSummaryRateText} · ${salesSummaryTerm} งวด`}</span></div>
                                 <div><span className="k">ค่างวด</span><span className="v">{isCash ? '-' : `${salesSummaryMonthlyText} (${paymentType === 'beginning' ? 'ผ่อนต้นงวด' : 'ผ่อนปลายงวด'})`}</span></div>
-                                <div><span className="k">คอมไฟแนนซ์</span><span className="v">{isCash ? '-' : <span style={{ fontWeight: 400 }}>รอยืนยันสูตร</span>}</span></div>
+                                <div style={{ gridColumn: 'span 2' }}><span className="k">คอม FN</span><span className="v">{isCash ? '-' : !fnPct ? <span style={{ fontWeight: 400 }}>ยังไม่กรอก คอม FN %</span> : !fnRate ? <span>0 <span style={{ fontWeight: 400 }}>(ดอกเบี้ย 0%)</span></span> : <span>{formatCurrency(fnTotal)} บาท <span style={{ fontWeight: 400 }}>({formatCurrency(financeAmount)} × {fnRate}% × {fnYears} ปี × {fnPct}%)</span> · AT ได้ 20%: {fnStep1 ? `${formatCurrency(fnAt)} บาท` : <span style={{ fontWeight: 400 }}>0 (ไม่ใช่ STEP ช่อง 1)</span>}</span>}</span></div>
                             </div>
                             <div style={{ padding: '1.5px 0' }}><span style={{ color: '#444' }}>รายละเอียดแคมเปญ</span>&nbsp;&nbsp;<b>{campaign?.name || 'ไม่ใช้แคมเปญ Honda'}</b>{!isCash && salesSummaryInstallment?.balloon > 0 ? ` · ชำระก้อนสุดท้าย ${formatCurrency(salesSummaryInstallment.balloon)} บาท` : ''}</div>
 

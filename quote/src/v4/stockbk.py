@@ -168,3 +168,22 @@ rep("        const AT_AVAIL = { specs: null, at: '' };",
     "        const AT_AVAIL = { specs: null, at: '' };\n        const AT_COMPANY = { PSC: 'บริษัท เอที ฮอนด้า ออโตโมบิล (ภาษีเจริญ) จำกัด', ATE: 'บริษัท เอที ฮอนด้า ออโตโมบิล (เอกชัย-บางบอน) จำกัด', SPH: 'บริษัท เอที ฮอนด้า ออโตโมบิล (สามพราน) จำกัด', KPA: 'บริษัท เอที ฮอนด้า ออโตโมบิล (กำแพงแสน) จำกัด' };")
 rep("const salesSummaryPurchaseText = salesSummaryIsCash ? 'ซื้อสด' : (isDSP || financeType === 'dsp' ? 'ผ่อน Double Smile Plus' : 'ผ่อนปกติ');",
     "const salesSummaryPurchaseText = salesSummaryIsCash ? 'ซื้อสด' : (isDSP || financeType === 'dsp' ? 'ผ่อน Double Smile Plus' : isUsingStandardRate ? `ดอกเบี้ยปกติ ${BANK_LABELS[selectedBank] || selectedBank || ''}`.trim() : 'ดอกเบี้ยแคมเปญ');")
+
+# 7. booking form (28/11): ค่าประกันคุ้มครองสินเชื่อ (ถ้ามี) และ คอม FN % ที่เซลล์กรอก → ใบสรุปการขาย
+rep("                customFinance: '',\n                selectedTerm: '48',",
+    "                customFinance: '',\n                creditIns: '',\n                fnPct: '',\n                selectedTerm: '48',")
+_a = "                                    \n                                    {isDSP && dspOptions && ("
+assert s.count(_a) == 1, 'dsp anchor'
+s = s.replace(_a, """                                    {form.purchaseType !== 'cash' && (
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-1">ค่าประกันคุ้มครองสินเชื่อ <span className="font-normal text-gray-400">(ถ้ามี)</span></label>
+                                                <input type="number" inputMode="decimal" min="0" value={form.creditIns} onChange={e => setForm({...form, creditIns: e.target.value})} className="input-modern w-full p-2 rounded-lg text-sm" placeholder="บาท" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-1">คอม FN % <span className="font-normal text-gray-400">(ภายใน)</span></label>
+                                                <input type="number" inputMode="decimal" min="0" step="0.01" value={form.fnPct} onChange={e => setForm({...form, fnPct: e.target.value})} className="input-modern w-full p-2 rounded-lg text-sm" placeholder="เช่น 8" />
+                                            </div>
+                                        </div>
+                                    )}
+                                    {isDSP && dspOptions && (""")
