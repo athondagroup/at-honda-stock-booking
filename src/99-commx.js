@@ -8,7 +8,7 @@ function commGaps(a, D) {
   const d = a.rec.deal || {}, fl = a.rec.flow || {}, g = [];
   if (!d.at) g.push('เงื่อนไขการขาย');
   else { if (!d.at_step) g.push('ช่อง STEP'); if (!d.reg_by) g.push('ผู้จ่ายค่าจดทะเบียน'); }
-  if (!(fl.po && fl.po.at)) g.push(fl.po_skip ? 'ใบสั่งแต่ง (ข้ามไว้) · ยังคิดเหลือ/เกินไม่ได้' : 'ใบสั่งแต่ง · ยังคิดเหลือ/เกินไม่ได้');
+  if (!(fl.po && fl.po.at)) g.push(fl.po_skip ? 'ใบสั่งแต่ง (ข้ามไว้) จึงยังคิดเหลือ/เกินไม่ได้' : 'ใบสั่งแต่ง จึงยังคิดเหลือ/เกินไม่ได้');
   if (!fl.delivered) g.push('บันทึกส่งมอบ');
   if (!String(a.rec.receipt_no || '').trim()) g.push('เลขใบเสร็จ');
   if (d.at && fl.po && fl.po.at) { const foc = saleFoc(a).v, m = num(d.margin); if (foc && m > 0 && foc > 3 * m) g.push(`FOC ${money(foc)} สูงผิดปกติ`); }
@@ -16,7 +16,7 @@ function commGaps(a, D) {
 }
 function commGapCell(a, D) {
   const g = commGaps(a, D);
-  return g.length ? `<span class="text-xs font-semibold" style="color:var(--bad)">⚠ ขาด ${g.length}</span><div class="text-xs" style="color:var(--bad)">${g.map(esc).join(' · ')}</div>`
+  return g.length ? `<span class="text-xs font-semibold" style="color:var(--bad)">⚠ ขาด ${g.length}</span><ul class="text-xs" style="color:var(--bad);white-space:normal;line-height:1.35">${g.map(x => `<li>• ${esc(x)}</li>`).join('')}</ul>`
     : '<span class="text-xs font-semibold" style="color:var(--good)">✓ ครบ</span>';
 }
 function commGapBadge(list, D) {
