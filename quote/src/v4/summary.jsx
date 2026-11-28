@@ -28,12 +28,15 @@
                             const left = totalMarginSum - focUsed;
                             const accSold = extraTotal;
                             const branch = (window.__QWEB && window.__QWEB.branch) || '';
-                            // คอม FN (ตกลง 28/11): ยอดจัด × ดอกเบี้ยลูกค้า (สุทธิ) × ปี (สูงสุด 6) × คอม FN % ที่เซลล์กรอก · AT ได้ 20% เฉพาะ STEP ช่อง 1 · ดอกเบี้ย 0% = 0
-                            const creditIns = getExpenseValue(bookingData?.creditIns);
+                            // คอม FN (ตกลง 28/11): ยอดจัด × ดอกเบี้ยลูกค้า (สุทธิ) × ปี (สูงสุด 6) × คอม FN % ที่เซลล์กรอก · เซลล์ได้ 20% (เข้าค่าคอมเซลล์) เฉพาะ STEP ช่อง 1 · ดอกเบี้ย 0% = 0
+                            // ค่าประกันคุ้มครองสินเชื่อ: แบบเดียวกับเงื่อนไขไฟแนนซ์ในใบจอง AT stock · หักจากดาวน์ = ยอดจัดเพิ่ม · ลูกค้าชำระ = บวกในค่าใช้จ่ายวันรับรถ
+                            const creditIns = isCash ? 0 : getExpenseValue(bookingData?.creditIns);
+                            const creditInDown = creditIns > 0 && bookingData?.creditInsBy !== 'pay';
+                            const finAmt = financeAmount + (creditInDown ? creditIns : 0);
                             const fnPct = parseFloat(bookingData?.fnPct) || 0;
                             const fnRate = Number(salesSummaryInstallment?.rate) || 0;
                             const fnYears = Math.min(6, (salesSummaryTerm || 0) / 12);
-                            const fnTotal = isCash ? 0 : Math.round(financeAmount * fnRate / 100 * fnYears * fnPct / 100);
+                            const fnTotal = isCash ? 0 : Math.round(finAmt * fnRate / 100 * fnYears * fnPct / 100);
                             const fnStep1 = atStep === 'step1';
                             const fnAt = fnStep1 ? Math.round(fnTotal * 0.2) : 0;
                             const docNo = `SS-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String((bookingData?.customerPhone || '').replace(/\D/g, '').slice(-4) || '0000')}`;
@@ -148,12 +151,12 @@
                             {/* เงื่อนไขการซื้อ */}
                             <div className="sec"><span>เงื่อนไขการซื้อ</span></div>
                             <div className="info">
-                                <div style={{ gridColumn: 'span 3' }}><span className="k">เงื่อนไข</span><span className="v">{isCash ? 'ซื้อสด' : `จัดไฟแนนซ์ · ${salesSummaryPurchaseText} ${salesSummaryRateText} · ยอดจัด ${formatCurrency(financeAmount)} บาท${creditIns ? ` · ประกันคุ้มครองสินเชื่อ ${formatCurrency(creditIns)} บาท` : ''}`}</span></div>
+                                <div style={{ gridColumn: 'span 3' }}><span className="k">เงื่อนไข</span><span className="v">{isCash ? 'ซื้อสด' : `จัดไฟแนนซ์ · ${salesSummaryPurchaseText} ${salesSummaryRateText} · ยอดจัด ${formatCurrency(finAmt)} บาท${creditIns ? ` · ประกันคุ้มครองสินเชื่อ ${formatCurrency(creditIns)} บาท (${creditInDown ? 'หักจากเงินดาวน์ · รวมในยอดจัดแล้ว' : 'ลูกค้าชำระวันรับรถ'})` : ''}`}</span></div>
                                 <div><span className="k">สถาบันการเงิน</span><span className="v">{salesSummaryFinanceCompany}</span></div>
                                 <div><span className="k">ดาวน์</span><span className="v">{isCash ? '-' : `${parseFloat(Number(downPct).toFixed(2))}% · ${formatCurrency(downAmount)} บาท`}</span></div>
                                 <div><span className="k">ดอกเบี้ย / งวด</span><span className="v">{isCash ? '-' : `${salesSummaryRateText} · ${salesSummaryTerm} งวด`}</span></div>
-                                <div><span className="k">ค่างวด</span><span className="v">{isCash ? '-' : `${salesSummaryMonthlyText} (${paymentType === 'beginning' ? 'ผ่อนต้นงวด' : 'ผ่อนปลายงวด'})`}</span></div>
-                                <div style={{ gridColumn: 'span 2' }}><span className="k">คอม FN</span><span className="v">{isCash ? '-' : !fnPct ? <span style={{ fontWeight: 400 }}>ยังไม่กรอก คอม FN %</span> : !fnRate ? <span>0 <span style={{ fontWeight: 400 }}>(ดอกเบี้ย 0%)</span></span> : <span>{formatCurrency(fnTotal)} บาท <span style={{ fontWeight: 400 }}>({formatCurrency(financeAmount)} × {fnRate}% × {fnYears} ปี × {fnPct}%)</span> · AT ได้ 20%: {fnStep1 ? `${formatCurrency(fnAt)} บาท` : <span style={{ fontWeight: 400 }}>0 (ไม่ใช่ STEP ช่อง 1)</span>}</span>}</span></div>
+                                <div><span className="k">ค่างวด</span><span className="v">{isCash ? '-' : `${creditInDown && financeAmount > 0 && salesSummaryInstallment?.monthly ? `${formatCurrency(Math.round(salesSummaryInstallment.monthly * finAmt / financeAmount))} บาท/เดือน` : salesSummaryMonthlyText} · ${paymentType === 'beginning' ? 'ผ่อนต้นงวด' : 'ผ่อนปลายงวด'}`}</span></div>
+                                <div style={{ gridColumn: 'span 2' }}><span className="k">คอม FN</span><span className="v">{isCash ? '-' : !fnPct ? <span style={{ fontWeight: 400 }}>ยังไม่กรอก คอม FN %</span> : !fnRate ? <span>0 <span style={{ fontWeight: 400 }}>(ดอกเบี้ย 0%)</span></span> : <span>{formatCurrency(fnTotal)} บาท <span style={{ fontWeight: 400 }}>({formatCurrency(finAmt)} × {fnRate}% × {fnYears} ปี × {fnPct}%)</span> · เซลล์ได้ 20% (เข้าค่าคอม): {fnStep1 ? `${formatCurrency(fnAt)} บาท` : <span style={{ fontWeight: 400 }}>0 (ไม่ใช่ STEP ช่อง 1)</span>}</span>}</span></div>
                             </div>
                             <div style={{ padding: '1.5px 0' }}><span style={{ color: '#444' }}>รายละเอียดแคมเปญ</span>&nbsp;&nbsp;<b>{campaign?.name || 'ไม่ใช้แคมเปญ Honda'}</b>{!isCash && salesSummaryInstallment?.balloon > 0 ? ` · ชำระก้อนสุดท้าย ${formatCurrency(salesSummaryInstallment.balloon)} บาท` : ''}</div>
 
@@ -190,13 +193,14 @@
                             </table>
 
                             {/* ค่าใช้จ่ายวันรับรถ */}
-                            <div className="sec"><span>ค่าใช้จ่ายลูกค้าวันรับรถ</span><span style={{ fontWeight: 400, fontSize: 12 }}>รวมชำระ <b style={{ fontSize: 14 }}>{formatCurrency(salesSummaryTotalOnDelivery)}</b> บาท</span></div>
+                            <div className="sec"><span>ค่าใช้จ่ายลูกค้าวันรับรถ</span><span style={{ fontWeight: 400, fontSize: 12 }}>รวมชำระ <b style={{ fontSize: 14 }}>{formatCurrency(salesSummaryTotalOnDelivery + (creditIns > 0 && !creditInDown ? creditIns : 0))}</b> บาท</span></div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', columnGap: 22 }}>
                                 {[
                                     [isCash ? 'ราคารถ (ซื้อสด)' : 'เงินดาวน์', isCash ? netPrice : downAmount],
                                     ['ค่าเบี้ยประกันภัย', insuranceCosts.customer > 0 ? insuranceCosts.customer : null, insuranceCosts.customer > 0 ? null : (insuranceCosts.freeYears ? `แถม ${insuranceCosts.freeYears} ปี` : (expenses.insurance || '-'))],
                                     ['ค่าจดทะเบียน', registrationPayer === 'dealer' ? null : registrationCosts.customer, registrationPayer === 'dealer' ? 'AT แถม' : null],
                                     ['มัดจำป้ายแดง', getExpenseValue(expenses.redPlate)],
+                                    ...(creditIns > 0 && !creditInDown ? [['ประกันคุ้มครองสินเชื่อ', creditIns]] : []),
                                     ['อุปกรณ์ (ลูกค้าซื้อ)', getExpenseValue(expenses.accessories)],
                                     ...(getExpenseValue(expenses.vatDiscount) > 0 ? [['VAT', getExpenseValue(expenses.vatDiscount)]] : []),
                                     ...(getExpenseValue(expenses.othersAdd) > 0 ? [[expenses.othersAddLabel || 'อื่น ๆ', getExpenseValue(expenses.othersAdd)]] : []),

@@ -7156,6 +7156,7 @@ const BookingFormModal = ({ initialData, onConfirm, onClose, isDSP, currentInsta
     financeOption: FINANCE_OPTIONS[0],
     customFinance: "",
     creditIns: "",
+    creditInsBy: "down",
     fnPct: "",
     selectedTerm: "48",
     remark: "",
@@ -7332,7 +7333,15 @@ const BookingFormModal = ({ initialData, onConfirm, onClose, isDSP, currentInsta
     onChange: (e) => setForm({ ...form, creditIns: e.target.value }),
     className: "input-modern w-full p-2 rounded-lg text-sm",
     placeholder: "บาท"
-  })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", {
+  }), Number(form.creditIns) > 0 && /* @__PURE__ */ React.createElement("select", {
+    value: form.creditInsBy,
+    onChange: (e) => setForm({ ...form, creditInsBy: e.target.value }),
+    className: "input-modern w-full p-2 rounded-lg text-sm mt-2"
+  }, /* @__PURE__ */ React.createElement("option", {
+    value: "down"
+  }, "หักจากเงินดาวน์ (ยอดจัดเพิ่ม)"), /* @__PURE__ */ React.createElement("option", {
+    value: "pay"
+  }, "ลูกค้าชำระวันรับรถ"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", {
     className: "block text-sm font-bold text-gray-700 mb-1"
   }, "คอม FN % ", /* @__PURE__ */ React.createElement("span", {
     className: "font-normal text-gray-400"
@@ -12370,7 +12379,8 @@ const App = () => {
         ins3_by: insuranceDuration >= 3 ? STOCK_WHO[insurancePayers[3] || "customer"] : "",
         reg_by: registrationPayer === "dealer" ? "AT แถม" : "ลูกค้าซื้อ",
         reg_type: registrationType === "corporate" ? "นิติบุคคล" : "บุคคลธรรมดา",
-        extra_pay: xp
+        extra_pay: xp,
+        ...!cash && Number(b.creditIns) > 0 ? { ins_credit: Number(b.creditIns), ins_credit_by: b.creditInsBy === "pay" ? "pay" : "down" } : {}
       },
       po,
       sum: { model: uiModelShort(uiModel), grade: grade?.name || "", color: color?.name || "", price: carPrice + colorPriceVal, tier: ((AT_PRICE_MAP[MODEL_MAPPING[uiModel]] || {})[grade?.name] || [])[3] || "", net: netPrice, cash, down: cash ? 0 : downAmount, term: cash ? "" : term, rate: inst.rate, monthly: inst.monthly, campaign: campaign?.name || "" }
@@ -15405,11 +15415,13 @@ const App = () => {
     const left = totalMarginSum - focUsed;
     const accSold = extraTotal;
     const branch = window.__QWEB && window.__QWEB.branch || "";
-    const creditIns = getExpenseValue(bookingData?.creditIns);
+    const creditIns = isCash ? 0 : getExpenseValue(bookingData?.creditIns);
+    const creditInDown = creditIns > 0 && bookingData?.creditInsBy !== "pay";
+    const finAmt = financeAmount + (creditInDown ? creditIns : 0);
     const fnPct = parseFloat(bookingData?.fnPct) || 0;
     const fnRate = Number(salesSummaryInstallment?.rate) || 0;
     const fnYears = Math.min(6, (salesSummaryTerm || 0) / 12);
-    const fnTotal = isCash ? 0 : Math.round(financeAmount * fnRate / 100 * fnYears * fnPct / 100);
+    const fnTotal = isCash ? 0 : Math.round(finAmt * fnRate / 100 * fnYears * fnPct / 100);
     const fnStep1 = atStep === "step1";
     const fnAt = fnStep1 ? Math.round(fnTotal * 0.2) : 0;
     const docNo = `SS-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String((bookingData?.customerPhone || "").replace(/\D/g, "").slice(-4) || "0000")}`;
@@ -15644,7 +15656,7 @@ const App = () => {
       className: "k"
     }, "เงื่อนไข"), /* @__PURE__ */ React.createElement("span", {
       className: "v"
-    }, isCash ? "ซื้อสด" : `จัดไฟแนนซ์ · ${salesSummaryPurchaseText} ${salesSummaryRateText} · ยอดจัด ${formatCurrency(financeAmount)} บาท${creditIns ? ` · ประกันคุ้มครองสินเชื่อ ${formatCurrency(creditIns)} บาท` : ""}`)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
+    }, isCash ? "ซื้อสด" : `จัดไฟแนนซ์ · ${salesSummaryPurchaseText} ${salesSummaryRateText} · ยอดจัด ${formatCurrency(finAmt)} บาท${creditIns ? ` · ประกันคุ้มครองสินเชื่อ ${formatCurrency(creditIns)} บาท (${creditInDown ? "หักจากเงินดาวน์ · รวมในยอดจัดแล้ว" : "ลูกค้าชำระวันรับรถ"})` : ""}`)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", {
       className: "k"
     }, "สถาบันการเงิน"), /* @__PURE__ */ React.createElement("span", {
       className: "v"
@@ -15660,7 +15672,7 @@ const App = () => {
       className: "k"
     }, "ค่างวด"), /* @__PURE__ */ React.createElement("span", {
       className: "v"
-    }, isCash ? "-" : `${salesSummaryMonthlyText} (${paymentType === "beginning" ? "ผ่อนต้นงวด" : "ผ่อนปลายงวด"})`)), /* @__PURE__ */ React.createElement("div", {
+    }, isCash ? "-" : `${creditInDown && financeAmount > 0 && salesSummaryInstallment?.monthly ? `${formatCurrency(Math.round(salesSummaryInstallment.monthly * finAmt / financeAmount))} บาท/เดือน` : salesSummaryMonthlyText} · ${paymentType === "beginning" ? "ผ่อนต้นงวด" : "ผ่อนปลายงวด"}`)), /* @__PURE__ */ React.createElement("div", {
       style: { gridColumn: "span 2" }
     }, /* @__PURE__ */ React.createElement("span", {
       className: "k"
@@ -15672,7 +15684,7 @@ const App = () => {
       style: { fontWeight: 400 }
     }, "(ดอกเบี้ย 0%)")) : /* @__PURE__ */ React.createElement("span", null, formatCurrency(fnTotal), " บาท ", /* @__PURE__ */ React.createElement("span", {
       style: { fontWeight: 400 }
-    }, "(", formatCurrency(financeAmount), " × ", fnRate, "% × ", fnYears, " ปี × ", fnPct, "%)"), " · AT ได้ 20%: ", fnStep1 ? `${formatCurrency(fnAt)} บาท` : /* @__PURE__ */ React.createElement("span", {
+    }, "(", formatCurrency(finAmt), " × ", fnRate, "% × ", fnYears, " ปี × ", fnPct, "%)"), " · เซลล์ได้ 20% (เข้าค่าคอม): ", fnStep1 ? `${formatCurrency(fnAt)} บาท` : /* @__PURE__ */ React.createElement("span", {
       style: { fontWeight: 400 }
     }, "0 (ไม่ใช่ STEP ช่อง 1)"))))), /* @__PURE__ */ React.createElement("div", {
       style: { padding: "1.5px 0" }
@@ -15753,13 +15765,14 @@ const App = () => {
       style: { fontWeight: 400, fontSize: 12 }
     }, "รวมชำระ ", /* @__PURE__ */ React.createElement("b", {
       style: { fontSize: 14 }
-    }, formatCurrency(salesSummaryTotalOnDelivery)), " บาท")), /* @__PURE__ */ React.createElement("div", {
+    }, formatCurrency(salesSummaryTotalOnDelivery + (creditIns > 0 && !creditInDown ? creditIns : 0))), " บาท")), /* @__PURE__ */ React.createElement("div", {
       style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", columnGap: 22 }
     }, [
       [isCash ? "ราคารถ (ซื้อสด)" : "เงินดาวน์", isCash ? netPrice : downAmount],
       ["ค่าเบี้ยประกันภัย", insuranceCosts.customer > 0 ? insuranceCosts.customer : null, insuranceCosts.customer > 0 ? null : insuranceCosts.freeYears ? `แถม ${insuranceCosts.freeYears} ปี` : expenses.insurance || "-"],
       ["ค่าจดทะเบียน", registrationPayer === "dealer" ? null : registrationCosts.customer, registrationPayer === "dealer" ? "AT แถม" : null],
       ["มัดจำป้ายแดง", getExpenseValue(expenses.redPlate)],
+      ...creditIns > 0 && !creditInDown ? [["ประกันคุ้มครองสินเชื่อ", creditIns]] : [],
       ["อุปกรณ์ (ลูกค้าซื้อ)", getExpenseValue(expenses.accessories)],
       ...getExpenseValue(expenses.vatDiscount) > 0 ? [["VAT", getExpenseValue(expenses.vatDiscount)]] : [],
       ...getExpenseValue(expenses.othersAdd) > 0 ? [[expenses.othersAddLabel || "อื่น ๆ", getExpenseValue(expenses.othersAdd)]] : [],

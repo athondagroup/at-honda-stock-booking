@@ -90,7 +90,8 @@ r"""            const [stockBkId, setStockBkId] = useState(null);
                         priv_gtg: privGtg || '', priv_ln: privLn ? 'cash' : '', priv_hk: privHk || '',
                         ins2_by: insuranceDuration >= 2 ? STOCK_WHO[insurancePayers[2] || 'customer'] : '', ins3_by: insuranceDuration >= 3 ? STOCK_WHO[insurancePayers[3] || 'customer'] : '',
                         reg_by: registrationPayer === 'dealer' ? 'AT แถม' : 'ลูกค้าซื้อ', reg_type: registrationType === 'corporate' ? 'นิติบุคคล' : 'บุคคลธรรมดา',
-                        extra_pay: xp
+                        extra_pay: xp,
+                        ...(!cash && Number(b.creditIns) > 0 ? { ins_credit: Number(b.creditIns), ins_credit_by: b.creditInsBy === 'pay' ? 'pay' : 'down' } : {})
                     },
                     po,
                     sum: { model: uiModelShort(uiModel), grade: grade?.name || '', color: color?.name || '', price: carPrice + colorPriceVal, tier: ((AT_PRICE_MAP[MODEL_MAPPING[uiModel]] || {})[grade?.name] || [])[3] || '', net: netPrice, cash, down: cash ? 0 : downAmount, term: cash ? '' : term, rate: inst.rate, monthly: inst.monthly, campaign: campaign?.name || '' }
@@ -171,7 +172,7 @@ rep("const salesSummaryPurchaseText = salesSummaryIsCash ? 'ซื้อสด' 
 
 # 7. booking form (28/11): ค่าประกันคุ้มครองสินเชื่อ (ถ้ามี) และ คอม FN % ที่เซลล์กรอก → ใบสรุปการขาย
 rep("                customFinance: '',\n                selectedTerm: '48',",
-    "                customFinance: '',\n                creditIns: '',\n                fnPct: '',\n                selectedTerm: '48',")
+    "                customFinance: '',\n                creditIns: '',\n                creditInsBy: 'down',\n                fnPct: '',\n                selectedTerm: '48',")
 _a = "                                    \n                                    {isDSP && dspOptions && ("
 assert s.count(_a) == 1, 'dsp anchor'
 s = s.replace(_a, """                                    {form.purchaseType !== 'cash' && (
@@ -179,6 +180,7 @@ s = s.replace(_a, """                                    {form.purchaseType !== 
                                             <div>
                                                 <label className="block text-sm font-bold text-gray-700 mb-1">ค่าประกันคุ้มครองสินเชื่อ <span className="font-normal text-gray-400">(ถ้ามี)</span></label>
                                                 <input type="number" inputMode="decimal" min="0" value={form.creditIns} onChange={e => setForm({...form, creditIns: e.target.value})} className="input-modern w-full p-2 rounded-lg text-sm" placeholder="บาท" />
+                                                {Number(form.creditIns) > 0 && <select value={form.creditInsBy} onChange={e => setForm({...form, creditInsBy: e.target.value})} className="input-modern w-full p-2 rounded-lg text-sm mt-2"><option value="down">หักจากเงินดาวน์ (ยอดจัดเพิ่ม)</option><option value="pay">ลูกค้าชำระวันรับรถ</option></select>}
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-bold text-gray-700 mb-1">คอม FN % <span className="font-normal text-gray-400">(ภายใน)</span></label>
